@@ -208,7 +208,9 @@ def install():
     """
     find_package_manager("Install")
     exit_if_vm_not_supported('Install')
-        
+
+    public_settings, protected_settings = get_settings()
+    
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
@@ -220,51 +222,7 @@ def install():
     exit_code, output = run_command_with_retries_output(OneAgentInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)    
-    return exit_code, output
-
-def check_kill_process(pstring):
-    for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
-        fields = line.split()
-        pid = fields[0]
-        os.kill(int(pid), signal.SIGKILL)
-
-def uninstall():
-    """
-    Uninstall the Azure Monitor Linux Agent.
-    This is a somewhat soft uninstall. It is not a purge.
-    Note: uninstall operation times out from WAAgent at 5 minutes
-    """
-    find_package_manager("Uninstall")
-    if PackageManager == "dpkg":
-        OneAgentUninstallCommand = "dpkg -P azure-mdsd"
-    elif PackageManager == "rpm":
-        OneAgentUninstallCommand = "rpm -e azure-mdsd"
-    else:
-        log_and_exit(operation, UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
-    hutil_log_info('Running command "{0}"'.format(OneAgentUninstallCommand))
-
-    # Retry, since uninstall can fail due to concurrent package operations
-    try:
-        exit_code, output = run_command_with_retries_output(OneAgentUninstallCommand, retries = 4,
-                                            retry_check = retry_if_dpkg_locked,
-                                            final_check = final_check_if_dpkg_locked)
-    except Exception as ex:
-        exit_code = 1
-        output = 'Uninstall failed with error: {0}\n' \
-                'Stacktrace: {1}'.format(ex, traceback.format_exc())
-    return exit_code, output
-
-def enable():
-    """
-    Start the Azure Monitor Linux Agent Service
-    This call will return non-zero or throw an exception if
-    the settings provided are incomplete or incorrect.
-    Note: enable operation times out from WAAgent at 5 minutes
-    """
-    exit_if_vm_not_supported('Enable')
-
-    public_settings, protected_settings = get_settings()
-
+    
     default_configs = {        
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
@@ -391,43 +349,58 @@ def enable():
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
     except:
-        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/mdsd" ) 
+        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/mdsd" )        
+    return exit_code, output
+
+def check_kill_process(pstring):
+    for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
+        fields = line.split()
+        pid = fields[0]
+        os.kill(int(pid), signal.SIGKILL)
+
+def uninstall():
+    """
+    Uninstall the Azure Monitor Linux Agent.
+    This is a somewhat soft uninstall. It is not a purge.
+    Note: uninstall operation times out from WAAgent at 5 minutes
+    """
+    find_package_manager("Uninstall")
+    if PackageManager == "dpkg":
+        OneAgentUninstallCommand = "dpkg -P azure-mdsd"
+    elif PackageManager == "rpm":
+        OneAgentUninstallCommand = "rpm -e azure-mdsd"
+    else:
+        log_and_exit(operation, UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
+    hutil_log_info('Running command "{0}"'.format(OneAgentUninstallCommand))
+
+    # Retry, since uninstall can fail due to concurrent package operations
+    try:
+        exit_code, output = run_command_with_retries_output(OneAgentUninstallCommand, retries = 4,
+                                            retry_check = retry_if_dpkg_locked,
+                                            final_check = final_check_if_dpkg_locked)
+    except Exception as ex:
+        exit_code = 1
+        output = 'Uninstall failed with error: {0}\n' \
+                'Stacktrace: {1}'.format(ex, traceback.format_exc())
+    return exit_code, output
+
+def enable():
+    """
+    Start the Azure Monitor Linux Agent Service
+    This call will return non-zero or throw an exception if
+    the settings provided are incomplete or incorrect.
+    Note: enable operation times out from WAAgent at 5 minutes
+    """
+    exit_if_vm_not_supported('Enable')
 
     if is_systemd():
         OneAgentEnableCommand = "systemctl start mdsd"
-        hutil_log_info('Handler initiating onboarding.')
-        exit_code, output = run_command_and_log(OneAgentEnableCommand)
-
     else:
-        mdsd_pid_file = os.path.join(os.getcwd(), NonSystemdPidFileName)
-        hutil_log_info("The VM doesn't have systemctl. Running mdsd as a process and storing the pid in {0}".format(mdsd_pid_file))
-        mdsd_run_command = "/usr/sbin/mdsd -A -c /etc/mdsd.d/mdsd.xml -r /var/run/mdsd/default -S /var/opt/microsoft/linuxmonagent/eh -e /var/log/mdsd.err -w /var/log/mdsd.warn -o /var/log/mdsd.info"
-        
-        # update the required MCS environment variables 
-        env_var = os.environ
-        env_var["MCS_ENDPOINT"] = default_configs["MCS_ENDPOINT"]
-        env_var["AZURE_ENDPOINT"] = default_configs["AZURE_ENDPOINT"]
-        env_var["ADD_REGION_TO_MCS_ENDPOINT" ] = default_configs["ADD_REGION_TO_MCS_ENDPOINT" ]
-        env_var["ENABLE_MCS"] = default_configs["ENABLE_MCS"]
-        env_var["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"]
-
-        proc = subprocess.Popen(mdsd_run_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env_var)
-        # # Sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
-        time.sleep(3)
-        p = proc.poll()
-
-        # Process is running successfully
-        if p is None:
-            output = "Successfully started mdsd."
-            mdsd_pid = proc.pid
-            exit_code = 0
-            # Write this pid to a file for future use
-            with open(mdsd_pid_file, "w+") as f:
-                f.write(str(mdsd_pid))
-        else:
-            output = "Failed to start mdsd"
-            exit_code = 1
-            hutil_log_error("Unable to run mdsd binary as a process due to error. Failed to start AMA.")
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
+        OneAgentEnableCommand = "/etc/init.d/mdsd start"
+    
+    hutil_log_info('Handler initiating onboarding.')
+    exit_code, output = run_command_and_log(OneAgentEnableCommand)
 
     if exit_code is 0:
         #start metrics process if enable is successful
@@ -446,37 +419,12 @@ def disable():
     #stop the Azure Monitor Linux Agent service
     if is_systemd():
         DisableOneAgentServiceCommand = "systemctl stop mdsd"
-        exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
+        
     else:
-        mdsd_pid_file = os.path.join(os.getcwd(), NonSystemdPidFileName)
-        hutil_log_info("The VM doesn't have systemctl. Reading pid stored in the file {0} and stopping the mdsd process".format(mdsd_pid_file))
-        if os.path.isfile(mdsd_pid_file):
-            pid = ""
-            with open(mdsd_pid_file, "r") as f:
-                pid = f.read()
-            if pid != "":
-                # Check if the process running is indeed mdsd, ignore if the process output doesn't contain mdsd
-                proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
-                output = proc.communicate()[0]
-                if "mdsd" in output:
-                    os.kill(int(pid), signal.SIGKILL)
-                    exit_code = 0
-                    output = "Stopped running mdsd process with pid {0}".format(pid)
-                    
-                else:
-                    output = "No mdsd process found for pid {0}".format(pid)
-                    exit_code = 1
-                    hutil_log_error("Found a different process running with PID {0}. Failed to stop AMA.".format(pid))
-            else:
-                output = "Could not find the pid for runnning mdsd process."
-                exit_code = 1
-                hutil_log_error("No pid found for an currently running mdsd process in {0}. Failed to stop AMA.".format(mdsd_pid_file))
-        else:
-            exit_code = 1
-            output = "Could not find the pid file"
-            hutil_log_error("Pid file at {0} doesn't exists.".format(mdsd_pid_file))
-
+        DisableOneAgentServiceCommand = "/etc/init.d/mdsd stop"
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop mdsd.")
     
+    exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
     return exit_code, output
 
 def update():
