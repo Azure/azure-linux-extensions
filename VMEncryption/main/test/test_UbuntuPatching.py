@@ -157,7 +157,6 @@ class Test_UbuntuPatching(unittest.TestCase):
         self.assertEquals(exists_mock.call_count, 2)
         self.assertEquals(expected_crypttab_contents, open_mock.content_dict["/etc/crypttab"])
 
-
         # Test 7: /dev/disk/azure/root-part1 does not exist
         crypttab_contents="""osencrypt /dev/sda1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh
         mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
