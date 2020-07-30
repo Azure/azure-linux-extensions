@@ -115,7 +115,49 @@ class Test_UbuntuPatching(unittest.TestCase):
         self.assertEqual(exists_mock.call_count, 2)
         self.assertEqual(expected_crypttab_contents, open_mock.content_dict["/etc/crypttab"])
 
-        # Test 5: /dev/disk/azure/root-part1 does not exist
+        # Test 5: osencrypt entry with /dev/disk/by-id/wwn-*
+        crypttab_contents="#This is mock crypttab file\n"\
+        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "osencrypt /dev/disk/by-id/wwn-0x60022480b469b749f472dfc8093da5dd-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
+        "\n"\
+        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        expected_crypttab_contents="#This is mock crypttab file\n"\
+        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
+        "\n"\
+        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        open_mock.reset_mock()
+        ce_mock.reset_mock()
+        exists_mock.reset_mock()
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/crypttab": crypttab_contents})
+        self.UbuntuPatching.update_prereq()
+        self.assertEquals(open_mock.call_count, 2)
+        self.assertEquals(ce_mock.call_count, 1)
+        self.assertEquals(exists_mock.call_count, 2)
+        self.assertEquals(expected_crypttab_contents, open_mock.content_dict["/etc/crypttab"])
+
+        # Test 6: osencrypt entry with /dev/disk/by-id/scsi-*
+        crypttab_contents="#This is mock crypttab file\n"\
+        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "osencrypt /dev/disk/by-id/scsi-0x60022480b469b749f472dfc8093da5dd-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
+        "\n"\
+        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        expected_crypttab_contents="#This is mock crypttab file\n"\
+        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
+        "\n"\
+        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        open_mock.reset_mock()
+        ce_mock.reset_mock()
+        exists_mock.reset_mock()
+        self._mock_open_with_read_data_dict(open_mock, {"/etc/crypttab": crypttab_contents})
+        self.UbuntuPatching.update_prereq()
+        self.assertEquals(open_mock.call_count, 2)
+        self.assertEquals(ce_mock.call_count, 1)
+        self.assertEquals(exists_mock.call_count, 2)
+        self.assertEquals(expected_crypttab_contents, open_mock.content_dict["/etc/crypttab"])
+
+        # Test 7: /dev/disk/azure/root-part1 does not exist
         crypttab_contents="""osencrypt /dev/sda1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh
         mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
         mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
