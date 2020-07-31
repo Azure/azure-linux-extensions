@@ -189,7 +189,14 @@ def get_free_space_mb(dirname):
     """
     st = os.statvfs(dirname)
     return st.f_bavail * st.f_frsize / 1024 / 1024
-  
+
+
+def is_systemd():
+    """
+    Check if the system is using systemd
+    """
+    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
+    return check_systemd == 0
 
 def install():
     """
@@ -202,12 +209,6 @@ def install():
     exit_if_vm_not_supported('Install')
 
     public_settings, protected_settings = get_settings()
-    
-    # if public_settings is None:
-    #     raise ParameterMissingException('Public configuration must be ' \
-    #                                     'provided')
-    #public_settings.get('workspaceId')
-    #protected_settings.get('workspaceKey')
     
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
@@ -391,8 +392,12 @@ def enable():
     """
     exit_if_vm_not_supported('Enable')
 
-    OneAgentEnableCommand = "systemctl start mdsd"
-
+    if is_systemd():
+        OneAgentEnableCommand = "systemctl start mdsd"
+    else:
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
+        OneAgentEnableCommand = "/etc/init.d/mdsd start"
+    
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
 
@@ -411,8 +416,13 @@ def disable():
     stop_metrics_process()
 
     #stop the Azure Monitor Linux Agent service
-    DisableOneAgentServiceCommand = "systemctl stop mdsd"
-
+    if is_systemd():
+        DisableOneAgentServiceCommand = "systemctl stop mdsd"
+        
+    else:
+        DisableOneAgentServiceCommand = "/etc/init.d/mdsd stop"
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop mdsd.")
+    
     exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
     return exit_code, output
 
@@ -721,8 +731,8 @@ def find_package_manager(operation):
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
-    dpkg_set = {"debian", "ubuntu"}
-    rpm_set = {"oracle", "redhat", "centos", "red hat", "suse"}
+    dpkg_set = set(["debian", "ubuntu"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse"])
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
