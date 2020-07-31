@@ -840,12 +840,7 @@ class DiskUtil(object):
 
         DiskUtil.os_disk_lvm = False
 
-        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'swaplv', 'tmplv', 'usrlv', 'varlv'])
-        if expected_lv_names == current_lv_names:
-            DiskUtil.os_disk_lvm = True
-
-        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'tmplv', 'usrlv', 'varlv'])
-        if expected_lv_names == current_lv_names:
+        if 'homelv' in current_lv_names and 'rootlv' in current_lv_names:
             DiskUtil.os_disk_lvm = True
 
         return DiskUtil.os_disk_lvm

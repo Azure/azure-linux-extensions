@@ -26,10 +26,5 @@ scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe
 oscryptodir = os.path.abspath(os.path.join(scriptdir, '../../'))
 sys.path.append(oscryptodir)
 
-from OSEncryptionState import *
-from PrereqState import *
-from SelinuxState import *
-from StripdownState import *
-from UnmountOldrootState import *
-from EncryptBlockDeviceState import *
-from PatchBootSystemState import *
+from PrereqState import PrereqState
+from PatchBootSystemState import OSEncryptionState

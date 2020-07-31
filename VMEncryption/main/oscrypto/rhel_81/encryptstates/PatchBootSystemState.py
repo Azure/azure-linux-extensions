@@ -91,7 +91,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         # Add the new kernel param
         additional_params = "rd.luks.ade.partuuid={0} rd.debug".format(root_partuuid)
-        self.command_executor.ExecuteInBash("grub2-editenv - set \"$(grub2-editenv - list | grep kernelopts) {0}\"".format(additional_params), raise_exception_on_failure=True)
+        self.command_executor.ExecuteInBash("grub2-editenv - set \'$(grub2-editenv - list | grep kernelopts) {0}\'".format(additional_params), raise_exception_on_failure=True)
 
     def _get_root_partuuid(self):
         root_partuuid = None
