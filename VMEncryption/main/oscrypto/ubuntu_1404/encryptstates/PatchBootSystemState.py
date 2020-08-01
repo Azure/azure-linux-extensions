@@ -147,8 +147,14 @@ class PatchBootSystemState(OSEncryptionState):
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
         
         self.command_executor.ExecuteInBash('patch -b -d /usr/share/initramfs-tools -p1 <{0}'.format(patchpath), True)
+
+        os_volume = None
+        if os.path.exists(CommonVariables.az_symlink_os_volume) and os.path.realpath(CommonVariables.az_symlink_os_volume) == os.path.realpath(self.rootfs_block_device):
+            os_volume = CommonVariables.az_symlink_os_volume
+        else:
+            os_volume = self.rootfs_block_device
         
-        entry = 'osencrypt {0} none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'.format(self.rootfs_block_device)
+        entry = 'osencrypt {0} none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'.format(os_volume)
         self._append_contents_to_file(entry, '/etc/crypttab')
 
         self.command_executor.Execute('update-initramfs -u -k all', True)
