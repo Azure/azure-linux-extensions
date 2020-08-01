@@ -83,12 +83,11 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_cryptsetup(self):
-        packages = ['cryptsetup',
-                    'cryptsetup-reencrypt']
-
         if self.distro_info[1].startswith("6."):
-            packages.remove('cryptsetup')
-            
+            packages = ['cryptsetup-reencrypt']
+        else:
+            packages = ['cryptsetup']
+
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             return_code = self.command_executor.Execute("yum install -y " + " ".join(packages), timeout=100)
             if return_code == -9:
@@ -100,7 +99,6 @@ class redhatPatching(AbstractPatching):
         packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
-                    'cryptsetup-reencrypt',
                     'lvm2',
                     'uuid',
                     'at',
@@ -109,6 +107,7 @@ class redhatPatching(AbstractPatching):
                     'util-linux']
 
         if self.distro_info[1].startswith("6."):
+            packages.append('cryptsetup-reencrypt')
             packages.remove('cryptsetup')
             packages.remove('procps-ng')
             packages.remove('util-linux')
