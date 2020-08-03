@@ -218,7 +218,6 @@ class CheckUtil(object):
             # next, check that all required logical volume names exist (swaplv not required)
             lvlist = ['rootvg-tmplv',
                       'rootvg-usrlv',
-                      'rootvg-optlv',
                       'rootvg-homelv',
                       'rootvg-varlv',
                       'rootvg-rootlv']

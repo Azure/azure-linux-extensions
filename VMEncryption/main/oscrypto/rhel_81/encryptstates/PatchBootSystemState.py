@@ -54,8 +54,12 @@ class PatchBootSystemState(OSEncryptionState):
 
         luks_uuid = self._get_luks_uuid()
 
-        # Add the new kernel param
-        self._install_and_enable_detached_header_kernel_params(root_partuuid, luks_uuid, boot_uuid)
+        if self._is_detached_header_fix():
+            # Add the new kernel param if the detached header fix is present
+            self._install_and_enable_detached_header_kernel_params(root_partuuid, luks_uuid, boot_uuid)
+        else:
+            # if detached header fix is absent we will use the 91ade workaround
+            self._install_and_enable_91ade(root_partuuid)
 
         # Add the plain os disk base to the "LVM Blacklist" and add osencrypt device to the whitelist
         self._append_contents_to_file('\ndevices { filter = ["a|osencrypt|", "r|' + root_partuuid + '|"] }\n', '/etc/lvm/lvm.conf')
@@ -64,7 +68,7 @@ class PatchBootSystemState(OSEncryptionState):
                                       '/etc/dracut.conf.d/ade.conf')
 
         # Everything is ready, repack dracut
-        self.command_executor.Execute('/usr/sbin/dracut -f -v', True)
+        self.command_executor.ExecuteInBash('dracut -f -v', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
@@ -116,3 +120,8 @@ class PatchBootSystemState(OSEncryptionState):
     def _get_luks_uuid(self):
         luks_header_path = "/boot/luks/osluksheader"
         return self.disk_util.luks_get_uuid(luks_header_path)
+
+    def _is_detached_header_fix(self):
+        # TODO: We need to ask the redhat folks the best way to do this, for now I will just scan the man pages
+        ret_code = self.command_executor.ExecuteInBash("man systemd-cryptsetup-generator | grep luks.hdr")
+        return ret_code == 0

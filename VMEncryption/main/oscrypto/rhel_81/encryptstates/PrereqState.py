@@ -63,8 +63,3 @@ class PrereqState(OSEncryptionState):
         self.context.logger.log("Verifying if machine should exit prereq state")
 
         return super(PrereqState, self).should_exit()
-
-    def _is_detached_header_fix(self):
-        # TODO: We need to ask the redhat folks the best way to do this, for now I will just scan the man pages
-        ret_code = self.command_executor.ExecuteInBash("man systemd-cryptsetup-generator | grep luks.hdr")
-        return ret_code == 0
