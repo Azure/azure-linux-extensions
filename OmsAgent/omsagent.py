@@ -1614,12 +1614,13 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         try:
             output = subprocess.check_output(cmd, stderr = subprocess.STDOUT,
                                              shell = True)
+            output = output.decode('latin-1')
             exit_code = 0
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
-            output = e.output
+            output = e.output.decode('latin-1')
 
-    output = output.encode('utf-8')
+    output = output.encode('utf-8', 'ignore')
 
     # On python 3, encode returns a byte object, so we must decode back to a string
     if sys.version_info >= (3,):
