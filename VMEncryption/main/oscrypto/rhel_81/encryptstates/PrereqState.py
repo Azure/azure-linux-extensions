@@ -55,10 +55,6 @@ class PrereqState(OSEncryptionState):
 
         self.context.distro_patcher.install_extras()
 
-        # if the detached header fix is not present we can't proceed:
-        if not self._is_detached_header_fix():
-            raise Exception("systemd-cryptsetup does not have support for the required kernel params 'rd.luks.data' and 'rd.luks.hdr'. Please update the package systemd-cryptsetup-udev")
-
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit prereq state")
 

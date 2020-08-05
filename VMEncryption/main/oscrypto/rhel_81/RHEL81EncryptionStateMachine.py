@@ -30,7 +30,7 @@ transitionsdir = os.path.abspath(os.path.join(scriptdir, '../../transitions'))
 sys.path.append(transitionsdir)
 
 from oscrypto import OSEncryptionStateMachine
-from encryptstates import PrereqState, PatchBootSystemState
+from .encryptstates import PrereqState, PatchBootSystemState
 from CommandExecutor import ProcessCommunicator
 from transitions import State, Machine
 

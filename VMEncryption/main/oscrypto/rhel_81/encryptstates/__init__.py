@@ -27,4 +27,4 @@ oscryptodir = os.path.abspath(os.path.join(scriptdir, '../../'))
 sys.path.append(oscryptodir)
 
 from .PrereqState import PrereqState
-from .PatchBootSystemState import OSEncryptionState
+from .PatchBootSystemState import PatchBootSystemState

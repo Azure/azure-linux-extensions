@@ -23,6 +23,7 @@ import inspect
 import os
 
 from OSEncryptionState import OSEncryptionState
+from CommandExecutor import ProcessCommunicator
 
 
 class PatchBootSystemState(OSEncryptionState):
@@ -42,6 +43,17 @@ class PatchBootSystemState(OSEncryptionState):
     def enter(self):
         if not self.should_enter():
             return
+
+        # Get BEK path
+        bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+
+        # Set up luksheader
+        self.command_executor.ExecuteInBash('mount /boot', False)
+        self.command_executor.ExecuteInBash('mkdir /boot/luks', True)
+        self.command_executor.ExecuteInBash('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
+        self.command_executor.ExecuteInBash('cryptsetup reencrypt --encrypt --init-only {1} --header /boot/luks/osluksheader -d {0} -q'.format(bek_path,
+                                                                                                                    self.rootfs_block_device),
+                                      raise_exception_on_failure=True)
 
         # Find out the PARTUUID for the root disk
         root_partuuid = self._get_root_partuuid()
@@ -80,8 +92,9 @@ class PatchBootSystemState(OSEncryptionState):
             f.write(contents)
 
     def _install_and_enable_detached_header_kernel_params(self, root_partuuid, luks_uuid, boot_uuid):
+        kernel_params = self._get_kernelopts()
         additional_params = "rd.luks.name={0}=osencrypt rd.luks.options={0}=header=/luks/osluksheader rd.luks.key={0}=/LinuxPassPhraseFileName:LABEL=BEK rd.luks.data={0}=PARTUUID={1} rd.luks.hdr={0}=UUID={2} rd.debug".format(luks_uuid, root_partuuid, boot_uuid)
-        self.command_executor.ExecuteInBash("grub2-editenv - set \"$(grub2-editenv - list | grep kernelopts) {0}\"".format(additional_params), raise_exception_on_failure=True)
+        self.command_executor.ExecuteInBash("grub2-editenv - set '{0} {1}'".format(kernel_params, additional_params), raise_exception_on_failure=True)
 
     def _install_and_enable_91ade(self, root_partuuid):
         # Copy the 91adeOnline directory to dracut/modules.d
@@ -94,14 +107,20 @@ class PatchBootSystemState(OSEncryptionState):
                                       '/etc/dracut.conf.d/ade.conf')
 
         # Add the new kernel param
+        kernel_params = self._get_kernelopts()
         additional_params = "rd.luks.ade.partuuid={0} rd.debug".format(root_partuuid)
-        self.command_executor.ExecuteInBash("grub2-editenv - set \'$(grub2-editenv - list | grep kernelopts) {0}\'".format(additional_params), raise_exception_on_failure=True)
+        self.command_executor.ExecuteInBash("grub2-editenv - set '{0} {1}'".format(kernel_params, additional_params), raise_exception_on_failure=True)
+
+    def _get_kernelopts(self):
+        proc_comm = ProcessCommunicator()
+        self.command_executor.ExecuteInBash("grub2-editenv - list | grep kernelopts", communicator=proc_comm)
+        return proc_comm.stdout.strip()
 
     def _get_root_partuuid(self):
         root_partuuid = None
         root_device_items = self.disk_util.get_device_items(self.rootfs_block_device)
         for root_item in root_device_items:
-            if self.rootfs_block_device.endwith(root_item.name):
+            if self.rootfs_block_device.endswith(root_item.name):
                 root_partuuid = self.disk_util.get_device_items_property(root_item.name, "PARTUUID")
                 if root_partuuid:
                     return root_partuuid
@@ -111,7 +130,7 @@ class PatchBootSystemState(OSEncryptionState):
         boot_uuid = None
         boot_device_items = self.disk_util.get_device_items(self.bootfs_block_device)
         for boot_item in boot_device_items:
-            if self.bootfs_block_device.endwith(boot_item.name):
+            if self.bootfs_block_device.endswith(boot_item.name):
                 boot_uuid = self.disk_util.get_device_items_property(boot_item.name, "UUID")
                 if boot_uuid:
                     return boot_uuid
