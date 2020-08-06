@@ -788,23 +788,27 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7', '8'], # RHEL
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
-                       'oracle' : ['6', '7'], # Oracle
+    supported_dists = {'redhat' : ['6', '7', '8'], 'red hat' : ['6', '7', '8'], 'rhel' : ['6', '7', '8'], # Red Hat
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'oracle' : ['6', '7'], 'ol': ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'] # SLES
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
+                       'suse' : ['12', '15'], 'sles' : ['12', '15'] # SLES
     }
 
-    vm_supported = False
+    vm_dist, vm_ver, vm_supported = '', '', False
 
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
-        vm_dist, vm_ver, vm_id = platform.dist()
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except AttributeError:
+            hutil_log_info("Falling back to /etc/os-release distribution parsing")
 
-    if not vm_dist and not vm_ver: # SLES 15 and others
+    # Fallback if either of the above fail; on some (especially newer)
+    # distros, linux_distribution() and dist() are unreliable or deprecated
+    if not vm_dist and not vm_ver:
         try:
             with open('/etc/os-release', 'r') as fp:
                 for line in fp:
@@ -814,7 +818,6 @@ def is_vm_supported_for_extension():
                         vm_dist = vm_dist.replace('\"', '').replace('\n', '')
                     elif line.startswith('VERSION_ID='):
                         vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.split('.')[0]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             return vm_supported, 'Indeterminate operating system', ''
@@ -1614,12 +1617,13 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         try:
             output = subprocess.check_output(cmd, stderr = subprocess.STDOUT,
                                              shell = True)
+            output = output.decode('latin-1')
             exit_code = 0
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
-            output = e.output
+            output = e.output.decode('latin-1')
 
-    output = output.encode('utf-8')
+    output = output.encode('utf-8', 'ignore')
 
     # On python 3, encode returns a byte object, so we must decode back to a string
     if sys.version_info >= (3,):
