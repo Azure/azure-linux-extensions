@@ -804,7 +804,7 @@ def is_vm_supported_for_extension():
         try:
             vm_dist, vm_ver, vm_id = platform.dist()
         except AttributeError:
-            pass
+            hutil_log_info("Falling back to /etc/os-release disribution parsing")
 
     # Fallback if either of the above fail; on some (especially newer)
     # distros, linux_distribution() and dist() are unreliable or deprecated
