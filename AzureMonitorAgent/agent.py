@@ -482,30 +482,7 @@ def start_metrics_process():
 
     """
     stop_metrics_process()
-
-    package_directory = os.path.join(os.getcwd(), PackagesDirectory)
-    telegraf_path = os.path.join(package_directory, TelegrafBinName)
-
-    # Check if previous file exist at the location, compare the two binaries,
-    # If the files are not same, remove the older file, and copy the new one
-    # If they are the same, then we ignore it and don't copy
-    if os.path.isfile(telegraf_path):
-        if os.path.isfile(metrics_constants.ama_telegraf_bin):
-            if not filecmp.cmp(telegraf_path, metrics_constants.ama_telegraf_bin):
-                # Removing the file in case it is already being run in a process,
-                # in which case we can get an error "text file busy" while copying
-                os.remove(metrics_constants.ama_telegraf_bin)
-                copyfile(telegraf_path, metrics_constants.ama_telegraf_bin)
-                os.chmod(metrics_constants.ama_telegraf_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
-
-        else:
-            # No previous binary exist, simply copy it and make it executable
-            copyfile(telegraf_path, metrics_constants.ama_telegraf_bin)
-            os.chmod(metrics_constants.ama_telegraf_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
-    else:
-        raise Exception("Unable to copy Telegraf Binary, could not find file at the location {0} . Failed to setup Telegraf.".format(telegraf_path))
-        return False
-
+    
     #start telemetry watcher
     omsagent_filepath = os.path.join(os.getcwd(),'agent.py')
     args = ['python', omsagent_filepath, '-metrics']
