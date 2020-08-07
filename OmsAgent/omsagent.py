@@ -374,7 +374,7 @@ def start_telemetry_process():
     omsagent_filepath = os.path.join(os.getcwd(),'omsagent.py')
     args = ['python', omsagent_filepath, '-telemetry']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    HUtilObject.log('start watcher process '+str(args))
+    hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
 
 def telemetry():
@@ -383,16 +383,17 @@ def telemetry():
     with open(pids_filepath, 'w') as f:
         f.write(str(py_pid) + '\n')
 
-    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
+    if HUtilObject is not None:
+        watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
 
-    watcher_thread = Thread(target = watcher.watch)
-    self_mon_thread = Thread(target = watcher.monitor_health)
+        watcher_thread = Thread(target = watcher.watch)
+        self_mon_thread = Thread(target = watcher.monitor_health)
 
-    watcher_thread.start()
-    self_mon_thread.start()
+        watcher_thread.start()
+        self_mon_thread.start()
 
-    watcher_thread.join()
-    self_mon_thread.join()
+        watcher_thread.join()
+        self_mon_thread.join()
 
     return 0, ""
 
