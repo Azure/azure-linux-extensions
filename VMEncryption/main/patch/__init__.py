@@ -73,6 +73,8 @@ def GetDistroPatcher(logger):
             Distro = platform.system()
     Distro = Distro.strip('"')
     Distro = Distro.strip(' ')
+    Distro = Distro.replace('ubuntu','Ubuntu') # to upper if needed
+
     patching_class_name = Distro + 'Patching'
 
     if patching_class_name not in globals():

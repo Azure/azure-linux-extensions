@@ -7,3 +7,6 @@
 [submodule "VMEncryption/transitions"]
 	path = VMEncryption/transitions
 	url = https://github.com/tyarkoni/transitions.git
+[submodule "VMEncryption/six"]
+	path = VMEncryption/six
+	url = https://github.com/benjaminp/six

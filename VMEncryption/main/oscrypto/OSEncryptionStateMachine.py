@@ -28,6 +28,8 @@ from time import sleep
 scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 maindir = os.path.abspath(os.path.join(scriptdir, '../'))
 sys.path.append(maindir)
+sixdir = os.path.abspath(os.path.join(scriptdir, '../../six'))
+sys.path.append(sixdir)
 transitionsdir = os.path.abspath(os.path.join(scriptdir, '../../transitions'))
 sys.path.append(transitionsdir)
 
