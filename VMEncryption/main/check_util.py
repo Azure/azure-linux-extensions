@@ -262,6 +262,7 @@ class CheckUtil(object):
             self.logger.log("OS volume already encrypted. Skipping OS encryption validation check.")
             return
         distro_name = DistroPatcher.distro_info[0]
+        distro_name = distro_name.replace('ubuntu','Ubuntu') # to upper if needed
         distro_version = DistroPatcher.distro_info[1]
         supported_os_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'SupportedOS.json')
         with open(supported_os_file) as json_file:

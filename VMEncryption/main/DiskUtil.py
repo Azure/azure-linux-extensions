@@ -776,8 +776,10 @@ class DiskUtil(object):
         lvs_command = 'lvs --noheadings --nameprefixes --unquoted -o lv_name,vg_name,lv_kernel_major,lv_kernel_minor'
         proc_comm = ProcessCommunicator()
 
-        if self.command_executor.Execute(lvs_command, communicator=proc_comm):
-            return []
+        try:
+            self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
+        except:
+            return [] # return empty list on non-lvm systems that do not have lvs
 
         lvm_items = []
 
