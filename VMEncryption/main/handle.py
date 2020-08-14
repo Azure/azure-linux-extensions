@@ -1868,6 +1868,7 @@ def daemon_encrypt():
         # import OSEncryption here instead of at the top because it relies
         # on pre-req packages being installed (specifically, python-six on Ubuntu)
         distro_name = DistroPatcher.distro_info[0]
+        distro_name = distro_name.replace('ubuntu','Ubuntu') # to upper if needed
         distro_version = DistroPatcher.distro_info[1]
 
         os_encryption = None
@@ -1935,7 +1936,7 @@ def daemon_encrypt():
                                                            distro_patcher=DistroPatcher,
                                                            logger=logger,
                                                            encryption_environment=encryption_environment)
-        elif distro_name == 'Ubuntu' and distro_version in ['16.04', '18.04']:
+        elif distro_name == 'Ubuntu' and distro_version in ['16.04', '18.04', '20.04']:
             from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
             os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
                                                              distro_patcher=DistroPatcher,
