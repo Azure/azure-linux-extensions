@@ -34,14 +34,14 @@ python hello.py --install
 
 function find_python(){
     local python_exec_command=$1
-
-    # Find python3, python2, or default python in that order
-    if command -v python3 >/dev/null 2>&1 ; then
-        eval ${python_exec_command}="python3"
+    
+    # Find default python, python2, or python3 in that order
+    if command -v python >/dev/null 2>&1 ; then
+        eval ${python_exec_command}="python"
     elif command -v python2 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python2"
-    elif command -v python >/dev/null 2>&1 ; then
-        eval ${python_exec_command}="python"
+    elif command -v python3 >/dev/null 2>&1 ; then
+        eval ${python_exec_command}="python3"
     fi
 }
 
