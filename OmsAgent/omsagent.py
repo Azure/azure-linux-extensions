@@ -117,7 +117,7 @@ OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
 # OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
 # OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
 # OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.eaglex.ic.gov -w {1} -s {2} {3}' #EX
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.microsoft.scloud -w {1} -s {2} {3}'
+# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.microsoft.scloud -w {1} -s {2} {3}' #RX
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
