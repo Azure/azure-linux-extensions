@@ -38,6 +38,7 @@ class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
         self.name = None
+        self.supported_workload = ["oracle", "mysql"]
         self.command = ""
         self.dbnames = []
         self.cred_string = ""
@@ -51,6 +52,8 @@ class WorkloadPatch:
         self.sudo_user = "sudo"
         self.outfile = ""
         self.logbackup = ""
+        self.custom_scripts_enabled = 0
+        self.scriptpath= "DefaultScripts"
         self.confParser()
 
     def pre(self):
@@ -122,14 +125,14 @@ class WorkloadPatch:
             if self.outfile == "":
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
                 return None
-            prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlMaster.sql")
+            prescript = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preMysqlMaster.sql")
             arg = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
+            preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", preOracle]
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
 
@@ -182,13 +185,13 @@ class WorkloadPatch:
         
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post master")
-            postscript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/postMysqlMaster.sql")
+            postscript = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postMysqlMaster.sql")
             args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
             self.logger.log("WorkloadPatch: command to execute: "+str(args))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            postOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
+            postOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", postOracle]
             self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
             process = subprocess.Popen(args)
@@ -228,14 +231,14 @@ class WorkloadPatch:
             if self.outfile == "":
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
                 return None
-            prescript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/preMysqlSlave.sql")
+            prescript = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preMysqlSlave.sql")
             arg = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleMaster.sql ")
+            preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", preOracle]
             process = subprocess.Popen(args)
             wait_counter = 5
@@ -286,13 +289,13 @@ class WorkloadPatch:
 
         if 'mysql' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post slave")
-            postscript = os.path.join(os.getcwd(), "main/workloadPatch/scripts/postMysqlSlave.sql")
+            postscript = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postMysqlSlave.sql")
             args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
             self.logger.log("WorkloadPatch: command to execute: "+str(args))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            postOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/postOracleMaster.sql ")
+            postOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", postOracle]
             process = subprocess.Popen(args)
             while process.poll()==None:
@@ -315,7 +318,7 @@ class WorkloadPatch:
 
     def postSlaveDB(self):
         pass
-
+    
     def confParser(self):
         self.logger.log("WorkloadPatch: Entering workload config parsing")
         configfile = '/etc/azure/workload.conf'
@@ -326,8 +329,12 @@ class WorkloadPatch:
                 if config.has_section("workload"):
                     self.logger.log("WorkloadPatch: config section present for workloads ")
                     if config.has_option("workload", 'workload_name'):                        
-                        self.name = config.get("workload", 'workload_name')
-                        self.logger.log("WorkloadPatch: config workload command "+ self.name)
+                        name = config.get("workload", 'workload_name')
+                        if name in self.supported_workload:
+                            self.name = name
+                            self.logger.log("WorkloadPatch: config workload command "+ self.name)
+                        else:
+                            return None
                     else:
                         return None
                     if config.has_option("workload", 'command_path'):                        
@@ -357,6 +364,11 @@ class WorkloadPatch:
                     if config.has_option("workload", 'dbnames'):
                         dbnames_list = config.get("workload", 'dbnames') #mydb1;mydb2;mydb3
                         self.dbnames = dbnames_list.split(';')
+                    if config.has_option("workload", 'customScriptEnabled'):
+                        self.custom_scripts_enabled = config.get("workload", 'customScriptEnabled')
+                        self.logger.log("WorkloadPatch: config workload customer using custom script "+ self.custom_scripts_enabled)
+                        if int(self.custom_scripts_enabled) == 1:
+                            self.scriptpath= "CustomScripts"
                     if config.has_section("logbackup"):
                         self.logbackup = "enable"
                         self.logger.log("WorkloadPatch: Logbackup Enabled")
@@ -404,7 +416,7 @@ class WorkloadPatch:
     def timeoutDaemon(self):
         if 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Inside oracle condition in timeout daemon")
-            preDaemonOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/scripts/preOracleDaemon.sql ") + self.timeout
+            preDaemonOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleDaemon.sql ") + self.timeout
             argsDaemon = ["su", "-", self.linux_user, "-c", preDaemonOracle]
             preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
             preDaemonThread.start()
