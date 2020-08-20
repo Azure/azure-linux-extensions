@@ -28,7 +28,6 @@ import sys
 import time
 import shlex
 import traceback
-import xml.parsers.expat
 import datetime
 try:
     import ConfigParser as ConfigParsers
