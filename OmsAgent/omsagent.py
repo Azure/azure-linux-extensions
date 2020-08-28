@@ -120,41 +120,20 @@ OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
-# Cloud Types MAP
-PublicCloudName     = "Public"
-FairfaxCloudName    = "Fairfax"
-MooncakeCloudName   = "Mooncake"
-USNATCloudName      = "USNAT" # EX
-USSECCloudName      = "USSEC" # RX
-DefaultCloudName    = PublicCloudName # used when thing go wrong
+# Cloud Environments
+PublicCloudName     = "AzurePublicCloud"
+FairfaxCloudName    = "AzureUSGovernmentCloud"
+MooncakeCloudName   = "AzureChinaCloud"
+USNatCloudName      = "USNat" # EX
+USSecCloudName      = "USSec" # RX
+DefaultCloudName    = PublicCloudName # Fallback
 
-CloudRegionMap = {
-    PublicCloudName: {
-        "Domain": "opinsights.azure.com",
-        "Regions": ["Central US EUAP", "East US 2 EUAP", "West Central US", "North Central US", "West US", "East Asia",
-                    "Australia East", "Australia Central", "Canada Central", "North Europe", "France Central", "West India",
-                    "Japan East", "Korea Central", "East US 2", "Brazil South", "South Africa North", "Switzerland North",
-                    "UK West", "UAE North", "East US", "Norway East", "Central India", "West US 2", "Southeast Asia",
-                    "Australia Southeast", "South Central US", "Canada East", "Japan West", "Korea South", "Switzerland West",
-                    "UAE Central", "Australia Central 2", "France South", "South India", "West Europe", "Central US",
-                    "Norway West", "South Africa West", "UK South"]        
-    },
-    FairfaxCloudName: {
-        "Domain": "opinsights.azure.us",
-        "Regions": ["USGov Texas", "USDoD Central", "USDoD East", "USGov Arizona", "USGov Virginia"]
-    },
-    MooncakeCloudName:  {
-        "Domain": "opinsights.azure.cn",
-        "Regions": ["China North", "China East", "China North 2", "China East 2"]
-    },
-    USNATCloudName: {
-        "Domain": "opinsights.azure.eaglex.ic.gov",
-        "Regions": ["USNat East", "USNat West"]
-    },
-    USSECCloudName: {
-        "Domain": "opinsights.azure.microsoft.scloud",
-        "Regions": ["USSec East", "USSec West"]
-    },
+CloudDomainMap = {
+    PublicCloudName:   "opinsights.azure.com",
+    FairfaxCloudName:  "opinsights.azure.us",
+    MooncakeCloudName: "opinsights.azure.cn",
+    USNatCloudName:    "opinsights.azure.eaglex.ic.gov",
+    USSecCloudName:    "opinsights.azure.microsoft.scloud"
 }
 
 # Error codes
@@ -190,9 +169,9 @@ OAuthTokenResource = 'https://management.core.windows.net/'
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 AutoManagedWorkspaceCreationSleepSeconds = 20
 
-# vmResourceId Metadata Service
-VMResourceIDMetadataHost = '169.254.169.254'
-VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
+# Instance Metadata Service
+IMDSHost = '169.254.169.254'
+IMDSEndpoint = 'http://{0}/metadata/instance?api-version=2018-10-01'.format(IMDSHost)
 
 # agent permissions
 AgentUser='omsagent'
@@ -711,14 +690,14 @@ def remove_workspace_configuration():
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
 
 def get_vmresourceid_from_metadata():
-    req = urllib.request.Request(VMResourceIDMetadataEndpoint)
+    req = urllib.request.Request(IMDSEndpoint)
     req.add_header('Metadata', 'True')
 
     try:
         response = json.loads(urllib.request.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
-            return None #classic vm
+            return None # classic vm
 
         if response['compute']['vmScaleSetName']:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
@@ -735,20 +714,20 @@ def get_vmresourceid_from_metadata():
         hutil_log_error('Unexpected error from Metadata service')
         return None
 
-def get_azure_region_from_imds():
-    req = urllib.request.Request(VMResourceIDMetadataEndpoint)
+def get_azure_environment_from_imds():
+    req = urllib.request.Request(IMDSEndpoint)
     req.add_header('Metadata', 'True')
 
     try:
         response = json.loads(urllib.request.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
-            return None #classic vm
+            return None # classic vm
 
-        if ('location' not in response['compute'] or response['compute']['location'] is None):
-            return None #classic vm
+        if ('azEnvironment' not in response['compute'] or response['compute']['azEnvironment'] is None):
+            return None # classic vm
 
-        return response['compute']['location']
+        return response['compute']['azEnvironment']
     except urllib.error.HTTPError as e:
         hutil_log_error('Request to Metadata service URL ' \
                         'failed with an HTTPError: {0}'.format(e))
@@ -761,24 +740,20 @@ def get_azure_region_from_imds():
 
 def get_azure_cloud_domain():
     try:
-        location = get_azure_region_from_imds()
-        # look for the cloud type associated with current location
-        for cloudName, data in CloudRegionMap.items():
-            domain = data['Domain']
-            regions = data['Regions']
-            for region in regions:
-                regionCompacted = region.replace(" ", "")
-                if regionCompacted.lower() == location.lower():
-                    hutil_log_info("Detecting cloud type '%s' by using the current location '%s' retrieved from IMDS. The domain '%s' will be used." % (cloudName, location, domain))
+        environment = get_azure_environment_from_imds()
+
+        if environment:
+            for cloud, domain in CloudDomainMap.items():
+                if environment.lower() == cloud.lower():
+                    hutil_log_info('Detected cloud environment "{0}" via IMDS. The domain "{1}" will be used.'.format(cloud, domain))
                     return domain
 
-        defaultDomain = CloudRegionMap[DefaultCloudName]['Domain']
-        hutil_log_info("Warning: We couldn't find a cloud type associated with the current location '%s', fallback to '%s' domain '%s'" % (location, DefaultCloudName, defaultDomain))
-        return defaultDomain
+        hutil_log_info('Unknown cloud environment "{0}"'.format(environment))
     except Exception as e:
-        hutil_log_error('Retrieving cloud type failed with an HTTPError: {0}'.format(e))
-        hutil_log_info('Retrieving cloud type error: {0}'.format(e.read()))
-        return None
+        hutil_log_error('Failed to detect cloud environment: {0}'.format(e))
+
+    hutil_log_info('Falling back to default domain "{0}"'.format(CloudDomainMap[DefaultCloudName]))
+    return CloudDomainMap[DefaultCloudName]
 
 def retrieve_managed_workspace(vm_resource_id):
     """
