@@ -17,9 +17,11 @@ if [ "$1" = "install" ]
 then
     if [ -f "/etc/azure/workload.conf" ]
     then
+        cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf #migration code. to be removed after the release
         echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
         exit $arc
     else
+        mkdir -p /etc/azure
         cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
         echo "`date`- The command is $1, exiting with conf file copy" >> $logfile
         exit $arc
