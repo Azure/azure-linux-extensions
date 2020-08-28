@@ -108,14 +108,10 @@ ExtensionStateSubdirectory = 'state'
 
 # Commands
 # Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
-# When releasing to FF/MC, comment the public OnboardCommandWithOptionalParams
-# and uncomment the corresponding FF/MC command
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
-OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
+OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
 
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
@@ -596,17 +592,17 @@ def enable():
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
 
-    optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
+    # detect opinsights domain using IMDS
+    domain = get_azure_cloud_domain()
+    domainParam = ''
+    if domain:
+        domainParam = '-d {0}'.format(domain)
+
+    optionalParams = '{0} {1} {2}'.format(domainParam, proxyParam, vmResourceIdParam)
     onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
                                                           workspaceId,
                                                           workspaceKey,
                                                           optionalParams)
-
-    
-    domain = get_azure_cloud_domain()
-    # Disabling this code until we make sure it works
-    # if domain:
-    #     onboard_cmd += ' -d {0}'.format(domain)
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_with_retries_output(onboard_cmd, retries = 5,
