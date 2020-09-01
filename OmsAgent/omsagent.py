@@ -87,7 +87,7 @@ if sys.version_info < (2,7):
 ProceedOnSigningVerificationFailure = True
 PackagesDirectory = 'packages'
 keysDirectory = 'keys'
-BundleFileName = 'omsagent-1.13.1-0.universal.x64.sh'
+BundleFileName = 'omsagent-1.13.11-0.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -108,17 +108,29 @@ ExtensionStateSubdirectory = 'state'
 
 # Commands
 # Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
-# When releasing to FF/MC, comment the public OnboardCommandWithOptionalParams
-# and uncomment the corresponding FF/MC command
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
-OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.eaglex.ic.gov -w {1} -s {2} {3}' #EX
+OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
+
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
+
+# Cloud Environments
+PublicCloudName     = "AzurePublicCloud"
+FairfaxCloudName    = "AzureUSGovernmentCloud"
+MooncakeCloudName   = "AzureChinaCloud"
+USNatCloudName      = "USNat" # EX
+USSecCloudName      = "USSec" # RX
+DefaultCloudName    = PublicCloudName # Fallback
+
+CloudDomainMap = {
+    PublicCloudName:   "opinsights.azure.com",
+    FairfaxCloudName:  "opinsights.azure.us",
+    MooncakeCloudName: "opinsights.azure.cn",
+    USNatCloudName:    "opinsights.azure.eaglex.ic.gov",
+    USSecCloudName:    "opinsights.azure.microsoft.scloud"
+}
 
 # Error codes
 DPKGLockedErrorCode = 55 #56, temporary as it excludes from SLA
@@ -153,9 +165,9 @@ OAuthTokenResource = 'https://management.core.windows.net/'
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 AutoManagedWorkspaceCreationSleepSeconds = 20
 
-# vmResourceId Metadata Service
-VMResourceIDMetadataHost = '169.254.169.254'
-VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
+# Instance Metadata Service
+IMDSHost = '169.254.169.254'
+IMDSEndpoint = 'http://{0}/metadata/instance?api-version=2018-10-01'.format(IMDSHost)
 
 # agent permissions
 AgentUser='omsagent'
@@ -372,9 +384,9 @@ def start_telemetry_process():
 
     #start telemetry watcher
     omsagent_filepath = os.path.join(os.getcwd(),'omsagent.py')
-    args = ['python', omsagent_filepath, '-telemetry']
+    args = ['python{0}'.format(sys.version_info[0]), omsagent_filepath, '-telemetry']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    HUtilObject.log('start watcher process '+str(args))
+    hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
 
 def telemetry():
@@ -383,16 +395,17 @@ def telemetry():
     with open(pids_filepath, 'w') as f:
         f.write(str(py_pid) + '\n')
 
-    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
+    if HUtilObject is not None:
+        watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
 
-    watcher_thread = Thread(target = watcher.watch)
-    self_mon_thread = Thread(target = watcher.monitor_health)
+        watcher_thread = Thread(target = watcher.watch)
+        self_mon_thread = Thread(target = watcher.monitor_health)
 
-    watcher_thread.start()
-    self_mon_thread.start()
+        watcher_thread.start()
+        self_mon_thread.start()
 
-    watcher_thread.join()
-    self_mon_thread.join()
+        watcher_thread.join()
+        self_mon_thread.join()
 
     return 0, ""
 
@@ -579,7 +592,13 @@ def enable():
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
 
-    optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
+    # detect opinsights domain using IMDS
+    domain = get_azure_cloud_domain()
+    domainParam = ''
+    if domain:
+        domainParam = '-d {0}'.format(domain)
+
+    optionalParams = '{0} {1} {2}'.format(domainParam, proxyParam, vmResourceIdParam)
     onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
                                                           workspaceId,
                                                           workspaceKey,
@@ -667,14 +686,14 @@ def remove_workspace_configuration():
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
 
 def get_vmresourceid_from_metadata():
-    req = urllib.request.Request(VMResourceIDMetadataEndpoint)
+    req = urllib.request.Request(IMDSEndpoint)
     req.add_header('Metadata', 'True')
 
     try:
         response = json.loads(urllib.request.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
-            return None #classic vm
+            return None # classic vm
 
         if response['compute']['vmScaleSetName']:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
@@ -690,6 +709,47 @@ def get_vmresourceid_from_metadata():
     except:
         hutil_log_error('Unexpected error from Metadata service')
         return None
+
+def get_azure_environment_from_imds():
+    req = urllib.request.Request(IMDSEndpoint)
+    req.add_header('Metadata', 'True')
+
+    try:
+        response = json.loads(urllib.request.urlopen(req).read())
+
+        if ('compute' not in response or response['compute'] is None):
+            return None # classic vm
+
+        if ('azEnvironment' not in response['compute'] or response['compute']['azEnvironment'] is None):
+            return None # classic vm
+
+        return response['compute']['azEnvironment']
+    except urllib.error.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL ' \
+                        'failed with an HTTPError: {0}'.format(e))
+        hutil_log_info('Response from Metadata service: ' \
+                       '{0}'.format(e.read()))
+        return None
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+        return None
+
+def get_azure_cloud_domain():
+    try:
+        environment = get_azure_environment_from_imds()
+
+        if environment:
+            for cloud, domain in CloudDomainMap.items():
+                if environment.lower() == cloud.lower():
+                    hutil_log_info('Detected cloud environment "{0}" via IMDS. The domain "{1}" will be used.'.format(cloud, domain))
+                    return domain
+
+        hutil_log_info('Unknown cloud environment "{0}"'.format(environment))
+    except Exception as e:
+        hutil_log_error('Failed to detect cloud environment: {0}'.format(e))
+
+    hutil_log_info('Falling back to default domain "{0}"'.format(CloudDomainMap[DefaultCloudName]))
+    return CloudDomainMap[DefaultCloudName]
 
 def retrieve_managed_workspace(vm_resource_id):
     """
@@ -788,23 +848,27 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7', '8'], # RHEL
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
-                       'oracle' : ['6', '7'], # Oracle
+    supported_dists = {'redhat' : ['6', '7', '8'], 'red hat' : ['6', '7', '8'], 'rhel' : ['6', '7', '8'], # Red Hat
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'oracle' : ['6', '7'], 'ol': ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'] # SLES
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
+                       'suse' : ['12', '15'], 'sles' : ['12', '15'] # SLES
     }
 
-    vm_supported = False
+    vm_dist, vm_ver, vm_supported = '', '', False
 
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
-        vm_dist, vm_ver, vm_id = platform.dist()
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except AttributeError:
+            hutil_log_info("Falling back to /etc/os-release distribution parsing")
 
-    if not vm_dist and not vm_ver: # SLES 15 and others
+    # Fallback if either of the above fail; on some (especially newer)
+    # distros, linux_distribution() and dist() are unreliable or deprecated
+    if not vm_dist and not vm_ver:
         try:
             with open('/etc/os-release', 'r') as fp:
                 for line in fp:
@@ -814,7 +878,6 @@ def is_vm_supported_for_extension():
                         vm_dist = vm_dist.replace('\"', '').replace('\n', '')
                     elif line.startswith('VERSION_ID='):
                         vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.split('.')[0]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             return vm_supported, 'Indeterminate operating system', ''
@@ -1614,12 +1677,13 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         try:
             output = subprocess.check_output(cmd, stderr = subprocess.STDOUT,
                                              shell = True)
+            output = output.decode('latin-1')
             exit_code = 0
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
-            output = e.output
+            output = e.output.decode('latin-1')
 
-    output = output.encode('utf-8')
+    output = output.encode('utf-8', 'ignore')
 
     # On python 3, encode returns a byte object, so we must decode back to a string
     if sys.version_info >= (3,):
