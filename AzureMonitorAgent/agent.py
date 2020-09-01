@@ -48,6 +48,7 @@ from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
+import metrics_ext_utils.metrics_common_utils as metrics_utils
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -392,6 +393,10 @@ def enable():
     """
     exit_if_vm_not_supported('Enable')
 
+    # Check if this is Arc VM and enable arc daemon if it is
+    if metrics_utils.is_arc_installed():
+        start_arc_watcher()
+
     if is_systemd():
         OneAgentEnableCommand = "systemctl start mdsd"
     else:
@@ -412,6 +417,10 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
+
+    # disable arc daemon if it is running
+    stop_arc_watcher()
+
     #stop the metrics process
     stop_metrics_process()
 
@@ -484,8 +493,8 @@ def start_metrics_process():
     stop_metrics_process()
     
     #start telemetry watcher
-    omsagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python', omsagent_filepath, '-metrics']
+    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python', oneagent_filepath, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     HUtilObject.log('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -675,8 +684,79 @@ operations = {'Disable' : disable,
               'Enable' : enable,
               'Update' : update,
               'Metrics' : metrics,
+              'Arc' : start_arc_watcher,
 }
 
+def start_arc_process():
+    """
+    Start arc process that performs periodic monitoring activities
+    :return: None
+
+    """
+    stop_arc_watcher()
+    
+    #start telemetry watcher
+    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python', oneagent_filepath, '-arc']
+    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+    HUtilObject.log('start watcher process '+str(args))
+    subprocess.Popen(args, stdout=log, stderr=log)
+
+def start_arc_watcher():
+    """
+    Take care of starting arc_watcher daemon if the VM has arc running
+    """    
+    pids_filepath = os.path.join(os.getcwd(), 'amaarc.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = arc_watcher, args = [HUtilObject.error, HUtilObject.log])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
+
+def stop_arc_watcher():
+    """
+    Take care of stopping arc_watcher daemon if the VM has arc running
+    """    
+    pids_filepath = os.path.join(os.getcwd(),'amaarc.pid')
+
+    # kill existing telemetry watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pids in f.readlines():
+                kill_cmd = "kill " + pids  # TODO : Check to see if the process actually is arc or not
+                run_command_and_log(kill_cmd)
+        
+        # Delete the file after to avoid clutter
+        os.remove(pids_filepath)
+
+def arc_watcher():
+    """
+    This is needed to override mdsd's syslog permissions restriction which prevents mdsd 
+    from reading temporary key files that are needed to make https calls to get an MSI token for arc
+    This method spins up a process that will continuously keep refreshing that particular file path with valid keys
+    So that whenever mdsd needs to refresh it's MSI token, it is able to find correct keys there to make the https calls
+    """
+
+    while True:
+        arc_token_mdsd_dir = "/etc/mdsd.d/arc_tokens/"
+        if not os.path.exists(arc_token_mdsd_dir):
+            os.makedirs(arc_token_mdsd_dir)
+
+        arc_endpoint = metrics_utils.get_arc_endpoint()
+            try:
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://management.azure.com/"
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib2.urlopen(req)
+            except:
+                # The above request is expected to fail and add a key to the path - 
+                authkey_dir = "/var/opt/azcmagent/tokens/"
+
+                # Checkpoint
+                # TODO add more retry logic.
 
 def parse_context(operation):
     """
