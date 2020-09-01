@@ -414,30 +414,25 @@ class WorkloadPatch:
                 return None
         
     def timeoutDaemon(self):
+        global daemonProcess
         if 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Inside oracle condition in timeout daemon")
             preDaemonOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleDaemon.sql ") + self.timeout
             argsDaemon = ["su", "-", self.linux_user, "-c", preDaemonOracle]
-            preDaemonThread = threading.Thread(target=self.threadForTimeoutDaemon, args=[argsDaemon])
-            preDaemonThread.start()
-        self.logger.log("WorkloadPatch: timeoutDaemon started for: " + self.timeout + " seconds")
-
-    def threadForTimeoutDaemon(self, args): 
-            global daemonProcess
-            daemonProcess = subprocess.Popen(args)
-            self.logger.log("WorkloadPatch: daemonProcess started:"+str(args))
+            devnull = open(os.devnull, 'w')
+            daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull)
+            
+        wait_counter = 5
+        while daemonProcess == None and wait_counter > 0:
+            self.logger.log("WorkloadPatch: daemonProcess not created yet", True)
+            wait_counter -= 1
             sleep(1)
-            wait_counter = 5
-            while daemonProcess == None and wait_counter > 0:
-                self.logger.log("WorkloadPatch: daemonProcess not created yet", True)
-                wait_counter -= 1
-                sleep(2)
-            if wait_counter > 0:
-                self.logger.log("WorkloadPatch: daemonProcess Created "+str(daemonProcess.pid))
-            else:
-                self.logger.log("WorkloadPatch: daemon process creation failed")
-                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConnectionError, "sql connection failed"))
-                return None
+        if wait_counter > 0:
+            self.logger.log("WorkloadPatch: daemonProcess Created "+str(daemonProcess.pid))
+        else:
+            self.logger.log("WorkloadPatch: daemon process creation failed")
+            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConnectionError, "sql connection failed"))
+        return None
 
     def workloadStatus(self):
         if 'oracle' in self.name.lower():
