@@ -120,6 +120,8 @@ def main():
             operation = 'Update'
         elif re.match('^([-/]*)(metrics)', option):
             operation = 'Metrics'
+        elif re.match('^([-/]*)(arc)', option):
+            operation = 'Arc'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -395,7 +397,7 @@ def enable():
 
     # Check if this is Arc VM and enable arc daemon if it is
     if metrics_utils.is_arc_installed():
-        start_arc_watcher()
+        start_arc_process()
 
     if is_systemd():
         OneAgentEnableCommand = "systemctl start mdsd"
@@ -727,8 +729,11 @@ def stop_arc_watcher():
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
             for pids in f.readlines():
-                kill_cmd = "kill " + pids  # TODO : Check to see if the process actually is arc or not
-                run_command_and_log(kill_cmd)
+                proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
+                output = proc.communicate()[0]
+                if "arc" in output:
+                    kill_cmd = "kill " + pids 
+                    run_command_and_log(kill_cmd)
         
         # Delete the file after to avoid clutter
         os.remove(pids_filepath)
@@ -736,17 +741,28 @@ def stop_arc_watcher():
 def arc_watcher():
     """
     This is needed to override mdsd's syslog permissions restriction which prevents mdsd 
-    from reading temporary key files that are needed to make https calls to get an MSI token for arc
+    from reading temporary key files that are needed to make https calls to get an MSI token for arc during onboarding to download amcs config
     This method spins up a process that will continuously keep refreshing that particular file path with valid keys
     So that whenever mdsd needs to refresh it's MSI token, it is able to find correct keys there to make the https calls
     """
+    # check every 30 seconds
+    sleepTime =  30
+
+    # sleep before starting the monitoring.
+    time.sleep(sleepTime)
 
     while True:
-        arc_token_mdsd_dir = "/etc/mdsd.d/arc_tokens/"
-        if not os.path.exists(arc_token_mdsd_dir):
-            os.makedirs(arc_token_mdsd_dir)
+        try:
+            arc_token_mdsd_dir = "/etc/mdsd.d/arc_tokens/"
+            if not os.path.exists(arc_token_mdsd_dir):
+                os.makedirs(arc_token_mdsd_dir)
+            else:
+                # delete the existing keys as they might not be valid anymore
+                for filename in os.listdir(arc_token_mdsd_dir):
+                    filepath = arc_token_mdsd_dir + filename
+                    os.remove(filepath)
 
-        arc_endpoint = metrics_utils.get_arc_endpoint()
+            arc_endpoint = metrics_utils.get_arc_endpoint()
             try:
                 msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://management.azure.com/"
                 req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
@@ -754,9 +770,22 @@ def arc_watcher():
             except:
                 # The above request is expected to fail and add a key to the path - 
                 authkey_dir = "/var/opt/azcmagent/tokens/"
+                if not os.path.exists(authkey_dir):
+                    raise Exception("Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir))
+                # Copy the tokens to mdsd accessible dir
+                for filename in os.listdir(authkey_dir):
+                    filepath = authkey_dir + filename
+                    print filepath
+                    shutil.copy(filepath, arc_token_mdsd_dir)
+                
+                # Change the ownership of the mdsd arc token dir to be accessible by syslog (since mdsd runs as syslog user)
+                os.system("chown -R syslog:syslog {0}".format(arc_token_mdsd_dir))
 
-                # Checkpoint
-                # TODO add more retry logic.
+        except Exception as e:
+            hutil_error('Error in arc watcher process while copying token for arc MSI auth queries. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
 
 def parse_context(operation):
     """
