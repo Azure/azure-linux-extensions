@@ -19,7 +19,7 @@ def read_file(filepath):
 		data = in_file.read().decode('utf-8')
 		return data
 
-class ResourceDiskUtility(object):
+class ResourceDiskUtil(object):
 
 	def __init__(self,patching,logger):
 		self.logger=logger
@@ -58,7 +58,7 @@ class ResourceDiskUtility(object):
 		# We have to try device IDs for both Gen1 and Gen2 VMs.
 		self.logger.log('Searching gen1 prefix {0} or gen2 {1}'.format(gen1_device_prefix, gen2_device_id),True)
 		try: # pylint: disable=R1702
-			for vmbus, guid in ResourceDiskUtility._enumerate_device_id():
+			for vmbus, guid in ResourceDiskUtil._enumerate_device_id():
 				if guid.startswith(gen1_device_prefix) or guid == gen2_device_id:
 					for root, dirs, files in os.walk(STORAGE_DEVICE_PATH + vmbus): # pylint: disable=W0612
 						root_path_parts = root.split('/')

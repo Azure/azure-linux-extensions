@@ -27,7 +27,7 @@ import signal
 import traceback
 import threading
 from common import CommonVariables
-from Utils.ResourceDiskUtil import ResourceDiskUtility
+from Utils.ResourceDiskUtil import ResourceDiskUtil
 
 def thread_for_binary(self,args):
     self.logger.log("Thread for binary is called",True)
@@ -118,7 +118,7 @@ class FsFreezer:
         self.unfrozen_items = set()
         self.freeze_handler = FreezeHandler(self.logger, self.hutil)
         self.mount_open_failed = False
-        self.resource_disk= ResourceDiskUtility(patching = self.patching,logger = self.logger)
+        self.resource_disk= ResourceDiskUtil(patching = self.patching,logger = self.logger)
 
     def should_skip(self, mount):
         resource_disk_mount_point= self.resource_disk.get_resource_disk_mount_point()
