@@ -108,17 +108,29 @@ ExtensionStateSubdirectory = 'state'
 
 # Commands
 # Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
-# When releasing to FF/MC, comment the public OnboardCommandWithOptionalParams
-# and uncomment the corresponding FF/MC command
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
-OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.eaglex.ic.gov -w {1} -s {2} {3}' #EX
+OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
+
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
+
+# Cloud Environments
+PublicCloudName     = "AzurePublicCloud"
+FairfaxCloudName    = "AzureUSGovernmentCloud"
+MooncakeCloudName   = "AzureChinaCloud"
+USNatCloudName      = "USNat" # EX
+USSecCloudName      = "USSec" # RX
+DefaultCloudName    = PublicCloudName # Fallback
+
+CloudDomainMap = {
+    PublicCloudName:   "opinsights.azure.com",
+    FairfaxCloudName:  "opinsights.azure.us",
+    MooncakeCloudName: "opinsights.azure.cn",
+    USNatCloudName:    "opinsights.azure.eaglex.ic.gov",
+    USSecCloudName:    "opinsights.azure.microsoft.scloud"
+}
 
 # Error codes
 DPKGLockedErrorCode = 55 #56, temporary as it excludes from SLA
@@ -153,9 +165,9 @@ OAuthTokenResource = 'https://management.core.windows.net/'
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 AutoManagedWorkspaceCreationSleepSeconds = 20
 
-# vmResourceId Metadata Service
-VMResourceIDMetadataHost = '169.254.169.254'
-VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
+# Instance Metadata Service
+IMDSHost = '169.254.169.254'
+IMDSEndpoint = 'http://{0}/metadata/instance?api-version=2018-10-01'.format(IMDSHost)
 
 # agent permissions
 AgentUser='omsagent'
@@ -580,7 +592,13 @@ def enable():
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
 
-    optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
+    # detect opinsights domain using IMDS
+    domain = get_azure_cloud_domain()
+    domainParam = ''
+    if domain:
+        domainParam = '-d {0}'.format(domain)
+
+    optionalParams = '{0} {1} {2}'.format(domainParam, proxyParam, vmResourceIdParam)
     onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
                                                           workspaceId,
                                                           workspaceKey,
@@ -668,14 +686,14 @@ def remove_workspace_configuration():
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
 
 def get_vmresourceid_from_metadata():
-    req = urllib.request.Request(VMResourceIDMetadataEndpoint)
+    req = urllib.request.Request(IMDSEndpoint)
     req.add_header('Metadata', 'True')
 
     try:
         response = json.loads(urllib.request.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
-            return None #classic vm
+            return None # classic vm
 
         if response['compute']['vmScaleSetName']:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
@@ -691,6 +709,47 @@ def get_vmresourceid_from_metadata():
     except:
         hutil_log_error('Unexpected error from Metadata service')
         return None
+
+def get_azure_environment_from_imds():
+    req = urllib.request.Request(IMDSEndpoint)
+    req.add_header('Metadata', 'True')
+
+    try:
+        response = json.loads(urllib.request.urlopen(req).read())
+
+        if ('compute' not in response or response['compute'] is None):
+            return None # classic vm
+
+        if ('azEnvironment' not in response['compute'] or response['compute']['azEnvironment'] is None):
+            return None # classic vm
+
+        return response['compute']['azEnvironment']
+    except urllib.error.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL ' \
+                        'failed with an HTTPError: {0}'.format(e))
+        hutil_log_info('Response from Metadata service: ' \
+                       '{0}'.format(e.read()))
+        return None
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+        return None
+
+def get_azure_cloud_domain():
+    try:
+        environment = get_azure_environment_from_imds()
+
+        if environment:
+            for cloud, domain in CloudDomainMap.items():
+                if environment.lower() == cloud.lower():
+                    hutil_log_info('Detected cloud environment "{0}" via IMDS. The domain "{1}" will be used.'.format(cloud, domain))
+                    return domain
+
+        hutil_log_info('Unknown cloud environment "{0}"'.format(environment))
+    except Exception as e:
+        hutil_log_error('Failed to detect cloud environment: {0}'.format(e))
+
+    hutil_log_info('Falling back to default domain "{0}"'.format(CloudDomainMap[DefaultCloudName]))
+    return CloudDomainMap[DefaultCloudName]
 
 def retrieve_managed_workspace(vm_resource_id):
     """
