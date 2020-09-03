@@ -22,8 +22,8 @@ def read_file(filepath):
 class ResourceDiskUtil(object):
 
 	def __init__(self,patching,logger):
-		self.logger=logger
-		disk_util = DiskUtil(patching,logger)
+		self.logger = logger
+		self.disk_util = DiskUtil(patching,logger)
 
 	
 	@staticmethod
@@ -56,7 +56,7 @@ class ResourceDiskUtil(object):
 
 		device = None
 		# We have to try device IDs for both Gen1 and Gen2 VMs.
-		self.logger.log('Searching gen1 prefix {0} or gen2 {1}'.format(gen1_device_prefix, gen2_device_id),True)
+		#ResourceDiskUtil.logger.log('Searching gen1 prefix {0} or gen2 {1}'.format(gen1_device_prefix, gen2_device_id),True)
 		try: # pylint: disable=R1702
 			for vmbus, guid in ResourceDiskUtil._enumerate_device_id():
 				if guid.startswith(gen1_device_prefix) or guid == gen2_device_id:
@@ -97,6 +97,7 @@ class ResourceDiskUtil(object):
 			port_id = port_id - 2
 
 		gen1_device_prefix = '{0}-000{1}'.format(g0, port_id)
+		self.logger.log('Searching gen1 prefix {0} or gen2 {1}'.format(gen1_device_prefix, GEN2_DEVICE_ID),True)
 		device = self.search_for_resource_disk(
 			gen1_device_prefix=gen1_device_prefix,
 			gen2_device_id=GEN2_DEVICE_ID
@@ -143,11 +144,11 @@ class ResourceDiskUtil(object):
 
 		#p = Popen("mount", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		#mount_list, err = p.communicate()
-		mount_list = disk_util.get_mount_output()
+		mount_list = self.disk_util.get_mount_output()
 
 		if(mount_list is not None):
-			mount_point = self.get_mount_point(mount_list, device)
-			self.logger.log(("Resource disk [{0}] is mounted [{1}]",partition,existing),True)
+			mount_point = self.get_mount_point(mountlist = mount_list, device = device)
+			self.logger.log(("Resource disk [{0}] is mounted [{1}]",partition,mount_point),True)
 			if mount_point:
 				return mount_point
 		return None
