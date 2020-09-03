@@ -13,11 +13,14 @@ else
     } > /etc/udev/rules.d/70-luks-ade.rules.new
 
     PARTUUID=$(getargs rd.luks.ade.partuuid -d rd_LUKS_PARTUUID)
+    BOOTUUID=$(getargs rd.luks.ade.bootuuid -d rd_LUKS_BOOTUUID)
+
     {
         printf -- 'ENV{ID_PART_ENTRY_UUID}=="*%s*", ' "$PARTUUID"
         printf -- 'RUN+="%s ' "$(command -v initqueue)"
         printf -- '--unique --settled --onetime --name crypt-run-generator-ade-%%k '
-        printf -- '%s $env{DEVNAME} osencrypt"\n' "$(command -v crypt-run-generator-ade)"
+        printf -- '%s $env{DEVNAME} osencrypt ' "$(command -v crypt-run-generator-ade)"
+        printf -- '%s\n' "$BOOTUUID"
     } >> /etc/udev/rules.d/70-luks-ade.rules.new
     echo 'LABEL="luks_ade_end"' >> /etc/udev/rules.d/70-luks-ade.rules.new
     mv /etc/udev/rules.d/70-luks-ade.rules.new /etc/udev/rules.d/70-luks-ade.rules

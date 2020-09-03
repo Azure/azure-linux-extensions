@@ -7,11 +7,11 @@ set -x
 
 dev=$1
 luks=$2
-
-allowdiscards="discard"
+bootuuid=$3
 
 crypttab_contains "$luks" "$dev" && exit 0
-echo "$luks $dev /bek/LinuxPassPhraseFileName timeout=10,$allowdiscards,header=/osluksheader" >> /etc/crypttab
+echo "$luks $dev /bek/LinuxPassPhraseFileName timeout=10,discard,header=/boot/luks/osluksheader" >> /etc/crypttab
+echo "UUID=$bootuuid /boot auto defaults 0 0" >> /etc/fstab
 
 if command -v systemctl >/dev/null; then
     systemctl daemon-reload

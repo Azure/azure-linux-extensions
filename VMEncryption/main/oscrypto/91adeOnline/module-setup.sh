@@ -18,7 +18,6 @@ installkernel() {
 install() {
     inst_hook cmdline 30 "$moddir/parse-crypt-ade.sh"
     inst_script "$moddir"/crypt-run-generator-ade.sh /sbin/crypt-run-generator-ade
-    inst /boot/luks/osluksheader /osluksheader
     dracut_need_initqueue
 }
 
