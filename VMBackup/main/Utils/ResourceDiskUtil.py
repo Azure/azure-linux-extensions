@@ -88,6 +88,9 @@ class ResourceDiskUtil(object):
 	def device_for_ide_port(self, port_id=1):
 		"""
 		Return device name attached to ide port 'n'.
+		gen1 device prefix is the prefix of the file name in which the resource disk partition is stored eg sdb
+		gen1 is for new distros
+		In old distros the directory name which contains resource disk partition is assigned to gen2 device id
 		"""
 		if port_id > 3:
 			return None
