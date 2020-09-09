@@ -85,21 +85,15 @@ class ResourceDiskUtil(object):
 			self.logger.log(err_msg,True,'Error')
 		return None
 
-	def device_for_ide_port(self, port_id=1):
+	def device_for_ide_port(self):
 		"""
 		Return device name attached to ide port 'n'.
 		gen1 device prefix is the prefix of the file name in which the resource disk partition is stored eg sdb
 		gen1 is for new distros
 		In old distros the directory name which contains resource disk partition is assigned to gen2 device id
 		"""
-		if port_id > 3:
-			return None
 		g0 = "00000000"
-		if port_id > 1:
-			g0 = "00000001"
-			port_id = port_id - 2
-
-		gen1_device_prefix = '{0}-000{1}'.format(g0, port_id)
+		gen1_device_prefix = '{0}-0001'.format(g0)
 		self.logger.log('Searching gen1 prefix {0} or gen2 {1}'.format(gen1_device_prefix, GEN2_DEVICE_ID),True)
 		device = self.search_for_resource_disk(
 			gen1_device_prefix=gen1_device_prefix,
