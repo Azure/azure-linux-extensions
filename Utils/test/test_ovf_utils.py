@@ -25,13 +25,13 @@ logger.global_shared_context_logger = logger.TestLogger()
 
 class TestTestOvfUtils(unittest.TestCase):
     def test_ovf_env_parse(self):
-        current_dir = d = path.dirname(path.abspath(__file__))
+        current_dir = path.dirname(path.abspath(__file__))
         ovf_xml = ext_utils.get_file_contents(path.join(current_dir, 'ovf-env.xml'))
         ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, config)
         self.assertIsNotNone(ovf_env, "ovf_env should not be null")
 
     def test_ovf_env_parse_minimalxml(self):
-        current_dir = d = path.dirname(path.abspath(__file__))
+        current_dir = path.dirname(path.abspath(__file__))
         ovf_xml = ext_utils.get_file_contents(path.join(current_dir, 'ovf-env-empty.xml'))
         ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, config)
         self.assertIsNone(ovf_env, "ovf_env should be null")
