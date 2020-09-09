@@ -95,7 +95,7 @@ class OvfEnv(object):
         try:
             dom = xml.dom.minidom.parseString(xml_text)
         except (TypeError, xml.parsers.expat.ExpatError):
-            # when the input is NoneType or invalid xml
+            # when the input is of unexpected type or invalid xml
             return None
         if len(dom.getElementsByTagNameNS(ovf_env.OvfNs, "Environment")) != 1:
             logger.error("Unable to parse OVF XML.")
