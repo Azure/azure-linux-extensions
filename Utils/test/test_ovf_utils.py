@@ -30,6 +30,20 @@ class TestTestOvfUtils(unittest.TestCase):
         ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, config)
         self.assertIsNotNone(ovf_env, "ovf_env should not be null")
 
+    def test_ovf_env_parse_minimalxml(self):
+        current_dir = d = path.dirname(path.abspath(__file__))
+        ovf_xml = ext_utils.get_file_contents(path.join(current_dir, 'ovf-env-empty.xml'))
+        ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, config)
+        self.assertIsNone(ovf_env, "ovf_env should be null")
+
+    def test_ovf_env_parse_none_string(self):
+        ovf_env = ovf_utils.OvfEnv.parse(None, config)
+        self.assertIsNone(ovf_env, "ovf_env should be null")
+
+    def test_ovf_env_parse_empty_string(self):
+        ovf_env = ovf_utils.OvfEnv.parse("", config)
+        self.assertIsNone(ovf_env, "ovf_env should be null")
+
 
 if __name__ == '__main__':
     unittest.main()
