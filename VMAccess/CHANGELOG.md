@@ -1,7 +1,10 @@
 ## 1.5.10 (2020-09-09)
 - VMAccess Linux is now more robust to the absence of ovf-env.xml file
 
-## 1.5.9 (2020-07-20)
+## 1.5.6 - 1.5.9
+- several bug-fixes
+
+## 1.5.5 (2020-07-20)
 - Created new python modules under Utils that are meant to be python 3
   compatible and are supposed to be used instead of importing waagent python file through waagentloader.py
 - Fixed code injection vulnerability through the username
