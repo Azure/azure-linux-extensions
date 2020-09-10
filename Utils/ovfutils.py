@@ -91,7 +91,7 @@ class OvfEnv(object):
         ovf_env = OvfEnv()
         if xml_text is None:
             return None
-        logger.log_if_verbose(re.sub("<UserPassword>.*?<", "<UserPassword>*<", xml_text))
+        logger.log_if_verbose(re.sub("UserPassword>.*?<", "UserPassword>*<", xml_text))
         try:
             dom = xml.dom.minidom.parseString(xml_text)
         except (TypeError, xml.parsers.expat.ExpatError):
