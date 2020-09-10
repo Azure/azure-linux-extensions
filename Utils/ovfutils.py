@@ -88,24 +88,30 @@ class OvfEnv(object):
         Parse xml tree, retrieving user and ssh key information.
         Return self.
         """
-        ofv_env = OvfEnv()
-        logger.log_if_verbose(re.sub("<UserPassword>.*?<", "<UserPassword>*<", xml_text))
-        dom = xml.dom.minidom.parseString(xml_text)
-        if len(dom.getElementsByTagNameNS(ofv_env.OvfNs, "Environment")) != 1:
+        ovf_env = OvfEnv()
+        if xml_text is None:
+            return None
+        logger.log_if_verbose(re.sub("UserPassword>.*?<", "UserPassword>*<", xml_text))
+        try:
+            dom = xml.dom.minidom.parseString(xml_text)
+        except (TypeError, xml.parsers.expat.ExpatError):
+            # when the input is of unexpected type or invalid xml
+            return None
+        if len(dom.getElementsByTagNameNS(ovf_env.OvfNs, "Environment")) != 1:
             logger.error("Unable to parse OVF XML.")
         section = None
         newer = False
-        for p in dom.getElementsByTagNameNS(ofv_env.WaNs, "ProvisioningSection"):
+        for p in dom.getElementsByTagNameNS(ovf_env.WaNs, "ProvisioningSection"):
             for n in p.childNodes:
                 if n.localName == "Version":
                     verparts = get_node_text_data(n).split('.')
                     major = int(verparts[0])
                     minor = int(verparts[1])
-                    if major > ofv_env.MajorVersion:
+                    if major > ovf_env.MajorVersion:
                         newer = True
-                    if major != ofv_env.MajorVersion:
+                    if major != ovf_env.MajorVersion:
                         break
-                    if minor > ofv_env.MinorVersion:
+                    if minor > ovf_env.MinorVersion:
                         newer = True
                     section = p
         if newer:
@@ -113,33 +119,33 @@ class OvfEnv(object):
                 "Newer provisioning configuration detected. Please consider updating waagent.")
         if section is None:
             logger.error(
-                "Could not find ProvisioningSection with major version=" + str(ofv_env.MajorVersion))
+                "Could not find ProvisioningSection with major version=" + str(ovf_env.MajorVersion))
             return None
-        ofv_env.ComputerName = get_node_text_data(section.getElementsByTagNameNS(ofv_env.WaNs, "HostName")[0])
-        ofv_env.UserName = get_node_text_data(section.getElementsByTagNameNS(ofv_env.WaNs, "UserName")[0])
+        ovf_env.ComputerName = get_node_text_data(section.getElementsByTagNameNS(ovf_env.WaNs, "HostName")[0])
+        ovf_env.UserName = get_node_text_data(section.getElementsByTagNameNS(ovf_env.WaNs, "UserName")[0])
         if is_deprovision:
-            return ofv_env
+            return ovf_env
         try:
-            ofv_env.UserPassword = get_node_text_data(section.getElementsByTagNameNS(ofv_env.WaNs, "UserPassword")[0])
+            ovf_env.UserPassword = get_node_text_data(section.getElementsByTagNameNS(ovf_env.WaNs, "UserPassword")[0])
         except (KeyError, ValueError, AttributeError, IndexError):
             pass
 
         try:
-            cd_section = section.getElementsByTagNameNS(ofv_env.WaNs, "CustomData")
+            cd_section = section.getElementsByTagNameNS(ovf_env.WaNs, "CustomData")
             if len(cd_section) > 0:
-                ofv_env.CustomData = get_node_text_data(cd_section[0])
-                if len(ofv_env.CustomData) > 0:
+                ovf_env.CustomData = get_node_text_data(cd_section[0])
+                if len(ovf_env.CustomData) > 0:
                     ext_utils.set_file_contents(constants.LibDir + '/CustomData', bytearray(
-                        translate_custom_data(ofv_env.CustomData, configuration)))
+                        translate_custom_data(ovf_env.CustomData, configuration)))
                     logger.log('Wrote ' + constants.LibDir + '/CustomData')
                 else:
                     logger.error('<CustomData> contains no data!')
         except Exception as e:
             logger.error(str(e) + ' occured creating ' + constants.LibDir + '/CustomData')
-        disable_ssh_passwd = section.getElementsByTagNameNS(ofv_env.WaNs, "DisableSshPasswordAuthentication")
+        disable_ssh_passwd = section.getElementsByTagNameNS(ovf_env.WaNs, "DisableSshPasswordAuthentication")
         if len(disable_ssh_passwd) != 0:
-            ofv_env.DisableSshPasswordAuthentication = (get_node_text_data(disable_ssh_passwd[0]).lower() == "true")
-        for pkey in section.getElementsByTagNameNS(ofv_env.WaNs, "PublicKey"):
+            ovf_env.DisableSshPasswordAuthentication = (get_node_text_data(disable_ssh_passwd[0]).lower() == "true")
+        for pkey in section.getElementsByTagNameNS(ovf_env.WaNs, "PublicKey"):
             logger.log_if_verbose(repr(pkey))
             fp = None
             path = None
@@ -150,8 +156,8 @@ class OvfEnv(object):
                 if c.localName == "Path":
                     path = get_node_text_data(c)
                     logger.log_if_verbose(path)
-            ofv_env.SshPublicKeys += [[fp, path]]
-        for keyp in section.getElementsByTagNameNS(ofv_env.WaNs, "KeyPair"):
+            ovf_env.SshPublicKeys += [[fp, path]]
+        for keyp in section.getElementsByTagNameNS(ovf_env.WaNs, "KeyPair"):
             fp = None
             path = None
             logger.log_if_verbose(repr(keyp))
@@ -162,8 +168,8 @@ class OvfEnv(object):
                 if c.localName == "Path":
                     path = get_node_text_data(c)
                     logger.log_if_verbose(path)
-            ofv_env.SshKeyPairs += [[fp, path]]
-        return ofv_env
+            ovf_env.SshKeyPairs += [[fp, path]]
+        return ovf_env
 
     def prepare_dir(self, filepath, distro):
         """
