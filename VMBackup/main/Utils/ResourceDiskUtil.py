@@ -127,7 +127,7 @@ class ResourceDiskUtil(object):
 		if option = 0 then partition will be returned eg /dev/sdb1
 		if option = 1 then mount point will be returned eg /mnt/resource
 		"""
-		device = self.device_for_ide_port(1)
+		device = self.device_for_ide_port()
 		if device is None:
 			self.logger.log('unable to detect disk topology',True,'Error')
 
