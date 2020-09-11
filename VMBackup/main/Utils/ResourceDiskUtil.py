@@ -124,20 +124,20 @@ class ResourceDiskUtil(object):
 
 	def get_resource_disk_mount_point(self,option=1): # pylint: disable=R0912,R0914
 		"""
-		if option = 0 then partition will be returned eg /dev/sdb1
+		if option = 0 then partition will be returned eg sdb1
 		if option = 1 then mount point will be returned eg /mnt/resource
 		"""
-		device = self.device_for_ide_port(1)
+		device = self.device_for_ide_port()
 		if device is None:
 			self.logger.log('unable to detect disk topology',True,'Error')
 
-		device = "/dev/{0}".format(device)
+		# device = "/dev/{0}".format(device)
 		partition = device + "1"  #assuming only one resourde disk partition
 		# mount_list = shellutil.run_get_output("mount")[1]
 
 		self.logger.log(("Resource disk partition: {0} ",partition),True)
 		if(option==0):
-			return partition;
+			return partition
 
 		#p = Popen("mount", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		#mount_list, err = p.communicate()

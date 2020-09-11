@@ -10,6 +10,7 @@ import json
 import tempfile
 import time
 from Utils.DiskUtil import DiskUtil
+from Utils.ResourceDiskUtil import ResourceDiskUtil
 import Utils.HandlerUtil
 import traceback
 import subprocess
@@ -106,6 +107,9 @@ class SizeCalculation(object):
 
             output_length = len(output)
             index = 1
+            self.resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
+            resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
+            resource_disk_device= "/dev/{0}".format(resource_disk_device)
             while index < output_length:
                 if(len(output[index].split()) < 6 ): #when a row is divided in 2 lines
                     index = index+1
@@ -146,7 +150,7 @@ class SizeCalculation(object):
                     self.logger.log("Not Adding network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
-                elif device == '/dev/sdb1' and self.isOnlyOSDiskBackupEnabled == False : #<todo> in some cases root is mounted on /dev/sdb1
+                elif device == resource_disk_device and self.isOnlyOSDiskBackupEnabled == False : #<todo> in some cases root is mounted on /dev/sdb1
                     self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_temporary_disks = total_used_temporary_disks + int(used)
 

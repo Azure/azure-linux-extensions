@@ -23,8 +23,8 @@ import sys
 import subprocess
 import types
 from Utils.DiskUtil import DiskUtil
-
-class Error(Exception):
+from Utils.ResourceDiskUtil import ResourceDiskUtil
+class Error(Exception): 
     pass
 
 class Mount:
@@ -40,17 +40,18 @@ class Mounts:
         self.mounts = []
         added_mount_point_names = [] 
         disk_util = DiskUtil(patching,logger)
+        resource_disk = ResourceDiskUtil(patching,logger)
         # Get mount points 
         mount_points, mount_points_info = disk_util.get_mount_points() 
         # Get lsblk devices 
-        device_items = disk_util.get_device_items(None)
+        self.device_items = disk_util.get_device_items(None)
         lsblk_mounts = [] 
         lsblk_mount_points = []
         lsblk_unique_names = []
         lsblk_fs_types = []
         # List to hold mount-points returned from lsblk command but not reurned from mount command 
         lsblk_mounts_not_in_mount = [] 
-        for device_item in device_items:
+        for device_item in self.device_items:
             mount = Mount(device_item.name, device_item.type, device_item.file_system, device_item.mount_point)
             lsblk_mounts.append(mount)
             logger.log("lsblk mount point "+str(mount.mount_point)+" added with device-name "+str(mount.name)+" and fs type "+str(mount.fstype)+", unique-name "+str(mount.unique_name), True)
@@ -101,3 +102,13 @@ class Mounts:
             return False
         else:
             return True
+    
+    def device_list_for_billing(self):
+        #resource disk device will get device name e.g. sdb1
+        resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
+        devices_to_bill = [] #list to store device names to be billed
+        for device_item in self.device_items :
+            #skipping temp disk from the list
+            if(str(device_item.name).startswith("sd") and resource_disk_device != device_item.name):
+                devices_to_bill.append(device_item.name)
+        return devices_to_bill
