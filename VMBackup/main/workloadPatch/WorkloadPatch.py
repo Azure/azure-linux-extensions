@@ -38,7 +38,7 @@ class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
         self.name = None
-        self.supported_workload = ["oracle", "mysql"]
+        self.supported_workload = ["oracle", "mysql", "postgres"]
         self.command = ""
         self.dbnames = []
         self.cred_string = ""
@@ -143,6 +143,19 @@ class WorkloadPatch:
                 sleep(2)
             self.timeoutDaemon()
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
+        elif 'postgres' in self.name.lower():
+            self.logger.log("WorkloadPatch: Pre- Inside postgres pre")
+            prePostgres = self.command + "psql -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresMaster.sql")
+            args = ["su", "-", self.linux_user, "-c", prePostgres]
+            self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
+
+            process = subprocess.Popen(args)
+            wait_counter = 5
+            while process.poll() == None and wait_counter>0:
+                wait_counter -= 1
+                sleep(2)
+            self.timeoutDaemon()
+            self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master postgres")
         #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
@@ -201,6 +214,17 @@ class WorkloadPatch:
                 sleep(2)
             self.logger.log("WorkloadPatch: Post- Completed")
             self.callLogBackup()
+        elif 'postgres' in self.name.lower():
+            self.logger.log("WorkloadPatch: Post- Inside postgres post")
+            postPostgres = self.command + "psql -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postPostgresMaster.sql")
+            args = ["su", "-", self.linux_user, "-c", postPostgres]
+            self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
+            process = subprocess.Popen(args)
+            wait_counter = 5
+            while process.poll()==None and wait_counter>0:
+                wait_counter -= 1
+                sleep(2)
+            self.logger.log("WorkloadPatch: Post- Completed")
         #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
@@ -419,6 +443,12 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: Inside oracle condition in timeout daemon")
             preDaemonOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleDaemon.sql ") + self.timeout
             argsDaemon = ["su", "-", self.linux_user, "-c", preDaemonOracle]
+            devnull = open(os.devnull, 'w')
+            daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull)
+        elif 'postgres' in self.name.lower():
+            self.logger.log("WorkloadPatch: Inside postgres condition in timeout daemon")
+            prePostgresTimeout = self.command + "psql -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresTimeout.sql ")
+            argsDaemon = ["su", "-", self.linux_user, "-c", prePostgresTimeout]
             devnull = open(os.devnull, 'w')
             daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull)
             
