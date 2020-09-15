@@ -23,7 +23,7 @@ import sys
 import subprocess
 import types
 from Utils.DiskUtil import DiskUtil
-from Utils.ResourceDiskUtil import ResourceDiskUtil
+
 class Error(Exception): 
     pass
 
@@ -102,13 +102,3 @@ class Mounts:
             return False
         else:
             return True
-    
-    def device_list_for_billing(self):
-        #resource disk device will get device name e.g. sdb1
-        resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
-        devices_to_bill = [] #list to store device names to be billed
-        for device_item in self.device_items :
-            #skipping temp disk from the list
-            if(str(device_item.name).startswith("sd") and resource_disk_device != device_item.name):
-                devices_to_bill.append(device_item.name)
-        return devices_to_bill

@@ -52,6 +52,16 @@ class SizeCalculation(object):
             if 'loop' in file_system_info[0]:
                 disk_loop_devices_file_systems.append(file_system_info[0])
         return disk_loop_devices_file_systems
+  
+    def device_list_for_billing(self):
+        #resource disk device will get device name e.g. sdb1
+        resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
+        devices_to_bill = [] #list to store device names to be billed
+        for device_item in self.device_items :
+            #skipping temp disk from the list
+            if(str(device_item.name).startswith("sd") and resource_disk_device != device_item.name):
+                devices_to_bill.append(device_item.name)
+        return devices_to_bill
 
     def get_total_used_size(self):
         try:
@@ -99,6 +109,7 @@ class SizeCalculation(object):
             total_used_temporary_disks = 0 
             total_used_ram_disks = 0
             total_used_unknown_fs = 0
+            total_sd_size=0
             network_fs_types = []
             unknown_fs_types = []
       
@@ -110,6 +121,7 @@ class SizeCalculation(object):
             self.resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
             resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
             resource_disk_device= "/dev/{0}".format(resource_disk_device)
+            device_list=device_list_for_billing() #new logic: calculate the disk size for billing
             while index < output_length:
                 if(len(output[index].split()) < 6 ): #when a row is divided in 2 lines
                     index = index+1
@@ -140,6 +152,10 @@ class SizeCalculation(object):
                     if knownFs in fstype.lower():
                         isKnownFs = True
                         break
+                
+                if(device in device_list)
+                    self.logger.log("Adding sd* partition, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    total_sd_size = total_sd_size + used #calcutale total sd* size just skip temp disk
 
                 if not (isKnownFs or fstype == '' or fstype == None):
                     unknown_fs_types.append(fstype)
@@ -183,7 +199,7 @@ class SizeCalculation(object):
                         total_used_unknown_fs = total_used_unknown_fs + int(used)
 
                 index = index + 1
-
+                
             if not len(unknown_fs_types) == 0:
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("unknownFSTypeInDf",str(unknown_fs_types))
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedunknownFS",str(total_used_unknown_fs))
@@ -202,11 +218,13 @@ class SizeCalculation(object):
             if total_used_loop_device != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
             self.logger.log("Total used space in Bytes : {0}".format(total_used * 1024),True)
+            if total_sd_size != 0 :
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
+            self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
+
             return total_used * 1024, size_calc_failed #Converting into Bytes
         except Exception as e:
             errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True)
             size_calc_failed = True
             return 0,size_calc_failed
-
-
