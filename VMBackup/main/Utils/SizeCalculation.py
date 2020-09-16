@@ -54,13 +54,14 @@ class SizeCalculation(object):
         return disk_loop_devices_file_systems
   
     def device_list_for_billing(self):
-        #resource disk device will get device name e.g. sdb1
-        resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
+        self.logger.log("In device_list_for_billing",True)
         devices_to_bill = [] #list to store device names to be billed
-        for device_item in self.device_items :
-            #skipping temp disk from the list
-            if(str(device_item.name).startswith("sd") and resource_disk_device != device_item.name):
-                devices_to_bill.append(device_item.name)
+        device_items = disk_util.get_device_items(None)
+        for device_item in device_items :
+            # self.logger.log("Device name : {0} ".format(str(device_item.name)),True)
+            if str(device_item.name).startswith("sd"):
+                devices_to_bill.append("/dev/{0}".format(str(device_item.name)))
+        self.logger.log("exiting device_list_for_billing",True)
         return devices_to_bill
 
     def get_total_used_size(self):
@@ -118,10 +119,11 @@ class SizeCalculation(object):
 
             output_length = len(output)
             index = 1
-            self.resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
+            self.resource_disk= ResourceDiskUtil(patching = self.patching, logger = self.logger)
             resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
             resource_disk_device= "/dev/{0}".format(resource_disk_device)
-            device_list=device_list_for_billing() #new logic: calculate the disk size for billing
+            device_list=self.device_list_for_billing() #new logic: calculate the disk size for billing
+
             while index < output_length:
                 if(len(output[index].split()) < 6 ): #when a row is divided in 2 lines
                     index = index+1
@@ -153,9 +155,9 @@ class SizeCalculation(object):
                         isKnownFs = True
                         break
                 
-                if(device in device_list)
+                if device in device_list and device != resource_disk_device :
                     self.logger.log("Adding sd* partition, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
-                    total_sd_size = total_sd_size + used #calcutale total sd* size just skip temp disk
+                    total_sd_size = total_sd_size + int(used) #calcutale total sd* size just skip temp disk
 
                 if not (isKnownFs or fstype == '' or fstype == None):
                     unknown_fs_types.append(fstype)
