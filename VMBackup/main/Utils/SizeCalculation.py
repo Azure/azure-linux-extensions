@@ -10,6 +10,7 @@ import json
 import tempfile
 import time
 from Utils.DiskUtil import DiskUtil
+from Utils.ResourceDiskUtil import ResourceDiskUtil
 import Utils.HandlerUtil
 import traceback
 import subprocess
@@ -51,6 +52,17 @@ class SizeCalculation(object):
             if 'loop' in file_system_info[0]:
                 disk_loop_devices_file_systems.append(file_system_info[0])
         return disk_loop_devices_file_systems
+  
+    def device_list_for_billing(self):
+        self.logger.log("In device_list_for_billing",True)
+        devices_to_bill = [] #list to store device names to be billed
+        device_items = disk_util.get_device_items(None)
+        for device_item in device_items :
+            # self.logger.log("Device name : {0} ".format(str(device_item.name)),True)
+            if str(device_item.name).startswith("sd"):
+                devices_to_bill.append("/dev/{0}".format(str(device_item.name)))
+        self.logger.log("exiting device_list_for_billing",True)
+        return devices_to_bill
 
     def get_total_used_size(self):
         try:
@@ -98,6 +110,7 @@ class SizeCalculation(object):
             total_used_temporary_disks = 0 
             total_used_ram_disks = 0
             total_used_unknown_fs = 0
+            total_sd_size=0
             network_fs_types = []
             unknown_fs_types = []
       
@@ -106,6 +119,11 @@ class SizeCalculation(object):
 
             output_length = len(output)
             index = 1
+            self.resource_disk= ResourceDiskUtil(patching = self.patching, logger = self.logger)
+            resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
+            resource_disk_device= "/dev/{0}".format(resource_disk_device)
+            device_list=self.device_list_for_billing() #new logic: calculate the disk size for billing
+
             while index < output_length:
                 if(len(output[index].split()) < 6 ): #when a row is divided in 2 lines
                     index = index+1
@@ -136,6 +154,10 @@ class SizeCalculation(object):
                     if knownFs in fstype.lower():
                         isKnownFs = True
                         break
+                
+                if device in device_list and device != resource_disk_device :
+                    self.logger.log("Adding sd* partition, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    total_sd_size = total_sd_size + int(used) #calcutale total sd* size just skip temp disk
 
                 if not (isKnownFs or fstype == '' or fstype == None):
                     unknown_fs_types.append(fstype)
@@ -146,7 +168,7 @@ class SizeCalculation(object):
                     self.logger.log("Not Adding network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
-                elif device == '/dev/sdb1' and self.isOnlyOSDiskBackupEnabled == False : #<todo> in some cases root is mounted on /dev/sdb1
+                elif device == resource_disk_device and self.isOnlyOSDiskBackupEnabled == False : #<todo> in some cases root is mounted on /dev/sdb1
                     self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_temporary_disks = total_used_temporary_disks + int(used)
 
@@ -179,7 +201,7 @@ class SizeCalculation(object):
                         total_used_unknown_fs = total_used_unknown_fs + int(used)
 
                 index = index + 1
-
+                
             if not len(unknown_fs_types) == 0:
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("unknownFSTypeInDf",str(unknown_fs_types))
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedunknownFS",str(total_used_unknown_fs))
@@ -198,11 +220,13 @@ class SizeCalculation(object):
             if total_used_loop_device != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
             self.logger.log("Total used space in Bytes : {0}".format(total_used * 1024),True)
+            if total_sd_size != 0 :
+                Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
+            self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
+
             return total_used * 1024, size_calc_failed #Converting into Bytes
         except Exception as e:
             errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True)
             size_calc_failed = True
             return 0,size_calc_failed
-
-
