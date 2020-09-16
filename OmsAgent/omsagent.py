@@ -165,10 +165,6 @@ OAuthTokenResource = 'https://management.core.windows.net/'
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 AutoManagedWorkspaceCreationSleepSeconds = 20
 
-# Instance Metadata Service
-IMDSHost = '169.254.169.254'
-IMDSEndpoint = 'http://{0}/metadata/instance?api-version=2018-10-01'.format(IMDSHost)
-
 # agent permissions
 AgentUser='omsagent'
 AgentGroup='omiusers'
@@ -684,9 +680,40 @@ def remove_workspace_configuration():
     shutil.rmtree(etc_remove_path, True)
     shutil.rmtree(var_remove_path, True)
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
+    
+def is_arc_installed():
+    """
+    Check if the system is on an Arc machine
+    """
+    # Using systemctl to check this since Arc only supports VMs that have systemd
+    check_arc = os.system("systemctl status himdsd 1>/dev/null 2>&1")
+    return check_arc == 0
+
+def get_arc_endpoint():
+    """
+    Find the endpoint for Arc Hybrid IMDS
+    """
+    endpoint_filepath = "/lib/systemd/system.conf.d/azcmagent.conf"
+    with open(endpoint_filepath, "r") as f:
+        data = f.read()
+    endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+    return endpoint
+
+def get_imds_endpoint():
+    """
+    Find the endpoint for IMDS, whether Arc or not
+    """
+    if (is_arc_installed()):
+        imds_endpoint = get_arc_endpoint()
+        imds_endpoint += '/metadata/instance?api-version=2019-08-15'
+    else:
+        imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
+        
+    return imds_endpoint
 
 def get_vmresourceid_from_metadata():
-    req = urllib.request.Request(IMDSEndpoint)
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     try:
@@ -711,7 +738,8 @@ def get_vmresourceid_from_metadata():
         return None
 
 def get_azure_environment_from_imds():
-    req = urllib.request.Request(IMDSEndpoint)
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     try:
