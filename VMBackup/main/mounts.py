@@ -40,7 +40,6 @@ class Mounts:
         self.mounts = []
         added_mount_point_names = [] 
         disk_util = DiskUtil(patching,logger)
-        resource_disk = ResourceDiskUtil(patching,logger)
         # Get mount points 
         mount_points, mount_points_info = disk_util.get_mount_points() 
         # Get lsblk devices 
