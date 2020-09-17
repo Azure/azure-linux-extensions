@@ -30,7 +30,7 @@ transitionsdir = os.path.abspath(os.path.join(scriptdir, '../../transitions'))
 sys.path.append(transitionsdir)
 
 from oscrypto import OSEncryptionStateMachine
-from .encryptstates import PrereqState, PatchBootSystemState
+from .encryptstates import PrereqState, PatchBootSystemState, ResumeEncryptionState
 from CommandExecutor import ProcessCommunicator
 from transitions import State, Machine
 
@@ -40,14 +40,15 @@ class RHEL81EncryptionStateMachine(OSEncryptionStateMachine):
         State(name='uninitialized'),
         State(name='prereq', on_enter='on_enter_state'),
         State(name='patch_boot_system', on_enter='on_enter_state'),
+        State(name='resume_encryption', on_enter='on_enter_state'),
         State(name='completed')
     ]
 
     transitions = [
         {
-            'trigger': 'skip_encryption',
+            'trigger': 'skip_to_resume_encryption',
             'source': 'uninitialized',
-            'dest': 'completed'
+            'dest': 'resume_encryption'
         },
         {
             'trigger': 'enter_prereq',
@@ -62,8 +63,15 @@ class RHEL81EncryptionStateMachine(OSEncryptionStateMachine):
             'conditions': 'should_exit_previous_state'
         },
         {
-            'trigger': 'stop_machine',
+            'trigger': 'enter_resume_encryption',
             'source': 'patch_boot_system',
+            'dest': 'resume_encryption',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_previous_state'
+        },
+        {
+            'trigger': 'stop_machine',
+            'source': 'resume_encryption',
             'dest': 'completed',
             'conditions': 'should_exit_previous_state'
         },
@@ -82,6 +90,7 @@ class RHEL81EncryptionStateMachine(OSEncryptionStateMachine):
         self.state_objs = {
             'prereq': PrereqState(self.context),
             'patch_boot_system': PatchBootSystemState(self.context),
+            'resume_encryption': ResumeEncryptionState(self.context),
         }
 
         self.state_machine = Machine(model=self,
@@ -95,9 +104,12 @@ class RHEL81EncryptionStateMachine(OSEncryptionStateMachine):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
         if '/dev/mapper/osencrypt' in proc_comm.stdout:
-            self.logger.log("OS volume is already encrypted")
+            self.logger.log("OS volume is already mounted from /dev/mapper/osencrypt")
 
-            self.skip_encryption()
+            self.skip_to_resume_encryption()
+            self.log_machine_state()
+
+            self.stop_machine()
             self.log_machine_state()
 
             return
@@ -110,7 +122,8 @@ class RHEL81EncryptionStateMachine(OSEncryptionStateMachine):
         self.enter_patch_boot_system()
         self.log_machine_state()
 
-        self.stop_machine()
+        self.enter_resume_encryption()
         self.log_machine_state()
 
-        self._reboot()
+        self.stop_machine()
+        self.log_machine_state()

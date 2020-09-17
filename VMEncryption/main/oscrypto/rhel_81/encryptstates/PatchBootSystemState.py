@@ -24,6 +24,7 @@ import os
 
 from OSEncryptionState import OSEncryptionState
 from CommandExecutor import ProcessCommunicator
+from Common import CommonVariables
 
 
 class PatchBootSystemState(OSEncryptionState):
@@ -52,8 +53,8 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.ExecuteInBash('mkdir /boot/luks', True)
         self.command_executor.ExecuteInBash('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
         self.command_executor.ExecuteInBash('cryptsetup reencrypt --encrypt --init-only {1} --header /boot/luks/osluksheader -d {0} -q'.format(bek_path,
-                                                                                                                    self.rootfs_block_device),
-                                      raise_exception_on_failure=True)
+                                                                                                                                               self.rootfs_block_device),
+                                            raise_exception_on_failure=True)
 
         # Find out the PARTUUID for the root disk
         root_partuuid = self._get_root_partuuid()
@@ -85,7 +86,23 @@ class PatchBootSystemState(OSEncryptionState):
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
 
-        return super(PatchBootSystemState, self).should_exit()
+        if not os.path.exists(self.state_marker):
+            self.context.logger.log("First call to patch_boot_system state (pid={0}), restarting the machine".format(os.getpid()))
+
+            # create the marker, but do not advance the state machine
+            super(PatchBootSystemState, self).should_exit()
+
+            # the restarted vm shall see the marker and advance the state machine
+            self.command_executor.ExecuteInBash('sleep 30 && reboot &', True)
+
+            self.context.hutil.do_exit(exit_code=CommonVariables.encryption_failed,
+                                       operation='EnableEncryptionOSVolume',
+                                       status=CommonVariables.extension_error_status,
+                                       code=CommonVariables.encryption_failed,
+                                       message="Restarted vm after patching")
+        else:
+            self.context.logger.log("Second call to stripdown state (pid={0}), continuing process".format(os.getpid()))
+            return True
 
     def _append_contents_to_file(self, contents, path):
         with open(path, 'a') as f:
