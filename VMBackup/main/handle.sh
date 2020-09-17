@@ -17,7 +17,6 @@ if [ "$1" = "install" ]
 then
     if [ -f "/etc/azure/workload.conf" ]
     then
-        cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf #migration code. to be removed after the release
         echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
         exit $arc
     else
@@ -32,14 +31,14 @@ then
     exit $arc
 fi
 
-pythonVersionList="python3.6 python3.5 python3.4 python3.3 python3 python2.7 python2.6 python2 python"
+pythonVersionList="python3.8 python3.7 python3.6 python3.5 python3.4 python3.3 python3 python2.7 python2.6 python2 python"
 
-for i in ${pythonVersionList};
+for pythonVersion in ${pythonVersionList};
 do
-	cmnd="/usr/bin/${i}"
+	cmnd="/usr/bin/${pythonVersion}"
 	if [ -f "${cmnd}" ]
     then
-		echo "`date`- ${i} path exists" >> $logfile
+		echo "`date`- ${pythonVersion} path exists" >> $logfile
 		$cmnd main/handle.py -$1
 		rc=$?
 	fi
@@ -50,24 +49,25 @@ do
 done
 
 pythonProcess=$(ps -ef | grep waagent | grep python)
-
 pythonPath=$(echo "${pythonProcess}" | head -n1 | awk '{print $8;}')
 
-if [ $rc -ne 0 ]
+if [ $rc -ne 0 ] && [ -f "`which python`" ]
 then
-	if [ -f "`which python`" ]
-	then
-		echo "`date`- python path exists" >> $logfile
-		/usr/bin/env python main/handle.py -$1
-		rc=$?
-	elif [ -f "${pythonPath}" ]
-	then
-		echo "`date`- python path exists" >> $logfile
-		$pythonPath main/handle.py -$1
-		rc=$?
-	else
-		echo "`date`- python version unknown" >> $logfile
-	fi
+	echo "`date`- python path exists" >> $logfile
+	/usr/bin/env python main/handle.py -$1
+	rc=$?
+fi
+
+if [ $rc -ne 0 ] && [ -f "${pythonPath}" ]
+then
+	echo "`date`- python path exists" >> $logfile
+	$pythonPath main/handle.py -$1
+	rc=$?
+fi
+	
+if [ $rc -eq 3 ]
+then
+	echo "`date`- python version unknown" >> $logfile
 fi
 
 echo "`date`- $rc returned from handle.py" >> $logfile
