@@ -111,7 +111,7 @@ class PatchBootSystemState(OSEncryptionState):
     def _install_and_enable_detached_header_kernel_params(self, root_partuuid, luks_uuid, boot_uuid):
         additional_params = ["rd.luks.name={0}=osencrypt".format(luks_uuid),
                              "rd.luks.options={0}=header=/luks/osluksheader".format(luks_uuid),
-                             "rd.luks.key={0}=/LinuxPassPhraseFileName:LABEL=BEK".format(luks_uuid),
+                             "rd.luks.key={0}=/LinuxPassPhraseFileName:LABEL=\"BEK VOLUME\"".format(luks_uuid),
                              "rd.luks.data={0}=PARTUUID={1}".format(luks_uuid, root_partuuid),
                              "rd.luks.hdr={0}=UUID={1}".format(luks_uuid, boot_uuid),
                              "rd.debug"]
@@ -164,6 +164,9 @@ class PatchBootSystemState(OSEncryptionState):
         return self.disk_util.luks_get_uuid(luks_header_path)
 
     def _is_detached_header_fix(self):
-        # TODO: We need to ask the redhat folks the best way to do this, for now I will just scan the man pages
-        ret_code = self.command_executor.ExecuteInBash("man systemd-cryptsetup-generator | grep luks.hdr")
-        return ret_code == 0
+        # TODO: We need to ask the redhat folks the best way to do this. We can scan man pages like below.
+        # But as we haven't fully tested detached header fix's production code, I am going to hard code this method to return False
+
+        # ret_code = self.command_executor.ExecuteInBash("man systemd-cryptsetup-generator | grep luks.hdr")
+        # return ret_code == 0
+        return False
