@@ -71,7 +71,7 @@ class PatchBootSystemState(OSEncryptionState):
             self._install_and_enable_detached_header_kernel_params(root_partuuid, luks_uuid, boot_uuid)
         else:
             # if detached header fix is absent we will use the 91ade workaround
-            self._install_and_enable_91ade(root_partuuid)
+            self._install_and_enable_91ade(root_partuuid, boot_uuid)
 
         # Add the plain os disk base to the "LVM Blacklist" and add osencrypt device to the whitelist
         self._append_contents_to_file('\ndevices { filter = ["a|osencrypt|", "r|' + root_partuuid + '|"] }\n', '/etc/lvm/lvm.conf')
@@ -92,24 +92,37 @@ class PatchBootSystemState(OSEncryptionState):
             f.write(contents)
 
     def _install_and_enable_detached_header_kernel_params(self, root_partuuid, luks_uuid, boot_uuid):
-        kernel_params = self._get_kernelopts()
-        additional_params = "rd.luks.name={0}=osencrypt rd.luks.options={0}=header=/luks/osluksheader rd.luks.key={0}=/LinuxPassPhraseFileName:LABEL=BEK rd.luks.data={0}=PARTUUID={1} rd.luks.hdr={0}=UUID={2} rd.debug".format(luks_uuid, root_partuuid, boot_uuid)
-        self.command_executor.ExecuteInBash("grub2-editenv - set '{0} {1}'".format(kernel_params, additional_params), raise_exception_on_failure=True)
+        additional_params = ["rd.luks.name={0}=osencrypt".format(luks_uuid),
+                             "rd.luks.options={0}=header=/luks/osluksheader".format(luks_uuid),
+                             "rd.luks.key={0}=/LinuxPassPhraseFileName:LABEL=BEK".format(luks_uuid),
+                             "rd.luks.data={0}=PARTUUID={1}".format(luks_uuid, root_partuuid),
+                             "rd.luks.hdr={0}=UUID={1}".format(luks_uuid, boot_uuid),
+                             "rd.debug"]
+        self._add_kernelopts(additional_params)
 
-    def _install_and_enable_91ade(self, root_partuuid):
+    def _install_and_enable_91ade(self, root_partuuid, boot_uuid):
         # Copy the 91adeOnline directory to dracut/modules.d
         scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
         ademoduledir = os.path.join(scriptdir, '../../91adeOnline')
         self.command_executor.Execute('cp -r {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
+
+        # Change config so that dracut will force add the dm_crypt kernel module
+        self._append_contents_to_file('\nadd_drivers+=" dm_crypt "\n',
+                                      '/etc/dracut.conf.d/ade.conf')
 
         # Change config so that dracut will add the fstab line to the initrd
         self._append_contents_to_file('\nadd_fstab+=" /lib/dracut/modules.d/91adeOnline/ade_fstab_line "\n',
                                       '/etc/dracut.conf.d/ade.conf')
 
         # Add the new kernel param
-        kernel_params = self._get_kernelopts()
-        additional_params = "rd.luks.ade.partuuid={0} rd.debug".format(root_partuuid)
-        self.command_executor.ExecuteInBash("grub2-editenv - set '{0} {1}'".format(kernel_params, additional_params), raise_exception_on_failure=True)
+        additional_params = ["rd.luks.ade.partuuid={0}".format(root_partuuid),
+                             "rd.luks.ade.bootuuid={0}".format(boot_uuid),
+                             "rd.debug"]
+        self._add_kernelopts(additional_params)
+
+    def _add_kernelopts(self, args_to_add):
+        for arg in args_to_add:
+            self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel DEFAULT".format(arg))
 
     def _get_kernelopts(self):
         proc_comm = ProcessCommunicator()
@@ -127,14 +140,7 @@ class PatchBootSystemState(OSEncryptionState):
         return root_partuuid
 
     def _get_boot_uuid(self):
-        boot_uuid = None
-        boot_device_items = self.disk_util.get_device_items(self.bootfs_block_device)
-        for boot_item in boot_device_items:
-            if self.bootfs_block_device.endswith(boot_item.name):
-                boot_uuid = self.disk_util.get_device_items_property(boot_item.name, "UUID")
-                if boot_uuid:
-                    return boot_uuid
-        return boot_uuid
+        return self._parse_uuid_from_fstab('/boot')
 
     def _get_luks_uuid(self):
         luks_header_path = "/boot/luks/osluksheader"

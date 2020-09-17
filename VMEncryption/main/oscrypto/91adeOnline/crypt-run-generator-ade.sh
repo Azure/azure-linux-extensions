@@ -15,6 +15,7 @@ echo "UUID=$bootuuid /boot auto defaults 0 0" >> /etc/fstab
 
 if command -v systemctl >/dev/null; then
     systemctl daemon-reload
+    systemctl start boot.mount
     systemctl start cryptsetup.target
 fi
 exit 0

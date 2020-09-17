@@ -227,33 +227,81 @@ class DiskUtil(object):
 
         return self.luks_add_key(passphrase_file, dev_path, mapper_name, header_file, cleartext_key_file_path)
 
-    def luks_get_uuid(self, header_or_dev_path):
+    def _luks_get_header_dump(self, header_or_dev_path):
         cryptsetup_cmd = "{0} luksDump {1}".format(self.distro_patcher.cryptsetup_path, header_or_dev_path)
 
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm)
 
-        lines = filter(lambda l: "uuid" in l.lower(), proc_comm.stdout.split("\n"))
+        return proc_comm.stdout
+
+    def luks_get_uuid(self, header_or_dev_path):
+        luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
+
+        lines = filter(lambda l: "uuid" in l.lower(), luks_dump_out.split("\n"))
+
         for line in lines:
             splits = line.split()
             if len(splits) == 2 and len(splits[1]) == 36:
                 return splits[1]
         return None
 
+    def _extract_luks_version_from_dump(self, luks_dump_out):
+        lines = luks_dump_out.split("\n")
+        for line in lines:
+            if "version:" in line.lower():
+                return line.split()[-1]
+
+    def _extract_luksv2_keyslot_lines(self, luks_dump_out):
+            lines = luks_dump_out.split("\n")
+            keyslot_segment = False
+            keyslot_lines = []
+            for line in lines:
+                parts = line.split(":")
+                if len(parts) < 2:
+                    continue
+
+                if "keyslots" in parts[0].lower():
+                    keyslot_segment = True
+                    continue
+
+                if keyslot_segment and parts[0].strip().isnumeric():
+                    keyslot_lines.append(line)
+                    continue
+
+                if not parts[0][0].isspace():
+                    keyslot_segment = False
+            
+            return keyslot_lines
+
     def luks_dump_keyslots(self, dev_path, header_file):
-        cryptsetup_cmd = ""
-        if header_file:
-            cryptsetup_cmd = "{0} luksDump {1}".format(self.distro_patcher.cryptsetup_path, header_file)
+        luks_dump_out = self._luks_get_header_dump(header_file or dev_path)
+
+        luks_version = self._extract_luks_version_from_dump(luks_dump_out)
+
+        if luks_version == "2":
+            keyslot_lines = self._extract_luksv2_keyslot_lines(luks_dump_out)
+            keyslot_numbers = [int(line.split(":")[0].strip()) for line in keyslot_lines]
+            keyslot_array_size = max(keyslot_numbers) + 2
+            keyslots = [i in keyslot_numbers for i in range(keyslot_array_size)]
+            return keyslots
         else:
-            cryptsetup_cmd = "{0} luksDump {1}".format(self.distro_patcher.cryptsetup_path, dev_path)
+            lines = [l for l in luks_dump_out.split("\n") if "key slot" in l.lower()]
+            keyslots = ["enabled" in l.lower() for l in lines]
+            return keyslots
 
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm)
+    def luks_check_reencryption(self, dev_path, header_file):
+        luks_dump_out = self._luks_get_header_dump(header_file or dev_path)
 
-        lines = [l for l in proc_comm.stdout.split("\n") if "key slot" in l.lower()]
-        keyslots = ["enabled" in l.lower() for l in lines]
+        luks_version = self._extract_luks_version_from_dump(luks_dump_out)
 
-        return keyslots
+        if luks_version == "2":
+            keyslot_lines = self._extract_luksv2_keyslot_lines(luks_dump_out)
+            for line in keyslot_lines:
+                if "reencrypt" in line:
+                    return True
+
+        return False
 
     def luks_open(self, passphrase_file, dev_path, mapper_name, header_file, uses_cleartext_key):
         """
