@@ -97,7 +97,7 @@ class LadConfigAll:
 
         self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mxt.entire_xml_cfg_tmpl))
         self._sink_configs = LadUtil.SinkConfiguration()
-        self._sink_configs.insert_from_config(self._ext_settings.read_protected_config('sinksConfig'))
+        self._sink_configs.insert_from_config(self._ext_settings.read_public_config('sinksConfig'))
         # If we decide to also read sinksConfig from ladCfg, do it first, so that private settings override
 
         # Get encryption settings
