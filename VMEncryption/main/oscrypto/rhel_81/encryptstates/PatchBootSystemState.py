@@ -24,7 +24,7 @@ import os
 
 from OSEncryptionState import OSEncryptionState
 from CommandExecutor import ProcessCommunicator
-from Common import CommonVariables
+from Common import CommonVariables, CryptItem
 
 
 class PatchBootSystemState(OSEncryptionState):
@@ -74,11 +74,16 @@ class PatchBootSystemState(OSEncryptionState):
             # if detached header fix is absent we will use the 91ade workaround
             self._install_and_enable_91ade(root_partuuid, boot_uuid)
 
-        # Add the plain os disk base to the "LVM Blacklist" and add osencrypt device to the whitelist
-        self._append_contents_to_file('\ndevices { filter = ["a|osencrypt|", "r|' + root_partuuid + '|"] }\n', '/etc/lvm/lvm.conf')
-        # Force dracut to include LVM and Crypt modules
-        self._append_contents_to_file('\nadd_dracutmodules+=" crypt lvm"\n',
-                                      '/etc/dracut.conf.d/ade.conf')
+        if self.disk_util.is_os_disk_lvm():
+            # Add the plain os disk base to the "LVM Blacklist" and add osencrypt device to the whitelist
+            self._append_contents_to_file('\ndevices { filter = ["a|osencrypt|", "r|' + root_partuuid + '|"] }\n', '/etc/lvm/lvm.conf')
+            # Force dracut to include LVM and Crypt modules
+            self._append_contents_to_file('\nadd_dracutmodules+=" crypt lvm"\n',
+                                          '/etc/dracut.conf.d/ade.conf')
+        else:
+            self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
+                                          '/etc/dracut.conf.d/ade.conf')
+            self._add_kernelopts(["root=/dev/mapper/osencrypt"])
 
         # Everything is ready, repack dracut
         self.command_executor.ExecuteInBash('dracut -f -v', True)
@@ -92,14 +97,13 @@ class PatchBootSystemState(OSEncryptionState):
             # create the marker, but do not advance the state machine
             super(PatchBootSystemState, self).should_exit()
 
-            # the restarted vm shall see the marker and advance the state machine
-            self.command_executor.ExecuteInBash('sleep 30 && reboot &', True)
+            self.context.hutil.do_status_report(operation='EnableEncryptionOSVolume',
+                                                status=CommonVariables.extension_error_status,
+                                                status_code=CommonVariables.encryption_failed,
+                                                message="Restarting vm after patching")
 
-            self.context.hutil.do_exit(exit_code=CommonVariables.encryption_failed,
-                                       operation='EnableEncryptionOSVolume',
-                                       status=CommonVariables.extension_error_status,
-                                       code=CommonVariables.encryption_failed,
-                                       message="Restarted vm after patching")
+            # the restarted vm shall see the marker and advance the state machine
+            self.command_executor.Execute('reboot')
         else:
             self.context.logger.log("Second call to stripdown state (pid={0}), continuing process".format(os.getpid()))
             return True
@@ -137,6 +141,13 @@ class PatchBootSystemState(OSEncryptionState):
                              "rd.debug"]
         self._add_kernelopts(additional_params)
 
+        # For clarity after reboot, we should also add the correct info to crypttab
+        crypt_item = CryptItem()
+        crypt_item.dev_path = os.path.join("/dev/disk/by-partuuid/", root_partuuid)
+        crypt_item.mapper_name = CommonVariables.osmapper_name
+        crypt_item.luks_header_path = "/boot/luks/osluksheader"
+        self.crypt_mount_config_util.add_crypt_item(crypt_item)
+
     def _add_kernelopts(self, args_to_add):
         for arg in args_to_add:
             self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel DEFAULT".format(arg))
@@ -150,7 +161,7 @@ class PatchBootSystemState(OSEncryptionState):
         root_partuuid = None
         root_device_items = self.disk_util.get_device_items(self.rootfs_block_device)
         for root_item in root_device_items:
-            if self.rootfs_block_device.endswith(root_item.name):
+            if self.rootfs_sdx_path.endswith(root_item.name):
                 root_partuuid = self.disk_util.get_device_items_property(root_item.name, "PARTUUID")
                 if root_partuuid:
                     return root_partuuid

@@ -499,8 +499,9 @@ class DiskUtil(object):
 
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
                volume_type == CommonVariables.VolumeTypeAll.lower():
-                if not os_drive_encrypted:
+                if not os_drive_encrypted or self.luks_check_reencryption(dev_path=None, header_file="/boot/luks/osluksheader"):
                     encryption_status["os"] = "EncryptionInProgress"
+
         elif os.path.exists(self.get_osmapper_path()) and not os_drive_encrypted:
             encryption_status["os"] = "VMRestartPending"
 

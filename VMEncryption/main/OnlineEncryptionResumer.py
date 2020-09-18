@@ -55,14 +55,14 @@ class OnlineEncryptionResumer:
             child = subprocess.Popen(args, stdout=status_file_write, stderr=subprocess.PIPE)
 
             status_message = None
-            while not child.poll():
+            while child.poll() is None:
                 sleep(self.STATUS_INTERVAL)
                 with open(status_file_path, "r") as status_file_read:
                     lines = status_file_read.readlines()
                     if len(lines) > 0:
                         status_message = lines[-1].strip()
                 if status_message:
-                    full_message = "Bacground encrypting {0} - {1}".format(self.crypt_item.dev_path, status_message)
+                    full_message = "Background encrypting {0} - {1}".format(self.crypt_item.dev_path, status_message)
                     self.hutil.do_status_report(operation='DataCopy',
                                                 status=CommonVariables.extension_success_status,
                                                 status_code=str(CommonVariables.success),
@@ -73,3 +73,5 @@ class OnlineEncryptionResumer:
                                             status=CommonVariables.extension_success_status,
                                             status_code=str(CommonVariables.success),
                                             message=message)
+        # Let's clean up after ourselves
+        os.remove(status_file_path)

@@ -28,3 +28,4 @@ sys.path.append(oscryptodir)
 
 from .PrereqState import PrereqState
 from .PatchBootSystemState import PatchBootSystemState
+from .ResumeEncryptionState import ResumeEncryptionState

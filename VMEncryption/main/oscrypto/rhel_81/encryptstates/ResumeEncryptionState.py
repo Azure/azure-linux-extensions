@@ -41,7 +41,7 @@ class ResumeEncryptionState(OSEncryptionState):
             self.context.logger.log("osencrypt device mapper does not exist. Cannot do a resume.")
             return False
 
-        return self.disk_util.luks_check_reencryption(self.rootfs_block_device, '/boot/luks/osluksheader'):
+        return self.disk_util.luks_check_reencryption(self.rootfs_block_device, '/boot/luks/osluksheader')
 
     def enter(self):
         if not self.should_enter():
