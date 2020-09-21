@@ -686,28 +686,38 @@ def is_arc_installed():
     Check if the system is on an Arc machine
     """
     # Using systemctl to check this since Arc only supports VMs that have systemd
-    check_arc = os.system("systemctl status himdsd 1>/dev/null 2>&1")
+    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
     return check_arc == 0
 
 def get_arc_endpoint():
     """
     Find the endpoint for Arc Hybrid IMDS
     """
-    endpoint_filepath = "/lib/systemd/system.conf.d/azcmagent.conf"
-    with open(endpoint_filepath, "r") as f:
-        data = f.read()
-    endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+    endpoint_filepath = '/lib/systemd/system.conf.d/azcmagent.conf'
+    endpoint = ''
+    try:
+        with open(endpoint_filepath, 'r') as f:
+            data = f.read()
+        endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+    except:
+        hutil_log_error('Unable to load Arc IMDS endpoint from {0}'.format(endpoint_filepath))
     return endpoint
 
 def get_imds_endpoint():
     """
     Find the endpoint for IMDS, whether Arc or not
     """
+    azure_imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
     if (is_arc_installed()):
         imds_endpoint = get_arc_endpoint()
-        imds_endpoint += '/metadata/instance?api-version=2019-08-15'
+        if imds_endpoint:
+            imds_endpoint += '/metadata/instance?api-version=2019-08-15'
+        else: 
+            # Fall back to the traditional IMDS endpoint; the cloud domain and VM
+            # resource id detection logic are resilient to failed queries to IMDS
+            imds_endpoint = azure_imds_endpoint
     else:
-        imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
+        imds_endpoint = azure_imds_endpoint
         
     return imds_endpoint
 
