@@ -709,6 +709,7 @@ def get_imds_endpoint():
     """
     azure_imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
     if (is_arc_installed()):
+        hutil_log_info('Arc is installed, loading Arc-specific IMDS endpoint')
         imds_endpoint = get_arc_endpoint()
         if imds_endpoint:
             imds_endpoint += '/metadata/instance?api-version=2019-08-15'
@@ -716,9 +717,11 @@ def get_imds_endpoint():
             # Fall back to the traditional IMDS endpoint; the cloud domain and VM
             # resource id detection logic are resilient to failed queries to IMDS
             imds_endpoint = azure_imds_endpoint
+            hutil_log_info('Falling back to default Azure IMDS endpoint')
     else:
         imds_endpoint = azure_imds_endpoint
-        
+    
+    hutil_log_info('Using IMDS endpoint "{0}"'.format(imds_endpoint))
     return imds_endpoint
 
 def get_vmresourceid_from_metadata():
