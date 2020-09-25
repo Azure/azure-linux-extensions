@@ -227,14 +227,33 @@ class EncryptionSettingsUtil(object):
         from HttpUtil import HttpUtil
         return HttpUtil(self.logger)
 
+	def get_wireserver_endpoint_uri(self):
+
+		wireserver_endpoint_file = '/var/lib/waagent/WireServerEndpoint'
+		wireserverIP = None
+
+		if os.path.exists(wireserver_endpoint_file):
+		    with open(wireserver_endpoint_file, 'r') as wip:
+			    wireserverIP = wip.read()
+			    self.logger.log("wireserverIP found in {0} = {1}".format(wireserver_endpoint_file, wireserverIP))
+
+		if wireserverIP == None:
+            self.logger.log("Using static wireServerIP from CommonVariables")
+		    wireserverIP = CommonVariables.wireserverIP
+
+		wireserver_endpoint = "http://" + wireserverIP + ":80/machine?comp=diskEncryptionData"
+		self.logger.log("wireserver_endpoint = {0}".format(wireserver_endpoint))
+		return wireserver_endpoint
+
     def _post_to_wireserver_helper(self, msg_data, http_util):
 
         retry_count_max = 3
         retry_count = 0
+        wireserver_endpoint_uri = self.get_wireserver_endpoint_uri()
         while retry_count < retry_count_max:
             try:
                 result = http_util.Call(method='POST',
-                                        http_uri=CommonVariables.wireserver_endpoint,
+                                        http_uri=wireserver_endpoint_uri,
                                         headers=CommonVariables.wireprotocol_msg_headers,
                                         data=msg_data,
                                         use_https=False)
