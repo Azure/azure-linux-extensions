@@ -47,7 +47,7 @@ class CommonVariables:
     encryption_settings_counter_file = 'counter.txt'
     encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
 
-    wireserver_endpoint = "http://169.254.169.254:80/machine?comp=diskEncryptionData"
+	wireserverIP = "168.63.129.16"
     wireprotocol_msg_headers = {
         "Content-Type": "text/xml",
         "x-ms-version": "2015-04-05"
