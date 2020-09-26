@@ -110,6 +110,7 @@ class SizeCalculation(object):
             total_used_temporary_disks = 0 
             total_used_ram_disks = 0
             total_used_unknown_fs = 0
+            actual_temp_disk_used = 0
             total_sd_size=0
             network_fs_types = []
             unknown_fs_types = []
@@ -154,6 +155,10 @@ class SizeCalculation(object):
                     if knownFs in fstype.lower():
                         isKnownFs = True
                         break
+
+                if device == resource_disk_device and self.isOnlyOSDiskBackupEnabled == False : # adding log to check difference in billing of temp disk
+                    self.logger.log("Actual temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
+                    actual_temp_disk_used= int(used)
                 
                 if device in device_list and device != resource_disk_device :
                     self.logger.log("Adding sd* partition, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
@@ -168,7 +173,7 @@ class SizeCalculation(object):
                     self.logger.log("Not Adding network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
-                elif device == resource_disk_device and self.isOnlyOSDiskBackupEnabled == False : #<todo> in some cases root is mounted on /dev/sdb1
+                elif device == "/dev/sdb1"  and self.isOnlyOSDiskBackupEnabled == False : #<todo> in some cases root is mounted on /dev/sdb1
                     self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_temporary_disks = total_used_temporary_disks + int(used)
 
@@ -206,6 +211,9 @@ class SizeCalculation(object):
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("unknownFSTypeInDf",str(unknown_fs_types))
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedunknownFS",str(total_used_unknown_fs))
                 self.logger.log("Total used space in Bytes of unknown FSTypes : {0}".format(total_used_unknown_fs * 1024),True)
+
+            if total_used_temporary_disks != actual_temp_disk_used :
+                self.logger.log("Billing differenct because of incorrect temp disk: {0}".format(str(total_used_temporary_disks - actual_temp_disk_used)))
 
             if not len(network_fs_types) == 0:
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
