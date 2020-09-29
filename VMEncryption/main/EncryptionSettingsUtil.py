@@ -238,7 +238,7 @@ class EncryptionSettingsUtil(object):
                 wireserver_IP = wip.read()
                 self.logger.log("wireserver_IP found in {0} = {1}".format(wireserver_endpoint_file, wireserver_IP))
 
-        if wireserver_IP == None:
+        if wireserver_IP is None:
             self.logger.log("Using static wireServer_IP from CommonVariables")
             wireserver_IP = CommonVariables.static_wireserver_IP
 
