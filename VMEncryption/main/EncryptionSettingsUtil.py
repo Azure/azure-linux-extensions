@@ -235,7 +235,7 @@ class EncryptionSettingsUtil(object):
 
         if os.path.exists(wireserver_endpoint_file):
             with open(wireserver_endpoint_file, 'r') as wip:
-                wireserver_IP = wip.readline().rstrip()
+                wireserver_IP = wip.readline().strip()
                 self.logger.log("wireserver_IP found in {0} = {1}".format(wireserver_endpoint_file, wireserver_IP))
 
                 # validate the IP address found in wireserver_endpoint_file
