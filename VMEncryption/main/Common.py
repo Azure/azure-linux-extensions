@@ -47,7 +47,12 @@ class CommonVariables:
     encryption_settings_counter_file = 'counter.txt'
     encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
 
-    wireserver_endpoint = "http://169.254.169.254:80/machine?comp=diskEncryptionData"
+    """
+    Find more on Azure wire service IP address here: "https://docs.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16"
+    """
+    static_wireserver_IP = '168.63.129.16'
+    wireserver_endpoint_file = '/var/lib/waagent/WireServerEndpoint'
+    wireserver_endpoint_uri = ':80/machine?comp=diskEncryptionData'
     wireprotocol_msg_headers = {
         "Content-Type": "text/xml",
         "x-ms-version": "2015-04-05"
