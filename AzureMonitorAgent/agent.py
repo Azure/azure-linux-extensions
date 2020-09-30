@@ -222,7 +222,11 @@ def install():
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)    
     
-    default_configs = {        
+    default_configs = {   
+        "MDSD_LOG" : "/var/log",
+        "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
+        "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
+        "MDSD_OPTIONS" : "-l -A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
@@ -232,8 +236,11 @@ def install():
         #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
     }
 
-    # decide the mode
-    if protected_settings is None or len(protected_settings) is 0:
+    # Decide the mode
+    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+        hutil_log_info("Detecting Auto-Config mode.")
+        return 0, ""
+    elif protected_settings is None or len(protected_settings) is 0:
         default_configs["ENABLE_MCS"] = "true"
     else:
         # look for LA protected settings
@@ -398,6 +405,14 @@ def enable():
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
         OneAgentEnableCommand = "/etc/init.d/mdsd start"
     
+    public_settings, protected_settings = get_settings()
+
+    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+        OneAgentEnableCommand = "systemctl start mdsdmgr"
+        if not is_systemd():
+            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
+            OneAgentEnableCommand = "/etc/init.d/mdsdmgr start"
+
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
 
