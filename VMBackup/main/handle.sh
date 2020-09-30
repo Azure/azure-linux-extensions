@@ -12,13 +12,31 @@ logfile=$logfolder'/shell.log'
 
 rc=3
 arc=0
+skip=0
 
 if [ "$1" = "install" ]
 then
     if [ -f "/etc/azure/workload.conf" ]
     then
-        cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf #migration code. to be removed after the release
-        echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
+        cat "/etc/azure/workload.conf" | while read line
+        do 
+            if [ $skip < 2 ]
+            then
+                let "skip+=1"
+            elif [ $line == *"workload_name"* ]
+            then
+                if [ $line == *"mysql"* ] || [ $line == *"oracle"* ]
+                then
+                    echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
+                    break
+                elif [ $line != *"mysql"* ] && [ $line != *"oracle"* ]
+                then
+                    cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
+                    echo "`date`- The command is $1, exiting with conf file copy" >> $logfile
+                    break
+                fi
+            fi
+        done
         exit $arc
     else
         mkdir -p /etc/azure
@@ -26,7 +44,7 @@ then
         echo "`date`- The command is $1, exiting with conf file copy" >> $logfile
         exit $arc
     fi
-elif [ $1 != "enable"  ] && [ $1 != "daemon" ]
+elif [ "$1" != "enable"  ] && [ "$1"s != "daemon" ]
 then
     echo "`date`- The command is $1, exiting" >> $logfile
     exit $arc
