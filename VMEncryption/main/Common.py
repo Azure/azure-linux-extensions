@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 #
 # Azure Disk Encryption For Linux extension
 #
@@ -47,7 +47,12 @@ class CommonVariables:
     encryption_settings_counter_file = 'counter.txt'
     encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
 
-    wireserver_endpoint = "http://169.254.169.254:80/machine?comp=diskEncryptionData"
+    """
+    Find more on Azure wire service IP address here: "https://docs.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16"
+    """
+    static_wireserver_IP = '168.63.129.16'
+    wireserver_endpoint_file = '/var/lib/waagent/WireServerEndpoint'
+    wireserver_endpoint_uri = ':80/machine?comp=diskEncryptionData'
     wireprotocol_msg_headers = {
         "Content-Type": "text/xml",
         "x-ms-version": "2015-04-05"
@@ -78,6 +83,7 @@ class CommonVariables:
     osmapper_name = 'osencrypt'
     azure_symlinks_dir = '/dev/disk/azure'
     disk_by_id_root = '/dev/disk/by-id'
+    az_symlink_os_volume = '/dev/disk/azure/root-part1'
     disk_by_uuid_root = '/dev/disk/by-uuid'
 
     """

@@ -227,14 +227,39 @@ class EncryptionSettingsUtil(object):
         from HttpUtil import HttpUtil
         return HttpUtil(self.logger)
 
+    def get_wireserver_endpoint_uri(self):
+
+        wireserver_endpoint_file = CommonVariables.wireserver_endpoint_file
+        wireserver_IP = None
+        wireserver_endpoint_uri = CommonVariables.wireserver_endpoint_uri
+
+        if os.path.exists(wireserver_endpoint_file):
+            with open(wireserver_endpoint_file, 'r') as wip:
+                wireserver_IP = wip.readline().strip()
+                self.logger.log("wireserver_IP found in {0} = {1}".format(wireserver_endpoint_file, wireserver_IP))
+
+                # validate the IP address found in wireserver_endpoint_file
+                if re.match('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', wireserver_IP) is None:
+                    wireserver_IP = None
+                    self.logger.log("wireserver_IP found in file is not valid.")
+
+        if wireserver_IP is None:
+            self.logger.log("Using static wireServer_IP from CommonVariables")
+            wireserver_IP = CommonVariables.static_wireserver_IP
+
+        wireserver_endpoint = "http://" + wireserver_IP + wireserver_endpoint_uri
+        self.logger.log("wireserver_endpoint = {0}".format(wireserver_endpoint))
+        return wireserver_endpoint
+
     def _post_to_wireserver_helper(self, msg_data, http_util):
 
         retry_count_max = 3
         retry_count = 0
+        wireserver_endpoint_uri = self.get_wireserver_endpoint_uri()
         while retry_count < retry_count_max:
             try:
                 result = http_util.Call(method='POST',
-                                        http_uri=CommonVariables.wireserver_endpoint,
+                                        http_uri=wireserver_endpoint_uri,
                                         headers=CommonVariables.wireprotocol_msg_headers,
                                         data=msg_data,
                                         use_https=False)
