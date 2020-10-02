@@ -1,3 +1,7 @@
+1.1.0.51
+- Add support for RHEL 7.8
+- Make Resource Disk Encryption synchronus
+
 1.1.0.50
 - adds yaml pipeline files to support cdpx test extension build
 - parameterizes version and extension name to support cdpx
