@@ -145,11 +145,11 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
         elif 'postgres' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside postgres pre")
-            prePostgres = self.command + "psql -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresMaster.sql")
-            args = ["su", "-", self.linux_user, "-c", prePostgres]
+            prePostgres = self.command + "psql " + self.cred_string + " -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresMaster.sql")
+            args =  "su - "+self.linux_user+" -c "+"\'"+prePostgres+"\'"
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
 
-            process = subprocess.Popen(args)
+            process = subprocess.Popen(args, shell=True)
             wait_counter = 5
             while process.poll() == None and wait_counter>0:
                 wait_counter -= 1
@@ -216,10 +216,10 @@ class WorkloadPatch:
             self.callLogBackup()
         elif 'postgres' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside postgres post")
-            postPostgres = self.command + "psql -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postPostgresMaster.sql")
-            args = ["su", "-", self.linux_user, "-c", postPostgres]
+            postPostgres = self.command + "psql " + self.cred_string + " -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postPostgresMaster.sql")
+            args =  "su - "+self.linux_user+" -c "+"\'"+postPostgres+"\'"
             self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
-            process = subprocess.Popen(args)
+            process = subprocess.Popen(args, shell=True)
             wait_counter = 5
             while process.poll()==None and wait_counter>0:
                 wait_counter -= 1
@@ -447,10 +447,10 @@ class WorkloadPatch:
             daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull)
         elif 'postgres' in self.name.lower():
             self.logger.log("WorkloadPatch: Inside postgres condition in timeout daemon")
-            prePostgresTimeout = self.command + "psql -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresTimeout.sql ")
-            argsDaemon = ["su", "-", self.linux_user, "-c", prePostgresTimeout]
+            prePostgresTimeout = self.command + "psql " + self.cred_string + " -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresTimeout.sql ")
+            argsDaemon =  "su - "+self.linux_user+" -c "+"\'"+prePostgresTimeout+"\'"
             devnull = open(os.devnull, 'w')
-            daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull)
+            daemonProcess = subprocess.Popen(argsDaemon, shell=True, stdout=devnull, stderr=devnull)
             
         wait_counter = 5
         while daemonProcess == None and wait_counter > 0:
