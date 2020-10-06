@@ -133,3 +133,61 @@ class Test_Disk_Util(unittest.TestCase):
         path_exists = self.disk_util.make_sure_path_exists('/test/path')
         self.assertEqual(path_exists, 0)
         self.assertEqual(cmd_exc_mock.call_count, 1)
+
+    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    def test_is_device_mounted(self, get_luks_header_mock):
+        get_luks_header_mock.return_value = """
+LUKS header information
+Version:        2
+Epoch:          46
+Metadata area:  16384 [bytes]
+Keyslots area:  16744448 [bytes]
+UUID:           9d6914e8-769e-4138-8c06-169c249d19d7
+Requirements:   online-reencrypt
+
+Keyslots:
+  0: luks2
+        Key:        512 bits
+        Priority:   normal
+        Cipher:     aes-xts-plain64
+        Cipher key: 512 bits
+        PBKDF:      pbkdf2
+        Hash:       sha256
+        Iterations: 2048000
+        Salt:       06 e3 15 36 b2 4b 71 7a ad 0d e3 46 0a 72 c1 6b
+                    dc 5c ae ef 91 7c f3 1c ed 7e 96 fd a5 25 5a 42
+        AF stripes: 4000
+        AF hash:    sha256
+        Area offset:32768 [bytes]
+        Area length:258048 [bytes]
+        Digest ID:  0
+  1: reencrypt (unbound)
+        Key:        8 bits
+        Priority:   ignored
+        Mode:       encrypt
+        Direction:  forward
+        Resilience: checksum
+        Hash:       sha256
+        Hash data:  512 [bytes]
+        Area offset:290816 [bytes]
+        Area length:16486400 [bytes]
+Tokens:
+Digests:
+        """
+        keyslots = self.disk_util.luks_dump_keyslots("/dev/path", "/path/to/header")
+        self.assertEqual(keyslots, [True, True, False])
+
+        get_luks_header_mock.reset_mock()
+        # Smaller chunks to make the test more readable
+        get_luks_header_mock.return_value = """
+LUKS header information
+Version:        2
+Keyslots:
+  1: luks2
+        Key:        512 bits
+  3: reencrypt (unbound)
+        Key:        8 bits
+Tokens:
+"""
+        keyslots = self.disk_util.luks_dump_keyslots("/dev/path", "/path/to/header")
+        self.assertEqual(keyslots, [False, True, False, True, False])

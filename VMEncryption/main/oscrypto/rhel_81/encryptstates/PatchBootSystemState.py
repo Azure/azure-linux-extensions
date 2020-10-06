@@ -2,7 +2,7 @@
 #
 # VM Backup extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2020 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ class PatchBootSystemState(OSEncryptionState):
             self._install_and_enable_91ade(root_partuuid, boot_uuid)
 
         if self.disk_util.is_os_disk_lvm():
-            # Add the plain os disk base to the "LVM Blacklist" and add osencrypt device to the whitelist
+            # Add the plain os disk base to the "LVM Reject list" and add osencrypt device to the "Accept list"
             self._append_contents_to_file('\ndevices { filter = ["a|osencrypt|", "r|' + root_partuuid + '|"] }\n', '/etc/lvm/lvm.conf')
             # Force dracut to include LVM and Crypt modules
             self._append_contents_to_file('\nadd_dracutmodules+=" crypt lvm"\n',
@@ -85,7 +85,7 @@ class PatchBootSystemState(OSEncryptionState):
                                           '/etc/dracut.conf.d/ade.conf')
             self._add_kernelopts(["root=/dev/mapper/osencrypt"])
 
-        # Everything is ready, repack dracut
+        # Everything is ready, repack dracut. None of the changes above will take affect until this line is executed.
         self.command_executor.ExecuteInBash('dracut -f -v', True)
 
     def should_exit(self):

@@ -253,26 +253,54 @@ class DiskUtil(object):
                 return line.split()[-1]
 
     def _extract_luksv2_keyslot_lines(self, luks_dump_out):
-            lines = luks_dump_out.split("\n")
-            keyslot_segment = False
-            keyslot_lines = []
-            for line in lines:
-                parts = line.split(":")
-                if len(parts) < 2:
-                    continue
+        """
+        A luks v2 luksheader looks kind of like this: (inessential stuff removed)
 
-                if "keyslots" in parts[0].lower():
-                    keyslot_segment = True
-                    continue
+        LUKS header information
+        Version:        2
+        Data segments:
+            0: crypt
+                offset: 0 [bytes]
+                length: 5539430400 [bytes]
+                cipher: aes-xts-plain64
+                sector: 512 [bytes]
+        Keyslots:
+            1: luks2
+                    Key:        512 bits
+            3: reencrypt (unbound)
+                    Key:        8 bits
+        Tokens:
 
-                if keyslot_segment and parts[0].strip().isnumeric():
-                    keyslot_lines.append(line)
-                    continue
+        In order to parse out the keyslots, we focus into the "Keyslots:" section by looking for that exact string.
+        Then we look for the keyslot number (if present, we return that line)
 
-                if not parts[0][0].isspace():
-                    keyslot_segment = False
-            
-            return keyslot_lines
+        Output for the example above:
+        ["1: luks2", "3: reencrypt (unbound)"]
+        """
+
+        # Split into lines and decode to UTF for access to functions like "isnumeric"
+        lines = luks_dump_out.decode("utf-8").split("\n")
+
+        # This flag will be set to true once we enounter the line "Keyslots:"
+        keyslot_segment = False
+        keyslot_lines = []
+        for line in lines:
+            parts = line.split(":")
+            if len(parts) < 2:
+                continue
+
+            if "keyslots" in parts[0].lower():
+                keyslot_segment = True
+                continue
+
+            if keyslot_segment and parts[0].strip().isnumeric():
+                keyslot_lines.append(line)
+                continue
+
+            if not parts[0][0].isspace():
+                keyslot_segment = False
+
+        return keyslot_lines
 
     def luks_dump_keyslots(self, dev_path, header_file):
         luks_dump_out = self._luks_get_header_dump(header_file or dev_path)
@@ -281,6 +309,9 @@ class DiskUtil(object):
 
         if luks_version == "2":
             keyslot_lines = self._extract_luksv2_keyslot_lines(luks_dump_out)
+            # The code below converts keyslot line array ["0: luks", "2: reencrypt"]
+            # into the keyslots occupancy array [True, False, True, False]
+            # (We add an extra False slot at the end because we always assume luksv2 header is large enough to accomodate another slot)
             keyslot_numbers = [int(line.split(":")[0].strip()) for line in keyslot_lines]
             keyslot_array_size = max(keyslot_numbers) + 2
             keyslots = [i in keyslot_numbers for i in range(keyslot_array_size)]

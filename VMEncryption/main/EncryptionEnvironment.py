@@ -28,7 +28,6 @@ class EncryptionEnvironment(object):
         self.logger = logger
         self.encryption_config_path = '/var/lib/azure_disk_encryption_config/'
         self.daemon_lock_file_path = os.path.join(self.encryption_config_path, 'daemon_lock_file.lck')
-        self.resume_daemon_lock_file_path = os.path.join(self.encryption_config_path, 'resume_daemon_lock.lck')
         self.resume_daemon_status_file_path = os.path.join(self.encryption_config_path, 'resume_daemon_status.txt')
         self.encryption_config_file_path = os.path.join(self.encryption_config_path, 'azure_crypt_config.ini')
         self.extension_parameter_file_path = os.path.join(self.encryption_config_path, 'azure_crypt_params.ini')
