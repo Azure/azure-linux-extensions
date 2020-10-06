@@ -47,7 +47,8 @@ from EncryptionEnvironment import EncryptionEnvironment
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
-from io import open 
+from io import open
+
 
 def install():
     hutil.do_parse_context('Install')
@@ -287,10 +288,10 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             hutil.save_seq()
             message = "Cannot find current passphrase file. This could happen if BEK volume is not mounted or LinuxPassPhrase file is missing from BEK volume."
             hutil.do_exit(exit_code=CommonVariables.configuration_error,
-                      operation='UpdateEncryptionSettings',
-                      status=CommonVariables.extension_error_status,
-                      code=str(CommonVariables.configuration_error),
-                      message=message)
+                          operation='UpdateEncryptionSettings',
+                          status=CommonVariables.extension_error_status,
+                          code=str(CommonVariables.configuration_error),
+                          message=message)
 
         with open(existing_passphrase_file, 'r') as f:
             old_passphrase = f.read()
@@ -633,7 +634,7 @@ def enable():
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
         if encryption_config.config_file_exists():
             existing_volume_type = encryption_config.get_volume_type()
-        
+
         is_migrate_operation = False
         if CommonVariables.MigrateKey in public_settings:
             if public_settings.get(CommonVariables.MigrateKey) == CommonVariables.MigrateValue:
@@ -702,7 +703,7 @@ def enable():
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             if is_migrate_operation:
                 perform_migration(encryption_config, crypt_mount_config_util)
-                return #Control should not reach here but added return just to be safe
+                return  # Control should not reach here but added return just to be safe
             logger.log("handle.py found enable encryption operation")
 
             handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
@@ -824,7 +825,7 @@ def enable_encryption():
 
     existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
     if existing_passphrase_file is None and encryption_config.config_file_exists():
-        msg="EncryptionConfig is present, but could not get the key file."
+        msg = "EncryptionConfig is present, but could not get the key file."
         try:
             hutil.redo_last_status()
             logger.log(msg=msg, level=CommonVariables.WarningLevel)
@@ -943,12 +944,13 @@ def enable_encryption():
                       code=str(CommonVariables.unknown_error),
                       message=message)
 
+
 def perform_migration(encryption_config, crypt_mount_config_util):
     logger.log("Migrate operation found. Starting migration flow.")
     hutil.exit_if_same_seq()
 
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
-    extension_parameter.VolumeType = encryption_config.get_volume_type() # After migration config file has current volume type
+    extension_parameter.VolumeType = encryption_config.get_volume_type()  # After migration config file has current volume type
 
     encryption_config.volume_type = encryption_config.get_volume_type()
     encryption_config.passphrase_file_name = encryption_config.get_bek_filename()
@@ -1032,8 +1034,8 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
                     encryption_environment.enable_se_linux()
 
         if encrypt_result == CommonVariables.process_success:
-            #TODO: let customer specify the default file system in the
-            #parameter
+            # TODO: let customer specify the default file system in the
+            # parameter
             file_system = None
             if "file_system" in encryption_item and encryption_item["file_system"] != "":
                 file_system = encryption_item["file_system"]
@@ -1056,7 +1058,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
             else:
                 crypt_item_to_update.mount_point = os.path.join("/mnt/", mapper_name)
 
-            #allow override through the new full_mount_point field
+            # allow override through the new full_mount_point field
             if "full_mount_point" in encryption_item and encryption_item["full_mount_point"] != "":
                 crypt_item_to_update.mount_point = os.path.join(str(encryption_item["full_mount_point"]))
 
@@ -1127,7 +1129,7 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
                        level=CommonVariables.InfoLevel)
 
             device_fs = ongoing_item_config.get_file_system().lower()
-            if not device_fs in CommonVariables.inplace_supported_file_systems:
+            if device_fs not in CommonVariables.inplace_supported_file_systems:
                 if device_fs in CommonVariables.format_supported_file_systems:
                     msg = "Encrypting {0} file system is not supported for data-preserving encryption. Consider using the encrypt-format-all option.".format(device_fs)
                 else:
@@ -1137,14 +1139,14 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
                 ongoing_item_config.clear_config()
                 return current_phase
 
-            chk_shrink_result = disk_util.check_shrink_fs(dev_path = original_dev_path, size_shrink_to = size_shrink_to)
+            chk_shrink_result = disk_util.check_shrink_fs(dev_path=original_dev_path, size_shrink_to=size_shrink_to)
 
             if chk_shrink_result != CommonVariables.process_success:
                 logger.log(msg="check shrink fs failed with code {0} for {1}".format(chk_shrink_result, original_dev_path),
                            level=CommonVariables.ErrorLevel)
                 logger.log(msg="your file system may not have enough space to do the encryption.")
 
-                #remove the ongoing item.
+                # remove the ongoing item.
                 ongoing_item_config.clear_config()
                 return current_phase
             else:
@@ -1157,7 +1159,7 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
                 ongoing_item_config.original_dev_path = original_dev_path
                 ongoing_item_config.commit()
                 if os.path.exists(encryption_environment.copy_header_slice_file_path):
-                    logger.log(msg="the header slice file is there, remove it.", level = CommonVariables.WarningLevel)
+                    logger.log(msg="the header slice file is there, remove it.", level=CommonVariables.WarningLevel)
                     os.remove(encryption_environment.copy_header_slice_file_path)
 
                 copy_result = disk_util.copy(ongoing_item_config=ongoing_item_config, status_prefix=status_prefix)
@@ -1304,7 +1306,7 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
         ongoing_item_config.file_system = device_item.file_system
         ongoing_item_config.mapper_name = mapper_name
         ongoing_item_config.mount_point = device_item.mount_point
-        #TODO improve this.
+        # TODO improve this.
         if os.path.exists(os.path.join('/dev/', device_item.name)):
             ongoing_item_config.original_dev_name_path = os.path.join('/dev/', device_item.name)
         else:
@@ -1325,12 +1327,11 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
 
     while current_phase != CommonVariables.EncryptionPhaseDone:
         if current_phase == CommonVariables.EncryptionPhaseEncryptDevice:
-            disabled = False
             try:
                 mapper_name = ongoing_item_config.get_mapper_name()
                 original_dev_path = ongoing_item_config.get_original_dev_path()
                 luks_header_file_path = ongoing_item_config.get_header_file_path()
-                disabled = toggle_se_linux_for_centos7(True)
+                toggle_se_linux_for_centos7(True)
 
                 encrypt_result = disk_util.encrypt_disk(dev_path=original_dev_path,
                                                         passphrase_file=passphrase_file,
@@ -1349,12 +1350,11 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
                 toggle_se_linux_for_centos7(False)
 
         elif current_phase == CommonVariables.EncryptionPhaseCopyData:
-            disabled = False
             try:
                 mapper_name = ongoing_item_config.get_mapper_name()
                 original_dev_path = ongoing_item_config.get_original_dev_path()
                 luks_header_file_path = ongoing_item_config.get_header_file_path()
-                disabled = toggle_se_linux_for_centos7(True)
+                toggle_se_linux_for_centos7(True)
                 device_mapper_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
                 if not os.path.exists(device_mapper_path):
                     open_result = disk_util.luks_open(passphrase_file=passphrase_file,
@@ -1386,7 +1386,7 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
 
                 if copy_result != CommonVariables.success:
                     error_message = "the copying result is {0} so skip the mounting".format(copy_result)
-                    logger.log(msg = (error_message), level = CommonVariables.ErrorLevel)
+                    logger.log(msg=error_message, level=CommonVariables.ErrorLevel)
                     return current_phase
                 else:
                     crypt_item_to_update = CryptItem()
@@ -1415,7 +1415,7 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
                         update_crypt_item_result = crypt_mount_config_util.add_crypt_item(crypt_item_to_update)
 
                     if not update_crypt_item_result:
-                        logger.log(msg="update crypt item failed", level = CommonVariables.ErrorLevel)
+                        logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
 
                     if mount_point:
                         logger.log(msg="removing entry for unencrypted drive from fstab",
@@ -1452,7 +1452,7 @@ def decrypt_inplace_copy_data(passphrase_file,
         ongoing_item_config = OnGoingItemConfig(encryption_environment=encryption_environment, logger=logger)
         ongoing_item_config.current_destination = crypt_item.dev_path
         ongoing_item_config.current_source_path = os.path.join(CommonVariables.dev_mapper_root,
-                                                                crypt_item.mapper_name)
+                                                               crypt_item.mapper_name)
         ongoing_item_config.current_total_copy_size = mapper_device_item.size
         ongoing_item_config.from_end = True
         ongoing_item_config.phase = CommonVariables.DecryptionPhaseCopyData
@@ -1686,7 +1686,7 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
             status_prefix = "Encrypting data volume {0}/{1}".format(device_num + 1,
                                                                     len(device_items_to_encrypt))
 
-            #TODO check the file system before encrypting it.
+            # TODO check the file system before encrypting it.
             logger.log(msg="For VMSS we only do inplace headers",
                        level=CommonVariables.WarningLevel)
 
@@ -1868,7 +1868,7 @@ def daemon_encrypt():
         # import OSEncryption here instead of at the top because it relies
         # on pre-req packages being installed (specifically, python-six on Ubuntu)
         distro_name = DistroPatcher.distro_info[0]
-        distro_name = distro_name.replace('ubuntu','Ubuntu') # to upper if needed
+        distro_name = distro_name.replace('ubuntu', 'Ubuntu')  # to upper if needed
         distro_version = DistroPatcher.distro_info[1]
 
         os_encryption = None
@@ -2100,7 +2100,7 @@ def daemon_encrypt_data_volumes(encryption_marker, encryption_config, disk_util,
                 raise Exception(message)
             else:
                 return True
-    except Exception as e:
+    except Exception:
         raise
 
 
@@ -2171,7 +2171,7 @@ def daemon():
     hutil.do_parse_context('Executing')
     lock = ProcessLock(logger, encryption_environment.daemon_lock_file_path)
     if not lock.try_lock():
-        logger.log("there's another daemon running, please wait it to exit.", level = CommonVariables.WarningLevel)
+        logger.log("there's another daemon running, please wait it to exit.", level=CommonVariables.WarningLevel)
         return
 
     logger.log("daemon lock acquired sucessfully.")
@@ -2220,7 +2220,7 @@ def daemon():
                       message=error_msg)
     else:
         encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
-        #TODO not remove it, backed it up.
+        # TODO not remove it, backed it up.
         logger.log("returned to daemon successfully after encryption")
         logger.log("clearing the encryption mark.")
         encryption_marker.clear_config()
@@ -2231,19 +2231,19 @@ def daemon():
 
 
 def start_daemon(operation):
-    #This process will start a new background process by calling
-    #    extension_shim.sh -c handle.py -daemon
-    #to run the script and will exit itself immediatelly.
+    # This process will start a new background process by calling
+    #     extension_shim.sh -c handle.py -daemon
+    # to run the script and will exit itself immediatelly.
     shim_path = os.path.join(os.getcwd(), CommonVariables.extension_shim_filename)
     shim_opts = '-c ' + os.path.join(os.getcwd(), __file__) + ' -daemon'
     args = [shim_path, shim_opts]
     logger.log("start_daemon with args: {0}".format(args))
 
-    #Redirect stdout and stderr to /dev/null.  Otherwise daemon process will
-    #throw broken pipe exception when parent process exit.
-    #use 'wb' for python3 compat since stdout and stderr are bytes not strings
+    # Redirect stdout and stderr to /dev/null.  Otherwise daemon process will
+    # throw broken pipe exception when parent process exit.
+    # use 'wb' for python3 compat since stdout and stderr are bytes not strings
     devnull = open(os.devnull, 'wb')
-    child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
+    subprocess.Popen(args, stdout=devnull, stderr=devnull)
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     if encryption_config.config_file_exists():

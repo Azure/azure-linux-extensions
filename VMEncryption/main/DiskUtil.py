@@ -33,6 +33,7 @@ from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CommonVariables, LvmItem, DeviceItem
 from io import open
 
+
 class DiskUtil(object):
     os_disk_lvm = None
     sles_cache = {}
@@ -441,14 +442,14 @@ class DiskUtil(object):
         # python2 and python3+ compatible function for converting escaped unicode bytes to unicode string
         if s is None:
             return None
-        else: 
-            # decode unicode escape sequences, encode back to latin1, then decode all as 
+        else:
+            # decode unicode escape sequences, encode back to latin1, then decode all as
             return s.decode('unicode-escape').encode('latin1').decode('utf-8')
 
     def get_mount_items(self):
         items = []
         # open as binary in both python2 and python3+ prior to unescape
-        for line in open('/proc/mounts','rb'):
+        for line in open('/proc/mounts', 'rb'):
             mp_line = self.unescape(line)
             mp_list = [s for s in mp_line.split()]
             mp_item = {
@@ -736,6 +737,7 @@ class DiskUtil(object):
         self.command_executor.Execute(lsblk_command, communicator=proc_comm)
         output = proc_comm.stdout
         self.logger.log('\n' + output + '\n')
+
     def get_device_items_sles(self, dev_path):
         if dev_path:
             self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))
@@ -871,8 +873,8 @@ class DiskUtil(object):
 
         try:
             self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
-        except:
-            return [] # return empty list on non-lvm systems that do not have lvs
+        except Exception:
+            return []  # return empty list on non-lvm systems that do not have lvs
 
         lvm_items = []
 

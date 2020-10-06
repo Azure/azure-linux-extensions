@@ -19,8 +19,6 @@
 import inspect
 import os
 import sys
-import traceback
-from time import sleep
 
 scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 oscryptodir = os.path.abspath(os.path.join(scriptdir, '../../'))
