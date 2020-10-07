@@ -48,6 +48,7 @@ from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
+import metrics_ext_utils.metrics_common_utils as metrics_utils
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -119,6 +120,8 @@ def main():
             operation = 'Update'
         elif re.match('^([-/]*)(metrics)', option):
             operation = 'Metrics'
+        elif re.match('^([-/]*)(arc)', option):
+            operation = 'Arc'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -399,6 +402,11 @@ def enable():
     """
     exit_if_vm_not_supported('Enable')
 
+    # Check if this is Arc VM and enable arc daemon if it is
+    if metrics_utils.is_arc_installed():
+        hutil_log_info("This VM is an Arc VM, Running the arc watcher daemon.")
+        start_arc_process()
+
     if is_systemd():
         OneAgentEnableCommand = "systemctl start mdsd"
     else:
@@ -427,6 +435,10 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
+
+    # disable arc daemon if it is running
+    stop_arc_watcher()
+
     #stop the metrics process
     stop_metrics_process()
 
@@ -499,8 +511,8 @@ def start_metrics_process():
     stop_metrics_process()
     
     #start telemetry watcher
-    omsagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python', omsagent_filepath, '-metrics']
+    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python', oneagent_filepath, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     HUtilObject.log('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -683,6 +695,43 @@ def metrics():
 
     return 0, ""
 
+
+def start_arc_process():
+    """
+    Start arc process that performs periodic monitoring activities
+    :return: None
+
+    """
+    hutil_log_info("stopping previously running arc process")
+    stop_arc_watcher()
+    hutil_log_info("starting arc process")
+    
+    #start telemetry watcher
+    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python', oneagent_filepath, '-arc']
+    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+    HUtilObject.log('start watcher process '+str(args))
+    subprocess.Popen(args, stdout=log, stderr=log)
+
+def start_arc_watcher():
+    """
+    Take care of starting arc_watcher daemon if the VM has arc running
+    """    
+    hutil_log_info("Starting the watcher")
+    print("Starting the watcher")
+    pids_filepath = os.path.join(os.getcwd(), 'amaarc.pid')
+    py_pid = os.getpid()
+    print("pid ", py_pid)
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+    hutil_log_info("Written all the pids")
+    print("Written all the pids")
+    watcher_thread = Thread(target = arc_watcher, args = [HUtilObject.error, HUtilObject.log])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
+
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
               'Uninstall' : uninstall,
@@ -690,8 +739,77 @@ operations = {'Disable' : disable,
               'Enable' : enable,
               'Update' : update,
               'Metrics' : metrics,
+              'Arc' : start_arc_watcher,
 }
 
+
+def stop_arc_watcher():
+    """
+    Take care of stopping arc_watcher daemon if the VM has arc running
+    """    
+    pids_filepath = os.path.join(os.getcwd(),'amaarc.pid')
+
+    # kill existing telemetry watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pids in f.readlines():
+                proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
+                output = proc.communicate()[0]
+                if "arc" in output:
+                    kill_cmd = "kill " + pids 
+                    run_command_and_log(kill_cmd)
+        
+        # Delete the file after to avoid clutter
+        os.remove(pids_filepath)
+
+def arc_watcher(hutil_error, hutil_log):
+    """
+    This is needed to override mdsd's syslog permissions restriction which prevents mdsd 
+    from reading temporary key files that are needed to make https calls to get an MSI token for arc during onboarding to download amcs config
+    This method spins up a process that will continuously keep refreshing that particular file path with valid keys
+    So that whenever mdsd needs to refresh it's MSI token, it is able to find correct keys there to make the https calls
+    """
+    # check every 25 seconds
+    sleepTime =  25
+
+    # sleep before starting the monitoring.
+    time.sleep(sleepTime)
+
+    while True:
+        try:
+            arc_token_mdsd_dir = "/etc/mdsd.d/arc_tokens/"
+            if not os.path.exists(arc_token_mdsd_dir):
+                os.makedirs(arc_token_mdsd_dir)
+            else:
+                # delete the existing keys as they might not be valid anymore
+                for filename in os.listdir(arc_token_mdsd_dir):
+                    filepath = arc_token_mdsd_dir + filename
+                    os.remove(filepath)
+
+            arc_endpoint = metrics_utils.get_arc_endpoint()
+            try:
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://monitor.azure.com/"
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib2.urlopen(req)
+            except:
+                # The above request is expected to fail and add a key to the path - 
+                authkey_dir = "/var/opt/azcmagent/tokens/"
+                if not os.path.exists(authkey_dir):
+                    raise Exception("Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir))
+                # Copy the tokens to mdsd accessible dir
+                for filename in os.listdir(authkey_dir):
+                    filepath = authkey_dir + filename
+                    print filepath
+                    shutil.copy(filepath, arc_token_mdsd_dir)
+                
+                # Change the ownership of the mdsd arc token dir to be accessible by syslog (since mdsd runs as syslog user)
+                os.system("chown -R syslog:syslog {0}".format(arc_token_mdsd_dir))
+
+        except Exception as e:
+            hutil_error('Error in arc watcher process while copying token for arc MSI auth queries. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
 
 def parse_context(operation):
     """
