@@ -1,2 +1,2 @@
-select pg_sleep(90);
+select pg_sleep(:t);
 SELECT pg_stop_backup();

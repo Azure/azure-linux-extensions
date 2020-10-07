@@ -447,7 +447,7 @@ class WorkloadPatch:
             daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull)
         elif 'postgres' in self.name.lower():
             self.logger.log("WorkloadPatch: Inside postgres condition in timeout daemon")
-            prePostgresTimeout = self.command + "psql " + self.cred_string + " -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresTimeout.sql ")
+            prePostgresTimeout = self.command + "psql " + self.cred_string + " -v t=" + self.timeout + " -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresTimeout.sql ")
             argsDaemon =  "su - "+self.linux_user+" -c "+"\'"+prePostgresTimeout+"\'"
             devnull = open(os.devnull, 'w')
             daemonProcess = subprocess.Popen(argsDaemon, shell=True, stdout=devnull, stderr=devnull)
