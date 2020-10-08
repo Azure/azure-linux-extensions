@@ -19,6 +19,8 @@
 from Common import TestHooks
 import base64
 import os.path
+import traceback
+import sys
 
 """
 add retry-logic to the network api call.
@@ -45,21 +47,26 @@ class BekUtil(object):
             return passphrase_generated
 
     def store_bek_passphrase(self, encryption_config, passphrase):
-
         bek_filename = encryption_config.get_bek_filename()
-
         try:
             self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
             self.mount_bek_volume()
 
-            with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "w") as f:
+            # ensure base64 encoded passphrase string is identically encoded in
+            # python2 and python3 environments for consistency in output format
+            if sys.version_info[0] < 3:
+                if isinstance(passphrase, str):
+                    passphrase = passphrase.decode('utf-8')
+
+            with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "wb") as f:
                 f.write(passphrase)
             for bek_file in os.listdir(self.bek_filesystem_mount_point):
                 if bek_filename in bek_file and bek_filename != bek_file:
-                    with open(os.path.join(self.bek_filesystem_mount_point, bek_file), "w") as f:
+                    with open(os.path.join(self.bek_filesystem_mount_point, bek_file), "wb") as f:
                         f.write(passphrase)
+
         except Exception as e:
-            message = "Failed to store BEK in BEK VOLUME with error: {0}".format(str(e))
+            message = "Failed to store BEK in BEK VOLUME with error: {0}".format(traceback.format_exc(e))
             self.logger.log(message)
             raise e
         else:
@@ -70,9 +77,7 @@ class BekUtil(object):
         """
         Returns the LinuxPassPhraseFileName path
         """
-
         bek_filename = encryption_config.get_bek_filename()
-
         try:
             self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
             self.mount_bek_volume()
@@ -80,12 +85,13 @@ class BekUtil(object):
             if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
                 return os.path.join(self.bek_filesystem_mount_point, bek_filename)
 
-            for file in os.listdir(self.bek_filesystem_mount_point):
-                if bek_filename in file:
-                    return os.path.join(self.bek_filesystem_mount_point, file)
+            for filename in os.listdir(self.bek_filesystem_mount_point):
+                if bek_filename in filename:
+                    return os.path.join(self.bek_filesystem_mount_point, filename)
 
         except Exception as e:
-            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(str(e))
+            # use traceback to convert exception to string on both python2 and python3+
+            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(traceback.format_exc(e))
             self.logger.log(message)
 
         return None

@@ -30,15 +30,9 @@ import traceback
 import datetime
 import subprocess
 
-from AbstractPatching import AbstractPatching
-try:
-    from Common import *
-except Exception:
-    from ..Common import * # Added for unit test
-try:
-    from CommandExecutor import *
-except Exception:
-    from ..CommandExecutor import * # Added for unit test
+from .AbstractPatching import AbstractPatching
+from Common import *
+from CommandExecutor import *
 
 
 class SuSEPatching(AbstractPatching):

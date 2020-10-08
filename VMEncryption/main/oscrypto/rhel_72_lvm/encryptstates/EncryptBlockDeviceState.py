@@ -47,7 +47,7 @@ class EncryptBlockDeviceState(OSEncryptionState):
         self.context.logger.log("Entering encrypt_block_device state")
         
         self.command_executor.Execute('mount /boot', False)
-        # self._find_bek_and_execute_action('_dump_passphrase')
+
         self._find_bek_and_execute_action('_luks_format')
         self._find_bek_and_execute_action('_luks_open')
 
@@ -77,15 +77,6 @@ class EncryptBlockDeviceState(OSEncryptionState):
         self.command_executor.Execute('cryptsetup luksOpen --header /boot/luks/osluksheader {0} osencrypt -d {1}'.format(self.rootfs_block_device,
                                                                                                                          bek_path),
                                       raise_exception_on_failure=True)
-
-    def _dump_passphrase(self, bek_path):
-        proc_comm = ProcessCommunicator()
-
-        self.command_executor.Execute(command_to_execute="od -c {0}".format(bek_path),
-                                      raise_exception_on_failure=True,
-                                      communicator=proc_comm)
-        self.context.logger.log("Passphrase:")
-        self.context.logger.log(proc_comm.stdout)
 
     def _find_bek_and_execute_action(self, callback_method_name):
         callback_method = getattr(self, callback_method_name)

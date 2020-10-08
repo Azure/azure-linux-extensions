@@ -159,8 +159,8 @@ class SplitRootPartitionState(OSEncryptionState):
         contents += 'UUID={0}\t/boot\text2\tdefaults\t0 0'.format(boot_partition_uuid)
         contents += '\n'
 
-        with open('/etc/fstab', 'w') as f:
-            f.write(contents)
+        with open('/etc/fstab', 'wb') as f:
+            f.write(contents.encode("utf-8"))
 
         self.context.logger.log("fstab updated successfully")
 

@@ -31,16 +31,11 @@ import traceback
 import datetime
 import subprocess
 import inspect
+import io
 
-from AbstractPatching import AbstractPatching
-try:
-    from Common import *
-except Exception:
-    from ..Common import * # Added for unit test
-try:
-    from CommandExecutor import *
-except Exception:
-    from ..CommandExecutor import * # Added for unit test
+from .AbstractPatching import AbstractPatching
+from Common import *
+from CommandExecutor import *
 
 class redhatPatching(AbstractPatching):
     def __init__(self, logger, distro_info):
@@ -88,12 +83,11 @@ class redhatPatching(AbstractPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_cryptsetup(self):
-        packages = ['cryptsetup',
-                    'cryptsetup-reencrypt']
-
         if self.distro_info[1].startswith("6."):
-            packages.remove('cryptsetup')
-            
+            packages = ['cryptsetup-reencrypt']
+        else:
+            packages = ['cryptsetup']
+
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             return_code = self.command_executor.Execute("yum install -y " + " ".join(packages), timeout=100)
             if return_code == -9:
@@ -105,7 +99,6 @@ class redhatPatching(AbstractPatching):
         packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
-                    'cryptsetup-reencrypt',
                     'lvm2',
                     'uuid',
                     'at',
@@ -114,6 +107,7 @@ class redhatPatching(AbstractPatching):
                     'util-linux']
 
         if self.distro_info[1].startswith("6."):
+            packages.append('cryptsetup-reencrypt')
             packages.remove('cryptsetup')
             packages.remove('procps-ng')
             packages.remove('util-linux')
@@ -159,8 +153,13 @@ class redhatPatching(AbstractPatching):
         return False
 
     @staticmethod
-    def append_contents_to_file(contents, path):
-        with open(path, 'a') as f:
+    def _append_contents_to_file(self, contents, path):
+        # Python 3.x strings are Unicode by default and do not use decode
+        if sys.version_info[0] < 3:
+            if isinstance(contents, str):
+                contents = contents.decode('utf-8')
+
+        with io.open(path, 'a') as f:
             f.write(contents)
 
     @staticmethod

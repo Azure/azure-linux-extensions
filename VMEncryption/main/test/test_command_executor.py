@@ -1,6 +1,6 @@
 import unittest
-from main.CommandExecutor import CommandExecutor
-from console_logger import ConsoleLogger
+from CommandExecutor import CommandExecutor
+from .console_logger import ConsoleLogger
 
 class TestCommandExecutor(unittest.TestCase):
     """ unit tests for functions in the CommandExecutor module """

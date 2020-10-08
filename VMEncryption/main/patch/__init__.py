@@ -20,26 +20,45 @@ import os
 import re
 import platform
 
-from UbuntuPatching import UbuntuPatching
-from debianPatching import debianPatching
-from redhatPatching import redhatPatching
-from centosPatching import centosPatching
-from SuSEPatching import SuSEPatching
-from oraclePatching import oraclePatching
+from .UbuntuPatching import UbuntuPatching
+from .debianPatching import debianPatching
+from .redhatPatching import redhatPatching
+from .centosPatching import centosPatching
+from .SuSEPatching import SuSEPatching
+from .oraclePatching import oraclePatching
 
-# Define the function in case waagent(<2.0.4) doesn't have DistInfo()
-def DistInfo():
+try:
+    import distro # python3.8+
+except:
+    pass
+
+def get_linux_distribution():
+    """Abstract platform.linux_distribution() call which is deprecated as of
+       Python 3.5 and removed in Python 3.7"""
+
+    try:
+        osinfo = list(platform.linux_distribution(full_distribution_name=False))
+    except AttributeError:
+        osinfo = list(distro.linux_distribution(full_distribution_name=False))
+
+    return osinfo
+
+def DistInfo(fullname=0):
     if 'FreeBSD' in platform.system():
         release = re.sub('\-.*\Z', '', str(platform.release()))
         distinfo = ['FreeBSD', release]
         return distinfo
+
     if 'linux_distribution' in dir(platform):
-        distinfo = list(platform.linux_distribution(full_distribution_name=0))
-        # remove trailing whitespace in distro name
-        distinfo[0] = distinfo[0].strip()
+        distinfo = list(get_linux_distribution())
+        distinfo[0] = distinfo[0].strip()  # remove trailing whitespace in distro name
+        if not distinfo[0]:
+            distinfo = dist_info_SLES15()
+        if not distinfo[0]:
+            distinfo = dist_info_opensuse15()
         return distinfo
     else:
-        return platform.dist()
+        return get_linux_distribution()
 
 def GetDistroPatcher(logger):
     """
@@ -54,9 +73,11 @@ def GetDistroPatcher(logger):
             Distro = platform.system()
     Distro = Distro.strip('"')
     Distro = Distro.strip(' ')
+    Distro = Distro.replace('ubuntu','Ubuntu') # to upper if needed
+
     patching_class_name = Distro + 'Patching'
 
-    if not globals().has_key(patching_class_name):
+    if patching_class_name not in globals():
         logger.log('{0} is not a supported distribution.'.format(Distro))
         return None
     patchingInstance = globals()[patching_class_name](logger, dist_info)

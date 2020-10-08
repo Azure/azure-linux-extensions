@@ -23,6 +23,7 @@ import inspect
 import re
 import os
 import sys
+import io
 
 from time import sleep
 from OSEncryptionState import *
@@ -105,7 +106,12 @@ class PatchBootSystemState(OSEncryptionState):
         return super(PatchBootSystemState, self).should_exit()
 
     def _append_contents_to_file(self, contents, path):
-        with open(path, 'a') as f:
+        # Python 3.x strings are Unicode by default and do not use decode
+        if sys.version_info[0] < 3:
+            if isinstance(contents, str):
+                contents = contents.decode('utf-8')
+
+        with io.open(path, 'a') as f:
             f.write(contents)
 
     def _modify_pivoted_oldroot(self):

@@ -26,7 +26,7 @@
 - ADE SinglePass EV2 VSRM Artifacts
 - ADE SinglePass CDPx: Migrating Windows agent to image 1809
 
-(1.1.0.48)
+1.1.0.48
 -Fix disable after EFA encryption and stop-start
 -Fix missing Python-six module for CentOS 6.8
 -Add CDPx config

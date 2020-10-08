@@ -77,7 +77,7 @@ class StripdownState(OSEncryptionState):
             self.command_executor.Execute('service atd restart', True)
             os.chdir('/')
             with open("/restart-wala.sh", "w") as f:
-                f.write("service walinuxagent restart\n")
+                f.write("service walinuxagent restart\n".decode('utf-8'))
             self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
 
             self.context.hutil.do_exit(exit_code=CommonVariables.encryption_failed,

@@ -65,14 +65,15 @@ import base64
 import json
 import tempfile
 import time
-
-from Common import *
-from os.path import join
-from Utils.WAAgentUtil import waagent
-from waagent import LoggerInit
 import logging
 import logging.handlers
+
+from os.path import join
+
+from Common import *
 from ProcessLock import ProcessLock
+from .waagentloader import load_waagent
+waagent = load_waagent()
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -107,13 +108,13 @@ class HandlerUtility:
                 try:
                     if file.endswith('.settings'):
                         cur_seq_no = int(os.path.basename(file).split('.')[0])
-                        if os.path.exists(join(config_folder, str(cur_seq_no) + '.settings.rejected')):
+                        if os.path.exists(os.path.join(config_folder, str(cur_seq_no) + '.settings.rejected')):
                             continue
                         if freshest_time == None:
-                            freshest_time = os.path.getmtime(join(config_folder, file))
+                            freshest_time = os.path.getmtime(os.path.join(config_folder, file))
                             seq_no = cur_seq_no
                         else:
-                            current_file_m_time = os.path.getmtime(join(config_folder, file))
+                            current_file_m_time = os.path.getmtime(os.path.join(config_folder, file))
                             if current_file_m_time > freshest_time:
                                 freshest_time = current_file_m_time
                                 seq_no = cur_seq_no
@@ -198,14 +199,14 @@ class HandlerUtility:
 
             # skip unnecessary decryption of protected settings for query status 
             # operations, to avoid timeouts in case of multiple settings files
-            if handlerSettings.has_key('publicSettings'):
+            if 'publicSettings' in handlerSettings:
                 ps = handlerSettings.get('publicSettings')
                 op = ps.get(CommonVariables.EncryptionEncryptionOperationKey)
                 if op == CommonVariables.QueryEncryptionStatus:
                     return config
             
-            if handlerSettings.has_key('protectedSettings') and \
-                    handlerSettings.has_key("protectedSettingsCertThumbprint") and \
+            if 'protectedSettings' in handlerSettings and \
+                    "protectedSettingsCertThumbprint" in handlerSettings and \
                     handlerSettings['protectedSettings'] is not None and \
                     handlerSettings["protectedSettingsCertThumbprint"] is not None:
                 thumb = handlerSettings['protectedSettingsCertThumbprint']
@@ -253,7 +254,7 @@ class HandlerUtility:
             public_settings_str = config_obj['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
 
             # if not json already, load string as json 
-            if isinstance(public_settings_str, basestring):
+            if isinstance(public_settings_str, str):
                 public_settings = json.loads(public_settings_str)
             else:
                 public_settings = public_settings_str
@@ -319,6 +320,12 @@ class HandlerUtility:
         if nonquery:
             last_config_path = self.get_last_nonquery_config_path()
         else:
+            if self._context is None:
+                raise Exception("_context is not set")
+            if (self._context._config_dir is None) or (not os.path.isdir(self._context._config_dir)):
+                raise Exception("_context._config_dir is not set or is not a directory")
+            if (self._context._seq_no is None) or (self._context._seq_no < 0):
+                raise Exception("_context._seq_no is not set")
             # retrieve the settings file corresponding to the current sequence number 
             last_config_path = os.path.join(self._context._config_dir, str(self._context._seq_no) + '.settings')
 
@@ -347,7 +354,8 @@ class HandlerUtility:
         # load environment variables from HandlerEnvironment.json 
         # according to spec, it is always in the ./ directory
         #self.log('cwd is ' + os.path.realpath(os.path.curdir))
-        handler_env_file = './HandlerEnvironment.json'
+        handler_env_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+        handler_env_file = os.path.join(handler_env_dir, 'HandlerEnvironment.json')
         if not os.path.isfile(handler_env_file):
             self.error("Unable to locate " + handler_env_file)
             return None
@@ -376,7 +384,7 @@ class HandlerUtility:
         # initialize handler environment context variables
         handler_env = self.get_handler_env()
         self._context._name = handler_env['name']
-        self._context._version = str(handler_env['version'])
+        self._context._version = handler_env['version']
         self._context._config_dir = handler_env['handlerEnvironment']['configFolder']
         self._context._log_dir = handler_env['handlerEnvironment']['logFolder']
         self._context._log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'extension.log')
@@ -398,7 +406,7 @@ class HandlerUtility:
 
     def _change_log_file(self):
         #self.log("Logging to " + self._context._log_file)
-        LoggerInit(self._context._log_file,'/dev/stdout')
+        waagent.LoggerInit(self._context._log_file,'/dev/stdout')
         self._log = waagent.Log
         self._error = waagent.Error
 
@@ -485,8 +493,7 @@ class HandlerUtility:
             if message is None:
                 message = ""
                 
-            message = filter(lambda c: c in string.printable, message)
-            message = message.encode('ascii', 'ignore')
+            message = ''.join([x for x in message if x in string.printable])
             
             self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
             self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))
@@ -530,8 +537,10 @@ class HandlerUtility:
                 
                 if "VMRestartPending" in encryption_status:
                     stat[0]["status"]["formattedMessage"]["message"] = "OS disk successfully encrypted, please reboot the VM"
-                    
-            stat_rept = json.dumps(stat)
+
+            # use default encode_ascii of true, then encode to utf-8 for python2 + python3 compat on output
+            stat_rept = json.dumps(stat).encode('utf-8')
+            
             # rename all other status files, or the WALA would report the wrong
             # # status file.
             # # because the wala choose the status file with the highest sequence
@@ -540,7 +549,7 @@ class HandlerUtility:
             # is received in between then the guest agent only reports n+1.status. 
             # Hence, any status update from n.settings also needs to go to n+1.status.
             if self._context._status_file:
-                with open(self._context._status_file,'w+') as f:
+                with open(self._context._status_file,'wb+') as f:
                     f.write(stat_rept)
         except Exception as e:
             self.log('Exception occured while writing status: '+ str(e))

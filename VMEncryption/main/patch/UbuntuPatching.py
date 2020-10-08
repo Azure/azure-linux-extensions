@@ -30,15 +30,9 @@ import traceback
 import datetime
 import subprocess
 
-from AbstractPatching import AbstractPatching
-try:
-    from Common import *
-except Exception:
-    from ..Common import * # Added for unit test
-try:
-    from CommandExecutor import *
-except Exception:
-    from ..CommandExecutor import * # Added for unit test
+from .AbstractPatching import AbstractPatching
+from Common import *
+from CommandExecutor import *
 
 
 class UbuntuPatching(AbstractPatching):
@@ -88,16 +82,20 @@ class UbuntuPatching(AbstractPatching):
 
 
     def install_extras(self):
-        """
-        install the sg_dd because the default dd does not support sparse write
-        """
         cmd = " ".join(['apt-get', 'update'])
         self.command_executor.Execute(cmd)
 
+        # select the appropriate version specific parted package
+        if (sys.version_info >= (3,)):
+            parted = 'python3-parted'
+        else:
+            parted = 'python-parted'
+
+        # construct package installation list
         packages = ['at',
                     'cryptsetup-bin',
                     'lsscsi',
-                    'python-parted',
+                    parted,
                     'python-six',
                     'procps',
                     'psmisc']

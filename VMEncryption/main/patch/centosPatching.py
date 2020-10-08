@@ -31,15 +31,9 @@ import traceback
 import datetime
 import subprocess
 
-from redhatPatching import redhatPatching
-try:
-    from Common import *
-except Exception:
-    from ..Common import * # Added for unit test
-try:
-    from CommandExecutor import *
-except Exception:
-    from ..CommandExecutor import * # Added for unit test
+from .redhatPatching import redhatPatching
+from Common import *
+from CommandExecutor import *
 
 class centosPatching(redhatPatching):
     def __init__(self, logger, distro_info):
@@ -80,11 +74,10 @@ class centosPatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
 
     def install_cryptsetup(self):
-        packages = ['cryptsetup',
-                    'cryptsetup-reencrypt']
-
         if self.distro_info[1].startswith("6."):
-            packages.remove('cryptsetup')
+            packages = ['cryptsetup-reencrypt']
+        else:
+            packages = ['cryptsetup']
 
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             return_code = self.command_executor.Execute("yum install -y " + " ".join(packages), timeout=100)
@@ -97,7 +90,6 @@ class centosPatching(redhatPatching):
         packages = ['cryptsetup',
                     'lsscsi',
                     'psmisc',
-                    'cryptsetup-reencrypt',
                     'lvm2',
                     'uuid',
                     'at',
@@ -107,7 +99,8 @@ class centosPatching(redhatPatching):
                     'pyparted']
 
         if self.distro_info[1].startswith("6."):
-            packages.add('python-six')
+            packages.append('cryptsetup-reencrypt')
+            packages.append('python-six')
             packages.remove('cryptsetup')
             packages.remove('procps-ng')
             packages.remove('util-linux')
