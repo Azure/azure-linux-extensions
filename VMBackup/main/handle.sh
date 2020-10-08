@@ -17,7 +17,16 @@ if [ "$1" = "install" ]
 then
     if [ -f "/etc/azure/workload.conf" ]
     then
-        echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
+		WorkloadConfEdited=`awk '/(workload_name)([ ]*[=])([ ]*[(^|\")a-zA-Z(^|\")])/' /etc/azure/workload.conf`
+		if [ "$WorkloadConfEdited" != "" ]
+			then
+				#Workload.conf is edited
+				echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
+			else
+				#workload.conf is not edited
+				cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
+				echo "`date`- The command is $1, exiting with conf file copy" >> $logfile	
+		fi
         exit $arc
     else
         mkdir -p /etc/azure
