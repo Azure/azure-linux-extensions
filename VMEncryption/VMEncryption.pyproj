@@ -27,6 +27,9 @@
     <Content Include="MANIFEST.in" />
     <Content Include="main\oscrypto\centos_68\encryptpatches\centos_68_dracut.patch" />
     <Content Include="main\oscrypto\rhel_68\encryptpatches\rhel_68_dracut.patch" />
+    <Content Include="main\oscrypto\ubuntu_2004\encryptpatches\ubuntu_2004_initramfs.patch" />
+    <Content Include="main\oscrypto\ubuntu_2004\encryptscripts\azure_crypt_key.sh" />
+    <Content Include="main\oscrypto\ubuntu_2004\encryptscripts\inject_luks_header.sh" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptpatches\ubuntu_1604_initramfs.patch" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptscripts\azure_crypt_key.sh" />
     <Content Include="main\oscrypto\ubuntu_1604\encryptscripts\inject_luks_header.sh" />
@@ -124,6 +127,15 @@
     <Compile Include="main\oscrypto\centos_68\encryptstates\EncryptBlockDeviceState.py" />
     <Compile Include="main\oscrypto\centos_68\encryptstates\PatchBootSystemState.py" />
     <Compile Include="main\oscrypto\centos_68\encryptstates\__init__.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\Ubuntu2004EncryptionStateMachine.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\__init__.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\encryptstates\PrereqState.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\encryptstates\StripdownState.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\encryptstates\UnmountOldrootState.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\encryptstates\SplitRootPartitionState.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\encryptstates\EncryptBlockDeviceState.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\encryptstates\PatchBootSystemState.py" />
+    <Compile Include="main\oscrypto\ubuntu_2004\encryptstates\__init__.py" />
     <Compile Include="main\oscrypto\ubuntu_1604\Ubuntu1604EncryptionStateMachine.py" />
     <Compile Include="main\oscrypto\ubuntu_1604\__init__.py" />
     <Compile Include="main\oscrypto\ubuntu_1604\encryptstates\PrereqState.py" />
@@ -178,6 +190,10 @@
     <Folder Include="main\oscrypto\centos_68\" />
     <Folder Include="main\oscrypto\centos_68\encryptstates\" />
     <Folder Include="main\oscrypto\centos_68\encryptpatches\" />
+    <Folder Include="main\oscrypto\ubuntu_2004\" />
+    <Folder Include="main\oscrypto\ubuntu_2004\encryptstates\" />
+    <Folder Include="main\oscrypto\ubuntu_2004\encryptpatches\" />
+    <Folder Include="main\oscrypto\ubuntu_2004\encryptscripts\" />
     <Folder Include="main\oscrypto\ubuntu_1604\" />
     <Folder Include="main\oscrypto\ubuntu_1604\encryptstates\" />
     <Folder Include="main\oscrypto\ubuntu_1604\encryptpatches\" />
