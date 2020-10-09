@@ -4,6 +4,8 @@ recursive-include main/oscrypto/91adeOnline *
 recursive-include main/oscrypto/91ade *.rules
 recursive-include main/oscrypto/rhel_68/encryptpatches *.patch
 recursive-include main/oscrypto/centos_68/encryptpatches *.patch
+recursive-include main/oscrypto/ubuntu_2004/encryptpatches *.patch
+recursive-include main/oscrypto/ubuntu_2004/encryptscripts *.sh
 recursive-include main/oscrypto/ubuntu_1604/encryptpatches *.patch
 recursive-include main/oscrypto/ubuntu_1604/encryptscripts *.sh
 recursive-include main/oscrypto/ubuntu_1404/encryptpatches *.patch
