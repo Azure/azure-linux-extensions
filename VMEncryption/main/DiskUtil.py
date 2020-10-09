@@ -33,6 +33,7 @@ from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CommonVariables, LvmItem, DeviceItem
 from io import open
 
+
 class DiskUtil(object):
     os_disk_lvm = None
     sles_cache = {}
@@ -227,20 +228,112 @@ class DiskUtil(object):
 
         return self.luks_add_key(passphrase_file, dev_path, mapper_name, header_file, cleartext_key_file_path)
 
-    def luks_dump_keyslots(self, dev_path, header_file):
-        cryptsetup_cmd = ""
-        if header_file:
-            cryptsetup_cmd = "{0} luksDump {1}".format(self.distro_patcher.cryptsetup_path, header_file)
-        else:
-            cryptsetup_cmd = "{0} luksDump {1}".format(self.distro_patcher.cryptsetup_path, dev_path)
+    def _luks_get_header_dump(self, header_or_dev_path):
+        cryptsetup_cmd = "{0} luksDump {1}".format(self.distro_patcher.cryptsetup_path, header_or_dev_path)
 
         proc_comm = ProcessCommunicator()
         self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm)
 
-        lines = [l for l in proc_comm.stdout.split("\n") if "key slot" in l.lower()]
-        keyslots = ["enabled" in l.lower() for l in lines]
+        return proc_comm.stdout
 
-        return keyslots
+    def luks_get_uuid(self, header_or_dev_path):
+        luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
+
+        lines = filter(lambda l: "uuid" in l.lower(), luks_dump_out.split("\n"))
+
+        for line in lines:
+            splits = line.split()
+            if len(splits) == 2 and len(splits[1]) == 36:
+                return splits[1]
+        return None
+
+    def _extract_luks_version_from_dump(self, luks_dump_out):
+        lines = luks_dump_out.split("\n")
+        for line in lines:
+            if "version:" in line.lower():
+                return line.split()[-1]
+
+    def _extract_luksv2_keyslot_lines(self, luks_dump_out):
+        """
+        A luks v2 luksheader looks kind of like this: (inessential stuff removed)
+
+        LUKS header information
+        Version:        2
+        Data segments:
+            0: crypt
+                offset: 0 [bytes]
+                length: 5539430400 [bytes]
+                cipher: aes-xts-plain64
+                sector: 512 [bytes]
+        Keyslots:
+            1: luks2
+                    Key:        512 bits
+            3: reencrypt (unbound)
+                    Key:        8 bits
+        Tokens:
+
+        In order to parse out the keyslots, we focus into the "Keyslots:" section by looking for that exact string.
+        Then we look for the keyslot number (if present, we return that line)
+
+        Output for the example above:
+        ["1: luks2", "3: reencrypt (unbound)"]
+        """
+
+        # Split into lines and decode to UTF for access to functions like "isnumeric"
+        lines = luks_dump_out.decode("utf-8").split("\n")
+
+        # This flag will be set to true once we enounter the line "Keyslots:"
+        keyslot_segment = False
+        keyslot_lines = []
+        for line in lines:
+            parts = line.split(":")
+            if len(parts) < 2:
+                continue
+
+            if "keyslots" in parts[0].lower():
+                keyslot_segment = True
+                continue
+
+            if keyslot_segment and parts[0].strip().isnumeric():
+                keyslot_lines.append(line)
+                continue
+
+            if not parts[0][0].isspace():
+                keyslot_segment = False
+
+        return keyslot_lines
+
+    def luks_dump_keyslots(self, dev_path, header_file):
+        luks_dump_out = self._luks_get_header_dump(header_file or dev_path)
+
+        luks_version = self._extract_luks_version_from_dump(luks_dump_out)
+
+        if luks_version == "2":
+            keyslot_lines = self._extract_luksv2_keyslot_lines(luks_dump_out)
+            # The code below converts keyslot line array ["0: luks", "2: reencrypt"]
+            # into the keyslots occupancy array [True, False, True, False]
+            # (We add an extra False slot at the end because we always assume luksv2 header is large enough to accomodate another slot)
+            keyslot_numbers = [int(line.split(":")[0].strip()) for line in keyslot_lines]
+            keyslot_array_size = max(keyslot_numbers) + 2
+            keyslots = [i in keyslot_numbers for i in range(keyslot_array_size)]
+            return keyslots
+        else:
+            lines = [l for l in luks_dump_out.split("\n") if "key slot" in l.lower()]
+            keyslots = ["enabled" in l.lower() for l in lines]
+            return keyslots
+
+    def luks_check_reencryption(self, dev_path, header_file):
+        luks_dump_out = self._luks_get_header_dump(header_file or dev_path)
+
+        luks_version = self._extract_luks_version_from_dump(luks_dump_out)
+
+        if luks_version == "2":
+            keyslot_lines = self._extract_luksv2_keyslot_lines(luks_dump_out)
+            for line in keyslot_lines:
+                if "reencrypt" in line:
+                    return True
+
+        return False
 
     def luks_open(self, passphrase_file, dev_path, mapper_name, header_file, uses_cleartext_key):
         """
@@ -349,14 +442,14 @@ class DiskUtil(object):
         # python2 and python3+ compatible function for converting escaped unicode bytes to unicode string
         if s is None:
             return None
-        else: 
-            # decode unicode escape sequences, encode back to latin1, then decode all as 
+        else:
+            # decode unicode escape sequences, encode back to latin1, then decode all as
             return s.decode('unicode-escape').encode('latin1').decode('utf-8')
 
     def get_mount_items(self):
         items = []
         # open as binary in both python2 and python3+ prior to unescape
-        for line in open('/proc/mounts','rb'):
+        for line in open('/proc/mounts', 'rb'):
             mp_line = self.unescape(line)
             mp_list = [s for s in mp_line.split()]
             mp_item = {
@@ -438,8 +531,9 @@ class DiskUtil(object):
 
             if volume_type == CommonVariables.VolumeTypeOS.lower() or \
                volume_type == CommonVariables.VolumeTypeAll.lower():
-                if not os_drive_encrypted:
+                if not os_drive_encrypted or self.luks_check_reencryption(dev_path=None, header_file="/boot/luks/osluksheader"):
                     encryption_status["os"] = "EncryptionInProgress"
+
         elif os.path.exists(self.get_osmapper_path()) and not os_drive_encrypted:
             encryption_status["os"] = "VMRestartPending"
 
@@ -643,6 +737,7 @@ class DiskUtil(object):
         self.command_executor.Execute(lsblk_command, communicator=proc_comm)
         output = proc_comm.stdout
         self.logger.log('\n' + output + '\n')
+
     def get_device_items_sles(self, dev_path):
         if dev_path:
             self.logger.log(msg=("getting blk info for: {0}".format(dev_path)))
@@ -778,8 +873,8 @@ class DiskUtil(object):
 
         try:
             self.command_executor.Execute(lvs_command, communicator=proc_comm, raise_exception_on_failure=True)
-        except:
-            return [] # return empty list on non-lvm systems that do not have lvs
+        except Exception:
+            return []  # return empty list on non-lvm systems that do not have lvs
 
         lvm_items = []
 
@@ -827,12 +922,7 @@ class DiskUtil(object):
 
         DiskUtil.os_disk_lvm = False
 
-        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'swaplv', 'tmplv', 'usrlv', 'varlv'])
-        if expected_lv_names == current_lv_names:
-            DiskUtil.os_disk_lvm = True
-
-        expected_lv_names = set(['homelv', 'optlv', 'rootlv', 'tmplv', 'usrlv', 'varlv'])
-        if expected_lv_names == current_lv_names:
+        if 'homelv' in current_lv_names and 'rootlv' in current_lv_names:
             DiskUtil.os_disk_lvm = True
 
         return DiskUtil.os_disk_lvm

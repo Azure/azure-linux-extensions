@@ -88,6 +88,9 @@ class OSEncryptionState(object):
                     self.rootfs_block_device = line.strip().split()[0]
                     self.rootfs_disk = self.rootfs_block_device[:-1]
                     self.bootfs_block_device = self.rootfs_disk + '2'
+                    bootfs_uuid = self._parse_uuid_from_fstab('/boot')
+                    if bootfs_uuid:
+                        self.bootfs_block_device = self.disk_util.query_dev_sdx_path_by_uuid(bootfs_uuid)
         elif not self.rootfs_sdx_path:
             self.rootfs_disk = '/dev/sda'
             self.rootfs_block_device = '/dev/sda2'
