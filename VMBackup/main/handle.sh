@@ -17,7 +17,6 @@ if [ "$1" = "install" ]
 then
     if [ -f "/etc/azure/workload.conf" ]
     then
-<<<<<<< HEAD
 		WorkloadConfEdited=`awk '/(workload_name)([ ]*[=])([ ]*[(^|\")a-zA-Z(^|\")])/' /etc/azure/workload.conf`
 		if [ "$WorkloadConfEdited" != "" ]
 			then
@@ -28,27 +27,6 @@ then
 				cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
 				echo "`date`- The command is $1, exiting with conf file copy" >> $logfile	
 		fi
-=======
-        cat "/etc/azure/workload.conf" | while read line
-        do 
-            if [ $skip < 2 ]
-            then
-                let "skip+=1"
-            elif [ $line == *"workload_name"* ]
-            then
-                if [ $line == *"mysql"* ] || [ $line == *"oracle"* ]
-                then
-                    echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
-                    break
-                elif [ $line != *"mysql"* ] && [ $line != *"oracle"* ]
-                then
-                    cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
-                    echo "`date`- The command is $1, exiting with conf file copy" >> $logfile
-                    break
-                fi
-            fi
-        done
->>>>>>> ca05fcbdddfc7bfa96b3c6c700d38ae6738b102b
         exit $arc
     else
         mkdir -p /etc/azure
