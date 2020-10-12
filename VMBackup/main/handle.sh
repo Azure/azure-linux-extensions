@@ -50,59 +50,45 @@ then
     exit $arc
 fi
 
-if [ -f "/usr/bin/python2.7" ]
+pythonVersionList="python3.8 python3.7 python3.6 python3.5 python3.4 python3.3 python3 python2.7 python2.6 python2 python"
+
+for pythonVersion in ${pythonVersionList};
+do
+	cmnd="/usr/bin/${pythonVersion}"
+	if [ -f "${cmnd}" ]
+    then
+		echo "`date`- ${pythonVersion} path exists" >> $logfile
+		$cmnd main/handle.py -$1
+		rc=$?
+	fi
+	if [ $rc -eq 0 ]
+	then
+		break
+	fi
+done
+
+pythonProcess=$(ps -ef | grep waagent | grep python)
+pythonPath=$(echo "${pythonProcess}" | head -n1 | awk '{print $8;}')
+
+if [ $rc -ne 0 ] && [ -f "`which python`" ]
 then
-    echo "`date`- python 2.7 path exists" >> $logfile
-    /usr/bin/python2.7 main/handle.py -$1
-    rc=$?
-elif [ -f "/usr/bin/python2" ]
-then
-    echo "`date`- python2 path exists" >> $logfile
-    /usr/bin/python2 main/handle.py -$1
-    rc=$?
-elif [ -f "/usr/bin/python3.6" ]
-then
-    echo "`date`- python3.6 path exists" >> $logfile
-    /usr/bin/python3.6 main/handle.py -$1
-    rc=$?
-elif [ -f "/usr/bin/python3.5" ]
-then
-    echo "`date`- python3.5 path exists" >> $logfile
-    /usr/bin/python3.5 main/handle.py -$1
-    rc=$?
-elif [ -f "/usr/bin/python3.4" ]
-then
-    echo "`date`- python3.4 path exists" >> $logfile
-    /usr/bin/python3.4 main/handle.py -$1
-    rc=$?
-elif [ -f "/usr/bin/python3.3" ]
-then
-    echo "`date`- python3.3 path exists" >> $logfile
-    /usr/bin/python3.3 main/handle.py -$1
-    rc=$?
-elif [ -f "/usr/bin/python3" ]
-then
-    echo "`date`- python3 path exists" >> $logfile
-    /usr/bin/python3 main/handle.py -$1
-    rc=$?
-elif [ -f "/usr/bin/python2.6" ]
-then
-    echo "`date`- python2.6 path exists" >> $logfile
-    /usr/bin/python2.6 main/handle.py -$1
-    rc=$?
-elif [ -f "/usr/bin/python" ]
-then
-    echo "`date`- python path exists" >> $logfile
-    /usr/bin/python main/handle.py -$1
-    rc=$?
-elif [ -f "`which python`" ]
-then
-    echo "`date`- python path exists" >> $logfile
-    /usr/bin/env python main/handle.py -$1
-    rc=$?
-else
-    echo "`date`- python version unknown" >> $logfile
+	echo "`date`- python path exists" >> $logfile
+	/usr/bin/env python main/handle.py -$1
+	rc=$?
 fi
+
+if [ $rc -ne 0 ] && [ -f "${pythonPath}" ]
+then
+	echo "`date`- python path exists" >> $logfile
+	$pythonPath main/handle.py -$1
+	rc=$?
+fi
+	
+if [ $rc -eq 3 ]
+then
+	echo "`date`- python version unknown" >> $logfile
+fi
+
 echo "`date`- $rc returned from handle.py" >> $logfile
 
 exit $rc

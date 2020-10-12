@@ -26,14 +26,8 @@ import metrics_ext_utils.metrics_constants as metrics_constants
 import subprocess
 import time
 import signal
+import metrics_ext_utils.metrics_common_utils as metrics_utils
 
-def is_systemd():
-    """
-    Check if the system is using systemd
-    """
-
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    return check_systemd == 0
 
 def is_running(is_lad):
     """
@@ -67,7 +61,7 @@ def stop_metrics_service(is_lad):
         metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
 
     # If the VM has systemd, then we will use that to stop
-    if is_systemd():
+    if metrics_utils.is_systemd():
         code = 1
         metrics_service_path = metrics_constants.metrics_extension_service_path
 
@@ -126,13 +120,11 @@ def remove_metrics_service(is_lad):
 
     return True, "Successfully removed metrics-extensions service and MetricsExtension binary."
 
-
-def generate_MSI_token():
+def generate_Arc_MSI_token():
     """
-    This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
+    This method is used to query the Hyrbid metdadata service of Arc to get the MSI Auth token for the VM and write it to the ME config location
     This is called from the main extension code after config setup is complete
     """
-
     _, configFolder = get_handler_vars()
     me_config_dir = configFolder + "/metrics_configs/"
     me_auth_file_path = me_config_dir + "AuthToken-MSI.json"
@@ -148,10 +140,29 @@ def generate_MSI_token():
     try:
         data = None
         while retries <= max_retries:
-            msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
-            req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
-            res = urllib2.urlopen(req)
-            data = json.loads(res.read())
+            arc_endpoint = metrics_utils.get_arc_endpoint()
+            try:
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://management.azure.com/"
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib2.urlopen(req)
+            except:
+                # The above request is expected to fail and add a key to the path - 
+                authkey_dir = "/var/opt/azcmagent/tokens/"
+                if not os.path.exists(authkey_dir):
+                    log_messages += "Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir)
+                    return False, expiry_epoch_time, log_messages
+                keys_dir = []
+                for filename in os.listdir(authkey_dir):
+                    keys_dir.append(filename)
+
+                authkey_path = authkey_dir + keys_dir[-1]
+                auth = "basic "
+                with open(authkey_path, "r") as f:
+                    key = f.read()
+                auth += key
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
+                res = urllib2.urlopen(req)
+                data = json.loads(res.read())
 
             if not data or "access_token" not in data:
                 retries += 1
@@ -180,6 +191,64 @@ def generate_MSI_token():
         return False, expiry_epoch_time, log_messages
 
     return True, expiry_epoch_time, log_messages
+
+
+def generate_MSI_token():
+    """
+    This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
+    This is called from the main extension code after config setup is complete
+    """
+
+    if metrics_utils.is_arc_installed():
+        return generate_Arc_MSI_token()
+    else:
+        _, configFolder = get_handler_vars()
+        me_config_dir = configFolder + "/metrics_configs/"
+        me_auth_file_path = me_config_dir + "AuthToken-MSI.json"
+        expiry_epoch_time = ""
+        log_messages = ""
+        retries = 1
+        max_retries = 3
+        sleep_time = 5
+
+        if not os.path.exists(me_config_dir):
+            log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token fo ME.\n".format(me_config_dir)
+            return False, expiry_epoch_time, log_messages
+        try:
+            data = None
+            while retries <= max_retries:
+                msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+                res = urllib2.urlopen(req)
+                data = json.loads(res.read())
+
+                if not data or "access_token" not in data:
+                    retries += 1
+                else:
+                    break
+
+                log_messages += "Failed to fetch MSI Auth url. Retrying in {2} seconds. Retry Count - {0} out of Mmax Retries - {1}\n".format(retries, max_retries, sleep_time)
+                time.sleep(sleep_time)
+
+
+            if retries > max_retries:
+                log_messages += "Unable to generate a valid MSI auth token at {0}.\n".format(me_auth_file_path)
+                return False, expiry_epoch_time, log_messages
+
+            with open(me_auth_file_path, "w") as f:
+                f.write(json.dumps(data))
+
+            if "expires_on" in data:
+                expiry_epoch_time  = data["expires_on"]
+            else:
+                log_messages += "Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
+                return False, expiry_epoch_time, log_messages
+
+        except Exception as e:
+            log_messages += "Failed to get msi auth token. Please check if VM's system assigned Identity is enabled Failed with error {0}\n".format(e)
+            return False, expiry_epoch_time, log_messages
+
+        return True, expiry_epoch_time, log_messages
 
 
 def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
@@ -247,7 +316,7 @@ def start_metrics(is_lad):
 
 
     # If the VM has systemd, then we use that to start/stop
-    if is_systemd():
+    if metrics_utils.is_systemd():
         service_restart_status = os.system("sudo systemctl restart metrics-extension")
         if service_restart_status != 0:
             log_messages += "Unable to start metrics-extension.service. Failed to start ME service."
@@ -258,7 +327,7 @@ def start_metrics(is_lad):
         _, configFolder = get_handler_vars()
         me_config_dir = configFolder + "/metrics_configs/"
         #query imds to get the subscription id
-        az_resource_id, subscription_id, location, data = get_imds_values()
+        az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
 
         if is_lad:
             monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
@@ -401,18 +470,30 @@ def get_handler_vars():
     return logFolder, configFolder
 
 
-def get_imds_values():
+def get_imds_values(is_lad):
     """
     Query imds to get required values for MetricsExtension config for this VM
     """
     retries = 1
     max_retries = 3
     sleep_time = 5
+    imdsurl = ""
+    is_arc = False
+
+    if is_lad:
+        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+    else:
+        if metrics_utils.is_arc_installed():
+            imdsurl = metrics_utils.get_arc_endpoint()
+            imdsurl += "/metadata/instance?api-version=2019-11-01"
+            is_arc = True
+        else:
+            imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+
 
     data = None
     while retries <= max_retries:
 
-        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
         #query imds to get the required information
         req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
         res = urllib2.urlopen(req)
@@ -428,6 +509,7 @@ def get_imds_values():
     if retries > max_retries:
         raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup ME.".format(max_retries))
         return False
+
 
     if "resourceId" not in data["compute"]:
         raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup ME.")
@@ -457,7 +539,7 @@ def setup_me(is_lad):
     """
 
     # query imds to get the required information
-    az_resource_id, subscription_id, location, data = get_imds_values()
+    az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
 
     # get tenantID
     # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
@@ -545,8 +627,7 @@ def setup_me(is_lad):
 
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    if check_systemd == 0:
+    if metrics_utils.is_systemd():
         setup_me_service(me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port)
 
     return True
