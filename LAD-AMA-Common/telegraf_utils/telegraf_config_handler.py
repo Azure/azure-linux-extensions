@@ -25,6 +25,7 @@ import urllib2
 from shutil import copyfile
 import time
 import metrics_ext_utils.metrics_constants as metrics_constants
+import metrics_ext_utils.metrics_common_utils as metrics_utils
 
 
 
@@ -41,13 +42,6 @@ Sample input data received by this script
     }
 ]
 """
-def is_systemd():
-    """
-    Check if the system is using systemd
-    """
-
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    return check_systemd == 0
 
 def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name):
     """
@@ -437,7 +431,7 @@ def stop_telegraf_service(is_lad):
         telegraf_bin = metrics_constants.ama_telegraf_bin
 
     # If the VM has systemd, then we will use that to stop
-    if is_systemd():
+    if metrics_utils.is_systemd():
         code = 1
         telegraf_service_path = metrics_constants.telegraf_service_path
 
@@ -556,7 +550,7 @@ def start_telegraf(is_lad):
         return False, log_messages
 
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
-    if is_systemd():
+    if metrics_utils.is_systemd():
         service_restart_status = os.system("sudo systemctl restart metrics-sourcer")
         if service_restart_status != 0:
             log_messages += "Unable to start Telegraf service. Failed to start telegraf service."
@@ -603,11 +597,23 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     retries = 1
     max_retries = 3
     sleep_time = 5
+    imdsurl = ""
+    is_arc = False
+
+    if is_lad:
+        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+    else:
+        if metrics_utils.is_arc_installed():
+            imdsurl = metrics_utils.get_arc_endpoint()
+            imdsurl += "/metadata/instance?api-version=2019-11-01"
+            is_arc = True
+        else:
+            imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+
 
     data = None
     while retries <= max_retries:
 
-        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
         req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
         res = urllib2.urlopen(req)
         data = json.loads(res.read())
@@ -670,7 +676,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
 
     # Setup Telegraf service.
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
-    if is_systemd():
+    if metrics_utils.is_systemd():
         telegraf_service_setup = setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)
         if not telegraf_service_setup:
             return False, []
