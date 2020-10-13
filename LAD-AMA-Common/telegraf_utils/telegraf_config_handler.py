@@ -22,7 +22,7 @@ from telegraf_utils.telegraf_name_map import name_map
 import subprocess
 import signal
 import urllib2
-from shutil import copyfile
+from shutil import copyfile, rmtree
 import time
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_common_utils as metrics_utils
@@ -361,12 +361,13 @@ def write_configs(configs, telegraf_conf_dir, telegraf_d_conf_dir):
     :param telegraf_conf_dir: Path where the telegraf.conf is written to on the disk
     :param telegraf_d_conf_dir: Path where the individual module telegraf configs are written to on the disk
     """
+    # Delete the older config folder to prevent telegraf from loading older configs
+    if os.path.exists(telegraf_conf_dir):
+        rmtree(telegraf_conf_dir)
 
-    if not os.path.exists(telegraf_conf_dir):
-        os.mkdir(telegraf_conf_dir)
+    os.mkdir(telegraf_conf_dir)
 
-    if not os.path.exists(telegraf_d_conf_dir):
-        os.mkdir(telegraf_d_conf_dir)
+    os.mkdir(telegraf_d_conf_dir)
 
     for configfile in configs:
         if configfile["filename"] == "telegraf.conf" or configfile["filename"] == "intermediate.json":

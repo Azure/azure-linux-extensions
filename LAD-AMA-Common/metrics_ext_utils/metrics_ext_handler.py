@@ -19,7 +19,7 @@
 import urllib2
 import json
 import os
-from shutil import copyfile
+from shutil import copyfile, rmtree
 import stat
 import filecmp
 import metrics_ext_utils.metrics_constants as metrics_constants
@@ -570,8 +570,11 @@ def setup_me(is_lad):
     #write configs to disk
     logFolder, configFolder = get_handler_vars()
     me_config_dir = configFolder + "/metrics_configs/"
-    if not os.path.exists(me_config_dir):
-        os.mkdir(me_config_dir)
+
+    # Clear older config directory if exists. 
+    if os.path.exists(me_config_dir):
+        rmtree(me_config_dir)    
+    os.mkdir(me_config_dir)
 
 
     me_conf_path = me_config_dir + "MetricsExtensionV1_Configuration.json"
