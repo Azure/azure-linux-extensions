@@ -592,7 +592,7 @@ def get_telegraf_service_path():
     if os.path.exists("/lib/systemd/system/"):
         return metrics_constants.telegraf_service_path
     elif os.path.exists("/usr/lib/systemd/system/"):
-        return telegraf_service_path_usr_lib
+        return metrics_constants.telegraf_service_path_usr_lib
     else:
         raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
 

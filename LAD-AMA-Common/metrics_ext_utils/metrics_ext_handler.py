@@ -539,7 +539,7 @@ def get_metrics_extension_service_path():
     if os.path.exists("/lib/systemd/system/"):
         return metrics_constants.metrics_extension_service_path
     elif os.path.exists("/usr/lib/systemd/system/"):
-        return metrics_extension_service_path_usr_lib
+        return metrics_constants.metrics_extension_service_path_usr_lib
     else:
         raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
 
