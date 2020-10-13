@@ -61,6 +61,11 @@ class ResourceDiskUtil(object):
         cmd = 'cryptsetup isLuks ' + self.RD_DEV_PATH
         return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
+    def _resource_disk_exists(self):
+        """ true if udev name for resource disk exists """
+        cmd = 'test -b ' + self.RD_BASE_DEV_PATH
+        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
+
     def _resource_disk_partition_exists(self):
         """ true if udev name for resource disk partition exists """
         cmd = 'test -b ' + self.RD_DEV_PATH
