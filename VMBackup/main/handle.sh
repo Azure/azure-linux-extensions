@@ -34,7 +34,7 @@ then
         echo "`date`- The command is $1, exiting with conf file copy" >> $logfile
         exit $arc
     fi
-elif [ $1 != "enable"  ] && [ $1 != "daemon" ]
+elif [ "$1" != "enable"  ] && [ "$1" != "daemon" ]
 then
     echo "`date`- The command is $1, exiting" >> $logfile
     exit $arc
