@@ -38,7 +38,7 @@ class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
         self.name = None
-        self.supported_workload = ["oracle", "mysql", "mariadb"]
+        self.supported_workload = ["oracle", "mysql", "mariadb", "postgres"]
         self.command = ""
         self.dbnames = []
         self.cred_string = ""
@@ -142,13 +142,33 @@ class WorkloadPatch:
             args = ["su", "-", self.linux_user, "-c", preOracle]
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
 
-            process = subprocess.Popen(args)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE)
             wait_counter = 5
             while process.poll() == None and wait_counter>0:
                 wait_counter -= 1
                 sleep(2)
             self.timeoutDaemon()
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
+        elif 'postgres' in self.name.lower():
+            self.logger.log("WorkloadPatch: Pre- Inside postgres pre")
+            prePostgres = self.command + "psql " + self.cred_string + " -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/prePostgresMaster.sql")
+            args =  "su - "+self.linux_user+" -c "+"\'"+prePostgres+"\'"
+            self.logger.log("WorkloadPatch: argument passed for pre script:"+str(self.linux_user)+"  "+str(self.command))
+
+            process = subprocess.Popen(args,stdout=subprocess.PIPE, shell=True)
+            wait_counter = 5
+            while process.poll() == None and wait_counter>0:
+                wait_counter -= 1
+                sleep(2)
+            while True:
+                line= process.stdout.readline()
+                line=str(line)
+                if(line != ''):
+                    self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
+                else:
+                    break
+            self.timeoutDaemon()
+            self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master postgres")
         #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
@@ -193,20 +213,31 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: Create connection string for post master")
             postscript = os.path.join(self.temp_script_folder, self.scriptpath + "/postMysqlMaster.sql")
             args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
-            self.logger.log("WorkloadPatch: command to execute: "+str(args))
+            self.logger.log("WorkloadPatch: command to execute: "+str(self.sudo_user)+"  "+str(self.command))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
             postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", postOracle]
             self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
-            process = subprocess.Popen(args)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE)
             wait_counter = 5
             while process.poll()==None and wait_counter>0:
                 wait_counter -= 1
                 sleep(2)
             self.logger.log("WorkloadPatch: Post- Completed")
             self.callLogBackup()
+        elif 'postgres' in self.name.lower():
+            self.logger.log("WorkloadPatch: Post- Inside postgres post")
+            postPostgres = self.command + "psql " + self.cred_string + " -f " + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postPostgresMaster.sql")
+            args =  "su - "+self.linux_user+" -c "+"\'"+postPostgres+"\'"
+            self.logger.log("WorkloadPatch: argument passed for post script:"+str(self.linux_user)+"  "+str(self.command))
+            process = subprocess.Popen(args,stdout=subprocess.PIPE, shell=True)
+            wait_counter = 5
+            while process.poll()==None and wait_counter>0:
+                wait_counter -= 1
+                sleep(2)
+            self.logger.log("WorkloadPatch: Post- Completed")
         #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
@@ -246,7 +277,7 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", preOracle]
-            process = subprocess.Popen(args)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE)
             wait_counter = 5
             while process.poll() == None and wait_counter>0:
                 wait_counter -= 1
@@ -303,7 +334,7 @@ class WorkloadPatch:
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
             postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", postOracle]
-            process = subprocess.Popen(args)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE)
             while process.poll()==None:
                 sleep(1)
             self.logger.log("WorkloadPatch: Post- Completed")
@@ -348,7 +379,7 @@ class WorkloadPatch:
                         self.logger.log("WorkloadPatch: config workload command "+ self.command)
                     if config.has_option("workload", 'credString'):
                         self.cred_string = config.get("workload", 'credString')
-                        self.logger.log("WorkloadPatch: config workload cred_string "+ self.cred_string)
+                        self.logger.log("WorkloadPatch: config workload cred_string found")
                     elif not config.has_option("workload", 'linux_user'):
                         self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadAuthorizationMissing, "Cred and linux user string missing"))
                     if config.has_option("workload", 'role'):
@@ -457,22 +488,20 @@ class WorkloadPatch:
         
     def timeoutDaemon(self):
         global daemonProcess
-        if 'oracle' in self.name.lower():
-            self.logger.log("WorkloadPatch: Inside oracle condition in timeout daemon")
-            preDaemonOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleDaemon.sql ") + self.timeout
-            argsDaemon = ["su", "-", self.linux_user, "-c", preDaemonOracle]
-            devnull = open(os.devnull, 'w')
-            daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull)
+        argsDaemon = "su - "+self.linux_user+" -c " + "'" + os.path.join(self.temp_script_folder, self.scriptpath + "/timeoutDaemon.sh")+" "+self.name+" "+self.command+" \""+self.cred_string+"\" "+self.timeout+" "+os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"'")
+        devnull = open(os.devnull, 'w')
+        daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull, shell=True)
             
         wait_counter = 5
-        while daemonProcess == None and wait_counter > 0:
+        while (daemonProcess is None or daemonProcess.poll() is not None) and wait_counter > 0:
             self.logger.log("WorkloadPatch: daemonProcess not created yet", True)
             wait_counter -= 1
             sleep(1)
         if wait_counter > 0:
             self.logger.log("WorkloadPatch: daemonProcess Created "+str(daemonProcess.pid))
         else:
-            self.logger.log("WorkloadPatch: daemon process creation failed")
+            line= daemonProcess.stdout.readline()
+            self.logger.log("WorkloadPatch: daemon process creation failed "+str(line))
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConnectionError, "sql connection failed"))
         return None
 
