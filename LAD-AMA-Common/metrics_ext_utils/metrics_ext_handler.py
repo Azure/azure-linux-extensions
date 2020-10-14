@@ -63,7 +63,7 @@ def stop_metrics_service(is_lad):
     # If the VM has systemd, then we will use that to stop
     if metrics_utils.is_systemd():
         code = 1
-        metrics_service_path = metrics_constants.metrics_extension_service_path
+        metrics_service_path = get_metrics_extension_service_path()
 
         if os.path.isfile(metrics_service_path):
             code = os.system("sudo systemctl stop metrics-extension")
@@ -104,7 +104,7 @@ def remove_metrics_service(is_lad):
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
 
-    metrics_service_path = metrics_constants.metrics_extension_service_path
+    metrics_service_path = get_metrics_extension_service_path()
 
     if os.path.isfile(metrics_service_path):
         code = os.remove(metrics_service_path)
@@ -260,7 +260,7 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
     :param me_influx_port: Influxdb port that metrics extension will listen on
     """
 
-    me_service_path = metrics_constants.metrics_extension_service_path
+    me_service_path = get_metrics_extension_service_path()
     me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
     daemon_reload_status = 1
 
@@ -530,6 +530,20 @@ def get_imds_values(is_lad):
     location= data["compute"]["location"]
 
     return az_resource_id, subscription_id, location, data
+
+
+def get_metrics_extension_service_path():
+    """
+    Utility method to get the service path in case /lib/systemd/system doesnt exist on the OS
+    """
+    if os.path.exists("/lib/systemd/system/"):
+        return metrics_constants.metrics_extension_service_path
+    elif os.path.exists("/usr/lib/systemd/system/"):
+        return metrics_constants.metrics_extension_service_path_usr_lib
+    else:
+        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
+
+
 
 
 def setup_me(is_lad):

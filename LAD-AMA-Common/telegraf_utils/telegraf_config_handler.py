@@ -434,7 +434,7 @@ def stop_telegraf_service(is_lad):
     # If the VM has systemd, then we will use that to stop
     if metrics_utils.is_systemd():
         code = 1
-        telegraf_service_path = metrics_constants.telegraf_service_path
+        telegraf_service_path = get_telegraf_service_path()
 
         if os.path.isfile(telegraf_service_path):
             code = os.system("sudo systemctl stop metrics-sourcer")
@@ -475,7 +475,7 @@ def remove_telegraf_service():
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
 
-    telegraf_service_path = metrics_constants.telegraf_service_path
+    telegraf_service_path = get_telegraf_service_path()
 
     if os.path.isfile(telegraf_service_path):
         os.remove(telegraf_service_path)
@@ -495,7 +495,7 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
     This method is called after stop_telegraf_service by the main extension code during Extension uninstall
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
-    telegraf_service_path = metrics_constants.telegraf_service_path
+    telegraf_service_path = get_telegraf_service_path()
     telegraf_service_template_path = os.getcwd() + "/services/metrics-sourcer.service"
 
 
@@ -583,6 +583,18 @@ def start_telegraf(is_lad):
             log_messages += "Unable to run telegraf binary as a process due to error - {0}. Failed to start telegraf.".format(err)
             return False, log_messages
     return True, log_messages
+
+
+def get_telegraf_service_path():
+    """
+    Utility method to get the service path in case /lib/systemd/system doesnt exist on the OS
+    """
+    if os.path.exists("/lib/systemd/system/"):
+        return metrics_constants.telegraf_service_path
+    elif os.path.exists("/usr/lib/systemd/system/"):
+        return metrics_constants.telegraf_service_path_usr_lib
+    else:
+        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
 
 
 def handle_config(config_data, me_url, mdsd_url, is_lad):
