@@ -132,7 +132,7 @@ class WorkloadPatch:
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleMaster.sql ")
+            preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", preOracle]
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
 
@@ -211,7 +211,7 @@ class WorkloadPatch:
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            postOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postOracleMaster.sql ")
+            postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", postOracle]
             self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
@@ -269,7 +269,7 @@ class WorkloadPatch:
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleMaster.sql ")
+            preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", preOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             wait_counter = 5
@@ -326,7 +326,7 @@ class WorkloadPatch:
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            postOracle = self.command + "sqlplus" + " -s / as sysdba @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postOracleMaster.sql ")
+            postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", postOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             while process.poll()==None:
@@ -465,7 +465,7 @@ class WorkloadPatch:
 
     def workloadStatus(self):
         if 'oracle' in self.name.lower():
-            statusArgs =  "su - " + self.linux_user + " -c " +"'" + self.command + "sqlplus" +" -s / as sysdba<<-EOF\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
+            statusArgs =  "su - " + self.linux_user + " -c " +"'" + self.command + "sqlplus" +" -S -R 2 /nolog<<-EOF\nCONNECT / AS SYSBACKUP\nWHENEVER SQLERROR CONTINUE\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
             oracleStatus = subprocess.check_output(statusArgs, shell=True)
             self.logger.log("WorkloadPatch: workloadStatus- " + str(oracleStatus))
             return oracleStatus
