@@ -19,7 +19,7 @@
 import urllib2
 import json
 import os
-from shutil import copyfile
+from shutil import copyfile, rmtree
 import stat
 import filecmp
 import metrics_ext_utils.metrics_constants as metrics_constants
@@ -63,7 +63,7 @@ def stop_metrics_service(is_lad):
     # If the VM has systemd, then we will use that to stop
     if metrics_utils.is_systemd():
         code = 1
-        metrics_service_path = metrics_constants.metrics_extension_service_path
+        metrics_service_path = get_metrics_extension_service_path()
 
         if os.path.isfile(metrics_service_path):
             code = os.system("sudo systemctl stop metrics-extension")
@@ -104,7 +104,7 @@ def remove_metrics_service(is_lad):
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
 
-    metrics_service_path = metrics_constants.metrics_extension_service_path
+    metrics_service_path = get_metrics_extension_service_path()
 
     if os.path.isfile(metrics_service_path):
         code = os.remove(metrics_service_path)
@@ -260,7 +260,7 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
     :param me_influx_port: Influxdb port that metrics extension will listen on
     """
 
-    me_service_path = metrics_constants.metrics_extension_service_path
+    me_service_path = get_metrics_extension_service_path()
     me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
     daemon_reload_status = 1
 
@@ -532,6 +532,20 @@ def get_imds_values(is_lad):
     return az_resource_id, subscription_id, location, data
 
 
+def get_metrics_extension_service_path():
+    """
+    Utility method to get the service path in case /lib/systemd/system doesnt exist on the OS
+    """
+    if os.path.exists("/lib/systemd/system/"):
+        return metrics_constants.metrics_extension_service_path
+    elif os.path.exists("/usr/lib/systemd/system/"):
+        return metrics_constants.metrics_extension_service_path_usr_lib
+    else:
+        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
+
+
+
+
 def setup_me(is_lad):
     """
     The main method for creating and writing MetricsExtension configuration as well as service setup
@@ -570,8 +584,11 @@ def setup_me(is_lad):
     #write configs to disk
     logFolder, configFolder = get_handler_vars()
     me_config_dir = configFolder + "/metrics_configs/"
-    if not os.path.exists(me_config_dir):
-        os.mkdir(me_config_dir)
+
+    # Clear older config directory if exists. 
+    if os.path.exists(me_config_dir):
+        rmtree(me_config_dir)    
+    os.mkdir(me_config_dir)
 
 
     me_conf_path = me_config_dir + "MetricsExtensionV1_Configuration.json"
