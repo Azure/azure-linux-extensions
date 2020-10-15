@@ -927,7 +927,7 @@ def enable_encryption():
                                           code=str(CommonVariables.configuration_error),
                                           message='Failed to encrypt resource disk. Please make sure no process is using it.')
                         else:
-                            logger.log("Resource disk is present or encrypted successfully.")
+                            logger.log("Resource disk is not present or encrypted successfully.")
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
                                                     disk_format_query=extension_parameter.DiskFormatQuery)
