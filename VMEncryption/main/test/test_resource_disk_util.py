@@ -232,3 +232,15 @@ class TestResourceDiskUtil(unittest.TestCase):
         mock_icm.return_value = False
         rd_mounted = self.resource_disk.encrypt_resource_disk()
         self.assertFalse(rd_mounted)
+
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._resource_disk_exists', return_value=True)
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil.prepare')
+    def test_encrypt_format_mount_resource_disk_exists(self, mock_prepare, mock_resource_disk_exists):
+        self.resource_disk.encrypt_format_mount()
+        self.assertEqual(mock_prepare.call_count, 1)
+
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._resource_disk_exists', return_value=False)
+    @mock.patch('ResourceDiskUtil.ResourceDiskUtil.prepare')
+    def test_encrypt_format_mount_resource_disk_does_not_exist(self, mock_prepare, mock_resource_disk_exists):
+        self.assertEqual(self.resource_disk.encrypt_format_mount(), True)
+        self.assertEqual(mock_prepare.call_count, 0)

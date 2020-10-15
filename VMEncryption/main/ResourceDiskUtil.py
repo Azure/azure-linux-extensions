@@ -64,7 +64,11 @@ class ResourceDiskUtil(object):
     def _resource_disk_exists(self):
         """ true if udev name for resource disk exists """
         cmd = 'test -b ' + self.RD_BASE_DEV_PATH
-        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
+        if (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success:
+            self.logger.log("Resource disk exists.")
+            return True
+        self.logger.log("Resource disk does not exist.")
+        return False
 
     def _resource_disk_partition_exists(self):
         """ true if udev name for resource disk partition exists """
@@ -285,21 +289,21 @@ class ResourceDiskUtil(object):
             f.writelines(lines)
 
     def encrypt_format_mount(self):
-        if not self.prepare():
-            self.logger.log("Failed to prepare VM for Resource Disk Encryption", CommonVariables.ErrorLevel)
-            return False
-        if not self._encrypt():
-            self.logger.log("Failed to encrypt Resource Disk Encryption", CommonVariables.ErrorLevel)
-            return False
-        if not self._format_encrypted_partition():
-            self.logger.log("Failed to format the encrypted Resource Disk Encryption", CommonVariables.ErrorLevel)
-            return False
-        if not self._mount_resource_disk(self.RD_MAPPER_PATH):
-            self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
-            return False
-        # We haven't failed so far, lets just add the RD to crypttab
-        self.add_resource_disk_to_crypttab()
-            
+        if self._resource_disk_exists():
+            if not self.prepare():
+                self.logger.log("Failed to prepare VM for Resource Disk Encryption", CommonVariables.ErrorLevel)
+                return False
+            if not self._encrypt():
+                self.logger.log("Failed to encrypt Resource Disk Encryption", CommonVariables.ErrorLevel)
+                return False
+            if not self._format_encrypted_partition():
+                self.logger.log("Failed to format the encrypted Resource Disk Encryption", CommonVariables.ErrorLevel)
+                return False
+            if not self._mount_resource_disk(self.RD_MAPPER_PATH):
+                self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
+                return False
+            # We haven't failed so far, lets just add the RD to crypttab
+            self.add_resource_disk_to_crypttab()
         return True
 
     def add_resource_disk_to_crypttab(self):
