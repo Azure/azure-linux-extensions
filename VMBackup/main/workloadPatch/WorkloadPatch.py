@@ -38,7 +38,7 @@ class WorkloadPatch:
     def __init__(self, logger):
         self.logger = logger
         self.name = None
-        self.supported_workload = ["oracle", "mysql", "postgres"]
+        self.supported_workload = ["oracle", "mysql", "mariadb", "postgres"]
         self.command = ""
         self.dbnames = []
         self.cred_string = ""
@@ -54,11 +54,13 @@ class WorkloadPatch:
         self.logbackup = ""
         self.custom_scripts_enabled = 0
         self.scriptpath= "DefaultScripts"
+        self.temp_script_folder= "/etc/azure"
         self.confParser()
 
     def pre(self):
         try:
             self.logger.log("WorkloadPatch: Entering workload pre call")
+            self.createTempScriptsFolder()
             if self.role == "master" and int(self.enforce_slave_only) == 0:
                 if len(self.dbnames) == 0 :
                     #pre at server level create fork process for child and append
@@ -96,8 +98,12 @@ class WorkloadPatch:
                     self.postSlaveDB()
             else:
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidRole, "invalid role name in config"))
+            #Remove the temporary scripts folder created
+            self.removeTempScriptsFolder()
         except Exception as e:
             self.logger.log("WorkloadPatch: exception in post" + str(e))
+            #Remove the temporary scripts folder created
+            self.removeTempScriptsFolder()
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "exception in processing of postscript"))
 
     def preMaster(self):
@@ -120,19 +126,19 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Pre- Workload not open"))
             return None
         
-        if 'mysql' in self.name.lower():
+        if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster mysql")
             if self.outfile == "":
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
                 return None
-            prescript = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preMysqlMaster.sql")
+            prescript = os.path.join(self.temp_script_folder, self.scriptpath + "/preMysqlMaster.sql")
             arg = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleMaster.sql ")
+            preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", preOracle]
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
 
@@ -156,7 +162,10 @@ class WorkloadPatch:
                 sleep(2)
             while True:
                 line= process.stdout.readline()
-                line=str(line)
+                if sys.version_info > (3,):
+                    line = str(line, encoding='utf-8', errors="backslashreplace")
+                else:
+                    line = str(line)
                 if(line != ''):
                     self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
                 else:
@@ -203,15 +212,15 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Post- Workload is not open"))
             return None
         
-        if 'mysql' in self.name.lower():
+        if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post master")
-            postscript = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postMysqlMaster.sql")
+            postscript = os.path.join(self.temp_script_folder, self.scriptpath + "/postMysqlMaster.sql")
             args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
             self.logger.log("WorkloadPatch: command to execute: "+str(self.sudo_user)+"  "+str(self.command))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postOracleMaster.sql ")
+            postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", postOracle]
             self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
@@ -257,19 +266,19 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Pre- Workload not open"))
             return None
 
-        if 'mysql' in self.name.lower():
+        if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for preslave mysql")
             if self.outfile == "":
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
                 return None
-            prescript = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preMysqlSlave.sql")
+            prescript = os.path.join(self.temp_script_folder, self.scriptpath + "/preMysqlSlave.sql")
             arg = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/preOracleMaster.sql ")
+            preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", preOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             wait_counter = 5
@@ -318,15 +327,15 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Post- Workload is not open"))
             return None
 
-        if 'mysql' in self.name.lower():
+        if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post slave")
-            postscript = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postMysqlSlave.sql")
+            postscript = os.path.join(self.temp_script_folder, self.scriptpath + "/postMysqlSlave.sql")
             args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
             self.logger.log("WorkloadPatch: command to execute: "+str(args))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/postOracleMaster.sql ")
+            postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
             args = ["su", "-", self.linux_user, "-c", postOracle]
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             while process.poll()==None:
@@ -412,6 +421,42 @@ class WorkloadPatch:
             if(self.name != None):
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConfParsingError, "exception in workloadconfig parsing"))
     
+    def createTempScriptsFolder(self):
+        self.logger.log("WorkloadPatch: Creating temporary scripts folder")
+        try:
+            originalScriptsPath = os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath)
+            newScriptsPath = os.path.join(self.temp_script_folder, self.scriptpath)
+            
+            if (os.path.exists(self.temp_script_folder) == False):
+                self.logger.log("WorkloadPatch: Script folder directory path not found..creating")
+                os.makedirs(self.temp_script_folder)
+                
+            if (os.path.exists(newScriptsPath)):
+                self.logger.log("WorkloadPatch: Existing temporary scripts folder found..removing")
+                self.removeTempScriptsFolder()
+                
+            copyProcess = subprocess.Popen(['cp','-ar',originalScriptsPath,self.temp_script_folder])
+            copyProcess.wait()
+            changeOwnerProcess = subprocess.Popen(['chown','-R',self.linux_user,newScriptsPath], stdout=subprocess.PIPE)
+            changeOwnerProcess.wait()
+            permissionProcess = subprocess.Popen(['chmod','-R','500',newScriptsPath], stdout=subprocess.PIPE)
+            permissionProcess.wait()
+            self.logger.log("WorkloadPatch: Script files copied to temporary scripts folder present at " + newScriptsPath)
+        except Exception as e:
+            self.logger.log("WorkloadPatch: exception in creating temporary scripts folder: " + str(e))
+        
+    
+    def removeTempScriptsFolder(self):
+        self.logger.log("WorkloadPatch: Removing temporary scripts folder")
+        try:
+            newScriptsPath = os.path.join(self.temp_script_folder, self.scriptpath)
+            removalProcess = subprocess.Popen(['rm','-rf',newScriptsPath], stdout=subprocess.PIPE)
+            removalProcess.wait()
+            self.logger.log("WorkloadPatch: Removed temporary scripts folder")
+        except Exception as e:
+            self.logger.log("WorkloadPatch: exception in removing temporary scripts folder: " + str(e))
+        
+        
     def populateErrors(self):
         if len(self.error_details) > 0:
             errdetail = self.error_details[0]
@@ -446,7 +491,7 @@ class WorkloadPatch:
         
     def timeoutDaemon(self):
         global daemonProcess
-        argsDaemon = "su - "+self.linux_user+" -c " + "'" + os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"/timeoutDaemon.sh")+" "+self.name+" "+self.command+" \""+self.cred_string+"\" "+self.timeout+" "+os.path.join(os.getcwd(), "main/workloadPatch/"+self.scriptpath+"'")
+        argsDaemon = "su - "+self.linux_user+" -c " + "'" + os.path.join(self.temp_script_folder, self.scriptpath + "/timeoutDaemon.sh")+" "+self.name+" "+self.command+" \""+self.cred_string+"\" "+self.timeout+" "+os.path.join(self.temp_script_folder, self.scriptpath + "'")
         devnull = open(os.devnull, 'w')
         daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull, shell=True)
             
@@ -458,8 +503,16 @@ class WorkloadPatch:
         if wait_counter > 0:
             self.logger.log("WorkloadPatch: daemonProcess Created "+str(daemonProcess.pid))
         else:
-            line= daemonProcess.stdout.readline()
-            self.logger.log("WorkloadPatch: daemon process creation failed "+str(line))
+            while True:
+                line= daemonProcess.stdout.readline()
+                if sys.version_info > (3,):
+                    line = str(line, encoding='utf-8', errors="backslashreplace")
+                else:
+                    line = str(line)
+                if(line != ''):
+                    self.logger.log("WorkloadPatch: daemon process creation failed "+line.rstrip(), True)
+                else:
+                    break
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConnectionError, "sql connection failed"))
         return None
 
