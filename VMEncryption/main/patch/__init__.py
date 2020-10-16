@@ -45,7 +45,7 @@ def get_linux_distribution():
 
 def DistInfo(fullname=0):
     if 'FreeBSD' in platform.system():
-        release = re.sub('\-.*\Z', '', str(platform.release()))
+        release = re.sub(r'\-.*\Z', '', str(platform.release()))
         distinfo = ['FreeBSD', release]
         return distinfo
 

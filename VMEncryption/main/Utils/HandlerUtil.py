@@ -60,7 +60,6 @@ import shutil
 import string
 import subprocess
 import sys
-import imp
 import base64
 import json
 import tempfile

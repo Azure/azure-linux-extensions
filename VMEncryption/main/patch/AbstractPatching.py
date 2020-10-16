@@ -2,7 +2,7 @@
 #
 # AbstractPatching is the base patching class of all the linux distros
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright (C) Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,12 +16,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires Python 2.4+
-
 
 import os
 import sys
-import imp
 import base64
 import re
 import json

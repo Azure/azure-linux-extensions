@@ -65,7 +65,7 @@ class OSEncryptionState(object):
 
         self.rootfs_sdx_path = self._get_fs_partition(rootfs_mountpoint)
 
-        if self.rootfs_sdx_path == "none":
+        if self.rootfs_sdx_path == "none" or self.rootfs_sdx_path == "/dev/root":
             self.context.logger.log("self.rootfs_sdx_path is none, parsing UUID from fstab")
             self.rootfs_sdx_path = self._parse_uuid_from_fstab('/')
             self.context.logger.log("rootfs_uuid: {0}".format(self.rootfs_sdx_path))
@@ -101,8 +101,8 @@ class OSEncryptionState(object):
             self.context.logger.log("bootfs_uuid: {0}".format(bootfs_uuid))
             self.bootfs_block_device = self.disk_util.query_dev_sdx_path_by_uuid(bootfs_uuid)
         else:
-            self.rootfs_block_device = self.disk_util.query_dev_id_path_by_sdx_path(self.rootfs_sdx_path)
-            if not self.rootfs_block_device.startswith('/dev/disk/by-id/'):
+            self.rootfs_block_device = self.disk_util.get_persistent_path_by_sdx_path(self.rootfs_sdx_path)
+            if not self.rootfs_block_device.startswith('/dev/disk/'):
                 self.context.logger.log("rootfs_block_device: {0}".format(self.rootfs_block_device))
                 raise Exception("Could not find rootfs block device")
 
