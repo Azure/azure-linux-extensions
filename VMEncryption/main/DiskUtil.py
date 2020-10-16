@@ -279,7 +279,6 @@ class DiskUtil(object):
         ["1: luks2", "3: reencrypt (unbound)"]
         """
 
-        # Split into lines and decode to UTF for access to functions like "isnumeric"
         lines = luks_dump_out.split("\n")
 
         # This flag will be set to true once we enounter the line "Keyslots:"
