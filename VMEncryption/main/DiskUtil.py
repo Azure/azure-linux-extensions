@@ -280,7 +280,7 @@ class DiskUtil(object):
         """
 
         # Split into lines and decode to UTF for access to functions like "isnumeric"
-        lines = luks_dump_out.decode("utf-8").split("\n")
+        lines = luks_dump_out.split("\n")
 
         # This flag will be set to true once we enounter the line "Keyslots:"
         keyslot_segment = False
@@ -294,7 +294,7 @@ class DiskUtil(object):
                 keyslot_segment = True
                 continue
 
-            if keyslot_segment and parts[0].strip().isnumeric():
+            if keyslot_segment and self._isnumeric(parts[0].strip()):
                 keyslot_lines.append(line)
                 continue
 
@@ -302,6 +302,13 @@ class DiskUtil(object):
                 keyslot_segment = False
 
         return keyslot_lines
+
+    def _isnumeric(self, chars):
+        try:
+            int(chars)
+            return True
+        except ValueError:
+            return False
 
     def luks_dump_keyslots(self, dev_path, header_file):
         luks_dump_out = self._luks_get_header_dump(header_file or dev_path)

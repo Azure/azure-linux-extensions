@@ -18,11 +18,12 @@
 
 import CommonParameters
 
+
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = CommonParameters.inst.get_extension_name()
     extension_version = CommonParameters.inst.get_extension_version()
-    extension_provider_namespace = CommonParameters.inst.get_extension_provider_namespace()    
+    extension_provider_namespace = CommonParameters.inst.get_extension_provider_namespace()
     extension_type = CommonParameters.inst.get_extension_name()
     extension_media_link = 'https://amextpaas.blob.core.windows.net/prod/' + extension_name + '-' + str(extension_version) + '.zip'
     extension_label = 'Azure Disk Encryption For Linux VMSS'
@@ -214,6 +215,7 @@ class CommonVariables:
                     VolumeTypeOS.lower(): 'Encryption succeeded for OS volume',
                     VolumeTypeAll.lower(): 'Encryption succeeded for all volumes'
                 }
+
 
 class TestHooks:
     search_not_only_ide = False
