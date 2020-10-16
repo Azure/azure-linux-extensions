@@ -573,7 +573,7 @@ class DiskUtil(object):
         """
         return /dev/disk/by-id that maps to the sdx_path, otherwise return the original path
         Update: now we have realised that by-id is not a good way to refer to devices (they can change on reallocations or resizes).
-        Try not to use this- use get_stable_path_from_sdx instead
+        Try not to use this- use get_persistent_path_by_sdx_path instead
         """
         for disk_by_id in os.listdir(CommonVariables.disk_by_id_root):
             disk_by_id_path = os.path.join(CommonVariables.disk_by_id_root, disk_by_id)
