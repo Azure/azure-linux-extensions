@@ -71,21 +71,21 @@ DECLARE
 BEGIN
 	--
 	v_errcontext := 'azmessage-1';
-	sysbackup.azmessage('INFO - AzBackup pre-script: END BACKUP starting...');
+	sysbackup.azmessage('INFO - AzBackup post-script: END BACKUP starting...');
 	--
 	v_errcontext := 'END BACKUP';
 	execute immediate 'ALTER DATABASE END BACKUP';
 	--
 	v_errcontext := 'azmessage-2';
-	sysbackup.azmessage('INFO - AzBackup pre-script: END BACKUP succeeded');
+	sysbackup.azmessage('INFO - AzBackup post-script: END BACKUP succeeded');
 	--
 EXCEPTION
 	when noArchiveLog then
-		sysbackup.azmessage('INFO - AzBackup pre-script: END BACKUP in NOARCHIVELOG failed, no action required');
+		sysbackup.azmessage('INFO - AzBackup post-script: END BACKUP in NOARCHIVELOG failed, no action required');
 	when notInBackup then
-		sysbackup.azmessage('WARN - AzBackup pre-script: END BACKUP failed - no datafiles in backup');
+		sysbackup.azmessage('WARN - AzBackup post-script: END BACKUP failed - no datafiles in backup');
 	when others then
-		sysbackup.azmessage('FAIL - AzBackup pre-script: ' || v_errcontext || ' failed');
+		sysbackup.azmessage('FAIL - AzBackup post-script: ' || v_errcontext || ' failed');
 		raise;
 END;
 /

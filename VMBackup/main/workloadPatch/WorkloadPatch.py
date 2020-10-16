@@ -139,14 +139,25 @@ class WorkloadPatch:
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
-            args = ["su", "-", self.linux_user, "-c", preOracle]
+            #args = ["su", "-", self.linux_user, "-c", preOracle]
+            args = "su - "+self.linux_user+" -c "+"\'"+preOracle+"\'"
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
 
-            process = subprocess.Popen(args, stdout=subprocess.PIPE)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
             wait_counter = 5
             while process.poll() == None and wait_counter>0:
                 wait_counter -= 1
                 sleep(2)
+            while True:
+                line= process.stdout.readline()
+                if sys.version_info > (3,):
+                    line = str(line, encoding='utf-8', errors="backslashreplace")
+                else:
+                    line = str(line)
+                if(line != ''):
+                    self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
+                else:
+                    break
             self.timeoutDaemon()
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
         elif 'postgres' in self.name.lower():
@@ -221,13 +232,24 @@ class WorkloadPatch:
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
             postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
-            args = ["su", "-", self.linux_user, "-c", postOracle]
+            #args = ["su", "-", self.linux_user, "-c", postOracle]
+            args =  "su - "+self.linux_user+" -c "+"\'"+postOracle+"\'"
             self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
-            process = subprocess.Popen(args, stdout=subprocess.PIPE)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
             wait_counter = 5
             while process.poll()==None and wait_counter>0:
                 wait_counter -= 1
                 sleep(2)
+            while True:
+                line= process.stdout.readline()
+                if sys.version_info > (3,):
+                    line = str(line, encoding='utf-8', errors="backslashreplace")
+                else:
+                    line = str(line)
+                if(line != ''):
+                    self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
+                else:
+                    break
             self.logger.log("WorkloadPatch: Post- Completed")
             self.callLogBackup()
         elif 'postgres' in self.name.lower():
