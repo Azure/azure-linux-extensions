@@ -24,9 +24,10 @@ import os
 import sys
 import io
 
-from time import sleep
-from CommandExecutor import *
-from OSEncryptionState import *
+from CommandExecutor import ProcessCommunicator
+from OSEncryptionState import OSEncryptionState
+from Common import CommonVariables
+
 
 class PatchBootSystemState(OSEncryptionState):
     def __init__(self, context):
@@ -37,12 +38,12 @@ class PatchBootSystemState(OSEncryptionState):
 
         if not super(PatchBootSystemState, self).should_enter():
             return False
-        
+
         self.context.logger.log("Performing enter checks for patch_boot_system state")
 
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('umount /oldroot', True)
-                
+
         return True
 
     def enter(self):
@@ -62,7 +63,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         try:
             self._modify_pivoted_oldroot()
-        except Exception as e:
+        except Exception:
             self.command_executor.Execute('mount --make-rprivate /')
             self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
             self.command_executor.Execute('rmdir /oldroot/memroot')
@@ -83,20 +84,20 @@ class PatchBootSystemState(OSEncryptionState):
                                           ' /var/log/azure/{0}'.format(extension_full_name) +
                                           ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name))
             self.command_executor.ExecuteInBash('cp -ax' +
-                                          ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(extension_versioned_name) +
-                                          ' /oldroot/var/lib/waagent/{0}/config'.format(extension_versioned_name))
+                                                ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(extension_versioned_name) +
+                                                ' /oldroot/var/lib/waagent/{0}/config'.format(extension_versioned_name))
             self.command_executor.ExecuteInBash('cp -ax' +
-                                          ' /var/lib/waagent/{0}/status/*.status.rejected'.format(extension_versioned_name) +
-                                          ' /oldroot/var/lib/waagent/{0}/status'.format(extension_versioned_name))
+                                                ' /var/lib/waagent/{0}/status/*.status.rejected'.format(extension_versioned_name) +
+                                                ' /oldroot/var/lib/waagent/{0}/status'.format(extension_versioned_name))
             self.command_executor.Execute('cp -ax' +
                                           ' /var/log/azure/{0}'.format(test_extension_full_name) +
                                           ' /oldroot/var/log/azure/{0}.Stripdown'.format(test_extension_full_name), suppress_logging=True)
             self.command_executor.ExecuteInBash('cp -ax' +
-                                          ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(test_extension_versioned_name) +
-                                          ' /oldroot/var/lib/waagent/{0}/config'.format(test_extension_versioned_name), suppress_logging=True)
+                                                ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(test_extension_versioned_name) +
+                                                ' /oldroot/var/lib/waagent/{0}/config'.format(test_extension_versioned_name), suppress_logging=True)
             self.command_executor.ExecuteInBash('cp -ax' +
-                                          ' /var/lib/waagent/{0}/status/*.status.rejected'.format(test_extension_versioned_name) +
-                                          ' /oldroot/var/lib/waagent/{0}/status'.format(test_extension_versioned_name), suppress_logging=True)
+                                                ' /var/lib/waagent/{0}/status/*.status.rejected'.format(test_extension_versioned_name) +
+                                                ' /oldroot/var/lib/waagent/{0}/status'.format(test_extension_versioned_name), suppress_logging=True)
             # Preserve waagent log from pivot root env
             self.command_executor.Execute('cp -ax /var/log/waagent.log /oldroot/var/log/waagent.log.pivotroot')
             self.command_executor.Execute('umount /boot')
@@ -145,7 +146,7 @@ class PatchBootSystemState(OSEncryptionState):
             raise Exception(message)
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
-        
+
         self.command_executor.ExecuteInBash('patch -b -d /usr/share/initramfs-tools -p1 <{0}'.format(patchpath), True)
 
         os_volume = None
@@ -153,7 +154,7 @@ class PatchBootSystemState(OSEncryptionState):
             os_volume = CommonVariables.az_symlink_os_volume
         else:
             os_volume = self.rootfs_block_device
-        
+
         entry = 'osencrypt {0} none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'.format(os_volume)
         self._append_contents_to_file(entry, '/etc/crypttab')
 
@@ -164,7 +165,7 @@ class PatchBootSystemState(OSEncryptionState):
                                             raise_exception_on_failure=True,
                                             communicator=proc_comm)
 
-        if not "azure_crypt_key.sh" in proc_comm.stdout or not "osluksheader" in proc_comm.stdout:
+        if "azure_crypt_key.sh" not in proc_comm.stdout or "osluksheader" not in proc_comm.stdout:
             raise Exception("initramfs update failed")
 
         self.command_executor.Execute('update-grub', True)
