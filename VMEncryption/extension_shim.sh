@@ -35,8 +35,11 @@ python hello.py --install
 function find_python(){
     local python_exec_command=$1
     
-    # Find default python, python2, or python3 in that order
-    if command -v python >/dev/null 2>&1 ; then
+    # Prefer python3 on Ubuntu 20.04
+    if [ -f /etc/os-release ] && grep -q "Ubuntu 20.04" /etc/os-release && command -v python3 >/dev/null 2>&1; then
+        eval ${python_exec_command}="python3"
+    # Default to python, python2, or python3 in that order
+    elif command -v python >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python"
     elif command -v python2 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python2"
