@@ -24,8 +24,9 @@ import os
 import sys
 import io
 
-from time import sleep
-from OSEncryptionState import *
+from OSEncryptionState import OSEncryptionState
+from CommandExecutor import ProcessCommunicator
+from Common import CommonVariables
 
 
 class PatchBootSystemState(OSEncryptionState):
@@ -37,12 +38,12 @@ class PatchBootSystemState(OSEncryptionState):
 
         if not super(PatchBootSystemState, self).should_enter():
             return False
-        
+
         self.context.logger.log("Performing enter checks for patch_boot_system state")
 
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('umount /oldroot', True)
-                
+
         return True
 
     def enter(self):
@@ -62,7 +63,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         try:
             self._modify_pivoted_oldroot()
-        except Exception as e:
+        except Exception:
             self.command_executor.Execute('mount --make-rprivate /')
             self.command_executor.Execute('pivot_root /memroot /memroot/oldroot')
             self.command_executor.Execute('rmdir /oldroot/memroot')
@@ -83,20 +84,20 @@ class PatchBootSystemState(OSEncryptionState):
                                           ' /var/log/azure/{0}'.format(extension_full_name) +
                                           ' /oldroot/var/log/azure/{0}.Stripdown'.format(extension_full_name))
             self.command_executor.ExecuteInBash('cp -ax' +
-                                          ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(extension_versioned_name) +
-                                          ' /oldroot/var/lib/waagent/{0}/config'.format(extension_versioned_name))
+                                                ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(extension_versioned_name) +
+                                                ' /oldroot/var/lib/waagent/{0}/config'.format(extension_versioned_name))
             self.command_executor.ExecuteInBash('cp -ax' +
-                                          ' /var/lib/waagent/{0}/status/*.status.rejected'.format(extension_versioned_name) +
-                                          ' /oldroot/var/lib/waagent/{0}/status'.format(extension_versioned_name))
+                                                ' /var/lib/waagent/{0}/status/*.status.rejected'.format(extension_versioned_name) +
+                                                ' /oldroot/var/lib/waagent/{0}/status'.format(extension_versioned_name))
             self.command_executor.Execute('cp -ax' +
                                           ' /var/log/azure/{0}'.format(test_extension_full_name) +
                                           ' /oldroot/var/log/azure/{0}.Stripdown'.format(test_extension_full_name), suppress_logging=True)
             self.command_executor.ExecuteInBash('cp -ax' +
-                                          ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(test_extension_versioned_name) +
-                                          ' /oldroot/var/lib/waagent/{0}/config'.format(test_extension_versioned_name), suppress_logging=True)
+                                                ' /var/lib/waagent/{0}/config/*.settings.rejected'.format(test_extension_versioned_name) +
+                                                ' /oldroot/var/lib/waagent/{0}/config'.format(test_extension_versioned_name), suppress_logging=True)
             self.command_executor.ExecuteInBash('cp -ax' +
-                                          ' /var/lib/waagent/{0}/status/*.status.rejected'.format(test_extension_versioned_name) +
-                                          ' /oldroot/var/lib/waagent/{0}/status'.format(test_extension_versioned_name), suppress_logging=True)
+                                                ' /var/lib/waagent/{0}/status/*.status.rejected'.format(test_extension_versioned_name) +
+                                                ' /oldroot/var/lib/waagent/{0}/status'.format(test_extension_versioned_name), suppress_logging=True)
             # Preserve waagent log from pivot root env
             self.command_executor.Execute('cp -ax /var/log/waagent.log /oldroot/var/log/waagent.log.pivotroot')
             self.command_executor.Execute('umount /boot')
@@ -115,7 +116,7 @@ class PatchBootSystemState(OSEncryptionState):
         if sys.version_info[0] < 3:
             if isinstance(contents, str):
                 contents = contents.decode('utf-8')
-        
+
         with io.open(path, 'a') as f:
             f.write(contents)
 
@@ -146,21 +147,43 @@ class PatchBootSystemState(OSEncryptionState):
             raise Exception(message)
         else:
             self.context.logger.log("Patch found at path: {0}".format(patchpath))
-        
+
         self.command_executor.ExecuteInBash('patch -b -d /usr/share/initramfs-tools/hooks -p1 <{0}'.format(patchpath), True)
 
         os_volume = None
-        if os.path.exists(CommonVariables.az_symlink_os_volume) and os.path.realpath(CommonVariables.az_symlink_os_volume) == os.path.realpath(self.rootfs_block_device):
-            os_volume = CommonVariables.az_symlink_os_volume
+        az_symlink_os_volume = self._get_az_symlink_os_volume()
+        if os.path.exists(az_symlink_os_volume) and os.path.realpath(az_symlink_os_volume) == os.path.realpath(self.rootfs_block_device):
+            os_volume = az_symlink_os_volume
         else:
             os_volume = self.rootfs_block_device
-        
+
         entry = 'osencrypt {0} none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'.format(os_volume)
         self._append_contents_to_file(entry, '/etc/crypttab')
 
         self.command_executor.Execute('update-initramfs -u -k all', True)
         self.command_executor.Execute('update-grub', True)
         self.command_executor.Execute('grub-install --recheck --force {0}'.format(self.rootfs_disk), True)
+
+    def _get_az_symlink_os_volume(self):
+        realpath_rootfs_dev = os.path.realpath(self.rootfs_block_device)
+
+        # First we check the scsi0 dir. If this dir is present we are almost guaranteed to find the rootfs device in here
+        gen2_dir = os.path.join(CommonVariables.azure_symlinks_dir, "scsi0/")
+        if os.path.exists(gen2_dir):
+            for top_level_item in os.listdir(gen2_dir):
+                dev_path = os.path.join(gen2_dir, top_level_item)
+                if os.path.realpath(dev_path) == realpath_rootfs_dev:
+                    return dev_path
+
+        # Then we check the root* devices. If these are present we use them.
+        # Though it's a little worrying that some Gen2 VMs don't have these links, so we take these as a second choice
+        for top_level_item in os.listdir(CommonVariables.azure_symlinks_dir):
+            if top_level_item.startswith("root"):
+                dev_path = os.path.join(CommonVariables.azure_symlinks_dir, top_level_item)
+                if os.path.realpath(dev_path) == realpath_rootfs_dev:
+                    return dev_path
+
+        return None
 
     def _get_uuid(self, partition_name):
         proc_comm = ProcessCommunicator()

@@ -1744,7 +1744,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
             logger.log("mapper device not found for crypt_item {0}".format(crypt_item))
             if disk_util.is_luks_device(crypt_item.dev_path, crypt_item.luks_header_path):
                 logger.log("Found a luks device for this device item, yet couldn't open mapper: {0}".format(crypt_item))
-                logger.log("Failing".format(crypt_item))
+                logger.log("Failing")
                 return crypt_item
             else:
                 continue

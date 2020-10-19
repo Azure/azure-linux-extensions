@@ -5,14 +5,14 @@ from EncryptionEnvironment import EncryptionEnvironment
 from CryptMountConfigUtil import CryptMountConfigUtil
 from .console_logger import ConsoleLogger
 from .test_utils import MockDistroPatcher
-from io import open
 
 try:
-    import unittest.mock as mock # python3+
+    import unittest.mock as mock  # python3+
     builtins_open = "builtins.open"
 except ImportError:
-    import mock # python2
+    import mock  # python2
     builtins_open = "__builtin__.open"
+
 
 class Test_crypt_mount_config_util(unittest.TestCase):
     """ unit tests for functions in the CryptMountConfig module """
@@ -44,7 +44,6 @@ class Test_crypt_mount_config_util(unittest.TestCase):
             return handle
 
         open_mock.side_effect = _open_side_effect
-
 
     def _create_expected_crypt_item(self,
                                     mapper_name=None,
@@ -173,27 +172,30 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         mock.mock_open(open_mock, acm_contents)
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
         self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
-                                                               dev_path="/dev/dev_path",
-                                                               uses_cleartext_key=True,
-                                                               mount_point="/",
-                                                               file_system="ext4",
-                                                               current_luks_slot=0)),
-                             str(crypt_items[0]))
+                                                              dev_path="/dev/dev_path",
+                                                              uses_cleartext_key=True,
+                                                              mount_point="/",
+                                                              file_system="ext4",
+                                                              current_luks_slot=0)),
+                         str(crypt_items[0]))
 
         ce_mock.ExecuteInBash.return_value = 0  # The grep on cryptsetup succeeds
-        pc_mock.return_value.stdout = "osencrypt /dev/dev_path"  # The grep find this line in there
-        mock.mock_open(open_mock, "")  # No content in the azure crypt mount file
-        disk_util_mock.get_mount_items.return_value = [{"src": "/dev/mapper/osencrypt", "dest": "/", "fs": "ext4"}]
+        # The grep find this line in there
+        pc_mock.return_value.stdout = "osencrypt /dev/dev_path"
+        # No content in the azure crypt mount file
+        mock.mock_open(open_mock, "")
+        disk_util_mock.get_mount_items.return_value = [
+            {"src": "/dev/mapper/osencrypt", "dest": "/", "fs": "ext4"}]
         exists_mock.return_value = False  # No luksheader file found
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
         self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
-                                                               dev_path="/dev/dev_path",
-                                                               mount_point="/",
-                                                               file_system="ext4",
-                                                               luks_header_path="/dev/dev_path",
-                                                               uses_cleartext_key="False",
-                                                               current_luks_slot="-1")),
-                             str(crypt_items[0]))
+                                                              dev_path="/dev/dev_path",
+                                                              mount_point="/",
+                                                              file_system="ext4",
+                                                              luks_header_path="/dev/dev_path",
+                                                              uses_cleartext_key="False",
+                                                              current_luks_slot="-1")),
+                         str(crypt_items[0]))
 
         use_acm_mock.return_value = False  # Now, use the /etc/crypttab file
         exists_mock.return_value = True  # Crypttab file found
@@ -201,10 +203,10 @@ class Test_crypt_mount_config_util(unittest.TestCase):
                                                         "/etc/crypttab": "osencrypt /dev/sda1 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard"})
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
         self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
-                                                               dev_path="/dev/sda1",
-                                                               file_system="ext4",
-                                                               mount_point="/")),
-                             str(crypt_items[0]))
+                                                              dev_path="/dev/sda1",
+                                                              file_system="ext4",
+                                                              mount_point="/")),
+                         str(crypt_items[0]))
 
         # if there was no crypttab entry for osencrypt
         exists_mock.side_effect = [True, False]  # Crypttab file found but luksheader not found
@@ -213,13 +215,13 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         pc_mock.return_value.stdout = "osencrypt /dev/sda1"  # The grep find this line in there
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
         self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
-                                                               dev_path="/dev/sda1",
-                                                               file_system="ext4",
-                                                               mount_point="/",
-                                                               luks_header_path="/dev/sda1",
-                                                               uses_cleartext_key="False",
-                                                               current_luks_slot="-1")),
-                             str(crypt_items[0]))
+                                                              dev_path="/dev/sda1",
+                                                              file_system="ext4",
+                                                              mount_point="/",
+                                                              luks_header_path="/dev/sda1",
+                                                              uses_cleartext_key="False",
+                                                              current_luks_slot="-1")),
+                         str(crypt_items[0]))
 
         exists_mock.side_effect = None  # Crypttab file found
         exists_mock.return_value = True  # Crypttab file found
@@ -240,11 +242,11 @@ class Test_crypt_mount_config_util(unittest.TestCase):
                                                         "/etc/crypttab": "encrypteddatadisk /dev/disk/azure/scsi1/lun0 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/headerfile"})
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
         self.assertEqual(str(self._create_expected_crypt_item(mapper_name="encrypteddatadisk",
-                                                               dev_path="/dev/disk/azure/scsi1/lun0",
-                                                               file_system="auto",
-                                                               luks_header_path="/headerfile",
-                                                               mount_point="/mnt/datadisk")),
-                             str(crypt_items[0]))
+                                                              dev_path="/dev/disk/azure/scsi1/lun0",
+                                                              file_system="auto",
+                                                              luks_header_path="/headerfile",
+                                                              mount_point="/mnt/datadisk")),
+                         str(crypt_items[0]))
 
     @mock.patch('shutil.copy2', return_value=True)
     @mock.patch('os.rename', return_value=True)
@@ -382,4 +384,3 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" not in open_mock.content_dict["/etc/crypttab"])
         self.assertTrue("/dev/mapper/mapper_name /mnt/point" not in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/fstab_line"])
         self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" not in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/crypttab_line"])
-
