@@ -240,7 +240,7 @@ def install():
     }
 
     # Decide the mode
-    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         hutil_log_info("Detecting Auto-Config mode.")
         return 0, ""
     elif protected_settings is None or len(protected_settings) is 0:
@@ -415,7 +415,7 @@ def enable():
     
     public_settings, protected_settings = get_settings()
 
-    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         OneAgentEnableCommand = "systemctl start mdsdmgr"
         if not is_systemd():
             hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
