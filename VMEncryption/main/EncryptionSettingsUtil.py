@@ -251,7 +251,7 @@ class EncryptionSettingsUtil(object):
                 self.logger.log("wireserver_IP found in {0} = {1}".format(wireserver_endpoint_file, wireserver_IP))
 
                 # validate the IP address found in wireserver_endpoint_file
-                if re.match('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', wireserver_IP) is None:
+                if re.match(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', wireserver_IP) is None:
                     wireserver_IP = None
                     self.logger.log("wireserver_IP found in file is not valid.")
 
