@@ -107,6 +107,7 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "exception in processing of postscript"))
 
     def preMaster(self):
+        global preSuccess
         self.logger.log("WorkloadPatch: Entering pre mode for master")
         if self.ipc_folder != None:
             self.outfile = os.path.join(self.ipc_folder, "azbackupIPC.txt")
@@ -126,6 +127,8 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Pre- Workload not open"))
             return None
         
+        preSuccess = False
+        
         if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for premaster mysql")
             if self.outfile == "":
@@ -139,7 +142,6 @@ class WorkloadPatch:
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
-            #args = ["su", "-", self.linux_user, "-c", preOracle]
             args = "su - "+self.linux_user+" -c "+"\'"+preOracle+"\'"
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
 
@@ -154,11 +156,22 @@ class WorkloadPatch:
                     line = str(line, encoding='utf-8', errors="backslashreplace")
                 else:
                     line = str(line)
+                if('BEGIN BACKUP succeeded' in line):
+                    preSuccess = True
+                    break
+                if('BEGIN BACKUP in NOARCHIVELOG' in line):
+                    self.logger.log("WorkloadPatch: No archive log mode for oracle")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseInNoArchiveLog, "Workload in no archive log mode"))
+                    break
                 if(line != ''):
                     self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
                 else:
                     break
-            self.timeoutDaemon()
+            if(preSuccess == True):
+                self.timeoutDaemon()
+            else:
+                self.logger.log("WorkloadPatch: Unsupported workload name")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPreError, "Workload Pre failed"))
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
         elif 'postgres' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside postgres pre")
@@ -229,10 +242,9 @@ class WorkloadPatch:
             args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
             self.logger.log("WorkloadPatch: command to execute: "+str(self.sudo_user)+"  "+str(self.command))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
-        elif 'oracle' in self.name.lower():
+        elif 'oracle' in self.name.lower() and preSuccess == True:
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
             postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
-            #args = ["su", "-", self.linux_user, "-c", postOracle]
             args =  "su - "+self.linux_user+" -c "+"\'"+postOracle+"\'"
             self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
             process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
@@ -246,6 +258,10 @@ class WorkloadPatch:
                     line = str(line, encoding='utf-8', errors="backslashreplace")
                 else:
                     line = str(line)
+                if 'END BACKUP failed' in line:
+                    self.logger.log("WorkloadPatch: post failed but pre succeeded")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "Workload post failed but pre succeeded"))
+                    break
                 if(line != ''):
                     self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
                 else:
@@ -301,7 +317,7 @@ class WorkloadPatch:
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
             preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
-            args = ["su", "-", self.linux_user, "-c", preOracle]
+            args = "su - "+self.linux_user+" -c "+"\'"+preOracle+"\'"
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             wait_counter = 5
             while process.poll() == None and wait_counter>0:
@@ -358,7 +374,7 @@ class WorkloadPatch:
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
             postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
-            args = ["su", "-", self.linux_user, "-c", postOracle]
+            args =  "su - "+self.linux_user+" -c "+"\'"+postOracle+"\'"
             process = subprocess.Popen(args, stdout=subprocess.PIPE)
             while process.poll()==None:
                 sleep(1)
