@@ -50,7 +50,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         # Set up luksheader
         self.command_executor.ExecuteInBash('mount /boot', False)
-        self.command_executor.ExecuteInBash('mkdir /boot/luks', True)
+        self.command_executor.ExecuteInBash('mkdir -p /boot/luks', True)
         self.command_executor.ExecuteInBash('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
         self.command_executor.ExecuteInBash('cryptsetup reencrypt --encrypt --init-only {1} --header /boot/luks/osluksheader -d {0} -q'.format(bek_path,
                                                                                                                                                self.rootfs_block_device),
@@ -161,7 +161,7 @@ class PatchBootSystemState(OSEncryptionState):
         root_partuuid = None
         root_device_items = self.disk_util.get_device_items(self.rootfs_block_device)
         for root_item in root_device_items:
-            if self.rootfs_sdx_path.endswith(root_item.name):
+            if self.rootfs_sdx_path.endswith(root_item.name) or os.path.realpath(self.rootfs_block_device).endswith(root_item.name):
                 root_partuuid = self.disk_util.get_device_items_property(root_item.name, "PARTUUID")
                 if root_partuuid:
                     return root_partuuid
