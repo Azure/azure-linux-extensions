@@ -152,10 +152,7 @@ class WorkloadPatch:
                 sleep(2)
             while True:
                 line= process.stdout.readline()
-                if sys.version_info > (3,):
-                    line = str(line, encoding='utf-8', errors="backslashreplace")
-                else:
-                    line = str(line)
+                line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
                 if('BEGIN BACKUP succeeded' in line):
                     preSuccess = True
                     break
@@ -186,10 +183,7 @@ class WorkloadPatch:
                 sleep(2)
             while True:
                 line= process.stdout.readline()
-                if sys.version_info > (3,):
-                    line = str(line, encoding='utf-8', errors="backslashreplace")
-                else:
-                    line = str(line)
+                line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
                 if(line != ''):
                     self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
                 else:
@@ -242,7 +236,7 @@ class WorkloadPatch:
             args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
             self.logger.log("WorkloadPatch: command to execute: "+str(self.sudo_user)+"  "+str(self.command))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
-        elif 'oracle' in self.name.lower() and preSuccess == True:
+        elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
             postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
             args =  "su - "+self.linux_user+" -c "+"\'"+postOracle+"\'"
@@ -254,10 +248,7 @@ class WorkloadPatch:
                 sleep(2)
             while True:
                 line= process.stdout.readline()
-                if sys.version_info > (3,):
-                    line = str(line, encoding='utf-8', errors="backslashreplace")
-                else:
-                    line = str(line)
+                line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
                 if 'END BACKUP failed' in line:
                     self.logger.log("WorkloadPatch: post failed but pre succeeded")
                     self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "Workload post failed but pre succeeded"))
@@ -543,10 +534,7 @@ class WorkloadPatch:
         else:
             while True:
                 line= daemonProcess.stdout.readline()
-                if sys.version_info > (3,):
-                    line = str(line, encoding='utf-8', errors="backslashreplace")
-                else:
-                    line = str(line)
+                line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
                 if(line != ''):
                     self.logger.log("WorkloadPatch: daemon process creation failed "+line.rstrip(), True)
                 else:

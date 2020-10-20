@@ -810,6 +810,14 @@ class HandlerUtility:
         
     def set_pre_post_enabled(self):
         self.pre_post_enabled = True
+        
+    @staticmethod
+    def convert_to_string(txt):
+        if sys.version_info > (3,):
+            txt = str(txt, encoding='utf-8', errors="backslashreplace")
+        else:
+            txt = str(txt)
+        return txt
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
