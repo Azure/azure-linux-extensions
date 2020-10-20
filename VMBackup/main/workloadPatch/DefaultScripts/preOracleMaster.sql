@@ -56,6 +56,13 @@ REM ****************************************************************************
 WHENEVER OSERROR EXIT FAILURE
 WHENEVER SQLERROR EXIT FAILURE
 
+REM
+REM ********************************************************************************
+REM Display the LOG_MODE of the database to be captured by the calling Python code...
+REM ********************************************************************************
+
+SELECT LOG_MODE FROM V$DATABASE;
+
 REM 
 REM ********************************************************************************
 REM Force a switch of the online redo logfiles, which will force a full checkpoint,
