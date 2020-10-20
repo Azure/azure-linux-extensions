@@ -196,27 +196,29 @@ class WorkloadPatch:
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
             
     def postMaster(self):
+        global daemonProcess
         self.logger.log("WorkloadPatch: Entering post mode for master")
-        if self.ipc_folder != None: #IPCm based workloads
-            if os.path.exists(self.outfile):
-                os.remove(self.outfile)
-            else:
-                self.logger.log("WorkloadPatch: File for IPC does not exist at post")
-            if len(self.child) == 0 or self.child[0].poll() is not None:
-                self.logger.log("WorkloadPatch: Not app consistent backup")
-                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
-                return
-            elif self.child[0].poll() is None:
-                self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
-                self.child[0].kill()
-        else: #non IPC based workloads
-            if daemonProcess is None or daemonProcess.poll() is not None:
-                self.logger.log("WorkloadPatch: Not app consistent backup")
-                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
-                return
-            elif daemonProcess.poll() is None:
-                self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
-                daemonProcess.kill()
+        try:
+            if self.ipc_folder != None: #IPCm based workloads
+                if os.path.exists(self.outfile):
+                    os.remove(self.outfile)
+                else:
+                    self.logger.log("WorkloadPatch: File for IPC does not exist at post")
+                if len(self.child) == 0 or self.child[0].poll() is not None:
+                    self.logger.log("WorkloadPatch: Not app consistent backup")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
+                elif self.child[0].poll() is None:
+                    self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+                    self.child[0].kill()
+            else: #non IPC based workloads
+                if daemonProcess is None or daemonProcess.poll() is not None:
+                    self.logger.log("WorkloadPatch: Not app consistent backup")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
+                elif daemonProcess.poll() is None:
+                    self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+                    daemonProcess.kill()
+        except Exception as e:
+            self.logger.log("WorkloadPatch: exception in daemon process indentification" + str(e))
 
         postWorkloadStatus = self.workloadStatus()
         if postWorkloadStatus != preWorkloadStatus:
@@ -250,11 +252,11 @@ class WorkloadPatch:
                 line= process.stdout.readline()
                 line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
                 if 'END BACKUP failed' in line:
-                    self.logger.log("WorkloadPatch: post failed but pre succeeded")
+                    self.logger.log("WorkloadPatch: post failed")
                     self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "Workload post failed but pre succeeded"))
                     break
                 if(line != ''):
-                    self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
+                    self.logger.log("WorkloadPatch: post completed with output "+line.rstrip(), True)
                 else:
                     break
             self.logger.log("WorkloadPatch: Post- Completed")
