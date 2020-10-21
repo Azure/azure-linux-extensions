@@ -273,8 +273,8 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
-    snapshot_type = "appAndFileSystem"
-
+    OnFailureDoFsFreeze = True
+    OnSuccessDoFsFreeze = True
     #Adding python version to the telemetry
     try:
         python_version_info = sys.version_info
@@ -299,9 +299,11 @@ def daemon():
         config = ConfigParsers.ConfigParser()
         config.read(configfile)
         if config.has_option('SnapshotThread','timeout'):
-            thread_timeout= config.get('SnapshotThread','timeout')
-        if config.has_option('SnapshotThread','snapshot_type'):
-           snapshot_type = config.get('SnapshotThread','snapshot_type') #values - appOnly, appAndFileSystem        
+            thread_timeout= config.get('SnapshotThread','timeout')      
+        if config.has_option('SnapshotThread','OnFailureDoFsFreeze'):
+            OnFailureDoFsFreeze= config.get('SnapshotThread','OnFailureDoFsFreeze')
+        if config.has_option('SnapshotThread','OnSuccessDoFsFreeze'):
+            OnSuccessDoFsFreeze= config.get('SnapshotThread','OnSuccessDoFsFreeze')
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
@@ -404,8 +406,14 @@ def daemon():
                     if len(workload_patch.error_details) > 0:
                         backup_logger.log("file system consistent backup only")
                     #todo error handling
-                    if snapshot_type == "appOnly":
+                    if len(workload_patch.error_details) > 0 and OnFailureDoFsFreeze == True: #App&FS consistency
+                        g_fsfreeze_on = True
+                    elif len(workload_patch.error_details) > 0 and OnFailureDoFsFreeze == False: # Do Fs freeze only if App success
                         g_fsfreeze_on = False
+                    elif len(workload_patch.error_details) == 0 and OnSuccessDoFsFreeze == False: # App only
+                        g_fsfreeze_on = False
+                    elif len(workload_patch.error_details) == 0 and OnSuccessDoFsFreeze == True: #App&FS consistency
+                        g_fsfreeze_on = True
                     else:
                         g_fsfreeze_on = True
                     freeze_snapshot(thread_timeout)
