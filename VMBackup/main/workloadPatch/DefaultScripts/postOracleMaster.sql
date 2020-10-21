@@ -56,6 +56,16 @@ REM ****************************************************************************
 WHENEVER OSERROR EXIT FAILURE
 WHENEVER SQLERROR EXIT FAILURE
 
+<<<<<<< HEAD
+=======
+REM
+REM ********************************************************************************
+REM Display the LOG_MODE of the database to be captured by the calling Python code...
+REM ********************************************************************************
+
+SELECT LOG_MODE FROM V$DATABASE;
+
+>>>>>>> 95d3bdca3d5c9cc3e3bad585685f3c357ed808c2
 REM 
 REM ********************************************************************************
 REM Attempt to put the database into BACKUP mode, which will succeed only if the
