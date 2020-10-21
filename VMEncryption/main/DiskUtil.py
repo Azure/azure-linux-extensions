@@ -1053,13 +1053,8 @@ class DiskUtil(object):
             return devices
 
         for symlink in os.listdir(scsi0_dir):
-            if symlink.startswith(self._LUN_PREFIX):
-                try:
-                    lun_number = int(symlink[3:])
-                except ValueError:
-                    # parsing will fail if "symlink" was a partition (e.g. "lun0-part1")
-                    continue  # so just ignore it
-                devices.append(os.path.join(scsi0_dir, symlink)
+            if symlink.startswith(self._LUN_PREFIX) and self._isnumeric(symlink[3:]):
+                devices.append(os.path.join(scsi0_dir, symlink))
 
         return devices
 

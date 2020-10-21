@@ -50,6 +50,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         # Set up luksheader
         self.command_executor.ExecuteInBash('mount /boot', False)
+        self.command_executor.ExecuteInBash('mount /boot/efi', False)
         self.command_executor.ExecuteInBash('mkdir -p /boot/luks', True)
         self.command_executor.ExecuteInBash('dd if=/dev/zero of=/boot/luks/osluksheader bs=33554432 count=1', True)
         self.command_executor.ExecuteInBash('cryptsetup reencrypt --encrypt --init-only {1} --header /boot/luks/osluksheader -d {0} -q'.format(bek_path,
