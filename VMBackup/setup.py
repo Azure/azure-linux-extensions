@@ -54,6 +54,14 @@ plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
 patch_folder = main_folder + '/patch'
 packages_array.append(patch_folder)
 
+workloadpatch_folder = main_folder + '/workloadPatch'
+workloadutils_folder = main_folder + '/workloadPatch/WorkloadUtils'
+workloadscripts_folder = main_folder + '/workloadPatch/DefaultScripts'
+workload_customscripts_folder = main_folder + '/workloadPatch/CustomScripts'
+sqlfilelists=os.listdir(workloadscripts_folder)
+custom_sqlfilelists=os.listdir(workload_customscripts_folder)
+packages_array.append(workloadpatch_folder)
+
 manifest = "manifest.xml"
 prod_manifest = "prodmanifest.xml"
 
@@ -126,8 +134,11 @@ setup(name = CommonVariables.extension_name,
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
-        'License :: OSI Approved :: Apache Software License'],
-      packages = packages_array)
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: SQL',
+        'Programming Language :: PL/SQL'],
+      packages = packages_array
+      )
 
 """
 unzip the package files and re-package it.
@@ -170,6 +181,12 @@ def copy(src, dst):
 final_folder_path = target_zip_file_location + target_folder_name
 final_binary_path= final_folder_path + '/main/safefreeze'
 final_plugin_path = final_folder_path + '/main/tempPlugin'
+final_workloadscripts_path = final_folder_path + '/main/workloadPatch/DefaultScripts'
+final_workload_customscripts_path = final_folder_path + '/main/workloadPatch/CustomScripts'
+final_workloadutils_path = final_folder_path + '/main/workloadPatch/WorkloadUtils'
+copybinary(workloadscripts_folder, final_workloadscripts_path) 
+copybinary(workload_customscripts_folder, final_workload_customscripts_path)
+copybinary(workloadutils_folder, final_workloadutils_path)
 final_plugin_conf_path = final_folder_path + '/main'
 copybinary(binary_entry, final_binary_path)
 copybinary(plugin_folder, final_plugin_path)

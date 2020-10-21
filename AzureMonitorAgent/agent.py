@@ -18,10 +18,13 @@
 
 import os
 import os.path
+import datetime
 import signal
 import pwd
 import grp
 import re
+import filecmp
+import stat
 import sys
 import traceback
 import time
@@ -35,10 +38,17 @@ import urllib2
 import shutil
 import crypt
 import xml.dom.minidom
+import re
+import hashlib
 from distutils.version import LooseVersion
-
+from hashlib import sha256
+from shutil import copyfile
 
 from threading import Thread
+import telegraf_utils.telegraf_config_handler as telhandler
+import metrics_ext_utils.metrics_constants as metrics_constants
+import metrics_ext_utils.metrics_ext_handler as me_handler
+import metrics_ext_utils.metrics_common_utils as metrics_utils
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -50,11 +60,14 @@ except Exception as e:
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-BundleFileNameDeb = 'azure-mdsd_1.5.118-build.master.54_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.118-build.master.54_x86_64.rpm'
+# TODO: Installer should automatically figure this out from the folder instead of requiring this update
+BundleFileNameDeb = 'azure-mdsd_1.5.124-build.master.89_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.124-build.master.89_x86_64.rpm'
 BundleFileName = ''
+TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
+MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
 
 # Commands
 OneAgentInstallCommand = ''
@@ -105,6 +118,10 @@ def main():
             operation = 'Enable'
         elif re.match('^([-/]*)(update)', option):
             operation = 'Update'
+        elif re.match('^([-/]*)(metrics)', option):
+            operation = 'Metrics'
+        elif re.match('^([-/]*)(arc)', option):
+            operation = 'Arc'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -175,7 +192,14 @@ def get_free_space_mb(dirname):
     """
     st = os.statvfs(dirname)
     return st.f_bavail * st.f_frsize / 1024 / 1024
-  
+
+
+def is_systemd():
+    """
+    Check if the system is using systemd
+    """
+    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
+    return check_systemd == 0
 
 def install():
     """
@@ -187,33 +211,150 @@ def install():
     find_package_manager("Install")
     exit_if_vm_not_supported('Install')
 
-    # public_settings, protected_settings = get_settings()
-    # if public_settings is None:
-    #     raise ParameterMissingException('Public configuration must be ' \
-    #                                     'provided')
+    public_settings, protected_settings = get_settings()
+    
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
     print (PackageManager, " and ", BundleFileName)
-    OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)
+    OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)        
     hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
 
     # Retry, since install can fail due to concurrent package operations
     exit_code, output = run_command_with_retries_output(OneAgentInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
-                                         final_check = final_check_if_dpkg_locked)
+                                         final_check = final_check_if_dpkg_locked)    
+    
+    default_configs = {   
+        "MDSD_LOG" : "/var/log",
+        "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
+        "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
+        "MDSD_OPTIONS" : "\"-l -A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
+        "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
+        "AZURE_ENDPOINT" : "https://monitor.azure.com/",
+        "ADD_REGION_TO_MCS_ENDPOINT" : "true",
+        "ENABLE_MCS" : "false",
+        "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
+        #"OMS_TLD" : "int2.microsoftatlanta-int.com",
+        #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
+    }
 
+    # Decide the mode
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+        hutil_log_info("Detecting Auto-Config mode.")
+        return 0, ""
+    elif protected_settings is None or len(protected_settings) is 0:
+        default_configs["ENABLE_MCS"] = "true"
+    else:
+        # look for LA protected settings
+        for var in protected_settings.keys():
+            if "_key" in var or "_id" in var:
+                default_configs[var] = protected_settings.get(var)
+        
+        # check if required GCS params are available
+        MONITORING_GCS_CERT_CERTFILE = None
+        if protected_settings.has_key("certificate"):
+            MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
+
+        MONITORING_GCS_CERT_KEYFILE = None
+        if protected_settings.has_key("certificateKey"):
+            MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(protected_settings.get("certificateKey"))
+
+        MONITORING_GCS_ENVIRONMENT = ""
+        if protected_settings.has_key("monitoringGCSEnvironment"):
+            MONITORING_GCS_ENVIRONMENT = protected_settings.get("monitoringGCSEnvironment")
+
+        MONITORING_GCS_NAMESPACE = ""
+        if protected_settings.has_key("namespace"):
+            MONITORING_GCS_NAMESPACE = protected_settings.get("namespace")
+
+        MONITORING_GCS_ACCOUNT = ""
+        if protected_settings.has_key("monitoringGCSAccount"):
+            MONITORING_GCS_ACCOUNT = protected_settings.get("monitoringGCSAccount")
+
+        MONITORING_GCS_REGION = ""
+        if protected_settings.has_key("monitoringGCSRegion"):
+            MONITORING_GCS_REGION = protected_settings.get("monitoringGCSRegion")
+
+        MONITORING_CONFIG_VERSION = ""
+        if protected_settings.has_key("configVersion"):
+            MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
+
+        MONITORING_GCS_AUTH_ID_TYPE = ""
+        if protected_settings.has_key("MONITORING_GCS_AUTH_ID_TYPE"):
+            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("MONITORING_GCS_AUTH_ID_TYPE")
+
+        if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE is "")) or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
+            waagent_log_error('Not all required GCS parameters are provided')
+            raise ParameterMissingException
+        else:
+            # set the values for GCS
+            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"        
+            default_configs["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
+            default_configs["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
+            default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
+            default_configs["MONITORING_GCS_REGION"] = MONITORING_GCS_REGION
+            default_configs["MONITORING_CONFIG_VERSION"] = MONITORING_CONFIG_VERSION
+
+            # write the certificate and key to disk
+            uid = pwd.getpwnam("syslog").pw_uid
+            gid = grp.getgrnam("syslog").gr_gid
+            
+            if MONITORING_GCS_AUTH_ID_TYPE is not "":
+                default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
+
+            if MONITORING_GCS_CERT_CERTFILE is not None:
+                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
+                fh = open("/etc/mdsd.d/gcscert.pem", "wb")
+                fh.write(MONITORING_GCS_CERT_CERTFILE)
+                fh.close()
+                os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))  
+
+            if MONITORING_GCS_CERT_KEYFILE is not None:
+                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/mdsd.d/gcskey.pem"
+                fh = open("/etc/mdsd.d/gcskey.pem", "wb")
+                fh.write(MONITORING_GCS_CERT_KEYFILE)
+                fh.close()
+                os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))  
+
+    config_file = "/etc/default/mdsd"
+    config_updated = False
     try:
-        if os.path.isfile("/etc/default/mdsd"):
-            with open("/etc/default/mdsd", "a+") as f:
-                data = f.read()
-                if "ENABLE_MCS=true" not in data:
-                    f.write("\n")
-                    f.write("export ENABLE_MCS=true\n")
-                if "MCS_ENDPOINT=mcs.azure.com" not in data:
-                    f.write("export MCS_ENDPOINT=mcs.azure.com\n")
-                if "AZURE_ENDPOINT=https://management.azure.com/" not in data:
-                    f.write("export AZURE_ENDPOINT=https://management.azure.com/\n")
+        if os.path.isfile(config_file):
+            data = []
+            new_data = ""
+            vars_set = set()
+            with open(config_file, "r") as f:
+                data = f.readlines()
+                for line in data:
+                    for var in default_configs.keys():
+                        if var in line:
+                            line = "export " + var + "=" + default_configs[var] + "\n"
+                            vars_set.add(var)
+                            break
+                    new_data += line
+            
+            for var in default_configs.keys():
+                if var not in vars_set:
+                    new_data += "export " + var + "=" + default_configs[var] + "\n"
+
+            with open("/etc/default/mdsd_temp", "w") as f:
+                f.write(new_data)
+                config_updated = True if len(new_data) > 0 else False 
+
+            if not config_updated or not os.path.isfile("/etc/default/mdsd_temp"):
+                log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/mdsd")
+
+            os.remove(config_file)
+            os.rename("/etc/default/mdsd_temp", config_file)
+
+            uid = pwd.getpwnam("syslog").pw_uid
+            gid = grp.getgrnam("syslog").gr_gid
+            os.chown(config_file, uid, gid)
+            os.system('chmod {1} {0}'.format(config_file, 400))  
+
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
     except:
@@ -261,10 +402,32 @@ def enable():
     """
     exit_if_vm_not_supported('Enable')
 
-    OneAgentEnableCommand = "systemctl start mdsd"
+    # Check if this is Arc VM and enable arc daemon if it is
+    if metrics_utils.is_arc_installed():
+        hutil_log_info("This VM is an Arc VM, Running the arc watcher daemon.")
+        start_arc_process()
+
+    if is_systemd():
+        OneAgentEnableCommand = "systemctl start mdsd"
+    else:
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
+        OneAgentEnableCommand = "/etc/init.d/mdsd start"
+    
+    public_settings, protected_settings = get_settings()
+
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+        OneAgentEnableCommand = "systemctl start mdsdmgr"
+        if not is_systemd():
+            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
+            OneAgentEnableCommand = "/etc/init.d/mdsdmgr start"
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
+
+    if exit_code is 0:
+        #start metrics process if enable is successful
+        start_metrics_process()
+        
     return exit_code, output
 
 def disable():
@@ -272,9 +435,21 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
-    #stop the Azure Monitor Linux Agent service
-    DisableOneAgentServiceCommand = "systemctl stop mdsd"
 
+    # disable arc daemon if it is running
+    stop_arc_watcher()
+
+    #stop the metrics process
+    stop_metrics_process()
+
+    #stop the Azure Monitor Linux Agent service
+    if is_systemd():
+        DisableOneAgentServiceCommand = "systemctl stop mdsd"
+        
+    else:
+        DisableOneAgentServiceCommand = "/etc/init.d/mdsd stop"
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop mdsd.")
+    
     exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
     return exit_code, output
 
@@ -284,17 +459,278 @@ def update():
     No logic to install the agent as agent -> install() will be called 
     with udpate because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
     """
-    # print ("Uinstalling the current mdsd")
-    # exit_code, output = uninstall()
-    # if exit_code != 0:
-    #     return exit_code, output
-    # print ("installing the curretn mdsd")
-    # exit_code, output = install()
-    # print ("Update finished")
     
     return 0, ""
 
+def stop_metrics_process():
+    
+    if telhandler.is_running(is_lad=False):
+        #Stop the telegraf and ME services
+        tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
+        if tel_out:
+            HUtilObject.log(tel_msg)
+        else:
+            HUtilObject.error(tel_msg)
+        
+        #Delete the telegraf and ME services
+        tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+        if tel_rm_out:
+            HUtilObject.log(tel_rm_msg)
+        else:
+            HUtilObject.error(tel_rm_msg)
+    
+    if me_handler.is_running(is_lad=False):
+        me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+        if me_out:
+            HUtilObject.log(me_msg)
+        else:
+            HUtilObject.error(me_msg)
 
+        me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
+        if me_rm_out:
+            HUtilObject.log(me_rm_msg)
+        else:
+            HUtilObject.error(me_rm_msg)
+
+    pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
+
+    # kill existing telemetry watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pids in f.readlines():
+                kill_cmd = "kill " + pids
+                run_command_and_log(kill_cmd)
+                run_command_and_log("rm "+pids_filepath)
+
+def start_metrics_process():
+    """
+    Start telemetry process that performs periodic monitoring activities
+    :return: None
+
+    """
+    stop_metrics_process()
+    
+    #start telemetry watcher
+    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python', oneagent_filepath, '-metrics']
+    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+    HUtilObject.log('start watcher process '+str(args))
+    subprocess.Popen(args, stdout=log, stderr=log)
+
+def metrics_watcher(hutil_error, hutil_log):
+    """
+    Watcher thread to monitor metric configuration changes and to take action on them
+    """    
+    
+    # check every 30 seconds
+    sleepTime =  30
+
+    # sleep before starting the monitoring.
+    time.sleep(sleepTime)
+    last_crc = None
+    me_msi_token_expiry_epoch = None
+
+    while True:
+        try:
+            if os.path.isfile(MdsdCounterJsonPath):
+                f = open(MdsdCounterJsonPath, "r")
+                data = f.read()
+                    
+                if (data != ''):
+                    json_data = json.loads(data)  
+                    
+                    if len(json_data) == 0:
+                        last_crc = hashlib.sha256(data).hexdigest()                    
+                        if telhandler.is_running(is_lad=False):
+                            #Stop the telegraf and ME services
+                            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
+                            if tel_out:
+                                HUtilObject.log(tel_msg)
+                            else:
+                                HUtilObject.error(tel_msg)
+
+                            #Delete the telegraf and ME services
+                            tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+                            if tel_rm_out:
+                                HUtilObject.log(tel_rm_msg)
+                            else:
+                                HUtilObject.error(tel_rm_msg)
+
+                        if me_handler.is_running(is_lad=False):
+                            me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+                            if me_out:
+                                HUtilObject.log(me_msg)
+                            else:
+                                HUtilObject.error(me_msg)
+
+                            me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
+                            if me_rm_out:
+                                HUtilObject.log(me_rm_msg)
+                            else:
+                                HUtilObject.error(me_rm_msg)
+                    else:
+                        crc = hashlib.sha256(data).hexdigest()                    
+                        generate_token = False
+                        me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
+
+                        if me_msi_token_expiry_epoch is None or me_msi_token_expiry_epoch == "":
+                            if os.path.isfile(me_token_path):
+                                with open(me_token_path, "r") as f:
+                                    authtoken_content = f.read()
+                                    if authtoken_content and "expires_on" in authtoken_content:
+                                        me_msi_token_expiry_epoch = authtoken_content["expires_on"]
+                                    else:
+                                        generate_token = True
+                            else:
+                                generate_token = True
+
+                        if me_msi_token_expiry_epoch:                
+                            currentTime = datetime.datetime.now()
+                            token_expiry_time = datetime.datetime.fromtimestamp(int(me_msi_token_expiry_epoch))
+                            if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
+                                # The MSI Token will expire within 30 minutes. We need to refresh the token
+                                generate_token = True
+
+                        if generate_token:
+                            generate_token = False
+                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
+                            if msi_token_generated:
+                                hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
+                            else:
+                                hutil_error(log_messages)
+
+                        if(crc != last_crc):
+                            hutil_log("Start processing metric configuration")
+                            hutil_log(data)
+
+                            telegraf_config, telegraf_namespaces = telhandler.handle_config(
+                                json_data, 
+                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port, 
+                                "unix:///var/run/mdsd/default_influx.socket",
+                                is_lad=False)
+
+                            me_handler.setup_me(is_lad=False)
+
+                            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
+                            if start_telegraf_out:
+                                hutil_log("Successfully started metrics-sourcer.")
+                            else:
+                                hutil_error(log_messages)
+
+
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                            if start_metrics_out:
+                                hutil_log("Successfully started metrics-extension.")
+                            else:
+                                hutil_error(log_messages)
+
+                            last_crc = crc
+
+                        telegraf_restart_retries = 0
+                        me_restart_retries = 0
+                        max_restart_retries = 10
+
+                        # Check if telegraf is running, if not, then restart
+                        if not telhandler.is_running(is_lad=False):
+                            if telegraf_restart_retries < max_restart_retries:
+                                telegraf_restart_retries += 1
+                                hutil_log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
+                                tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
+                                if tel_out:
+                                    hutil_log(tel_msg)
+                                else:
+                                    hutil_error(tel_msg)
+                                start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
+                                if start_telegraf_out:
+                                    hutil_log("Successfully started metrics-sourcer.")
+                                else:
+                                    hutil_error(log_messages)
+                            else:
+                                hutil_error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log".format(max_restart_retries))
+                        else:
+                            telegraf_restart_retries = 0
+
+                        # Check if ME is running, if not, then restart
+                        if not me_handler.is_running(is_lad=False):
+                            if me_restart_retries < max_restart_retries:
+                                me_restart_retries += 1
+                                hutil_log("MetricsExtension binary process is not running. Restarting MetricsExtension now. Retry count - {0}".format(me_restart_retries))
+                                me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+                                if me_out:
+                                    hutil_log(me_msg)
+                                else:
+                                    hutil_error(me_msg)                  
+                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+
+                                if start_metrics_out:
+                                    hutil_log("Successfully started metrics-extension.")
+                                else:
+                                    hutil_error(log_messages)
+                            else:
+                                hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
+                        else:
+                            me_restart_retries = 0   
+        
+        except IOError as e:
+            hutil_error('I/O error in monitoring metrics. Exception={0}'.format(e))
+
+        except Exception as e:
+            hutil_error('Error in monitoring metrics. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
+
+def metrics():
+    """
+    Take care of setting up telegraf and ME for metrics if configuration is present
+    """    
+    pids_filepath = os.path.join(os.getcwd(), 'amametrics.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = metrics_watcher, args = [HUtilObject.error, HUtilObject.log])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
+
+
+def start_arc_process():
+    """
+    Start arc process that performs periodic monitoring activities
+    :return: None
+
+    """
+    hutil_log_info("stopping previously running arc process")
+    stop_arc_watcher()
+    hutil_log_info("starting arc process")
+    
+    #start telemetry watcher
+    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python', oneagent_filepath, '-arc']
+    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+    HUtilObject.log('start watcher process '+str(args))
+    subprocess.Popen(args, stdout=log, stderr=log)
+
+def start_arc_watcher():
+    """
+    Take care of starting arc_watcher daemon if the VM has arc running
+    """    
+    hutil_log_info("Starting the watcher")
+    print("Starting the watcher")
+    pids_filepath = os.path.join(os.getcwd(), 'amaarc.pid')
+    py_pid = os.getpid()
+    print("pid ", py_pid)
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+    hutil_log_info("Written all the pids")
+    print("Written all the pids")
+    watcher_thread = Thread(target = arc_watcher, args = [HUtilObject.error, HUtilObject.log])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
 
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
@@ -302,8 +738,78 @@ operations = {'Disable' : disable,
               'Install' : install,
               'Enable' : enable,
               'Update' : update,
+              'Metrics' : metrics,
+              'Arc' : start_arc_watcher,
 }
 
+
+def stop_arc_watcher():
+    """
+    Take care of stopping arc_watcher daemon if the VM has arc running
+    """    
+    pids_filepath = os.path.join(os.getcwd(),'amaarc.pid')
+
+    # kill existing telemetry watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pids in f.readlines():
+                proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
+                output = proc.communicate()[0]
+                if "arc" in output:
+                    kill_cmd = "kill " + pids 
+                    run_command_and_log(kill_cmd)
+        
+        # Delete the file after to avoid clutter
+        os.remove(pids_filepath)
+
+def arc_watcher(hutil_error, hutil_log):
+    """
+    This is needed to override mdsd's syslog permissions restriction which prevents mdsd 
+    from reading temporary key files that are needed to make https calls to get an MSI token for arc during onboarding to download amcs config
+    This method spins up a process that will continuously keep refreshing that particular file path with valid keys
+    So that whenever mdsd needs to refresh it's MSI token, it is able to find correct keys there to make the https calls
+    """
+    # check every 25 seconds
+    sleepTime =  25
+
+    # sleep before starting the monitoring.
+    time.sleep(sleepTime)
+
+    while True:
+        try:
+            arc_token_mdsd_dir = "/etc/mdsd.d/arc_tokens/"
+            if not os.path.exists(arc_token_mdsd_dir):
+                os.makedirs(arc_token_mdsd_dir)
+            else:
+                # delete the existing keys as they might not be valid anymore
+                for filename in os.listdir(arc_token_mdsd_dir):
+                    filepath = arc_token_mdsd_dir + filename
+                    os.remove(filepath)
+
+            arc_endpoint = metrics_utils.get_arc_endpoint()
+            try:
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://monitor.azure.com/"
+                req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib2.urlopen(req)
+            except:
+                # The above request is expected to fail and add a key to the path - 
+                authkey_dir = "/var/opt/azcmagent/tokens/"
+                if not os.path.exists(authkey_dir):
+                    raise Exception("Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir))
+                # Copy the tokens to mdsd accessible dir
+                for filename in os.listdir(authkey_dir):
+                    filepath = authkey_dir + filename
+                    print filepath
+                    shutil.copy(filepath, arc_token_mdsd_dir)
+                
+                # Change the ownership of the mdsd arc token dir to be accessible by syslog (since mdsd runs as syslog user)
+                os.system("chown -R syslog:syslog {0}".format(arc_token_mdsd_dir))
+
+        except Exception as e:
+            hutil_error('Error in arc watcher process while copying token for arc MSI auth queries. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
 
 def parse_context(operation):
     """
@@ -335,8 +841,8 @@ def find_package_manager(operation):
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
-    dpkg_set = {"oracle", "debian", "ubuntu", "suse"}
-    rpm_set = {"redhat", "centos", "red hat"}
+    dpkg_set = set(["debian", "ubuntu"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse"])
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"

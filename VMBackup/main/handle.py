@@ -25,11 +25,9 @@ import json
 import string
 import subprocess
 import sys
-import imp
 import time
 import shlex
 import traceback
-import xml.parsers.expat
 import datetime
 try:
     import ConfigParser as ConfigParsers
@@ -56,11 +54,12 @@ import ExtensionErrorCodeHelper
 from PluginHost import PluginHost
 from PluginHost import PluginHostResult
 import platform
+from workloadPatch import WorkloadPatch
 
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -70,10 +69,9 @@ def main():
         total_used_size = 0
         size_calculation_failed = False
         HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
-##        HandlerUtil.waagent.Logger.Log((CommonVariables.extension_name) + " started to handle." ) 
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
-        MyPatching = GetMyPatching(backup_logger)
+        MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
         hutil.patching = MyPatching
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
@@ -110,7 +108,7 @@ def status_report_to_file(file_report_msg):
 
 def status_report_to_blob(blob_report_msg):
     global backup_logger,hutil,para_parser
-    UploadStatusAndLog = hutil.get_value_from_configfile('UploadStatusAndLog')
+    UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
     if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
         try:
             if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
@@ -131,14 +129,14 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
     file_report_msg = None
     try:
         if total_used_size == -1 :
-            sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger)
+            sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger , para_parser = para_parser)
             total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
-            number_of_blobs = len(para_parser.blobs)
+            number_of_blobs = len(para_parser.includeLunList)
             maximum_possible_size = number_of_blobs * 1099511627776
             if(total_used_size>maximum_possible_size):
                 total_used_size = maximum_possible_size
             backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_used_size,maximum_possible_size),True)
-        if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+        if(para_parser is not None):
             blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                     status_code=str(status_code),\
                     message=message,\
@@ -192,14 +190,16 @@ def convert_time(utcTicks):
 
 def freeze_snapshot(timeout):
     try:
-        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on
-        if(hutil.get_value_from_configfile('seqsnapshot') == None):
-            hutil.set_value_to_configfile('seqsnapshot', '0')
-        seqsnapshotflag = hutil.get_value_from_configfile('seqsnapshot')
-        backup_logger.log("seqsnapshot flag set as :" + str(seqsnapshotflag), True, 'Info')
-        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser)
+        global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on, workload_patch
+        canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
+        freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
         backup_logger.log("Calling do snapshot method", True, 'Info')
         run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
+        if (canTakeCrashConsistentSnapshot == True and run_result != CommonVariables.success and run_result != CommonVariables.success_appconsistent):
+            if (snapshot_info_array is not None and snapshot_info_array !=[] and check_snapshot_array_fail() == False and len(snapshot_info_array) == 1):
+                run_status = CommonVariables.status_success
+                run_result = CommonVariables.success
+                hutil.SetSnapshotConsistencyType(Status.SnapshotConsistencyType.crashConsistent)
     except Exception as e:
         errMsg = 'Failed to do the snapshot with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
@@ -220,13 +220,37 @@ def check_snapshot_array_fail():
                 break
     return snapshot_array_fail
 
+def get_key_value(jsonObj, key):
+    value = None
+    if(key in jsonObj.keys()):
+        value = jsonObj[key]
+    return value
+
+def can_take_crash_consistent_snapshot(para_parser):
+    global backup_logger
+    takeCrashConsistentSnapshot = False
+    if(para_parser != None and para_parser.customSettings != None and para_parser.customSettings != ''):
+        customSettings = json.loads(para_parser.customSettings)
+        isManagedVm = get_key_value(customSettings, 'isManagedVm')
+        canTakeCrashConsistentSnapshot = get_key_value(customSettings, 'canTakeCrashConsistentSnapshot')
+        backupRetryCount = get_key_value(customSettings, 'backupRetryCount')
+        numberOfDisks = 0
+        if (para_parser.includeLunList is not None):
+            numberOfDisks = len(para_parser.includeLunList)
+        isAnyNone = (isManagedVm is None or canTakeCrashConsistentSnapshot is None or backupRetryCount is None)
+        if (isAnyNone == False and isManagedVm == True and canTakeCrashConsistentSnapshot == True and backupRetryCount > 0 and numberOfDisks == 1):
+            takeCrashConsistentSnapshot = True
+        backup_logger.log("isManagedVm=" + str(isManagedVm) + ", canTakeCrashConsistentSnapshot=" + str(canTakeCrashConsistentSnapshot) + ", backupRetryCount=" + str(backupRetryCount) + ", numberOfDisks=" + str(numberOfDisks) + ", takeCrashConsistentSnapshot=" + str(takeCrashConsistentSnapshot), True, 'Info')
+    return takeCrashConsistentSnapshot
+
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing')
 
     try:
         backup_logger.log('starting daemon', True)
+        backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
         # handle the restoring scenario.
         mi = MachineIdentity()
         stored_identity = mi.stored_identity()
@@ -249,6 +273,7 @@ def daemon():
     freeze_called = False
     configfile='/etc/azure/vmbackup.conf'
     thread_timeout=str(60)
+    snapshot_type = "appAndFileSystem"
 
     #Adding python version to the telemetry
     try:
@@ -275,6 +300,8 @@ def daemon():
         config.read(configfile)
         if config.has_option('SnapshotThread','timeout'):
             thread_timeout= config.get('SnapshotThread','timeout')
+        if config.has_option('SnapshotThread','snapshot_type'):
+           snapshot_type = config.get('SnapshotThread','snapshot_type') #values - appOnly, appAndFileSystem        
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
@@ -295,7 +322,7 @@ def daemon():
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
         hutil.update_settings_file()
 
-        if(bool(public_settings) and not protected_settings): #Protected settings decryption failed case
+        if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
             hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
             temp_result=CommonVariables.FailedHandlerGuestAgentCertificateNotFound
@@ -309,10 +336,18 @@ def daemon():
             utcNow = datetime.datetime.utcnow()
             backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow), True)
             timespan = utcNow - commandStartTime
-            MAX_TIMESPAN = 150 * 60 # in seconds
+            MAX_TIMESPAN = 140 * 60 # in seconds
             # handle the machine identity for the restoration scenario.
             total_span_in_seconds = timedelta_total_seconds(timespan)
             backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
+
+            if total_span_in_seconds > MAX_TIMESPAN :
+                error_msg = "CRP timeout limit has reached, will not take snapshot."
+                errMsg = error_msg
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
+                temp_result=CommonVariables.FailedGuestAgentInvokedCommandTooLate
+                temp_status= 'error'
+                exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
@@ -332,7 +367,7 @@ def daemon():
             run_result = CommonVariables.success
             backup_logger.log(error_msg)
         elif(CommonVariables.iaas_vmbackup_command in commandToExecute.lower()):
-            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None or para_parser.private_config_obj is None):
+            if(para_parser.backup_metadata is None or para_parser.public_config_obj is None):
                 run_result = CommonVariables.error_parameter
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error_parameter)
                 run_status = 'error'
@@ -355,97 +390,142 @@ def daemon():
                 else:
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
                 backup_logger.log('commandToExecute is ' + commandToExecute, True)
-
-                PluginHostObj = PluginHost(logger=backup_logger)
-                PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
-                doFsConsistentbackup = False
-                appconsistentBackup = False
-
-                if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
-                        PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
-                    backup_logger.log('App Consistent Consistent Backup Enabled', True)
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
-                    appconsistentBackup = True
-
-                if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
-                    backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
-                    doFsConsistentbackup = True
-
-                preResult = PluginHostResult()
-                postResult = PluginHostResult()
-
-                if not doFsConsistentbackup:
-                    preResult = PluginHostObj.pre_script()
-                    dobackup = preResult.continueBackup
-
-                    if(g_fsfreeze_on == False and preResult.anyScriptFailed):
-                        dobackup = False
-
-                if dobackup:
-                    freeze_snapshot(thread_timeout)
-
-                if not doFsConsistentbackup:
-                    postResult = PluginHostObj.post_script()
-                    if not postResult.continueBackup:
-                        dobackup = False
                 
-                    if(g_fsfreeze_on == False and postResult.anyScriptFailed):
-                        dobackup = False
-
-                if not dobackup:
-                    if run_result == CommonVariables.success and PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success:
+                workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
+                #new flow only if workload name is present in workload.conf
+                if workload_patch.name != None and workload_patch.name != "":
+                    backup_logger.log("workload backup enabled for workload: " + workload_patch.name, True)
+                    hutil.set_pre_post_enabled()
+                    pre_skipped = False
+                    if len(workload_patch.error_details) > 0:
+                        backup_logger.log("skip pre and post")
+                        pre_skipped = True
+                    else:
+                        workload_patch.pre()
+                    if len(workload_patch.error_details) > 0:
+                        backup_logger.log("file system consistent backup only")
+                    #todo error handling
+                    if snapshot_type == "appOnly":
+                        g_fsfreeze_on = False
+                    else:
+                        g_fsfreeze_on = True
+                    freeze_snapshot(thread_timeout)
+                    if pre_skipped == False:
+                        workload_patch.post()
+                    workload_error = workload_patch.populateErrors()
+                    if workload_error != None and g_fsfreeze_on == False:
                         run_status = 'error'
-                        run_result = PluginHostErrorCode
-                        hutil.SetExtErrorCode(PluginHostErrorCode)
-                        error_msg = 'Plugin Host Precheck Failed'
+                        run_result = workload_error.errorCode
+                        hutil.SetExtErrorCode(workload_error.errorCode)
+                        error_msg = 'Workload Patch failed with error message: ' +  workload_error.errorMsg
                         error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
                         backup_logger.log(error_msg, True)
+                    elif workload_error != None and g_fsfreeze_on == True:
+                        hutil.SetExtErrorCode(workload_error.errorCode)
+                        error_msg = 'Workload Patch failed with warning message: ' +  workload_error.errorMsg
+                        error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                        backup_logger.log(error_msg, True)                        
+                    else:
+                        if(run_status == CommonVariables.status_success):
+                            run_status = 'success'
+                            run_result = CommonVariables.success_appconsistent
+                            hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
+                            error_msg = 'Enable Succeeded with App Consistent Snapshot'
+                            backup_logger.log(error_msg, True)
+                        else:
+                            error_msg = 'Enable failed in fsfreeze snapshot flow'
+                            backup_logger.log(error_msg, True)
+                else:
+                    PluginHostObj = PluginHost(logger=backup_logger)
+                    PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
+                    doFsConsistentbackup = False
+                    appconsistentBackup = False
 
-                    if run_result == CommonVariables.success:
+                    if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
+                            PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
+                            PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
+                            PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
+                            PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
+                        backup_logger.log('App Consistent Consistent Backup Enabled', True)
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
+                        appconsistentBackup = True
+
+                    if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                        backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
+                        doFsConsistentbackup = True
+
+                    preResult = PluginHostResult()
+                    postResult = PluginHostResult()
+
+                    if not doFsConsistentbackup:
+                        preResult = PluginHostObj.pre_script()
+                        dobackup = preResult.continueBackup
+
+                        if(g_fsfreeze_on == False and preResult.anyScriptFailed):
+                            dobackup = False
+
+                    if dobackup:
+                        freeze_snapshot(thread_timeout)
+
+                    if not doFsConsistentbackup:
+                        postResult = PluginHostObj.post_script()
+                        if not postResult.continueBackup:
+                            dobackup = False
+                
+                        if(g_fsfreeze_on == False and postResult.anyScriptFailed):
+                            dobackup = False
+
+                    if not dobackup:
+                        if run_result == CommonVariables.success and PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success:
+                            run_status = 'error'
+                            run_result = PluginHostErrorCode
+                            hutil.SetExtErrorCode(PluginHostErrorCode)
+                            error_msg = 'Plugin Host Precheck Failed'
+                            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                            backup_logger.log(error_msg, True)
+
+                        if run_result == CommonVariables.success:
+                            pre_plugin_errors = preResult.errors
+                            for error in pre_plugin_errors:
+                                if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                                    run_status = 'error'
+                                    run_result = error.errorCode
+                                    hutil.SetExtErrorCode(error.errorCode)
+                                    error_msg = 'PreScript failed for the plugin ' +  error.pluginName
+                                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                                    backup_logger.log(error_msg, True)
+                                    break
+
+                        if run_result == CommonVariables.success:
+                            post_plugin_errors = postResult.errors
+                            for error in post_plugin_errors:
+                                if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                                    run_status = 'error'
+                                    run_result = error.errorCode
+                                    hutil.SetExtErrorCode(error.errorCode)
+                                    error_msg = 'PostScript failed for the plugin ' +  error.pluginName
+                                    error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
+                                    backup_logger.log(error_msg, True)
+                                    break
+
+                    if appconsistentBackup:
+                        if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                            hutil.SetExtErrorCode(PluginHostErrorCode)
                         pre_plugin_errors = preResult.errors
                         for error in pre_plugin_errors:
                             if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                                run_status = 'error'
-                                run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
-                                error_msg = 'PreScript failed for the plugin ' +  error.pluginName
-                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                                backup_logger.log(error_msg, True)
-                                break
-
-                    if run_result == CommonVariables.success:
                         post_plugin_errors = postResult.errors
                         for error in post_plugin_errors:
                             if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                                run_status = 'error'
-                                run_result = error.errorCode
                                 hutil.SetExtErrorCode(error.errorCode)
-                                error_msg = 'PostScript failed for the plugin ' +  error.pluginName
-                                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(hutil.ExtErrorCode)
-                                backup_logger.log(error_msg, True)
-                                break
 
-                if appconsistentBackup:
-                    if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
-                        hutil.SetExtErrorCode(PluginHostErrorCode)
-                    pre_plugin_errors = preResult.errors
-                    for error in pre_plugin_errors:
-                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                            hutil.SetExtErrorCode(error.errorCode)
-                    post_plugin_errors = postResult.errors
-                    for error in post_plugin_errors:
-                        if error.errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                            hutil.SetExtErrorCode(error.errorCode)
-
-                if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
-                    run_status = 'success'
-                    run_result = CommonVariables.success_appconsistent
-                    hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
-                    error_msg = 'Enable Succeeded with App Consistent Snapshot'
-                    backup_logger.log(error_msg, True)
+                    if run_result == CommonVariables.success and not doFsConsistentbackup and not (preResult.anyScriptFailed or postResult.anyScriptFailed):
+                        run_status = 'success'
+                        run_result = CommonVariables.success_appconsistent
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success_appconsistent)
+                        error_msg = 'Enable Succeeded with App Consistent Snapshot'
+                        backup_logger.log(error_msg, True)
 
         else:
             run_status = 'error'
@@ -507,11 +587,12 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
-    global backup_logger,hutil,error_msg,para_parser
+    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro
     try:
         hutil.do_parse_context('Enable')
 
         backup_logger.log('starting enable', True)
+        backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
 
         hutil.exit_if_same_seq()
 

@@ -44,7 +44,7 @@ import ExtensionErrorCodeHelper
 
 class FreezeSnapshotter(object):
     """description of class"""
-    def __init__(self, logger, hutil , freezer, g_fsfreeze_on, para_parser):
+    def __init__(self, logger, hutil , freezer, g_fsfreeze_on, para_parser, takeCrashConsistentSnapshot):
         self.logger = logger
         self.configfile = '/etc/azure/vmbackup.conf'
         self.hutil = hutil
@@ -59,7 +59,9 @@ class FreezeSnapshotter(object):
         self.taskId = self.para_parser.taskId
         self.hostIp = '168.63.129.16'
         self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
-
+        self.takeCrashConsistentSnapshot = takeCrashConsistentSnapshot
+        self.logger.log('FreezeSnapshotter : takeCrashConsistentSnapshot = ' + str(self.takeCrashConsistentSnapshot))
+        
         #implement in next release
         '''
         # fetching wireserver IP from DHCP
@@ -79,7 +81,7 @@ class FreezeSnapshotter(object):
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
                 customSettings = json.loads(para_parser.customSettings)
-                snapshotMethodConfigValue = self.hutil.get_value_from_configfile(CommonVariables.SnapshotMethod)
+                snapshotMethodConfigValue = self.hutil.get_strvalue_from_configfile(CommonVariables.SnapshotMethod,customSettings['takeSnapshotFrom'])
                 self.logger.log('snapshotMethodConfigValue : ' + str(snapshotMethodConfigValue))
                 if snapshotMethodConfigValue != None and snapshotMethodConfigValue != '':
                     self.takeSnapshotFrom = snapshotMethodConfigValue
@@ -95,6 +97,19 @@ class FreezeSnapshotter(object):
                 if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
                     self.logger.log('Some disk blob Uris have special characters. Setting the snapshot mode to onlyGuest.')
                     self.takeSnapshotFrom = CommonVariables.onlyGuest
+                
+                waDiskLunList= []
+
+                if "waDiskLunList" in customSettings.keys() and customSettings['waDiskLunList'] != None :
+                    waDiskLunList = customSettings['waDiskLunList']            
+                    self.logger.log('WA Disk Lun List ' + str(waDiskLunList))
+
+                if waDiskLunList!=None and waDiskLunList.count != 0 and para_parser.includeLunList!=None and para_parser.includeLunList.count!=0 : 
+                    for crpLunNo in para_parser.includeLunList :
+                        if crpLunNo in waDiskLunList :
+                            self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
+                            self.takeSnapshotFrom = CommonVariables.onlyHost
+                            break
 
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
@@ -110,6 +125,10 @@ class FreezeSnapshotter(object):
         run_result = CommonVariables.success
         run_status = 'success'
         all_failed = False
+        unable_to_sleep = False
+
+        """ Do Not remove below HttpUtil object creation. This is to ensure HttpUtil singleton object is created before freeze."""
+        http_util = HttpUtil(self.logger)
 
         if(self.takeSnapshotFrom == CommonVariables.onlyGuest):
             run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromGuest()
@@ -119,6 +138,9 @@ class FreezeSnapshotter(object):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstHostThenGuest()
         elif(self.takeSnapshotFrom == CommonVariables.onlyHost):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
+        else :
+            self.logger.log('Snapshot method did not match any listed type, taking  firstHostThenGuest as default')
+            run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromFirstHostThenGuest()
 
         self.logger.log('doFreezeSnapshot : run_result - {0} run_status - {1} all_failed - {2} unable_to_sleep - {3} is_inconsistent - {4} values post snapshot'.format(str(run_result), str(run_status), str(all_failed), str(unable_to_sleep), str(is_inconsistent)))
 
@@ -200,17 +222,8 @@ class FreezeSnapshotter(object):
 
     def freeze(self):
         try:
-            timeout = self.hutil.get_value_from_configfile('timeout')
-            if(timeout == None):
-                timeout = str(60)
+            timeout = self.hutil.get_intvalue_from_configfile('timeout',60)
             self.logger.log('T:S freeze, timeout value ' + str(timeout))
-            timeout_int = 60
-            try:
-                timeout_int = int(timeout)
-            except ValueError:
-                self.logger.log('T:S freeze, timeout value was not a number, defaulting to 60 seconds', True, 'Warning')
-                timeout_int = 60
-                timeout = str(timeout_int)
             time_before_freeze = datetime.datetime.now()
             freeze_result,timedout = self.freezer.freeze_safe(timeout)
             time_after_freeze = datetime.datetime.now()
@@ -229,6 +242,13 @@ class FreezeSnapshotter(object):
                 self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout
                 error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
                 self.logger.log(error_msg, True, 'Error')
+            elif(freeze_result is not None and len(freeze_result.errors) > 0 and CommonVariables.unable_to_open_err_string in str(freeze_result)):
+                run_result = CommonVariables.FailedUnableToOpenMount
+                run_status = 'error'
+                error_msg = 'T:S Enable failed with error: ' + str(freeze_result)
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount
+                error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
+                self.logger.log(error_msg, True, 'Warning')
             elif(freeze_result is not None and len(freeze_result.errors) > 0):
                 run_result = CommonVariables.FailedFsFreezeFailed
                 run_status = 'error'
@@ -254,8 +274,6 @@ class FreezeSnapshotter(object):
         blob_snapshot_info_array = None
         all_snapshots_failed = False
         try:
-            if self.g_fsfreeze_on :
-                run_result, run_status = self.freeze()
             if( self.para_parser.blobs == None or len(self.para_parser.blobs) == 0) :
                 run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
                 run_status = 'error'
@@ -263,8 +281,12 @@ class FreezeSnapshotter(object):
                 self.logger.log(error_msg, True, 'Error')
                 all_failed = True
                 all_snapshots_failed = True
+                return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
-            if(run_result == CommonVariables.success):
+            if self.g_fsfreeze_on :
+                run_result, run_status = self.freeze()
+
+            if(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
@@ -344,7 +366,7 @@ class FreezeSnapshotter(object):
 
         if self.g_fsfreeze_on :
             run_result, run_status = self.freeze()
-        if(run_result == CommonVariables.success):
+        if(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
             snap_shotter = HostSnapshotter(self.logger, self.hostIp)
             self.logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()

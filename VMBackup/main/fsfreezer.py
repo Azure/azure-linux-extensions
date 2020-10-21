@@ -26,6 +26,8 @@ import sys
 import signal
 import traceback
 import threading
+from common import CommonVariables
+from Utils.ResourceDiskUtil import ResourceDiskUtil
 
 def thread_for_binary(self,args):
     self.logger.log("Thread for binary is called",True)
@@ -82,20 +84,10 @@ class FreezeHandler(object):
         binary_thread.start()
 
         SafeFreezeWaitInSecondsDefault = 66
-        proc_sleep_time = self.hutil.get_value_from_configfile('SafeFreezeWaitInSeconds')
-        if(proc_sleep_time == None or proc_sleep_time == ''):
-            proc_sleep_time = SafeFreezeWaitInSecondsDefault
 
-        proc_sleep_time_int = SafeFreezeWaitInSecondsDefault
-        try:
-            proc_sleep_time_int = int(proc_sleep_time)
-        except ValueError:
-            self.logger.log('T:S freeze startproc, SafeFreezeWaitInSeconds config value was not a number, defaulting to 66 seconds', True, 'Warning')
-            proc_sleep_time_int = SafeFreezeWaitInSecondsDefault
-
-        self.logger.log("safe freeze wait time in seconds : " + str(proc_sleep_time_int))
-
-        for i in range(0,(int(proc_sleep_time_int/2))):
+        proc_sleep_time = self.hutil.get_intvalue_from_configfile('SafeFreezeWaitInSeconds',SafeFreezeWaitInSecondsDefault)
+        
+        for i in range(0,(int(proc_sleep_time/2))):
             if(self.sig_handle==0):
                 self.logger.log("inside while with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
@@ -125,10 +117,15 @@ class FsFreezer:
         self.frozen_items = set()
         self.unfrozen_items = set()
         self.freeze_handler = FreezeHandler(self.logger, self.hutil)
-
+        self.mount_open_failed = False
+        self.resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
+        self.skip_freeze= True
 
     def should_skip(self, mount):
-        if((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop'):
+        resource_disk_mount_point= self.resource_disk.get_resource_disk_mount_point()
+        if(resource_disk_mount_point is not None and mount.mount_point == resource_disk_mount_point):
+            return True
+        elif((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop' ):
             return False
         else:
             return True
@@ -137,25 +134,43 @@ class FsFreezer:
         self.root_seen = False
         error_msg=''
         timedout = False
+        self.skip_freeze = True 
+        mounts_to_skip = None
+        try:
+            mounts_to_skip = self.hutil.get_strvalue_from_configfile('MountsToSkip','')
+            self.logger.log("skipped mount :" + str(mounts_to_skip), True)
+        except Exception as e:
+            errMsg='Failed to read from config, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.logger.log(errMsg,True,'Warning')
         try:
             freeze_result = FreezeResult()
             freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
             args=[freezebin,str(timeout)]
-            arg=[]
+            no_mount_found = True
             for mount in self.mounts.mounts:
                 self.logger.log("fsfreeze mount :" + str(mount.mount_point), True)
                 if(mount.mount_point == '/'):
                     self.root_seen = True
                     self.root_mount = mount
-                elif(mount.mount_point and not self.should_skip(mount)):
+                elif(mount.mount_point != mounts_to_skip and not self.should_skip(mount)):
+                    if(self.skip_freeze == True):
+                        self.skip_freeze = False
                     args.append(str(mount.mount_point))
-            if(self.root_seen):
+            if(self.root_seen and not self.should_skip(self.root_mount)):
+                if(self.skip_freeze == True):
+                    self.skip_freeze = False
                 args.append('/')
+            self.logger.log("skip freeze is : " + str(self.skip_freeze), True)
+            if(self.skip_freeze == True):
+                return freeze_result,timedout
             self.logger.log("arg : " + str(args),True)
             self.freeze_handler.reset_signals()
             self.freeze_handler.signal_receiver()
             self.logger.log("proceeded for accepting signals", True)
-            self.logger.enforce_local_flag(False) 
+            if(mounts_to_skip == '/'): #for continue logging to avoid out of memory issue
+                self.logger.enforce_local_flag(True)
+            else:
+                self.logger.enforce_local_flag(False) 
             sig_handle=self.freeze_handler.startproc(args)
             self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
@@ -164,6 +179,10 @@ class FsFreezer:
                 if (sig_handle == 0):
                     timedout = True
                     error_msg="freeze timed-out"
+                    freeze_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
+                elif (self.mount_open_failed == True):
+                    error_msg=CommonVariables.unable_to_open_err_string
                     freeze_result.errors.append(error_msg)
                     self.logger.log(error_msg, True, 'Error')
                 else:
@@ -180,6 +199,8 @@ class FsFreezer:
     def thaw_safe(self):
         thaw_result = FreezeResult()
         unable_to_sleep = False
+        if(self.skip_freeze == True):
+            return thaw_result, unable_to_sleep
         if(self.freeze_handler.child is None):
             self.logger.log("child already completed", True)
             self.logger.log("****** 7. Error - Binary Process Already Completed", True)
@@ -224,10 +245,11 @@ class FsFreezer:
                 line = str(line, encoding='utf-8', errors="backslashreplace")
             else:
                 line = str(line)
+            if("Failed to open:" in line):
+                self.mount_open_failed = True
             if(line != ''):
                 self.logger.log(line.rstrip(), True)
             else:
                 break
         self.logger.log("============== Binary output traces end ================= ", True)
-
 

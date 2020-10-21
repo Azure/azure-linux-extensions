@@ -16,13 +16,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
+import sys
+
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+
 import os
 import os.path
 import signal
 import pwd
 import grp
 import re
-import sys
 import traceback
 import time
 import platform
@@ -30,8 +39,7 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
 import watcherutil
 import shutil
 
@@ -44,9 +52,42 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
+# This monkey patch duplicates the one made in the waagent import above.
+# It is necessary because on 2.6, the waagent monkey patch appears to be overridden
+# by the python-future subprocess.check_output backport.
+if sys.version_info < (2,7):
+    def check_output(*popenargs, **kwargs):
+        r"""Backport from subprocess module from python 2.7"""
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+        return output
+
+    # Exception classes used by this module.
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+    subprocess.check_output = check_output
+    subprocess.CalledProcessError = CalledProcessError
+
 # Global Variables
+ProceedOnSigningVerificationFailure = True
 PackagesDirectory = 'packages'
-BundleFileName = 'omsagent-1.12.15-0.universal.x64.sh'
+keysDirectory = 'keys'
+BundleFileName = 'omsagent-1.13.11-0.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -66,14 +107,30 @@ SCOMCertPath = '/etc/opt/microsoft/scx/ssl/scx.pem'
 ExtensionStateSubdirectory = 'state'
 
 # Commands
-# Always use upgrade - will handle install if scx, omi are not installed or
-# upgrade if they are
+# Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
 OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
+
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
+
+# Cloud Environments
+PublicCloudName     = "AzurePublicCloud"
+FairfaxCloudName    = "AzureUSGovernmentCloud"
+MooncakeCloudName   = "AzureChinaCloud"
+USNatCloudName      = "USNat" # EX
+USSecCloudName      = "USSec" # RX
+DefaultCloudName    = PublicCloudName # Fallback
+
+CloudDomainMap = {
+    PublicCloudName:   "opinsights.azure.com",
+    FairfaxCloudName:  "opinsights.azure.us",
+    MooncakeCloudName: "opinsights.azure.cn",
+    USNatCloudName:    "opinsights.azure.eaglex.ic.gov",
+    USSecCloudName:    "opinsights.azure.microsoft.scloud"
+}
 
 # Error codes
 DPKGLockedErrorCode = 55 #56, temporary as it excludes from SLA
@@ -108,10 +165,6 @@ OAuthTokenResource = 'https://management.core.windows.net/'
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 AutoManagedWorkspaceCreationSleepSeconds = 20
 
-# vmResourceId Metadata Service
-VMResourceIDMetadataHost = '169.254.169.254'
-VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
-
 # agent permissions
 AgentUser='omsagent'
 AgentGroup='omiusers'
@@ -124,6 +177,54 @@ try:
 except:
     pass
 
+"""
+What need to be packaged to make the signing work:
+    keys
+        dscgpgkey.asc
+        msgpgkey.asc
+    packages
+        omsagent-*.universal.x64.asc
+        omsagent-*.universal.x64.sha256sums
+"""
+def verifyShellBundleSigningAndChecksum():
+    cert_directory = os.path.join(os.getcwd(), PackagesDirectory)
+    keys_directory = os.path.join(os.getcwd(), keysDirectory)
+    # import GPG key
+    dscGPGKeyFilePath = os.path.join(keys_directory, 'dscgpgkey.asc')
+    if not os.path.isfile(dscGPGKeyFilePath):
+        raise Exception("Unable to find the dscgpgkey.asc file at " + dscGPGKeyFilePath)
+
+    importGPGKeyCommand = "sh ImportGPGkey.sh " + dscGPGKeyFilePath
+    exit_code, output = run_command_with_retries_output(importGPGKeyCommand, retries = 0, retry_check = retry_skip, check_error = False)
+
+    # Check that we can find the keyring file
+    keyringFilePath = os.path.join(keys_directory, 'keyring.gpg')
+    if not os.path.isfile(keyringFilePath):
+        raise Exception("Unable to find the Extension keyring file at " + keyringFilePath)
+
+    # Check that we can find the asc file
+    bundleFileName, file_ext = os.path.splitext(BundleFileName)
+    ascFilePath = os.path.join(cert_directory, bundleFileName + ".asc")
+    if not os.path.isfile(ascFilePath):
+        raise Exception("Unable to find the OMS shell bundle asc file at " + ascFilePath)
+
+    # check that we can find the SHA256 sums file
+    sha256SumsFilePath = os.path.join(cert_directory, bundleFileName + ".sha256sums")
+    if not os.path.isfile(sha256SumsFilePath):
+        raise Exception("Unable to find the OMS shell bundle SHA256 sums file at " + sha256SumsFilePath)
+
+    # Verify the SHA256 sums file with the keyring and asc files
+    verifySha256SumsCommand = "HOME=" + keysDirectory + " gpg --no-default-keyring --keyring " + keyringFilePath + " --verify " + ascFilePath  + " " + sha256SumsFilePath
+    exit_code, output = run_command_with_retries_output(verifySha256SumsCommand, retries = 0, retry_check = retry_skip, check_error = False)
+    if exit_code != 0:
+        raise Exception("Failed to verify SHA256 sums file at " + sha256SumsFilePath)
+
+    # Perform SHA256 sums to verify shell bundle
+    hutil_log_info("Perform SHA256 sums to verify shell bundle")
+    performSha256SumsCommand = "cd %s; sha256sum -c %s" % (cert_directory, sha256SumsFilePath)
+    exit_code, output = run_command_with_retries_output(performSha256SumsCommand, retries = 0, retry_check = retry_skip, check_error = False)
+    if exit_code != 0:
+        raise Exception("Failed to verify shell bundle with the SHA256 sums file at " + sha256SumsFilePath)
 
 def main():
     """
@@ -180,12 +281,26 @@ def main():
     exit_code = check_disk_space_availability()
     if exit_code is not 0:
         message = '{0} failed due to low disk space'.format(operation)
-        log_and_exit(operation, exit_code, message)   
+        log_and_exit(operation, exit_code, message)
 
     # Invoke operation
     try:
         global HUtilObject
         HUtilObject = parse_context(operation)
+
+        # Verify shell bundle signing
+        try:
+            hutil_log_info("Start signing verification")
+            verifyShellBundleSigningAndChecksum()
+            hutil_log_info("ShellBundle signing verification succeeded")
+        except Exception as ex:
+            errmsg = "ShellBundle signing verification failed with '%s'" % ex.message
+            if ProceedOnSigningVerificationFailure:
+                hutil_log_error(errmsg)
+            else:
+                log_and_exit(operation, errmsg)
+        
+        # invoke operation
         exit_code, output = operations[operation]()
 
         # Exit code 1 indicates a general problem that doesn't have a more
@@ -209,7 +324,6 @@ def main():
         elif exit_code is not 0:
             message = '{0} failed with exit code {1} {2}'.format(operation,
                                                              exit_code, output)
-
     except OmsAgentForLinuxException as e:
         exit_code = e.error_code
         message = e.get_error_message(operation)
@@ -218,10 +332,10 @@ def main():
         message = '{0} failed with error: {1}\n' \
                   'Stacktrace: {2}'.format(operation, e,
                                            traceback.format_exc())
-     
+
     # Finish up and log messages
-    log_and_exit(operation, exit_code, message)   
-        
+    log_and_exit(operation, exit_code, message)
+
 def check_disk_space_availability():
     """
     Check if there is the required space on the machine.
@@ -236,14 +350,14 @@ def check_disk_space_availability():
     except:
         print('Failed to check disk usage.')
         return 0
-        
+
 
 def get_free_space_mb(dirname):
     """
     Get the free space in MB in the directory path.
     """
     st = os.statvfs(dirname)
-    return st.f_bavail * st.f_frsize / 1024 / 1024
+    return (st.f_bavail * st.f_frsize) // (1024 * 1024)
 
 def stop_telemetry_process():
     pids_filepath = os.path.join(os.getcwd(),'omstelemetry.pid')
@@ -266,9 +380,9 @@ def start_telemetry_process():
 
     #start telemetry watcher
     omsagent_filepath = os.path.join(os.getcwd(),'omsagent.py')
-    args = ['python', omsagent_filepath, '-telemetry']
+    args = ['python{0}'.format(sys.version_info[0]), omsagent_filepath, '-telemetry']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    HUtilObject.log('start watcher process '+str(args))
+    hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
 
 def telemetry():
@@ -277,31 +391,32 @@ def telemetry():
     with open(pids_filepath, 'w') as f:
         f.write(str(py_pid) + '\n')
 
-    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log, log_to_console=True)
+    if HUtilObject is not None:
+        watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
 
-    watcher_thread = Thread(target = watcher.watch)
-    self_mon_thread = Thread(target = watcher.monitor_health)
+        watcher_thread = Thread(target = watcher.watch)
+        self_mon_thread = Thread(target = watcher.monitor_health)
 
-    watcher_thread.start()
-    self_mon_thread.start()
+        watcher_thread.start()
+        self_mon_thread.start()
 
-    watcher_thread.join()
-    self_mon_thread.join()
- 
-    return 0, ""   
+        watcher_thread.join()
+        self_mon_thread.join()
+
+    return 0, ""
 
 def prepare_update():
     """
     Copy / move configuration directory to the backup
     """
 
-    # First check if backup directory was previously created for given workspace. 
-    # If it is created with all the files , we need not move the files again. 
+    # First check if backup directory was previously created for given workspace.
+    # If it is created with all the files , we need not move the files again.
 
     public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
-    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)        
-    etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)        
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
+    etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
     if (not os.path.isdir(etc_move_path)):
         shutil.move(etc_remove_path, etc_move_path)
 
@@ -315,10 +430,10 @@ def restore_state(workspaceId):
         etc_backup_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
         etc_final_path = os.path.join(EtcOMSAgentPath, workspaceId)
         if (os.path.isdir(etc_backup_path) and not os.path.isdir(etc_final_path)):
-            shutil.move(etc_backup_path, etc_final_path)        
+            shutil.move(etc_backup_path, etc_final_path)
     except Exception as e:
         hutil_log_error("Error while restoring the state. Exception : "+traceback.format_exc())
-       
+
 
 def install():
     """
@@ -336,7 +451,7 @@ def install():
     workspaceId = public_settings.get('workspaceId')
     check_workspace_id(workspaceId)
 
-    # Take the backup of the state for given workspace. 
+    # Take the backup of the state for given workspace.
     restore_state(workspaceId)
 
     # In the case where a SCOM connection is already present, we should not
@@ -357,7 +472,7 @@ def install():
     exit_code, output = run_command_with_retries_output(cmd, retries = 15,
                                          retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
                                          final_check = final_check_if_dpkg_locked)
-    
+
     return exit_code, output
 
 def check_kill_process(pstring):
@@ -473,7 +588,13 @@ def enable():
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
 
-    optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
+    # detect opinsights domain using IMDS
+    domain = get_azure_cloud_domain()
+    domainParam = ''
+    if domain:
+        domainParam = '-d {0}'.format(domain)
+
+    optionalParams = '{0} {1} {2}'.format(domainParam, proxyParam, vmResourceIdParam)
     onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
                                                           workspaceId,
                                                           workspaceKey,
@@ -493,26 +614,15 @@ def enable():
             uid = pwd.getpwnam(AgentUser).pw_uid
             gid = grp.getgrnam(AgentGroup).gr_gid
             os.chown(etc_final_path, uid, gid)
-
-            # octal numbers are represented differently in python 3
-            if sys.version_info >= (3,):
-                os.chmod(etc_final_path, 0o750)
-            else:    
-                os.chmod(etc_final_path, 0750)
+            os.system('chmod {1} {0}'.format(etc_final_path, 750))
 
             for root, dirs, files in os.walk(etc_final_path):
                 for d in dirs:
                     os.chown(os.path.join(root, d), uid, gid)
-                    if sys.version_info >= (3,):
-                        os.chmod(os.path.join(root, d), 0o750)
-                    else:    
-                        os.chmod(os.path.join(root, d), 0750)                
+                    os.system('chmod {1} {0}'.format(os.path.join(root, d), 750))
                 for f in files:
-                    os.chown(os.path.join(root, f), uid, gid)                  
-                    if sys.version_info >= (3,):
-                        os.chmod(os.path.join(root, f), 0o640)
-                    else:    
-                        os.chmod(os.path.join(root, f), 0640)                           
+                    os.chown(os.path.join(root, f), uid, gid)
+                    os.system('chmod {1} {0}'.format(os.path.join(root, f), 640))
     except:
         hutil_log_info('Failed to set permissions for OMS directories, could potentially have issues uploading.')
 
@@ -566,27 +676,71 @@ def remove_workspace_configuration():
     workspaceId = public_settings.get('workspaceId')
     etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     var_remove_path = os.path.join(VarOMSAgentPath, workspaceId)
-    
+
     shutil.rmtree(etc_remove_path, True)
     shutil.rmtree(var_remove_path, True)
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
+    
+def is_arc_installed():
+    """
+    Check if the system is on an Arc machine
+    """
+    # Using systemctl to check this since Arc only supports VMs that have systemd
+    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
+    return check_arc == 0
+
+def get_arc_endpoint():
+    """
+    Find the endpoint for Arc Hybrid IMDS
+    """
+    endpoint_filepath = '/lib/systemd/system.conf.d/azcmagent.conf'
+    endpoint = ''
+    try:
+        with open(endpoint_filepath, 'r') as f:
+            data = f.read()
+        endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+    except:
+        hutil_log_error('Unable to load Arc IMDS endpoint from {0}'.format(endpoint_filepath))
+    return endpoint
+
+def get_imds_endpoint():
+    """
+    Find the endpoint for IMDS, whether Arc or not
+    """
+    azure_imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
+    if (is_arc_installed()):
+        hutil_log_info('Arc is installed, loading Arc-specific IMDS endpoint')
+        imds_endpoint = get_arc_endpoint()
+        if imds_endpoint:
+            imds_endpoint += '/metadata/instance?api-version=2019-08-15'
+        else: 
+            # Fall back to the traditional IMDS endpoint; the cloud domain and VM
+            # resource id detection logic are resilient to failed queries to IMDS
+            imds_endpoint = azure_imds_endpoint
+            hutil_log_info('Falling back to default Azure IMDS endpoint')
+    else:
+        imds_endpoint = azure_imds_endpoint
+    
+    hutil_log_info('Using IMDS endpoint "{0}"'.format(imds_endpoint))
+    return imds_endpoint
 
 def get_vmresourceid_from_metadata():
-    req = urllib2.Request(VMResourceIDMetadataEndpoint)
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     try:
-        response = json.loads(urllib2.urlopen(req).read())
+        response = json.loads(urllib.request.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
-            return None #classic vm
+            return None # classic vm
 
         if response['compute']['vmScaleSetName']:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
         else:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
 
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         hutil_log_error('Request to Metadata service URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from Metadata service: ' \
@@ -595,6 +749,48 @@ def get_vmresourceid_from_metadata():
     except:
         hutil_log_error('Unexpected error from Metadata service')
         return None
+
+def get_azure_environment_from_imds():
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
+    req.add_header('Metadata', 'True')
+
+    try:
+        response = json.loads(urllib.request.urlopen(req).read())
+
+        if ('compute' not in response or response['compute'] is None):
+            return None # classic vm
+
+        if ('azEnvironment' not in response['compute'] or response['compute']['azEnvironment'] is None):
+            return None # classic vm
+
+        return response['compute']['azEnvironment']
+    except urllib.error.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL ' \
+                        'failed with an HTTPError: {0}'.format(e))
+        hutil_log_info('Response from Metadata service: ' \
+                       '{0}'.format(e.read()))
+        return None
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+        return None
+
+def get_azure_cloud_domain():
+    try:
+        environment = get_azure_environment_from_imds()
+
+        if environment:
+            for cloud, domain in CloudDomainMap.items():
+                if environment.lower() == cloud.lower():
+                    hutil_log_info('Detected cloud environment "{0}" via IMDS. The domain "{1}" will be used.'.format(cloud, domain))
+                    return domain
+
+        hutil_log_info('Unknown cloud environment "{0}"'.format(environment))
+    except Exception as e:
+        hutil_log_error('Failed to detect cloud environment: {0}'.format(e))
+
+    hutil_log_info('Falling back to default domain "{0}"'.format(CloudDomainMap[DefaultCloudName]))
+    return CloudDomainMap[DefaultCloudName]
 
 def retrieve_managed_workspace(vm_resource_id):
     """
@@ -668,7 +864,7 @@ def parse_context(operation):
     if ('Utils.WAAgentUtil' in sys.modules
             and 'Utils.HandlerUtil' in sys.modules):
         try:
-            
+
             logFileName = 'extension.log'
             if (operation == 'Telemetry'):
                 logFileName = 'watcher.log'
@@ -693,23 +889,27 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Oracle, RHEL
-                       'oracle' : ['6', '7'], # Oracle
+    supported_dists = {'redhat' : ['6', '7', '8'], 'red hat' : ['6', '7', '8'], 'rhel' : ['6', '7', '8'], # Red Hat
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'oracle' : ['6', '7'], 'ol': ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'] # SLES
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
+                       'suse' : ['12', '15'], 'sles' : ['12', '15'] # SLES
     }
 
-    vm_supported = False
+    vm_dist, vm_ver, vm_supported = '', '', False
 
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
-        vm_dist, vm_ver, vm_id = platform.dist()
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except AttributeError:
+            hutil_log_info("Falling back to /etc/os-release distribution parsing")
 
-    if not vm_dist and not vm_ver: # SLES 15 and others
+    # Fallback if either of the above fail; on some (especially newer)
+    # distros, linux_distribution() and dist() are unreliable or deprecated
+    if not vm_dist and not vm_ver:
         try:
             with open('/etc/os-release', 'r') as fp:
                 for line in fp:
@@ -719,13 +919,12 @@ def is_vm_supported_for_extension():
                         vm_dist = vm_dist.replace('\"', '').replace('\n', '')
                     elif line.startswith('VERSION_ID='):
                         vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.split('.')[0]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             return vm_supported, 'Indeterminate operating system', ''
 
     # Find this VM distribution in the supported list
-    for supported_dist in supported_dists.keys():
+    for supported_dist in list(supported_dists.keys()):
         if not vm_dist.lower().startswith(supported_dist):
             continue
 
@@ -793,6 +992,9 @@ def check_workspace_id_and_key(workspace_id, workspace_key):
 
     try:
         encoded_key = base64.b64encode(base64.b64decode(workspace_key))
+        if sys.version_info >= (3,): # in python 3, base64.b64encode will return bytes, so decode to str for comparison
+            encoded_key = encoded_key.decode()
+
         if encoded_key != workspace_key:
             raise InvalidParameterError('Workspace key is invalid')
     except TypeError:
@@ -827,8 +1029,14 @@ def detect_multiple_connections(workspace_id):
     """
     other_connection_exists = False
     if os.path.exists(OMSAdminPath):
-        exit_code, output = run_get_output(WorkspaceCheckCommand,
+        exit_code, utfoutput = run_get_output(WorkspaceCheckCommand,
                                            chk_err = False)
+
+        # output may contain unicode characters not supported by ascii
+        # for e.g., generates the following error if used without conversion: UnicodeDecodeError: 'ascii' codec can't decode byte 0xc3 in position 18: ordinal not in range(128)
+        # default encoding in python is ascii in python < 3
+        if sys.version_info < (3,):
+            output = utfoutput.decode('utf8').encode('utf8')
 
         if output.strip().lower() != 'no workspace':
             for line in output.split('\n'):
@@ -1033,48 +1241,95 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     """
     exit_code, output = run_get_output(cmd, check_error, log_cmd)
     if log_cmd:
-        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
+        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd.rstrip(), output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
-        
-    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB	
-    # take only the last 100 characters as extension cuts off after that	
-    try:	
-        if exit_code is not 0:	
-            sys.stderr.write(output[-500:])        
 
+    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB
+    # take only the last 100 characters as extension cuts off after that
+    try:
+        if exit_code is not 0:
+            sys.stderr.write(output[-500:])
+
+        # For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log
         if exit_code is 17:
-            if "Failed dependencies:" in output or "waiting for transaction lock" in output or "dpkg: error processing package systemd" in output:
+            if "Failed dependencies:" in output:
                 # 52 is the exit code for missing dependency
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
+                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+            elif "waiting for transaction lock" in output or "dpkg: error processing package systemd" in output or "dpkg-deb" in output or "dpkg:" in output:
+                # 52 is the exit code for missing dependency
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+                output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+            elif "Errors were encountered while processing:" in output:
+                # 52 is the exit code for missing dependency
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+                output = "There seems to be an issue while processing triggers in systemd. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+            elif "Cannot allocate memory" in output:
+                # 52 is the exit code for missing dependency
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+                output = "There seems to be insufficient memory for the installation. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 19:
-            if "rpmdb" in output or "libc6 is not installed" in output or "libpam-runtime is not installed" in output or "cannot open Packages database" in output or "exited with status 52" in output or "/bin/sh is needed" in output or "dpkg (subprocess): cannot set security execution context for maintainer script" in output or "error: dpkg status database is locked by another process" in output:
+            if "rpmdb" in output or "cannot open Packages database" in output or "dpkg (subprocess): cannot set security execution context for maintainer script" in output or "error: dpkg status database is locked by another process" in output:
                 # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
+                output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+            elif "libc6 is not installed" in output or "libpam-runtime is not installed" in output or "exited with status 52" in output or "/bin/sh is needed" in output:
+                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
+                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 33:
             if "Permission denied" in output:
                 # Enable failures
                 # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52        
+                exit_code = 52
+                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 5:
             if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
                 # Enable failures
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 53     
+                exit_code = 53
+                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 8:
             if "Check the correctness of the workspace ID and shared key" in output:
                 # Enable failures
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 53                   
-    except:	
-        hutil_log_info('Failed to write output to STDERR')	
-  
+                exit_code = 53
+                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+
+        if exit_code is not 0 and exit_code is not 52:
+            if "dpkg:" in output or "dpkg :" in output or "rpmdb:" in output or "rpm.lock" in output:
+                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
+                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+                output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+            if "conflicts with file from package" in output or "Failed dependencies:" in output or "Please install curl" in output or "is needed by" in output or "check_version_installable" in output or "Error: curl was not installed" in output or "Please install the ctypes package" in output or "gpg is not installed" in output:
+                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
+                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+            if "Permission denied" in output:
+                # Enable failures
+                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                exit_code = 52
+                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+    except:
+        hutil_log_info('Failed to write output to STDERR')
+
     return exit_code, output
 
 
@@ -1178,6 +1433,11 @@ def was_curl_found(exit_code, output):
         return False
     return True
 
+def retry_skip(exit_code, output):
+    """
+    skip retires
+    """
+    return False, '', False
 
 def retry_if_dpkg_locked_or_curl_is_not_found(exit_code, output):
     """
@@ -1293,8 +1553,8 @@ def get_settings():
             hutil_log_error('Unable to load handler settings from ' \
                             '{0}'.format(settings_path))
 
-        if (h_settings.has_key('protectedSettings')
-                and h_settings.has_key('protectedSettingsCertThumbprint')
+        if ('protectedSettings' in h_settings
+                and 'protectedSettingsCertThumbprint' in h_settings
                 and h_settings['protectedSettings'] is not None
                 and h_settings['protectedSettingsCertThumbprint'] is not None):
             encoded_settings = h_settings['protectedSettings']
@@ -1458,12 +1718,19 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         try:
             output = subprocess.check_output(cmd, stderr = subprocess.STDOUT,
                                              shell = True)
+            output = output.decode('latin-1')
             exit_code = 0
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
-            output = e.output
+            output = e.output.decode('latin-1')
 
-    return exit_code, output.encode('utf-8').strip()
+    output = output.encode('utf-8', 'ignore')
+
+    # On python 3, encode returns a byte object, so we must decode back to a string
+    if sys.version_info >= (3,):
+        output = output.decode()
+
+    return exit_code, output.strip()
 
 
 def get_tenant_id_from_metadata_api(vm_resource_id):
@@ -1474,15 +1741,15 @@ def get_tenant_id_from_metadata_api(vm_resource_id):
     """
     tenant_id = None
     metadata_endpoint = get_metadata_api_endpoint(vm_resource_id)
-    metadata_request = urllib2.Request(metadata_endpoint)
+    metadata_request = urllib.request.Request(metadata_endpoint)
     try:
         # This request should fail with code 401
-        metadata_response = urllib2.urlopen(metadata_request)
+        metadata_response = urllib.request.urlopen(metadata_request)
         hutil_log_info('Request to Metadata API did not fail as expected; ' \
                        'attempting to use headers from response to ' \
                        'determine Tenant ID')
         metadata_headers = metadata_response.headers
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         metadata_headers = e.headers
 
     if metadata_headers is not None and 'WWW-Authenticate' in metadata_headers:
@@ -1526,7 +1793,7 @@ def get_metadata_api_endpoint(vm_resource_id):
     metadata_url = 'https://management.azure.com/subscriptions/{0}' \
                    '/resourceGroups/{1}'.format(subscription_id,
                                                 resource_group)
-    metadata_data = urllib.urlencode({'api-version' : '2016-09-01'})
+    metadata_data = urllib.parse.urlencode({'api-version' : '2016-09-01'})
     metadata_endpoint = '{0}?{1}'.format(metadata_url, metadata_data)
     return metadata_endpoint
 
@@ -1552,13 +1819,13 @@ def get_access_token(tenant_id, resource):
                                 '{0}'.format(tenant_id),
                   'resource' : resource
     }
-    oauth_request = urllib2.Request(listening_url + '/oauth2/token',
-                                    urllib.urlencode(oauth_data))
+    oauth_request = urllib.request.Request(listening_url + '/oauth2/token',
+                                    urllib.parse.urlencode(oauth_data))
     oauth_request.add_header('Metadata', 'true')
     try:
-        oauth_response = urllib2.urlopen(oauth_request)
+        oauth_response = urllib.request.urlopen(oauth_request)
         oauth_response_txt = oauth_response.read()
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         hutil_log_error('Request to ManagedIdentity extension listening URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from ManagedIdentity extension: ' \
@@ -1593,7 +1860,7 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
                 'JwtToken' : access_token
     }
     oms_request_json = json.dumps(oms_data)
-    oms_request = urllib2.Request(OMSServiceValidationEndpoint)
+    oms_request = urllib.request.Request(OMSServiceValidationEndpoint)
     oms_request.add_header('Content-Type', 'application/json')
 
     retries = 5
@@ -1606,9 +1873,9 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
     # provisioning has been accepted
     while try_count <= retries:
         try:
-            oms_response = urllib2.urlopen(oms_request, oms_request_json)
+            oms_response = urllib.request.urlopen(oms_request, oms_request_json)
             oms_response_txt = oms_response.read()
-        except urllib2.HTTPError as e:
+        except urllib.error.HTTPError as e:
             hutil_log_error('Request to OMS threw HTTPError: {0}'.format(e))
             hutil_log_info('Response from OMS: {0}'.format(e.read()))
             raise OMSServiceOneClickException('ValidateMachineIdentity ' \

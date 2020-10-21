@@ -216,7 +216,11 @@ class ResourceDiskUtil(object):
         return self.executor.Execute(cmd) == CommonVariables.process_success
 
     def try_remount(self):
-        """ mount the resource disk if not already mounted"""
+        """
+        Mount the resource disk if not already mounted
+        Returns true if the resource disk is mounted, false otherwise
+        Throws an exception if anything goes wrong
+        """
         self.logger.log("In try_remount")
 
         if self.passphrase_filename:
@@ -224,12 +228,22 @@ class ResourceDiskUtil(object):
 
             if self._is_crypt_mounted():
                 self.logger.log("Resource disk already encrypted and mounted")
+                # Add resource disk to crypttab if crypt mount is used
+                # Scenario: RD is alreday crypt mounted and crypt mount to crypttab migration is initiated
+                if not self.disk_util.should_use_azure_crypt_mount():
+                    self.add_resource_disk_to_crypttab()
                 return True
 
             if self._resource_disk_partition_exists() and self._is_luks_device():
                 self.disk_util.luks_open(passphrase_file=self.passphrase_filename, dev_path=self.RD_DEV_PATH, mapper_name=self.RD_MAPPER_NAME, header_file=None, uses_cleartext_key=False)
                 self.logger.log("Trying to mount resource disk.")
-                return self._mount_resource_disk(self.RD_MAPPER_PATH)
+                mount_retval = self._mount_resource_disk(self.RD_MAPPER_PATH)
+                if mount_retval:
+                    # We successfully mounted the RD but
+                    # the RD was not auto-mounted, so trying to enable auto-unlock for RD
+                    self.add_resource_disk_to_crypttab()
+                return mount_retval
+
         else:
             self.logger.log("passphrase_filename(value={0}) is null, so trying to mount plain Resource Disk".format(self.passphrase_filename))
             if self._is_plain_mounted():
@@ -282,26 +296,35 @@ class ResourceDiskUtil(object):
         if not self._mount_resource_disk(self.RD_MAPPER_PATH):
             self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
             return False
-        if not self.disk_util.should_use_azure_crypt_mount():
-            self.logger.log("Adding resource disk to the crypttab file")
-            crypt_item = CryptItem()
-            crypt_item.dev_path = self.RD_DEV_PATH
-            crypt_item.mapper_name = self.RD_MAPPER_NAME
-            crypt_item.uses_cleartext_key = False
-            self.disk_util.remove_crypt_item(crypt_item) # Remove old item in case it was already there
-            self.disk_util.add_crypt_item_to_crypttab(crypt_item, self.passphrase_filename)
-            self.add_to_fstab()
+        # We haven't failed so far, lets just add the RD to crypttab
+        self.add_resource_disk_to_crypttab()
         return True
 
+    def add_resource_disk_to_crypttab(self):
+        self.logger.log("Adding resource disk to the crypttab file")
+        crypt_item = CryptItem()
+        crypt_item.dev_path = self.RD_DEV_PATH
+        crypt_item.mapper_name = self.RD_MAPPER_NAME
+        crypt_item.uses_cleartext_key = False
+        self.disk_util.remove_crypt_item(crypt_item)  # Remove old item in case it was already there
+        self.disk_util.add_crypt_item_to_crypttab(crypt_item, self.passphrase_filename)
+        self.add_to_fstab()
+
     def automount(self):
-        """ encrypt resource disk """
+        """
+        Mount the resource disk (encrypted or not)
+        or
+        encrypt the resource disk and mount it if enable was called with EFA
+
+        If False is returned, the resource disk is not mounted.
+        """
         # try to remount if the disk was previously encrypted and is still valid
         if self.try_remount():
             return True
-
         # unencrypted or unusable
-        if self._is_encrypt_format_all():
+        elif self._is_encrypt_format_all():
             return self.encrypt_format_mount()
         else:
             self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
-            return False
+
+        return self._is_crypt_mounted() or self._is_plain_mounted()

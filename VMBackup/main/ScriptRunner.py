@@ -130,7 +130,7 @@ class ScriptRunner(object):
         valid_permissions = True
         try:
             permissions = oct(os.stat(filename)[ST_MODE])[-3:]
-            self.logger.log('Permisisons  of the file ' + filename + ' are ' + permissions,True)
+            self.logger.log('Permissions of the file ' + filename + ' are ' + permissions,True)
             if int(permissions[1]) > 0 : #validating permissions for group
                 valid_permissions = False
             if int(permissions[2]) > 0 : #validating permissions for others

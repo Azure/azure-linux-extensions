@@ -95,6 +95,7 @@ class centosPatching(redhatPatching):
                     'pyparted']
 
         if self.distro_info[1].startswith("6."):
+            packages.add('python-six')
             packages.remove('cryptsetup')
             packages.remove('procps-ng')
             packages.remove('util-linux')

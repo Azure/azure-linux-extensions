@@ -2,7 +2,7 @@
 set -x
 
 if [[ "$1" == "--help" ]]; then
-    echo "update_version.sh <MAJOR> <MINOR> <PATH> <BUILDNR>"
+    echo "update_version.sh <MAJOR> <MINOR> <PATCH> <BUILDNR>"
     exit 0
 fi
 

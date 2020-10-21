@@ -202,8 +202,8 @@ class DiskUtil(object):
                 if (out_which_output is not None):
                      lsblk_path = str(out_which_output)
                      is_lsblk_path_wrong, out_lsblk_output, error_msg = self.get_lsblk_pairs_output(lsblk_path, dev_path)
-            # if error_msg contains "invalid option", then get device_items using method get_device_items_from_lsblk_list
-            if (error_msg is not None and error_msg.strip() != "" and 'invalid option' in error_msg):
+            # if error_msg contains "invalid option" or "P" (rely on only "-P" optiont in error to handle non-English locales), then get device_items using method get_device_items_from_lsblk_list
+            if (error_msg is not None and error_msg.strip() != "" and ('invalid option' in error_msg or 'P' in error_msg)):
                 device_items = self.get_device_items_from_lsblk_list(lsblk_path, dev_path)
             # else get device_items from parsing the lsblk command output
             elif (out_lsblk_output is not None):
@@ -256,22 +256,16 @@ class DiskUtil(object):
             errMsg = 'Exception in mount command, error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             is_mount_path_wrong = True
-
-        try:
-            if is_mount_path_wrong == False :
-                out_mount_output, err = p.communicate()
-                if sys.version_info > (3,):
-                    out_mount_output = str(out_mount_output, encoding='utf-8', errors="backslashreplace")
-                else:
-                    out_mount_output = str(out_mount_output)
-                self.logger.log("getting the mount info using mount_path " + out_mount_output, True)
-                error_msg = str(err)
-                if(error_msg is not None and error_msg.strip() != ""):
-                    self.logger.log(str(err), True)
-        except Exception as e:
-            errMsg = 'Exception in mount output reading, error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.logger.log(errMsg, True, 'Error')
-
+        if is_mount_path_wrong == False :
+            out_mount_output, err = p.communicate()
+            if sys.version_info > (3,):
+                out_mount_output = str(out_mount_output, encoding='utf-8', errors="backslashreplace")
+            else:
+                out_mount_output = str(out_mount_output)
+            self.logger.log("getting the mount info using mount_path " + out_mount_output, True)
+            error_msg = str(err)
+            if(error_msg is not None and error_msg.strip() != ""):
+                self.logger.log(str(err), True)
         return is_mount_path_wrong, out_mount_output, error_msg
 
     def get_mount_points(self):

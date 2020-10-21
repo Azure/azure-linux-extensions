@@ -156,7 +156,7 @@ class SplitRootPartitionState(OSEncryptionState):
         if not probed_root_fs == 'ext4':
             raise Exception("Probed root fs is not ext4")
 
-        self.command_executor.Execute("partprobe", True)
+        self.command_executor.Execute("partprobe {0}".format(self.rootfs_disk), True)
         self.command_executor.Execute("mkfs.ext2 {0}".format(self.bootfs_block_device), True)
 
         boot_partition_uuid = self._get_uuid(self.bootfs_block_device)

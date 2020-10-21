@@ -1,7 +1,6 @@
 # OmsAgent Extension
-Allow the owner of the Azure Virtual Machines to install the OmsAgent and onboard to Operations Management Suite
 
-Latest version is 1.12.1.
+[See the latest version and extension-bundle mapping.](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/oms-linux#agent-and-vm-extension-version)
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
@@ -208,13 +207,7 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 }
 ```
 
-## Supported Linux Distributions
-* CentOS Linux 5,6, and 7 (x86/x64)
-* Oracle Linux 5,6, and 7 (x86/x64)
-* Red Hat Enterprise Linux Server 5,6 and 7 (x86/x64)
-* Debian GNU/Linux 6, 7, and 8 (x86/x64)
-* Ubuntu 12.04 LTS, 14.04 LTS, 15.04, 15.10, 16.04 LTS (x86/x64)
-* SUSE Linux Enteprise Server 11 and 12 (x86/x64)
+## [Supported Linux Distributions](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/log-analytics-agent#supported-linux-operating-systems)
 
 ## Troubleshooting
 
@@ -237,6 +230,8 @@ in HandlerEnvironment.json and reported back to Azure
 | 20 | Enable called prematurely | [Update the Azure Linux Agent](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/update-agent) to the latest available version. |
 | 40-44 | Issue with the Automatic Management scenario | Please contact support with the details from the /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/\<version\>/extension.log |
 | 51 | This extension is not supported on the VM's operation system | |
+| 52 | The extension failed due to a missing dependency | |
+| 53 | The extension failed due to missing or wrong configuration parameters | |
 | 55 | Cannot connect to the Microsoft Operations Management Suite service | Check that the system either has Internet access, or that a valid HTTP proxy has been provided. Additionally, check the correctness of the workspace ID. |
 
 Additional error codes and troubleshooting information can be found on the [OMS-Agent-for-Linux Troubleshooting Guide](https://github.com/Microsoft/OMS-Agent-for-Linux/blob/master/docs/Troubleshooting.md#).
