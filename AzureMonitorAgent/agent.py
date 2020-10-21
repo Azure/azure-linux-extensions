@@ -229,7 +229,7 @@ def install():
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
-        "MDSD_OPTIONS" : "-l -A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info",
+        "MDSD_OPTIONS" : "\"-l -A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
@@ -240,7 +240,7 @@ def install():
     }
 
     # Decide the mode
-    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         hutil_log_info("Detecting Auto-Config mode.")
         return 0, ""
     elif protected_settings is None or len(protected_settings) is 0:
@@ -415,7 +415,7 @@ def enable():
     
     public_settings, protected_settings = get_settings()
 
-    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         OneAgentEnableCommand = "systemctl start mdsdmgr"
         if not is_systemd():
             hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
