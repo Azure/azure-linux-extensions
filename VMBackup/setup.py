@@ -63,7 +63,6 @@ custom_sqlfilelists=os.listdir(workload_customscripts_folder)
 packages_array.append(workloadpatch_folder)
 
 manifest = "manifest.xml"
-prod_manifest = "prodmanifest.xml"
 
 """
 copy the dependency to the local
@@ -192,7 +191,6 @@ copybinary(binary_entry, final_binary_path)
 copybinary(plugin_folder, final_plugin_path)
 copy(plugin_conf, final_plugin_conf_path)
 copy(manifest,final_folder_path)
-copy(prod_manifest,final_folder_path)
 copy(main_entry,final_plugin_conf_path)
 zip(final_folder_path, target_zip_file_path)
 
