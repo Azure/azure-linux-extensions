@@ -54,6 +54,7 @@ class ExtensionErrorCodeEnum():
     FailedWorkloadDatabaseNotOpen = 508
     FailedWorkloadQuiescingError = 509
     FailedWorkloadQuiescingTimeout = 510
+    FailedWorkloadDatabaseInNoArchiveLog = 511
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -108,7 +109,8 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedWorkloadIPCDirectoryMissing : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadDatabaseNotOpen : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadQuiescingError : Status.ExtVmHealthStateEnum.yellow,
-            ExtensionErrorCodeEnum.FailedWorkloadQuiescingTimeout : Status.ExtVmHealthStateEnum.yellow
+            ExtensionErrorCodeEnum.FailedWorkloadQuiescingTimeout : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedWorkloadDatabaseInNoArchiveLog : Status.ExtVmHealthStateEnum.yellow
             }
 
     ExtensionErrorCodeNameDict = {
@@ -161,7 +163,8 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedWorkloadIPCDirectoryMissing : "FailedWorkloadIPCDirectoryMissing",
             ExtensionErrorCodeEnum.FailedWorkloadDatabaseNotOpen : "FailedWorkloadDatabaseNotOpen",
             ExtensionErrorCodeEnum.FailedWorkloadQuiescingError : "FailedWorkloadQuiescingError",
-            ExtensionErrorCodeEnum.FailedWorkloadQuiescingTimeout : "FailedWorkloadQuiescingTimeout"
+            ExtensionErrorCodeEnum.FailedWorkloadQuiescingTimeout : "FailedWorkloadQuiescingTimeout",
+            ExtensionErrorCodeEnum.FailedWorkloadDatabaseInNoArchiveLog : "FailedWorkloadDatabaseInNoArchiveLog"
             }
     
     @staticmethod

@@ -395,6 +395,7 @@ def daemon():
                 #new flow only if workload name is present in workload.conf
                 if workload_patch.name != None and workload_patch.name != "":
                     backup_logger.log("workload backup enabled for workload: " + workload_patch.name, True)
+                    hutil.set_pre_post_enabled()
                     pre_skipped = False
                     if len(workload_patch.error_details) > 0:
                         backup_logger.log("skip pre and post")
