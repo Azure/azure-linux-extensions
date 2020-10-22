@@ -52,18 +52,24 @@ REM ****************************************************************************
 REM Next, if SQL*Plus hasn't exited as a result of the last command, now ensure that
 REM the failure of any command results in a FAILURE exit status from SQL*Plus...
 REM ********************************************************************************
+
 WHENEVER OSERROR EXIT FAILURE
 WHENEVER SQLERROR EXIT FAILURE
+
 REM
 REM ********************************************************************************
 REM Display the LOG_MODE of the database to be captured by the calling Python code...
 REM ********************************************************************************
+
 SELECT 'LOG_MODE='||LOG_MODE AS LOG_MODE FROM V$DATABASE;
+
 REM
 REM ********************************************************************************
 REM Enable emitting DBMS_OUTPUT to standard output...
 REM ********************************************************************************
+
 SET SERVEROUTPUT ON SIZE 1000000
+
 REM
 REM ********************************************************************************
 REM Force a switch of the online redo logfiles, which will force a full checkpoint,
