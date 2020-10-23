@@ -229,7 +229,7 @@ def install():
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
-        "MDSD_OPTIONS" : "\"-l -A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
+        "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
