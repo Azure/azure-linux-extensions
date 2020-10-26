@@ -38,7 +38,7 @@ name_map = {
 
 # VM Insights
 "Processor\UtilizationPercentage" : {"plugin":"cpu_vmi", "field":"Processor\UtilizationPercentage", "module":"processor_vmi"},
-"Computer\\Heartbeat" : {"plugin":"cpu_heartbeat_vmi", "field":"Computer\\Heartbeat", "module":"processor_vmi"},
+"Computer\Heartbeat" : {"plugin":"cpu_heartbeat_vmi", "field":"Computer\Heartbeat", "module":"processor_vmi"},
 
 "network->network in guest os" : {"plugin":"net", "field":"bytes_recv", "ladtablekey":"/builtin/network/bytesreceived"},
 "network->network total bytes" : {"plugin":"net", "field":"bytes_total", "ladtablekey":"/builtin/network/bytestotal"}, #Need to calculate sum
