@@ -132,7 +132,7 @@ class ResourceDiskUtil(object):
 			self.logger.log('unable to detect disk topology',True,'Error')
 
 		# device = "/dev/{0}".format(device)
-		partition = device + "1"  #assuming only one resourde disk partition
+		partition = "{0}{1}".format(device,"1")  #assuming only one resourde disk partition
 		# mount_list = shellutil.run_get_output("mount")[1]
 
 		self.logger.log(("Resource disk partition: {0} ",partition),True)
