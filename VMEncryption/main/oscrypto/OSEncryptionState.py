@@ -159,6 +159,19 @@ class OSEncryptionState(object):
 
         return result
 
+    def _get_root_partuuid(self):
+        root_partuuid = None
+        root_device_items = self.disk_util.get_device_items(self.rootfs_block_device)
+        self.context.logger.log("For root_partuuid scanning: {0}".format(self.rootfs_block_device))
+        for root_item in root_device_items:
+            self.context.logger.log("Checking {0}".format(root_item.name))
+            if self.rootfs_sdx_path.endswith(root_item.name) or os.path.realpath(self.rootfs_block_device).endswith(root_item.name):
+                self.context.logger.log("Finding partuuid for {0}".format(root_item.name))
+                root_partuuid = self.disk_util.get_device_items_property(root_item.name, "PARTUUID")
+                if root_partuuid:
+                    return root_partuuid
+        return root_partuuid
+
     def _is_in_memfs_root(self):
         mounts = open('/proc/mounts', 'r').read()
         return bool(re.search(r'/\s+tmpfs', mounts))
