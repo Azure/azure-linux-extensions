@@ -82,7 +82,6 @@ class ResourceDiskUtil(object):
 									return device
 		except (OSError, IOError) as exc:
 			err_msg='Error getting device for %s or %s: %s , Stack Trace: %s' % (gen1_device_prefix, gen2_device_id, str(exc),traceback.format_exc())
-			self.logger.log(err_msg,True,'Error')
 		return None
 
 	def device_for_ide_port(self):
@@ -123,29 +122,34 @@ class ResourceDiskUtil(object):
 		return None
 
 	def get_resource_disk_mount_point(self,option=1): # pylint: disable=R0912,R0914
-		"""
-		if option = 0 then partition will be returned eg sdb1
-		if option = 1 then mount point will be returned eg /mnt/resource
-		"""
-		device = self.device_for_ide_port()
-		if device is None:
-			self.logger.log('unable to detect disk topology',True,'Error')
+		try:
+			"""
+			if option = 0 then partition will be returned eg sdb1
+			if option = 1 then mount point will be returned eg /mnt/resource
+			"""
+			device = self.device_for_ide_port()
+			if device is None:
+				self.logger.log('unable to detect disk topology',True,'Error')
 
-		# device = "/dev/{0}".format(device)
-		partition = "{0}{1}".format(device,"1")  #assuming only one resourde disk partition
-		# mount_list = shellutil.run_get_output("mount")[1]
+			if device is not None:
+				partition = "{0}{1}".format(device,"1")  #assuming only one resourde disk partition
+			else:
+				partition=""
 
-		self.logger.log(("Resource disk partition: {0} ",partition),True)
-		if(option==0):
-			return partition
+			self.logger.log(("Resource disk partition: {0} ",partition),True)
+			if(option==0):
+				return partition
 
-		#p = Popen("mount", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		#mount_list, err = p.communicate()
-		mount_list = self.disk_util.get_mount_output()
+			#p = Popen("mount", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			#mount_list, err = p.communicate()
+			mount_list = self.disk_util.get_mount_output()
 
-		if(mount_list is not None):
-			mount_point = self.get_mount_point(mountlist = mount_list, device = device)
-			self.logger.log(("Resource disk [{0}] is mounted [{1}]",partition,mount_point),True)
-			if mount_point:
-				return mount_point
-		return None
+			if(mount_list is not None):
+				mount_point = self.get_mount_point(mountlist = mount_list, device = device)
+				self.logger.log(("Resource disk [{0}] is mounted [{1}]",partition,mount_point),True)
+				if mount_point:
+					return mount_point
+			return None
+		except Exception as e:
+			err_msg='Cannot get Resource disk partition, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
+			self.logger.log(err_msg, True, 'Error')
