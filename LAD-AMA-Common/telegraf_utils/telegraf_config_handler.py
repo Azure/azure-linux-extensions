@@ -61,7 +61,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     storage_namepass_list = []    
     storage_namepass_str = ""
 
-    vmi_rate_counters_list = ["LogicalDisk\BytesPerSecond", "LogicalDisk\ReadBytesPerSecond", "LogicalDisk\ReadsPerSecond",  "LogicalDisk\WriteBytesPerSecond", "LogicalDisk\WritesPerSecond", "LogicalDisk\TransfersPerSecond", "Network\ReadBytesPerSecond", "Network\WriteBytesPerSecond"]
+    vmi_rate_counters_list = ["LogicalDisk/BytesPerSecond", "LogicalDisk/ReadBytesPerSecond", "LogicalDisk/ReadsPerSecond",  "LogicalDisk/WriteBytesPerSecond", "LogicalDisk/WritesPerSecond", "LogicalDisk/TransfersPerSecond", "Network/ReadBytesPerSecond", "Network/WriteBytesPerSecond"]
 
     MetricsExtensionNamepsace = metrics_constants.metrics_extension_namespace
 
