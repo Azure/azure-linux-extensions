@@ -234,9 +234,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                     lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
-                elif is_vmi:
-                    # no rename of fields as they are set in telegraf directly
-                else:
+                elif not is_vmi:
+                    # no rename of fields as they are set in telegraf directly                
                     ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                     ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
@@ -251,13 +250,12 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                         metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                         metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
                         metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
-                elif is_vmi:
-                    # no rename of fields as they are set in telegraf directly
                 elif is_vmi_rate_counter:
                     metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                     metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     metricsext_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
-                else:
+                elif not is_vmi:
+                    # no rename of fields as they are set in telegraf directly                
                     metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                     metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
@@ -284,9 +282,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
             if is_lad:
                 lad_specific_rename_str += "\n"
-            elif is_vmi:
-                # no rename of fields as they are set in telegraf directly
-            else:
+            elif not is_vmi:
+                # no rename of fields as they are set in telegraf directly            
                 ama_rename_str += "\n"
 
             # Using fields[: -2] here to get rid of the last ", " at the end of the string
