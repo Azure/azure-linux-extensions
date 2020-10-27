@@ -10,3 +10,6 @@
 [submodule "OmsAgent/ext/python-future"]
 	path = OmsAgent/ext/python-future
 	url = https://github.com/PythonCharmers/python-future
+[submodule "AzureMonitorAgent/ext/python-future"]
+	path = AzureMonitorAgent/ext/python-future
+	url = https://github.com/PythonCharmers/python-future
