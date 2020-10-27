@@ -36,6 +36,10 @@ name_map = {
 "% Idle Time" : {"plugin":"cpu", "field":"usage_idle", "module":"processor"},
 "% Privileged Time" : {"plugin":"cpu", "field":"usage_system", "module":"processor"},
 
+# VM Insights
+"Processor/UtilizationPercentage" : {"plugin":"cpu_vmi", "field":"Processor/UtilizationPercentage", "module":"processor_vmi"},
+"Computer/Heartbeat" : {"plugin":"cpu_heartbeat_vmi", "field":"Computer/Heartbeat", "module":"processor_vmi"},
+
 "network->network in guest os" : {"plugin":"net", "field":"bytes_recv", "ladtablekey":"/builtin/network/bytesreceived"},
 "network->network total bytes" : {"plugin":"net", "field":"bytes_total", "ladtablekey":"/builtin/network/bytestotal"}, #Need to calculate sum
 "network->network out guest os" : {"plugin":"net", "field":"bytes_sent", "ladtablekey":"/builtin/network/bytestransmitted"},
@@ -53,6 +57,11 @@ name_map = {
 "Total Packets Transmitted" : {"plugin":"net", "field":"packets_sent", "module":"network"},
 "Total Packets Received" : {"plugin":"net", "field":"packets_recv", "module":"network"},
 "Total Tx Errors" : {"plugin":"net", "field":"err_out", "module":"network"},
+
+# VM Insights
+# "Network\ReadBytesPerSecond", "Network\WriteBytesPerSecond"
+"Network/ReadBytesPerSecond" : {"plugin":"net", "field":"bytes_recv", "op":"rate", "module":"network_vmi"},
+"Network/WriteBytesPerSecond" : {"plugin":"net", "field":"bytes_sent", "op":"rate", "module":"network_vmi"},
 
 "memory->memory available" : {"plugin":"mem", "field":"available", "ladtablekey":"/builtin/memory/availablememory"},
 "memory->mem. percent available" : {"plugin":"mem", "field":"available_percent", "ladtablekey":"/builtin/memory/percentavailablememory"},
@@ -82,6 +91,9 @@ name_map = {
 "Page Writes/sec" : {"plugin":"kernel_vmstat", "field":"pgpgout", "op":"rate", "module":"memory"},
 "Pages/sec" : {"plugin":"kernel_vmstat", "field":"total_pages", "op":"rate", "module":"memory"},
 
+# VM Insights
+"Memory/AvailableMB" : {"plugin":"mem_vmi", "field":"Memory/AvailableMB", "module":"memory_vmi"},
+"Memory/AvailablePercentage" : {"plugin":"mem_vmi", "field":"Memory/AvailablePercentage", "module":"memory_vmi"},
 
 #OMI Filesystem plugin
 "filesystem->filesystem used space" : {"plugin":"disk", "field":"used", "ladtablekey":"/builtin/filesystem/usedspace"},
@@ -111,6 +123,19 @@ name_map = {
 "Disk Reads/sec" : {"plugin":"diskio", "field":"reads", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 "Disk Writes/sec" : {"plugin":"diskio", "field":"writes", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 
+# VM Insights
+"LogicalDisk/FreeSpaceMB" : {"plugin":"disk_vmi", "field":"LogicalDisk/FreeSpaceMB", "module":"filesystem_vmi"},
+"LogicalDisk/FreeSpacePercentage" : {"plugin":"disk_vmi", "field":"LogicalDisk/FreeSpacePercentage", "module":"filesystem_vmi"}, #Need to calculate percentage
+
+#"LogicalDisk\BytesPerSecond", "LogicalDisk\ReadBytesPerSecond", "LogicalDisk\ReadsPerSecond",  "LogicalDisk\WriteBytesPerSecond", "LogicalDisk\WritesPerSecond", "LogicalDisk\TransfersPerSecond", 
+
+"LogicalDisk/TransfersPerSecond" : {"plugin":"diskio", "field":"total_transfers", "op":"rate", "module":"filesystem_vmi"}, #Need to calculate sum
+"LogicalDisk/ReadBytesPerSecond" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "module":"filesystem_vmi"}, #Need to calculate rate (but each second not each interval)
+"LogicalDisk/BytesPerSecond" : {"plugin":"diskio", "field":"total_bytes", "op":"rate", "module":"filesystem_vmi"}, #Need to calculate rate and then sum
+"LogicalDisk/WriteBytesPerSecond" : {"plugin":"diskio", "field":"write_bytes", "op":"rate", "module":"filesystem_vmi"}, #Need to calculate rate (but each second not each interval)
+"LogicalDisk/ReadsPerSecond" : {"plugin":"diskio", "field":"reads", "op":"rate", "module":"filesystem_vmi"}, #Need to calculate rate (but each second not each interval)
+"LogicalDisk/WritesPerSecond" : {"plugin":"diskio", "field":"writes", "op":"rate", "module":"filesystem_vmi"}, #Need to calculate rate (but each second not each interval)
+
 # #OMI Disk plugin
 "disk->disk read guest os" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "ladtablekey":"/builtin/disk/readbytespersecond"},
 "disk->disk write guest os" : {"plugin":"diskio", "field":"write_bytes", "op":"rate", "ladtablekey":"/builtin/disk/writebytespersecond"},
@@ -123,6 +148,6 @@ name_map = {
 "disk->disk transfer time" : {"plugin":"diskio", "field":"io_time", "op":"rate", "ladtablekey":"/builtin/disk/averagetransfertime"},
 "disk->disk queue length" : {"plugin":"diskio", "field":"iops_in_progress", "ladtablekey":"/builtin/disk/averagediskqueuelength"}
 
-  ##### These are the counter keys and telegraf plugins for Azure Monitor Agent
+##### These are the counter keys and telegraf plugins for Azure Monitor Agent
 
 }
