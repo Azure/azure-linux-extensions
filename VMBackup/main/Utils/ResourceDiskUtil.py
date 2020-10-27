@@ -153,3 +153,4 @@ class ResourceDiskUtil(object):
 		except Exception as e:
 			err_msg='Cannot get Resource disk partition, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
 			self.logger.log(err_msg, True, 'Error')
+			return None
