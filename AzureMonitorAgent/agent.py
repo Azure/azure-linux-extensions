@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import os
 import os.path
 import datetime
@@ -216,7 +217,7 @@ def install():
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
-    print (PackageManager, " and ", BundleFileName)
+    print(PackageManager, " and ", BundleFileName)
     OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)        
     hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
 
@@ -253,35 +254,35 @@ def install():
         
         # check if required GCS params are available
         MONITORING_GCS_CERT_CERTFILE = None
-        if protected_settings.has_key("certificate"):
+        if "certificate" in protected_settings:
             MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
 
         MONITORING_GCS_CERT_KEYFILE = None
-        if protected_settings.has_key("certificateKey"):
+        if "certificateKey" in protected_settings:
             MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(protected_settings.get("certificateKey"))
 
         MONITORING_GCS_ENVIRONMENT = ""
-        if protected_settings.has_key("monitoringGCSEnvironment"):
+        if "monitoringGCSEnvironment" in protected_settings:
             MONITORING_GCS_ENVIRONMENT = protected_settings.get("monitoringGCSEnvironment")
 
         MONITORING_GCS_NAMESPACE = ""
-        if protected_settings.has_key("namespace"):
+        if "namespace" in protected_settings:
             MONITORING_GCS_NAMESPACE = protected_settings.get("namespace")
 
         MONITORING_GCS_ACCOUNT = ""
-        if protected_settings.has_key("monitoringGCSAccount"):
+        if "monitoringGCSAccount" in protected_settings:
             MONITORING_GCS_ACCOUNT = protected_settings.get("monitoringGCSAccount")
 
         MONITORING_GCS_REGION = ""
-        if protected_settings.has_key("monitoringGCSRegion"):
+        if "monitoringGCSRegion" in protected_settings:
             MONITORING_GCS_REGION = protected_settings.get("monitoringGCSRegion")
 
         MONITORING_CONFIG_VERSION = ""
-        if protected_settings.has_key("configVersion"):
+        if "configVersion" in protected_settings:
             MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
 
         MONITORING_GCS_AUTH_ID_TYPE = ""
-        if protected_settings.has_key("MONITORING_GCS_AUTH_ID_TYPE"):
+        if "MONITORING_GCS_AUTH_ID_TYPE" in protected_settings:
             MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("MONITORING_GCS_AUTH_ID_TYPE")
 
         if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE is "")) or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
@@ -799,7 +800,7 @@ def arc_watcher(hutil_error, hutil_log):
                 # Copy the tokens to mdsd accessible dir
                 for filename in os.listdir(authkey_dir):
                     filepath = authkey_dir + filename
-                    print filepath
+                    print(filepath)
                     shutil.copy(filepath, arc_token_mdsd_dir)
                 
                 # Change the ownership of the mdsd arc token dir to be accessible by syslog (since mdsd runs as syslog user)
@@ -1097,8 +1098,8 @@ def get_settings():
             hutil_log_error('Unable to load handler settings from ' \
                             '{0}'.format(settings_path))
 
-        if (h_settings.has_key('protectedSettings')
-                and h_settings.has_key('protectedSettingsCertThumbprint')
+        if ('protectedSettings' in h_settings
+                and 'protectedSettingsCertThumbprint' in h_settings
                 and h_settings['protectedSettings'] is not None
                 and h_settings['protectedSettingsCertThumbprint'] is not None):
             encoded_settings = h_settings['protectedSettings']
