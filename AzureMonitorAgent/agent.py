@@ -17,6 +17,11 @@
 # limitations under the License.
 
 from __future__ import print_function
+from __future__ import division
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from past.utils import old_div
 import os
 import os.path
 import datetime
@@ -34,8 +39,8 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 import shutil
 import crypt
 import xml.dom.minidom
@@ -192,7 +197,7 @@ def get_free_space_mb(dirname):
     Get the free space in MB in the directory path.
     """
     st = os.statvfs(dirname)
-    return st.f_bavail * st.f_frsize / 1024 / 1024
+    return old_div(old_div(st.f_bavail * st.f_frsize, 1024), 1024)
 
 
 def is_systemd():
@@ -248,7 +253,7 @@ def install():
         default_configs["ENABLE_MCS"] = "true"
     else:
         # look for LA protected settings
-        for var in protected_settings.keys():
+        for var in list(protected_settings.keys()):
             if "_key" in var or "_id" in var:
                 default_configs[var] = protected_settings.get(var)
         
@@ -330,14 +335,14 @@ def install():
             with open(config_file, "r") as f:
                 data = f.readlines()
                 for line in data:
-                    for var in default_configs.keys():
+                    for var in list(default_configs.keys()):
                         if var in line:
                             line = "export " + var + "=" + default_configs[var] + "\n"
                             vars_set.add(var)
                             break
                     new_data += line
             
-            for var in default_configs.keys():
+            for var in list(default_configs.keys()):
                 if var not in vars_set:
                     new_data += "export " + var + "=" + default_configs[var] + "\n"
 
@@ -790,8 +795,8 @@ def arc_watcher(hutil_error, hutil_log):
             arc_endpoint = metrics_utils.get_arc_endpoint()
             try:
                 msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://monitor.azure.com/"
-                req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
-                res = urllib2.urlopen(req)
+                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.request.urlopen(req)
             except:
                 # The above request is expected to fail and add a key to the path - 
                 authkey_dir = "/var/opt/azcmagent/tokens/"
@@ -908,7 +913,7 @@ def is_vm_supported_for_extension(operation):
     vm_supported = False
     vm_dist, vm_ver = find_vm_distro(operation)
     # Find this VM distribution in the supported list
-    for supported_dist in supported_dists.keys():
+    for supported_dist in list(supported_dists.keys()):
         if not vm_dist.lower().startswith(supported_dist):
             continue
 
