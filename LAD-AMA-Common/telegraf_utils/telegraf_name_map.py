@@ -126,6 +126,7 @@ name_map = {
 # VM Insights
 "LogicalDisk/FreeSpaceMB" : {"plugin":"disk_vmi", "field":"LogicalDisk/FreeSpaceMB", "module":"filesystem_vmi"},
 "LogicalDisk/FreeSpacePercentage" : {"plugin":"disk_vmi", "field":"LogicalDisk/FreeSpacePercentage", "module":"filesystem_vmi"}, #Need to calculate percentage
+"LogicalDisk/Status" : {"plugin":"disk_vmi", "field":"LogicalDisk/Status", "module":"filesystem_vmi"}, #Need to calculate percentage
 
 #"LogicalDisk\BytesPerSecond", "LogicalDisk\ReadBytesPerSecond", "LogicalDisk\ReadsPerSecond",  "LogicalDisk\WriteBytesPerSecond", "LogicalDisk\WritesPerSecond", "LogicalDisk\TransfersPerSecond", 
 
