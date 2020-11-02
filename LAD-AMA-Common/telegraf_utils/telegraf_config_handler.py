@@ -16,12 +16,15 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
 import json
 import os
 from telegraf_utils.telegraf_name_map import name_map
 import subprocess
 import signal
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from shutil import copyfile, rmtree
 import time
 import metrics_ext_utils.metrics_constants as metrics_constants
@@ -652,8 +655,8 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     data = None
     while retries <= max_retries:
 
-        req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
-        res = urllib2.urlopen(req)
+        req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
+        res = urllib.request.urlopen(req)
         data = json.loads(res.read())
 
         if "compute" not in data:
