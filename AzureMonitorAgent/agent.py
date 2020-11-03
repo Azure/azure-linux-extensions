@@ -17,11 +17,16 @@
 # limitations under the License.
 
 from __future__ import print_function
-from __future__ import division
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
-from past.utils import old_div
+import sys
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+if sys.version_info[0] < 3:
+    from __future__ import division
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+    from past.utils import old_div
+
 import os
 import os.path
 import datetime
@@ -31,7 +36,6 @@ import grp
 import re
 import filecmp
 import stat
-import sys
 import traceback
 import time
 import platform
@@ -197,7 +201,7 @@ def get_free_space_mb(dirname):
     Get the free space in MB in the directory path.
     """
     st = os.statvfs(dirname)
-    return old_div(old_div(st.f_bavail * st.f_frsize, 1024), 1024)
+    return (st.f_bavail * st.f_frsize) // (1024 * 1024)
 
 
 def is_systemd():
@@ -518,7 +522,7 @@ def start_metrics_process():
     
     #start telemetry watcher
     oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python', oneagent_filepath, '-metrics']
+    args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     HUtilObject.log('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -714,7 +718,7 @@ def start_arc_process():
     
     #start telemetry watcher
     oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python', oneagent_filepath, '-arc']
+    args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-arc']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     HUtilObject.log('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -901,9 +905,9 @@ def is_vm_supported_for_extension(operation):
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
+    supported_dists = {'redhat' : ['6', '7', '8'], # Rhel
                        'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Oracle, RHEL
+                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
                        'oracle' : ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu

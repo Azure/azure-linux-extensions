@@ -16,9 +16,14 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+import sys
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+
 import json
 import os
 from telegraf_utils.telegraf_name_map import name_map
@@ -441,7 +446,7 @@ def is_running(is_lad):
 
     proc = subprocess.Popen(["ps  aux | grep telegraf | grep -v grep"], stdout=subprocess.PIPE, shell=True)
     output = proc.communicate()[0]
-    if telegraf_bin in output:
+    if telegraf_bin in output.decode():
         return True
     else:
         return False
@@ -484,7 +489,7 @@ def stop_telegraf_service(is_lad):
                 # Check if the process running is indeed telegraf, ignore if the process output doesn't contain telegraf
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
-                if telegraf_bin in output:
+                if telegraf_bin in output.decode():
                     os.kill(int(pid), signal.SIGKILL)
                 else:
                     return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)
