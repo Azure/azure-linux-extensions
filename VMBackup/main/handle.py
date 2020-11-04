@@ -409,9 +409,11 @@ def daemon():
                     if len(workload_patch.error_details) > 0 and OnAppFailureDoFsFreeze == True: #App&FS consistency
                         g_fsfreeze_on = True
                     elif len(workload_patch.error_details) > 0 and OnAppFailureDoFsFreeze == False: # Do Fs freeze only if App success
+                        hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
                         error_msg= 'Failing backup as OnAppFailureDoFsFreeze is set to false'
-                        backup_logger.log(error_msg, True)
-                        sys.exit(0)
+                        temp_result=CommonVariables.error
+                        temp_status= 'error'
+                        exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
                     elif len(workload_patch.error_details) == 0 and OnAppSuccessDoFsFreeze == False: # App only
                         g_fsfreeze_on = False
                     elif len(workload_patch.error_details) == 0 and OnAppSuccessDoFsFreeze == True: #App&FS consistency
