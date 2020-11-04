@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
     {
         char *mountPoint = argv[i + 2];
         logger("Freezing: %s\n", mountPoint);
-
+        sync();
         if (ioctl(fileSystemDescriptors[i], FIFREEZE, 0) != 0)
         {
             int errsv = errno;
