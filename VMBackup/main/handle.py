@@ -409,7 +409,6 @@ def daemon():
                     if len(workload_patch.error_details) > 0 and OnAppFailureDoFsFreeze == True: #App&FS consistency
                         g_fsfreeze_on = True
                     elif len(workload_patch.error_details) > 0 and OnAppFailureDoFsFreeze == False: # Do Fs freeze only if App success
-                        g_fsfreeze_on = False
                         error_msg= 'Failing backup as OnAppFailureDoFsFreeze is set to false'
                         backup_logger.log(error_msg, True)
                         sys.exit(0)
