@@ -185,9 +185,6 @@ class PatchBootSystemState(OSEncryptionState):
         sed_cmd = 'sed -i.bak s/ENCRYPTED_DISK_PARTITION/{0}/ "{1}"'.format(partition, udevaderulepath)
         self.command_executor.Execute(command_to_execute=sed_cmd, raise_exception_on_failure=True)
 
-        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" rd.debug"\n', 
-                                      '/etc/default/grub')
-
         self._append_contents_to_file('osencrypt UUID=osencrypt-locked none discard,header=/osluksheader\n',
                                       '/etc/crypttab')
 
