@@ -550,7 +550,7 @@ def metrics_watcher(hutil_error, hutil_log):
                     json_data = json.loads(data)  
                     
                     if len(json_data) == 0:
-                        last_crc = hashlib.sha256(data).hexdigest()                    
+                        last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
                         if telhandler.is_running(is_lad=False):
                             #Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
@@ -579,7 +579,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 HUtilObject.error(me_rm_msg)
                     else:
-                        crc = hashlib.sha256(data).hexdigest()                    
+                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
                         generate_token = False
                         me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
 
