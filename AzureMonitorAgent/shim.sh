@@ -2,7 +2,7 @@
 
 # This is the main driver file for AMA extension. This file first checks if Python 2 or 3 is available on the VM 
 # and if yes then uses that Python (if both are available then, default is set to python3) to run extension operations in agent.py
-# Control arguments passed to the shim are redirected to omsagent.py without validation.
+# Control arguments passed to the shim are redirected to agent.py without validation.
 
 COMMAND="./agent.py"
 PYTHON=""
@@ -26,7 +26,7 @@ find_python PYTHON FUTURE_PATH
 
 if [ -z "$PYTHON" ] # Need to discuss if we want to install python explicitly or ask the cx to install it
 then
-    echo "No Python interpreter found, which is an OMS extension dependency. Please install either Python 2 or 3." >&2
+    echo "No Python interpreter found, which is an AMA extension dependency. Please install either Python 2 or 3." >&2
     exit 52 # Missing Dependency
 else
     ${PYTHON} --version
