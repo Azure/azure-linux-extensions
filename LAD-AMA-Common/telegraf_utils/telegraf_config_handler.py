@@ -34,11 +34,13 @@ Sample input data received by this script
 [
     {
         "displayName" : "Network->Packets sent",
-        "interval" : "15s"
+        "interval" : "15s",
+        "sink" : ["mdsd" , "me"]
     },
     {
         "displayName" : "Network->Packets recieved",
-        "interval" : "15s"
+        "interval" : "15s",
+        "sink" : ["mdsd" , "me"]
     }
 ]
 """
@@ -56,8 +58,10 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     :param region: Azure Region value for the VM
     :param virtual_machine_name: Azure Virtual Machine Name value (Only in the case for VMSS) for the VM
     """
-    storage_namepass_list = []
+    storage_namepass_list = []    
     storage_namepass_str = ""
+
+    vmi_rate_counters_list = ["LogicalDisk/BytesPerSecond", "LogicalDisk/ReadBytesPerSecond", "LogicalDisk/ReadsPerSecond",  "LogicalDisk/WriteBytesPerSecond", "LogicalDisk/WritesPerSecond", "LogicalDisk/TransfersPerSecond", "Network/ReadBytesPerSecond", "Network/WriteBytesPerSecond"]
 
     MetricsExtensionNamepsace = metrics_constants.metrics_extension_namespace
 
@@ -147,7 +151,19 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             config_file = {"filename" : omiclass+".conf"}
             # Arbitrary max value for finding min
             min_interval = "999999999s"
-            input_str += "[[inputs." + plugin + "]]\n"
+            is_vmi = plugin.endswith("_vmi")
+            is_vmi_rate_counter = False
+            for field in telegraf_json[omiclass][plugin]:
+                if not is_vmi_rate_counter:
+                    is_vmi_rate_counter = telegraf_json[omiclass][plugin][field]["displayName"] in vmi_rate_counters_list
+            
+            if is_vmi:
+                splitResult = plugin.split('_')
+                telegraf_plugin = splitResult[0]
+                input_str += "[[inputs." + telegraf_plugin + "]]\n"
+                # plugin = plugin[:-4]
+            else:
+                input_str += "[[inputs." + plugin + "]]\n"
             # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
 
             # If it's a lad config then add the namepass fields for sending totals to storage
@@ -157,6 +173,9 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"
                 if lad_plugin_name not in storage_namepass_list:
                     storage_namepass_list.append(lad_plugin_name)
+            elif is_vmi:                
+                if plugin not in storage_namepass_list:
+                    storage_namepass_list.append(plugin)
             else:
                 ama_plugin_name = plugin + "_total"
                 ama_rename_str += "\n[[processors.rename]]\n"
@@ -164,13 +183,14 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 if ama_plugin_name not in storage_namepass_list:
                     storage_namepass_list.append(ama_plugin_name)
 
+            namespace = MetricsExtensionNamepsace
+            if is_vmi or is_vmi_rate_counter:
+                namespace = "insights.virtualmachine"
             metricsext_rename_str += "\n[[processors.rename]]\n"
             metricsext_rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
             metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
             metricsext_rename_str += " "*4 + "measurement = \"" + plugin + "\"\n"
-            metricsext_rename_str += " "*4 + "dest = \"" + MetricsExtensionNamepsace + "\"\n"
-
-
+            metricsext_rename_str += " "*4 + "dest = \"" + namespace + "\"\n"
 
             fields = ""
             ops_fields = ""
@@ -214,7 +234,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                     lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
-                else:
+                elif not is_vmi:
+                    # no rename of fields as they are set in telegraf directly                
                     ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                     ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
@@ -229,36 +250,40 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                         metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                         metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
                         metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
-                else:
+                elif is_vmi_rate_counter:
+                    metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
+                    metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                    metricsext_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
+                elif not is_vmi:
+                    # no rename of fields as they are set in telegraf directly                
                     metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                     metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
                     metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
 
             #Add respective operations for aggregators
             # if is_lad:
-            if rate_aggregate:
-                aggregator_str += "[[aggregators.basicstats]]\n"
-                aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
-                aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
-                aggregator_str += " "*2 + "drop_original = true\n"
-                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-                aggregator_str += " "*2 + "stats = [" + ops + "]\n"
-                aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
+            if not is_vmi:
+                if rate_aggregate:
+                    aggregator_str += "[[aggregators.basicstats]]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                    aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
+                    aggregator_str += " "*2 + "drop_original = true\n"
+                    aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                    aggregator_str += " "*2 + "stats = [" + ops + "]\n"
+                    aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
 
-            if non_rate_aggregate:
-                aggregator_str += "[[aggregators.basicstats]]\n"
-                aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
-                aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
-                aggregator_str += " "*2 + "drop_original = true\n"
-                aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-                aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
-
-
-
+                if non_rate_aggregate:
+                    aggregator_str += "[[aggregators.basicstats]]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                    aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
+                    aggregator_str += " "*2 + "drop_original = true\n"
+                    aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                    aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
 
             if is_lad:
                 lad_specific_rename_str += "\n"
-            else:
+            elif not is_vmi:
+                # no rename of fields as they are set in telegraf directly            
                 ama_rename_str += "\n"
 
             # Using fields[: -2] here to get rid of the last ", " at the end of the string

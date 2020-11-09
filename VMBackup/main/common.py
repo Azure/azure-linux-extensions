@@ -132,6 +132,7 @@ class CommonVariables:
     FailedWorkloadDatabaseNotOpen = 508
     FailedWorkloadQuiescingError = 509
     FailedWorkloadQuiescingTimeout = 510
+    FailedWorkloadDatabaseInNoArchiveLog = 511
 
     """
     Consistency-Types
