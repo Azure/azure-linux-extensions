@@ -43,16 +43,16 @@ ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.1.0.ssl_'
-dsc_package_prefix = 'packages/dsc-1.1.1-294.ssl_'
+omi_package_prefix = 'packages/omi-1.4.2-5.ssl_'
+dsc_package_prefix = 'packages/dsc-1.1.1-926.ssl_'
 omi_major_version = 1
-omi_minor_version = 1
-omi_build = 0
-omi_release = 0
+omi_minor_version = 4
+omi_build = 2
+omi_release = 5
 dsc_major_version = 1
 dsc_minor_version = 1
 dsc_build = 1
-dsc_release = 294
+dsc_release = 926
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
@@ -145,7 +145,7 @@ def check_supported_OS():
                        'centos' : ['6', '7'], # CentOS
                        'red hat' : ['6', '7'], # Redhat
                        'debian' : ['8'], # Debian
-                       'ubuntu' : ['14.04', '16.04'], # Ubuntu
+                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
                        'suse' : ['11', '12'], #SLES
                        'opensuse' : ['13', '42.3'] #OpenSuse
     }
@@ -589,8 +589,10 @@ def get_openssl_version():
         return '100'
     elif re.match('^0.9.8*', openssl_version):
         return '098'
+    elif re.match('^1.1.*', openssl_version):
+        return '110'
     else:
-        error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 0.9.8*, 1.0.*'
+        error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 0.9.8*, 1.0.*, 1.1.*'
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="System doesn't have supported OpenSSL version:" + openssl_version)
         hutil.do_exit(51, 'Install', 'error', '51', openssl_version + 'is not supported.')
