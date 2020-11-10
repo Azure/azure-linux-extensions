@@ -24,7 +24,7 @@ function find_python() {
 
 find_python PYTHON FUTURE_PATH
 
-if [ -z "$PYTHON" ] # Need to discuss if we want to install python explicitly or ask the cx to install it
+if [ -z "$PYTHON" ] # If python is not installed, we will fail the install with the following error, requiring cx to have python pre-installed
 then
     echo "No Python interpreter found, which is an AMA extension dependency. Please install either Python 2 or 3." >&2
     exit 52 # Missing Dependency

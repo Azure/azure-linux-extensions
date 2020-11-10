@@ -67,6 +67,38 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
+# This code is taken from the omsagent's extension wrapper. 
+# This same monkey patch fix is relevant for AMA extension as well.
+# This monkey patch duplicates the one made in the waagent import above.
+# It is necessary because on 2.6, the waagent monkey patch appears to be overridden
+# by the python-future subprocess.check_output backport.
+if sys.version_info < (2,7):
+    def check_output(*popenargs, **kwargs):
+        r"""Backport from subprocess module from python 2.7"""
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+        return output
+
+    # Exception classes used by this module.
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+    subprocess.check_output = check_output
+
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
@@ -478,33 +510,33 @@ def stop_metrics_process():
         #Stop the telegraf and ME services
         tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
         if tel_out:
-            HUtilObject.log(tel_msg)
+            hutil_log_info(tel_msg)
         else:
             HUtilObject.error(tel_msg)
         
         #Delete the telegraf and ME services
         tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
         if tel_rm_out:
-            HUtilObject.log(tel_rm_msg)
+            hutil_log_info(tel_rm_msg)
         else:
             HUtilObject.error(tel_rm_msg)
     
     if me_handler.is_running(is_lad=False):
         me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
         if me_out:
-            HUtilObject.log(me_msg)
+            hutil_log_info(me_msg)
         else:
             HUtilObject.error(me_msg)
 
         me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
         if me_rm_out:
-            HUtilObject.log(me_rm_msg)
+            hutil_log_info(me_rm_msg)
         else:
             HUtilObject.error(me_rm_msg)
 
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
-    # kill existing telemetry watcher
+    # kill existing metrics watcher
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
             for pids in f.readlines():
@@ -514,17 +546,17 @@ def stop_metrics_process():
 
 def start_metrics_process():
     """
-    Start telemetry process that performs periodic monitoring activities
+    Start metrics process that performs periodic monitoring activities
     :return: None
 
     """
     stop_metrics_process()
     
-    #start telemetry watcher
+    #start metrics watcher
     oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
     args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    HUtilObject.log('start watcher process '+str(args))
+    hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
 
 def metrics_watcher(hutil_error, hutil_log):
@@ -555,27 +587,27 @@ def metrics_watcher(hutil_error, hutil_log):
                             #Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
-                                HUtilObject.log(tel_msg)
+                                hutil_log_info(tel_msg)
                             else:
                                 HUtilObject.error(tel_msg)
 
                             #Delete the telegraf and ME services
                             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
                             if tel_rm_out:
-                                HUtilObject.log(tel_rm_msg)
+                                hutil_log_info(tel_rm_msg)
                             else:
                                 HUtilObject.error(tel_rm_msg)
 
                         if me_handler.is_running(is_lad=False):
                             me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
                             if me_out:
-                                HUtilObject.log(me_msg)
+                                hutil_log_info(me_msg)
                             else:
                                 HUtilObject.error(me_msg)
 
                             me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
                             if me_rm_out:
-                                HUtilObject.log(me_rm_msg)
+                                hutil_log_info(me_rm_msg)
                             else:
                                 HUtilObject.error(me_rm_msg)
                     else:
@@ -717,11 +749,11 @@ def start_arc_process():
     stop_arc_watcher()
     hutil_log_info("starting arc process")
     
-    #start telemetry watcher
+    #start arc watcher
     oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
     args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-arc']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    HUtilObject.log('start watcher process '+str(args))
+    hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
 
 def start_arc_watcher():
@@ -760,7 +792,7 @@ def stop_arc_watcher():
     """    
     pids_filepath = os.path.join(os.getcwd(),'amaarc.pid')
 
-    # kill existing telemetry watcher
+    # kill existing arc watcher
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
             for pids in f.readlines():
