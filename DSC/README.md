@@ -357,7 +357,7 @@ $publicConfig = '{
 ```
 
 ## 4. Supported Linux Distributions
-- Ubuntu 14.04 LTS, 16.04 LTS
+- Ubuntu 14.04 LTS, 16.04 LTS, 18.04 LTS
 - Debian 8
 - CentOS 6.5 and higher
 - RHEL 6.5 and higher
