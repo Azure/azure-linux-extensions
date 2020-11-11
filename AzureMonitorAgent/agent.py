@@ -21,11 +21,9 @@ import sys
 # future imports have no effect on python 3 (verified in official docs)
 # importing from source causes import errors on python 3, lets skip import
 if sys.version_info[0] < 3:
-    from __future__ import division
     from future import standard_library
     standard_library.install_aliases()
     from builtins import str
-    from past.utils import old_div
 
 import os
 import os.path
@@ -175,7 +173,7 @@ def main():
     message = '{0} succeeded'.format(operation)
 
     exit_code = check_disk_space_availability()
-    if exit_code is not 0:
+    if exit_code != 0:
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)   
 
@@ -187,7 +185,7 @@ def main():
 
         # Exit code 1 indicates a general problem that doesn't have a more
         # specific error code; it often indicates a missing dependency
-        if exit_code is 1 and operation == 'Install':
+        if exit_code == 1 and operation == 'Install':
             message = 'Install failed with exit code 1. Please check that ' \
                       'dependencies are installed. For details, check logs ' \
                       'in /var/log/azure/Microsoft.Azure.Monitor' \
@@ -196,7 +194,7 @@ def main():
             message = 'Install failed with exit code {0} because the ' \
                       'package manager on the VM is currently locked: ' \
                       'please wait and try again'.format(DPKGLockedErrorCode)
-        elif exit_code is not 0:
+        elif exit_code != 0:
             message = '{0} failed with exit code {1} {2}'.format(operation,
                                                              exit_code, output)
 
@@ -285,7 +283,7 @@ def install():
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         hutil_log_info("Detecting Auto-Config mode.")
         return 0, ""
-    elif protected_settings is None or len(protected_settings) is 0:
+    elif protected_settings is None or len(protected_settings) == 0:
         default_configs["ENABLE_MCS"] = "true"
     else:
         # look for LA protected settings
@@ -326,7 +324,7 @@ def install():
         if "MONITORING_GCS_AUTH_ID_TYPE" in protected_settings:
             MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("MONITORING_GCS_AUTH_ID_TYPE")
 
-        if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE is "")) or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
+        if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE == "")) or MONITORING_GCS_ENVIRONMENT == "" or MONITORING_GCS_NAMESPACE == "" or MONITORING_GCS_ACCOUNT == "" or MONITORING_GCS_REGION == "" or MONITORING_CONFIG_VERSION == "":
             waagent_log_error('Not all required GCS parameters are provided')
             raise ParameterMissingException
         else:
@@ -342,7 +340,7 @@ def install():
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
             
-            if MONITORING_GCS_AUTH_ID_TYPE is not "":
+            if MONITORING_GCS_AUTH_ID_TYPE != "":
                 default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
 
             if MONITORING_GCS_CERT_CERTFILE is not None:
@@ -466,7 +464,7 @@ def enable():
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
 
-    if exit_code is 0:
+    if exit_code == 0:
         #start metrics process if enable is successful
         start_metrics_process()
         
@@ -910,7 +908,10 @@ def find_vm_distro(operation):
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
-        vm_dist, vm_ver, vm_id = platform.dist()
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except AttributeError:
+            hutil_log_info("Falling back to /etc/os-release distribution parsing")
 
     if not vm_dist and not vm_ver: # SLES 15 and others
         try:
@@ -1012,7 +1013,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB	
     # take only the last 100 characters as extension cuts off after that	
     try:	
-        if exit_code is not 0:	
+        if exit_code != 0:	
             sys.stderr.write(output[-500:])        
 
         if "Permission denied" in output:
@@ -1069,7 +1070,7 @@ def is_dpkg_locked(exit_code, output):
     If dpkg is locked, the output will contain a message similar to 'dpkg
     status database is locked by another process'
     """
-    if exit_code is not 0:
+    if exit_code != 0:
         dpkg_locked_search = r'^.*dpkg.+lock.*$'
         dpkg_locked_re = re.compile(dpkg_locked_search, re.M)
         if dpkg_locked_re.search(output):
@@ -1379,7 +1380,7 @@ def log_and_exit(operation, exit_code = 1, message = ''):
     """
     Log the exit message and perform the exit
     """
-    if exit_code is 0:
+    if exit_code == 0:
         waagent_log_info(message)
         hutil_log_info(message)
         exit_status = 'success'
