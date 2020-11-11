@@ -1,7 +1,7 @@
 # DSCForLinux Extension
 Allow the owner of the Azure Virtual Machines to configure the VM using Desired State Configuration (DSC) for Linux.
 
-Latest version is 2.70
+Latest version is 2.71
 
 About how to create MOF document, please refer to below documents.
 * [Get started with Desired State Configuration (DSC) for Linux](https://technet.microsoft.com/en-us/library/mt126211.aspx)
@@ -357,7 +357,7 @@ $publicConfig = '{
 ```
 
 ## 4. Supported Linux Distributions
-- Ubuntu 14.04 LTS, 16.04 LTS
+- Ubuntu 14.04 LTS, 16.04 LTS, 18.04 LTS
 - Debian 8
 - CentOS 6.5 and higher
 - RHEL 6.5 and higher
