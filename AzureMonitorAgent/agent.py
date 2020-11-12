@@ -101,8 +101,8 @@ if sys.version_info < (2,7):
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
 # TODO: Installer should automatically figure this out from the folder instead of requiring this update
-BundleFileNameDeb = 'azure-mdsd_1.5.124-build.master.89_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.124-build.master.89_x86_64.rpm'
+BundleFileNameDeb = 'azure-mdsd_1.5.133-build.master.157_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.133-build.master.157_x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -912,8 +912,14 @@ def find_vm_distro(operation):
             vm_dist, vm_ver, vm_id = platform.dist()
         except AttributeError:
             hutil_log_info("Falling back to /etc/os-release distribution parsing")
+    # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
+    # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case 
+    try:
+        temp_vm_ver = int(vm_ver.split('.')[0])
+    except:
+        parse_manually = True
 
-    if not vm_dist and not vm_ver: # SLES 15 and others
+    if (not vm_dist and not vm_ver) or parse_manually: # SLES 15 and others
         try:
             with open('/etc/os-release', 'r') as fp:
                 for line in fp:
@@ -923,7 +929,6 @@ def find_vm_distro(operation):
                         vm_dist = vm_dist.replace('\"', '').replace('\n', '')
                     elif line.startswith('VERSION_ID='):
                         vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.split('.')[0]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             log_and_exit(operation, UndeterminateOperatingSystem, 'Undeterminate operating system')
@@ -944,7 +949,7 @@ def is_vm_supported_for_extension(operation):
                        'red hat' : ['6', '7', '8'], # Oracle, RHEL
                        'oracle' : ['6', '7'], # Oracle
                        'debian' : ['8', '9'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'] # SLES
     }
 
