@@ -58,7 +58,8 @@ class PrereqState(OSEncryptionState):
         self._patch_walinuxagent()
         self.command_executor.Execute('systemctl daemon-reload', True)
 
-        self._copy_key_script()
+        self._copy_key_script()        
+        self._snap_stop()
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit prereq state")
@@ -93,3 +94,12 @@ class PrereqState(OSEncryptionState):
             self.context.logger.log("Key script found at path: {0}".format(keyscriptpath))
 
         self.command_executor.Execute('cp {0} /usr/sbin/azure_crypt_key.sh'.format(keyscriptpath), True)
+
+    def _snap_stop(self):
+        self.context.logger.log('stop snaps and unmount')
+        self.command_executor.Execute('snap stop lxd',False)
+        self.command_executor.ExecuteInBash('umount `lsblk -r -o MOUNTPOINT | grep /snap/lxd`',False)
+        self.command_executor.Execute('snap stop core18',False)
+        self.command_executor.ExecuteInBash('umount `lsblk -r -o MOUNTPOINT | grep /snap/core18`',False)
+        self.command_executor.Execute('snap stop snapd',False)
+        self.command_executor.ExecuteInBash('umount `lsblk -r -o MOUNTPOINT | grep /snap/snapd`',False)
