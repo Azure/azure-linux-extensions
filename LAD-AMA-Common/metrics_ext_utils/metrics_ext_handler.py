@@ -170,7 +170,7 @@ def generate_Arc_MSI_token():
                 auth += key
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
                 res = urllib.request.urlopen(req)
-                data = json.loads(res.read())
+                data = json.loads(res.read().decode('utf-8'))
 
             if not data or "access_token" not in data:
                 retries += 1
@@ -228,7 +228,7 @@ def generate_MSI_token():
                 msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
                 res = urllib.request.urlopen(req)
-                data = json.loads(res.read())
+                data = json.loads(res.read().decode('utf-8'))
 
                 if not data or "access_token" not in data:
                     retries += 1
@@ -505,7 +505,7 @@ def get_imds_values(is_lad):
         #query imds to get the required information
         req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
         res = urllib.request.urlopen(req)
-        data = json.loads(res.read())
+        data = json.loads(res.read().decode('utf-8'))
 
         if "compute" not in data:
             retries += 1

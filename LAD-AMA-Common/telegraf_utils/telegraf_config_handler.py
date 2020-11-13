@@ -662,7 +662,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
 
         req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
         res = urllib.request.urlopen(req)
-        data = json.loads(res.read())
+        data = json.loads(res.read().decode('utf-8'))
 
         if "compute" not in data:
             retries += 1

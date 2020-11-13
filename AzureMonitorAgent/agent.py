@@ -905,6 +905,7 @@ def find_vm_distro(operation):
     Finds the Linux Distribution this vm is running on. 
     """
     vm_dist = vm_id = vm_ver =  None
+    parse_manually = False
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
