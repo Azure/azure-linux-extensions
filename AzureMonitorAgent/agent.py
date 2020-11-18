@@ -586,29 +586,29 @@ def metrics_watcher(hutil_error, hutil_log):
                             #Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
-                                hutil_log_info(tel_msg)
+                                hutil_log(tel_msg)
                             else:
-                                hutil_log_error(tel_msg)
+                                hutil_error(tel_msg)
 
                             #Delete the telegraf and ME services
                             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
                             if tel_rm_out:
-                                hutil_log_info(tel_rm_msg)
+                                hutil_log(tel_rm_msg)
                             else:
-                                hutil_log_error(tel_rm_msg)
+                                hutil_error(tel_rm_msg)
 
                         if me_handler.is_running(is_lad=False):
                             me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
                             if me_out:
-                                hutil_log_info(me_msg)
+                                hutil_log(me_msg)
                             else:
-                                hutil_log_error(me_msg)
+                                hutil_error(me_msg)
 
                             me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
                             if me_rm_out:
-                                hutil_log_info(me_rm_msg)
+                                hutil_log(me_rm_msg)
                             else:
-                                hutil_log_error(me_rm_msg)
+                                hutil_error(me_rm_msg)
                     else:
                         crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
 
@@ -1324,7 +1324,7 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
 
     # On python 3, encode returns a byte object, so we must decode back to a string
     if sys.version_info >= (3,):
-        output = output.decode()
+        output = output.decode('utf-8')
 
     return exit_code, output.strip()
 

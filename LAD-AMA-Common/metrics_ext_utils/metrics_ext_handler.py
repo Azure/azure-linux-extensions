@@ -49,7 +49,7 @@ def is_running(is_lad):
 
     proc = subprocess.Popen(["ps  aux | grep MetricsExtension | grep -v grep"], stdout=subprocess.PIPE, shell=True)
     output = proc.communicate()[0]
-    if metrics_bin in output.decode():
+    if metrics_bin in output.decode('utf-8'):
         return True
     else:
         return False
@@ -94,7 +94,7 @@ def stop_metrics_service(is_lad):
                 # Check if the process running is indeed MetricsExtension, ignore if the process output doesn't contain MetricsExtension
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
-                if metrics_ext_bin in output.decode():
+                if metrics_ext_bin in output.decode('utf-8'):
                     os.kill(int(pid), signal.SIGKILL)
                 else:
                     return False, "Found a different process running with PID {0}. Failed to stop MetricsExtension.".format(pid)
