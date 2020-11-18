@@ -192,6 +192,27 @@ class OSEncryptionState(object):
                                       communicator=proc_comm)
         return int(proc_comm.stdout.strip())
 
+    def _get_az_symlink_os_volume(self):
+        realpath_rootfs_dev = os.path.realpath(self.rootfs_block_device)
+
+        # First we check the scsi0 dir. If this dir is present we are almost guaranteed to find the rootfs device in here
+        gen2_dir = os.path.join(CommonVariables.azure_symlinks_dir, "scsi0/")
+        if os.path.exists(gen2_dir):
+            for top_level_item in os.listdir(gen2_dir):
+                dev_path = os.path.join(gen2_dir, top_level_item)
+                if os.path.realpath(dev_path) == realpath_rootfs_dev:
+                    return dev_path
+
+        # Then we check the root* devices. If these are present we use them.
+        # Though it's a little worrying that some Gen2 VMs don't have these links, so we take these as a second choice
+        for top_level_item in os.listdir(CommonVariables.azure_symlinks_dir):
+            if top_level_item.startswith("root"):
+                dev_path = os.path.join(CommonVariables.azure_symlinks_dir, top_level_item)
+                if os.path.realpath(dev_path) == realpath_rootfs_dev:
+                    return dev_path
+
+        return None
+
     def _is_uuid(self, s):
         try:
             UUID(s)
