@@ -42,7 +42,6 @@ import json
 import base64
 import inspect
 import urllib.request, urllib.parse, urllib.error
-import urllib.request, urllib.error, urllib.parse
 import shutil
 import crypt
 import xml.dom.minidom
