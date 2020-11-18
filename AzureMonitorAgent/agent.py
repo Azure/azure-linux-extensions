@@ -95,6 +95,7 @@ if sys.version_info < (2,7):
             return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
 
     subprocess.check_output = check_output
+    subprocess.CalledProcessError = CalledProcessError
 
 # Global Variables
 PackagesDirectory = 'packages'
