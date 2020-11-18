@@ -511,27 +511,27 @@ def stop_metrics_process():
         if tel_out:
             hutil_log_info(tel_msg)
         else:
-            HUtilObject.error(tel_msg)
+            hutil_log_error(tel_msg)
         
         #Delete the telegraf and ME services
         tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
         if tel_rm_out:
             hutil_log_info(tel_rm_msg)
         else:
-            HUtilObject.error(tel_rm_msg)
+            hutil_log_error(tel_rm_msg)
     
     if me_handler.is_running(is_lad=False):
         me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
         if me_out:
             hutil_log_info(me_msg)
         else:
-            HUtilObject.error(me_msg)
+            hutil_log_error(me_msg)
 
         me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
         if me_rm_out:
             hutil_log_info(me_rm_msg)
         else:
-            HUtilObject.error(me_rm_msg)
+            hutil_log_error(me_rm_msg)
 
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
@@ -588,27 +588,27 @@ def metrics_watcher(hutil_error, hutil_log):
                             if tel_out:
                                 hutil_log_info(tel_msg)
                             else:
-                                HUtilObject.error(tel_msg)
+                                hutil_log_error(tel_msg)
 
                             #Delete the telegraf and ME services
                             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
                             if tel_rm_out:
                                 hutil_log_info(tel_rm_msg)
                             else:
-                                HUtilObject.error(tel_rm_msg)
+                                hutil_log_error(tel_rm_msg)
 
                         if me_handler.is_running(is_lad=False):
                             me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
                             if me_out:
                                 hutil_log_info(me_msg)
                             else:
-                                HUtilObject.error(me_msg)
+                                hutil_log_error(me_msg)
 
                             me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
                             if me_rm_out:
                                 hutil_log_info(me_rm_msg)
                             else:
-                                HUtilObject.error(me_rm_msg)
+                                hutil_log_error(me_rm_msg)
                     else:
                         crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
 
@@ -733,7 +733,7 @@ def metrics():
     with open(pids_filepath, 'w') as f:
         f.write(str(py_pid) + '\n')
 
-    watcher_thread = Thread(target = metrics_watcher, args = [HUtilObject.error, HUtilObject.log])
+    watcher_thread = Thread(target = metrics_watcher, args = [hutil_log_error, hutil_log_info])
     watcher_thread.start()
     watcher_thread.join()
 
@@ -770,7 +770,7 @@ def start_arc_watcher():
         f.write(str(py_pid) + '\n')
     hutil_log_info("Written all the pids")
     print("Written all the pids")
-    watcher_thread = Thread(target = arc_watcher, args = [HUtilObject.error, HUtilObject.log])
+    watcher_thread = Thread(target = arc_watcher, args = [hutil_log_error, hutil_log_info])
     watcher_thread.start()
     watcher_thread.join()
 
