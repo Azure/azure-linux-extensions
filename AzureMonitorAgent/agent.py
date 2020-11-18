@@ -119,6 +119,7 @@ DisableOneAgentServiceCommand = ''
 DPKGLockedErrorCode = 56
 MissingorInvalidParameterErrorCode = 53
 UnsupportedOperatingSystem = 51
+IndeterminateOperatingSystem = 51
 
 # Configuration
 HUtilObject = None
@@ -934,7 +935,7 @@ def find_vm_distro(operation):
                         vm_ver = line.split('=')[1]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
-            log_and_exit(operation, UndeterminateOperatingSystem, 'Undeterminate operating system')
+            log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
     return vm_dist, vm_ver
 
 
@@ -979,7 +980,7 @@ def is_vm_supported_for_extension(operation):
                 except IndexError:
                     vm_ver_match = False
                     break
-                if vm_ver_num is not supported_ver_num:
+                if vm_ver_num != supported_ver_num:
                     vm_ver_match = False
                     break
             if vm_ver_match:
