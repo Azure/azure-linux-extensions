@@ -570,7 +570,15 @@ def setup_me(is_lad):
     amrurl = "https://management.azure.com/subscriptions/" + subscription_id + "?api-version=2014-04-01"
     try:
         req = urllib.request.Request(amrurl, headers={'Content-Type':'application/json'})
-        res = urllib.request.urlopen(req)
+
+        # urlopen alias in future backport is broken on py2.6, fails on urls with HTTPS - https://github.com/PythonCharmers/python-future/issues/167
+        # Using this hack of switching between py2 and 3 to avoid this
+        if sys.version_info < (2,7):
+            from urllib2 import HTTPError, Request, urlopen
+            urlopen(req)
+        else:
+            res = urllib.request.urlopen(req)
+
     except Exception as e:
         err_res = e.headers["WWW-Authenticate"]
         for line in err_res.split(","):

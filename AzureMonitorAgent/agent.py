@@ -612,6 +612,8 @@ def metrics_watcher(hutil_error, hutil_log):
                         crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
 
                         if(crc != last_crc):
+                            # Resetting the me_msi_token_expiry_epoch variable if we set up ME again.
+                            me_msi_token_expiry_epoch = None
                             hutil_log("Start processing metric configuration")
                             hutil_log(data)
 
