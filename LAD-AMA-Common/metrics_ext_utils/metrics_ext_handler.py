@@ -49,7 +49,7 @@ def is_running(is_lad):
 
     proc = subprocess.Popen(["ps  aux | grep MetricsExtension | grep -v grep"], stdout=subprocess.PIPE, shell=True)
     output = proc.communicate()[0]
-    if metrics_bin in output.decode('utf-8'):
+    if metrics_bin in output.decode('utf-8', 'ignore'):
         return True
     else:
         return False
@@ -94,7 +94,7 @@ def stop_metrics_service(is_lad):
                 # Check if the process running is indeed MetricsExtension, ignore if the process output doesn't contain MetricsExtension
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
-                if metrics_ext_bin in output.decode('utf-8'):
+                if metrics_ext_bin in output.decode('utf-8', 'ignore'):
                     os.kill(int(pid), signal.SIGKILL)
                 else:
                     return False, "Found a different process running with PID {0}. Failed to stop MetricsExtension.".format(pid)
@@ -170,7 +170,7 @@ def generate_Arc_MSI_token():
                 auth += key
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
                 res = urllib.request.urlopen(req)
-                data = json.loads(res.read().decode('utf-8'))
+                data = json.loads(res.read().decode('utf-8', 'ignore'))
 
             if not data or "access_token" not in data:
                 retries += 1
@@ -228,7 +228,7 @@ def generate_MSI_token():
                 msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
                 res = urllib.request.urlopen(req)
-                data = json.loads(res.read().decode('utf-8'))
+                data = json.loads(res.read().decode('utf-8', 'ignore'))
 
                 if not data or "access_token" not in data:
                     retries += 1
@@ -505,7 +505,7 @@ def get_imds_values(is_lad):
         #query imds to get the required information
         req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
         res = urllib.request.urlopen(req)
-        data = json.loads(res.read().decode('utf-8'))
+        data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "compute" not in data:
             retries += 1

@@ -446,7 +446,7 @@ def is_running(is_lad):
 
     proc = subprocess.Popen(["ps  aux | grep telegraf | grep -v grep"], stdout=subprocess.PIPE, shell=True)
     output = proc.communicate()[0]
-    if telegraf_bin in output.decode('utf-8'):
+    if telegraf_bin in output.decode('utf-8', 'ignore'):
         return True
     else:
         return False
@@ -489,7 +489,7 @@ def stop_telegraf_service(is_lad):
                 # Check if the process running is indeed telegraf, ignore if the process output doesn't contain telegraf
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
-                if telegraf_bin in output.decode('utf-8'):
+                if telegraf_bin in output.decode('utf-8', 'ignore'):
                     os.kill(int(pid), signal.SIGKILL)
                 else:
                     return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)
@@ -662,7 +662,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
 
         req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
         res = urllib.request.urlopen(req)
-        data = json.loads(res.read().decode('utf-8'))
+        data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "compute" not in data:
             retries += 1
