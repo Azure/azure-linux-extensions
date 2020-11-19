@@ -313,8 +313,24 @@ class PatchBootSystemState(OSEncryptionState):
                                       raise_exception_on_failure=True)
 
     def _add_kernelopts(self, args_to_add):
-        for arg in args_to_add:
-            self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel DEFAULT".format(arg))
+        """
+        For EFI machines (Gen2) we want to use the EFI grub.cfg path
+        For BIOS machines (Gen1) we want to use the old grub.cfg path
+        But we can't tell at this stage easily which one to use if both are present. so we will just update both.
+        Moreover, in case somebody runs grub2-mkconfig on the machine we don't want the changes to get nuked out, we will update grub defaults file too.
+        """
+        grub_cfg_paths = [
+            "/boot/grub2/grub.cfg",
+            "/boot/efi/EFI/redhat/grub.cfg"
+        ]
+        grub_cfg_paths = filter(os.path.exists, grub_cfg_paths)
+
+        for grub_cfg_path in grub_cfg_paths:
+            for arg in args_to_add:
+                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel DEFAULT -c {1}".format(arg, grub_cfg_path))
+
+        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+="{0}"\n'.format(" ".join(args_to_add)),
+                                      '/etc/default/grub')
 
     def _find_bek_and_execute_action(self, callback_method_name):
         callback_method = getattr(self, callback_method_name)
