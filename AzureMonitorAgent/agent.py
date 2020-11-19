@@ -949,10 +949,10 @@ def is_vm_supported_for_extension(operation):
     this VM extension. All other distros will get error code 51
     """
     supported_dists = {'redhat' : ['6', '7', '8'], # Rhel
-                       'centos' : ['6', '7'], # CentOS
+                       'centos' : ['6', '7', '8'], # CentOS
                        'red hat' : ['6', '7', '8'], # Oracle, RHEL
-                       'oracle' : ['6', '7'], # Oracle
-                       'debian' : ['8', '9'], # Debian
+                       'oracle' : ['6', '7', '8'], # Oracle
+                       'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'] # SLES
     }
@@ -1324,7 +1324,7 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
 
     # On python 3, encode returns a byte object, so we must decode back to a string
     if sys.version_info >= (3,):
-        output = output.decode('utf-8')
+        output = output.decode('utf-8', 'ignore')
 
     return exit_code, output.strip()
 
