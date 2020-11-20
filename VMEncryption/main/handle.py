@@ -1744,7 +1744,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
             logger.log("mapper device not found for crypt_item {0}".format(crypt_item))
             if disk_util.is_luks_device(crypt_item.dev_path, crypt_item.luks_header_path):
                 logger.log("Found a luks device for this device item, yet couldn't open mapper: {0}".format(crypt_item))
-                logger.log("Failing".format(crypt_item))
+                logger.log("Failing")
                 return crypt_item
             else:
                 continue
@@ -1872,55 +1872,42 @@ def daemon_encrypt():
 
         os_encryption = None
 
-        if (((distro_name == 'redhat' and distro_version == '7.3') or
-             (distro_name == 'redhat' and distro_version == '7.4') or
-             (distro_name == 'redhat' and distro_version == '7.5') or
-             (distro_name == 'redhat' and distro_version == '7.6') or
-             (distro_name == 'redhat' and distro_version == '7.7') or
-             (distro_name == 'redhat' and distro_version == '7.8')) and
-           (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
-            from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
-            os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
-                                                            distro_patcher=DistroPatcher,
-                                                            logger=logger,
-                                                            encryption_environment=encryption_environment)
-        elif (((distro_name == 'centos' and distro_version == '7.3.1611') or
-               (distro_name == 'centos' and distro_version.startswith('7.4')) or
-               (distro_name == 'centos' and distro_version.startswith('7.5')) or
-               (distro_name == 'centos' and distro_version.startswith('7.6')) or
-               (distro_name == 'centos' and distro_version.startswith('7.7')) or
-               (distro_name == 'centos' and distro_version.startswith('7.8'))) and
-              (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
-            from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
-            os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
-                                                            distro_patcher=DistroPatcher,
-                                                            logger=logger,
-                                                            encryption_environment=encryption_environment)
+        if ((distro_name == 'redhat' and distro_version == '7.2') or
+            (distro_name == 'redhat' and distro_version == '7.3') or
+            (distro_name == 'redhat' and distro_version == '7.4') or
+            (distro_name == 'redhat' and distro_version == '7.5') or
+            (distro_name == 'redhat' and distro_version == '7.6') or
+            (distro_name == 'redhat' and distro_version == '7.7') or
+            (distro_name == 'redhat' and distro_version == '7.8') or
+            (distro_name == 'redhat' and distro_version == '7.9') or
+            (distro_name == 'centos' and distro_version.startswith('7.9')) or
+            (distro_name == 'centos' and distro_version.startswith('7.8')) or
+            (distro_name == 'centos' and distro_version.startswith('7.7')) or
+            (distro_name == 'centos' and distro_version.startswith('7.6')) or
+            (distro_name == 'centos' and distro_version.startswith('7.5')) or
+            (distro_name == 'centos' and distro_version.startswith('7.4')) or
+            (distro_name == 'centos' and distro_version == '7.3.1611') or
+                (distro_name == 'centos' and distro_version == '7.2.1511')):
+            if disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'):
+                from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
+                os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
+                                                                distro_patcher=DistroPatcher,
+                                                                logger=logger,
+                                                                encryption_environment=encryption_environment)
+            else:
+                from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
+                os_encryption = RHEL72EncryptionStateMachine(hutil=hutil,
+                                                             distro_patcher=DistroPatcher,
+                                                             logger=logger,
+                                                             encryption_environment=encryption_environment)
         elif ((distro_name == 'redhat' and distro_version.startswith('8.1')) or
               (distro_name == 'redhat' and distro_version.startswith('8.2')) or
-              (distro_name == 'centos' and distro_version.startswith('8.1')) or
-              (distro_name == 'centos' and distro_version.startswith('8.2'))):
+              (distro_name == 'redhat' and distro_version.startswith('8.3')) or
+              (distro_name == 'centos' and distro_version.startswith('8.3')) or
+              (distro_name == 'centos' and distro_version.startswith('8.2')) or
+              (distro_name == 'centos' and distro_version.startswith('8.1'))):
             from oscrypto.rhel_81 import RHEL81EncryptionStateMachine
             os_encryption = RHEL81EncryptionStateMachine(hutil=hutil,
-                                                         distro_patcher=DistroPatcher,
-                                                         logger=logger,
-                                                         encryption_environment=encryption_environment)
-        elif ((distro_name == 'redhat' and distro_version == '7.2') or
-              (distro_name == 'redhat' and distro_version == '7.3') or
-              (distro_name == 'redhat' and distro_version == '7.4') or
-              (distro_name == 'redhat' and distro_version == '7.5') or
-              (distro_name == 'redhat' and distro_version == '7.6') or
-              (distro_name == 'redhat' and distro_version == '7.7') or
-              (distro_name == 'redhat' and distro_version == '7.8') or
-              (distro_name == 'centos' and distro_version.startswith('7.8')) or
-              (distro_name == 'centos' and distro_version.startswith('7.7')) or
-              (distro_name == 'centos' and distro_version.startswith('7.6')) or
-              (distro_name == 'centos' and distro_version.startswith('7.5')) or
-              (distro_name == 'centos' and distro_version.startswith('7.4')) or
-              (distro_name == 'centos' and distro_version == '7.3.1611') or
-              (distro_name == 'centos' and distro_version == '7.2.1511')):
-            from oscrypto.rhel_72 import RHEL72EncryptionStateMachine
-            os_encryption = RHEL72EncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,
                                                          logger=logger,
                                                          encryption_environment=encryption_environment)

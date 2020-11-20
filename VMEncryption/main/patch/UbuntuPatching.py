@@ -19,20 +19,10 @@
 
 import os
 import sys
-import imp
-import base64
-import re
-import json
-import platform
-import shutil
-import time
-import traceback
-import datetime
-import subprocess
 
 from .AbstractPatching import AbstractPatching
-from Common import *
-from CommandExecutor import *
+from Common import CommonVariables
+from CommandExecutor import CommandExecutor
 
 
 class UbuntuPatching(AbstractPatching):
@@ -59,12 +49,12 @@ class UbuntuPatching(AbstractPatching):
 
     def install_cryptsetup(self):
         packages = ['cryptsetup-bin']
-        cmd = " ".join(['apt-get', 'install', '-y' , '--no-upgrade'] + packages)
+        cmd = " ".join(['apt-get', 'install', '-y', '--no-upgrade'] + packages)
         return_code = self.command_executor.Execute(cmd, timeout=30)
         if return_code == -9:
             msg = "Command: apt-get install timed out. Make sure apt-get is configured correctly and there are no network problems."
             raise Exception(msg)
-        
+
         # If install fails, try running apt-get update and then try install again
         if return_code != 0:
             self.logger.log('cryptsetup installation failed. Retrying installation after running update')
@@ -79,7 +69,6 @@ class UbuntuPatching(AbstractPatching):
                 msg = "Command: apt-get install timed out. Make sure apt-get is configured correctly and there are no network problems."
                 raise Exception(msg)
             return return_code
-
 
     def install_extras(self):
         cmd = " ".join(['apt-get', 'update'])
@@ -123,8 +112,9 @@ class UbuntuPatching(AbstractPatching):
 
                 if crypttab_parts[0] == 'osencrypt' and (crypttab_parts[1] == '/dev/sda1' or crypttab_parts[1].startswith(CommonVariables.disk_by_id_root)) and 'keyscript=/usr/sbin/azure_crypt_key.sh' in line:
                     self.logger.log("Found osencrypt entry to update.")
-                    if os.path.exists('/dev/disk/azure/root-part1'):
-                        filtered_crypttab_lines.append(CommonVariables.osencrypt_crypttab_line_ubuntu)
+                    stable_os_disk_path = self._get_stable_os_disk_path()
+                    if stable_os_disk_path is not None:
+                        filtered_crypttab_lines.append(CommonVariables.osencrypt_crypttab_line_ubuntu.format(stable_os_disk_path))
                         initramfs_repack_needed = True
                         continue
                     else:
@@ -139,3 +129,13 @@ class UbuntuPatching(AbstractPatching):
             self.logger.log("Successfully updated osencrypt entry.")
         else:
             self.logger.log('osencrypt entry not present or already updated or expected root partition link does not exists.')
+
+    def _get_stable_os_disk_path(self):
+        gen1_disk = os.path.join(CommonVariables.azure_symlinks_dir, "root-part1")
+        gen2_disk = os.path.join(CommonVariables.azure_symlinks_dir, "scsi0/lun0-part1")
+        if os.path.exists(gen1_disk):
+            return gen1_disk
+        elif os.path.exists(gen2_disk):
+            return gen2_disk
+        else:
+            return None

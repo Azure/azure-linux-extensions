@@ -709,6 +709,10 @@ class DiskUtil(object):
                     # if its not an integer, probably just best to skip it
                     continue
 
+                if controller_id == 0:
+                    # scsi0 is a Gen2 special controller which never has Data disks, so we skip it here
+                    continue
+
                 for symlink in os.listdir(top_level_item_full_path):
                     if symlink.startswith(self._LUN_PREFIX):
                         try:
@@ -1013,6 +1017,12 @@ class DiskUtil(object):
             current_blk_items = self.get_device_items("/dev/" + ide_device)
             for current_blk_item in current_blk_items:
                 blk_items.append(current_blk_item)
+
+        scsi0_devices = self.get_scsi0_device_names()
+        for scsi0_device in scsi0_devices:
+            current_blk_items = self.get_device_items(scsi0_device)
+            for current_blk_item in current_blk_items:
+                blk_items.append(current_blk_item)
         return blk_items
 
     def get_ide_devices(self):
@@ -1030,6 +1040,23 @@ class DiskUtil(object):
                                                                                                 device_sdx_path))
                 ide_devices.append(device_sdx_path)
         return ide_devices
+
+    def get_scsi0_device_names(self):
+        """
+        gen2 equivalent of get_ide_devices()
+        """
+        devices = []
+        azure_links_dir = CommonVariables.azure_symlinks_dir
+        scsi0_dir = os.path.join(azure_links_dir, self._SCSI_PREFIX + "0")
+
+        if not os.path.exists(scsi0_dir):
+            return devices
+
+        for symlink in os.listdir(scsi0_dir):
+            if symlink.startswith(self._LUN_PREFIX) and self._isnumeric(symlink[3:]):
+                devices.append(os.path.join(scsi0_dir, symlink))
+
+        return devices
 
     def find_block_sdx_path(self, vmbus):
         device = None
