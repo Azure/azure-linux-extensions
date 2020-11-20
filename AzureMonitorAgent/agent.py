@@ -886,7 +886,7 @@ def find_package_manager(operation):
     dist, ver = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles"])
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
