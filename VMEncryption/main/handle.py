@@ -1900,6 +1900,17 @@ def daemon_encrypt():
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
+        elif ((distro_name == 'redhat' and distro_version.startswith('8.1')) or
+              (distro_name == 'redhat' and distro_version.startswith('8.2')) or
+              (distro_name == 'redhat' and distro_version.startswith('8.3')) or
+              (distro_name == 'centos' and distro_version.startswith('8.3')) or
+              (distro_name == 'centos' and distro_version.startswith('8.2')) or
+              (distro_name == 'centos' and distro_version.startswith('8.1'))):
+            from oscrypto.rhel_81 import RHEL81EncryptionStateMachine
+            os_encryption = RHEL81EncryptionStateMachine(hutil=hutil,
+                                                         distro_patcher=DistroPatcher,
+                                                         logger=logger,
+                                                         encryption_environment=encryption_environment)
         elif distro_name == 'redhat' and distro_version == '6.8':
             from oscrypto.rhel_68 import RHEL68EncryptionStateMachine
             os_encryption = RHEL68EncryptionStateMachine(hutil=hutil,
