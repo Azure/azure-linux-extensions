@@ -36,7 +36,7 @@ class PatchBootSystemState(OSEncryptionState):
     def __init__(self, context):
         super(PatchBootSystemState, self).__init__('PatchBootSystemState', context)
         self.root_partuuid = self._get_root_partuuid()
-        self.context.logger.log("root_partuuid: " + self.root_partuuid)
+        self.context.logger.log("root_partuuid: " + str(self.root_partuuid))
 
     def should_enter(self):
         self.context.logger.log("Verifying if machine should enter patch_boot_system state")
