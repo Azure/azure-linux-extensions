@@ -355,13 +355,14 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agentconf += "  logfile_rotation_max_archives = 5\n"
     agentconf += "\n# Configuration for adding gloabl tags\n"
     agentconf += "[global_tags]\n"
-    agentconf += "  DeploymentId= \"${DeploymentId}\"\n"
+    if is_lad:
+        agentconf += "  DeploymentId= \"${DeploymentId}\"\n"
     agentconf += "  \"microsoft.subscriptionId\"= \"" + subscription_id + "\"\n"
     agentconf += "  \"microsoft.resourceGroupName\"= \"" + resource_group + "\"\n"
     agentconf += "  \"microsoft.regionName\"= \"" + region + "\"\n"
     agentconf += "  \"microsoft.resourceId\"= \"" + az_resource_id + "\"\n"
     if virtual_machine_name != "":
-        agentconf += "  \"virtualMachine\"= \"" + virtual_machine_name + "\"\n"
+        agentconf += "  \"VMInstanceId\"= \"" + virtual_machine_name + "\"\n"
     agentconf += "\n# Configuration for sending metrics to MetricsExtension\n"
     agentconf += "[[outputs.influxdb]]\n"
     agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
