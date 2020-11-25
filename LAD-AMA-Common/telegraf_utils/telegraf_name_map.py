@@ -60,8 +60,8 @@ name_map = {
 
 # VM Insights
 # "Network\ReadBytesPerSecond", "Network\WriteBytesPerSecond"
-"Network\\ReadBytesPerSecond" : {"plugin":"net_recv_vmi", "field":"Network/ReadBytesPerSecond", "op":"rate", "module":"network"},
-"Network\\WriteBytesPerSecond" : {"plugin":"net_sent_vmi", "field":"Network/WriteBytesPerSecond", "op":"rate", "module":"network"},
+"Network\\ReadBytesPerSecond" : {"plugin":"net_recv_vmi", "field":"Network\\ReadBytesPerSecond", "op":"rate", "module":"network"},
+"Network\\WriteBytesPerSecond" : {"plugin":"net_sent_vmi", "field":"Network\\WriteBytesPerSecond", "op":"rate", "module":"network"},
 
 "memory->memory available" : {"plugin":"mem", "field":"available", "ladtablekey":"/builtin/memory/availablememory"},
 "memory->mem. percent available" : {"plugin":"mem", "field":"available_percent", "ladtablekey":"/builtin/memory/percentavailablememory"},
