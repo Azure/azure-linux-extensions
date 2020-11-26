@@ -280,7 +280,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 aggregator_str += " "*2 + "namepass = [\"" + plugin + "_mdsd\"]\n"
                 aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
                 aggregator_str += " "*2 + "drop_original = true\n"
-                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\') + "]\n" #-2 to strip the last comma and space
                 aggregator_str += " "*2 + "stats = [" + ops + "]\n"
                 aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
 
