@@ -201,6 +201,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             rate_aggregate = False
             for field in telegraf_json[omiclass][plugin]:
                 fields += "\"" + field + "\", "
+                if is_vmi or is_vmi_rate_counter:
+                    fields += "\"" + field.replace('MB','Bytes') + "\", "
 
                 #Use the shortest interval time for the whole plugin
                 new_interval = telegraf_json[omiclass][plugin][field]["interval"]
@@ -280,7 +282,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 aggregator_str += " "*2 + "namepass = [\"" + plugin + "_mdsd\"]\n"
                 aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
                 aggregator_str += " "*2 + "drop_original = true\n"
-                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\') + "]\n" #-2 to strip the last comma and space
+                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\\\\\') + "]\n" #-2 to strip the last comma and space
                 aggregator_str += " "*2 + "stats = [" + ops + "]\n"
                 aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
 
