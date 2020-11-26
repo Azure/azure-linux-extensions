@@ -201,8 +201,9 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             rate_aggregate = False
             for field in telegraf_json[omiclass][plugin]:
                 fields += "\"" + field + "\", "
-                if is_vmi or is_vmi_rate_counter:
-                    fields += "\"" + field.replace('MB','Bytes') + "\", "
+                if is_vmi or is_vmi_rate_counter :
+                    if "MB" in field:
+                        fields += "\"" + field.replace('MB','Bytes') + "\", "
 
                 #Use the shortest interval time for the whole plugin
                 new_interval = telegraf_json[omiclass][plugin][field]["interval"]
