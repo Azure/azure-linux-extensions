@@ -157,6 +157,9 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 if not is_vmi_rate_counter:
                     is_vmi_rate_counter = telegraf_json[omiclass][plugin][field]["displayName"] in vmi_rate_counters_list
             
+            if is_vmi_rate_counter:
+                min_interval = "1s"
+                
             if is_vmi or is_vmi_rate_counter:
                 splitResult = plugin.split('_')
                 telegraf_plugin = splitResult[0]
