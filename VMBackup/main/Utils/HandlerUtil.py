@@ -554,6 +554,7 @@ class HandlerUtility:
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
+            os.chdir(cur_dir)
             waagent_version="Unknown"
             return waagent_version
 
