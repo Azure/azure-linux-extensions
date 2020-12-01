@@ -37,6 +37,7 @@ name_map = {
 "% Privileged Time" : {"plugin":"cpu", "field":"usage_system", "module":"processor"},
 
 # VM Insights
+# 8 slashes because this goes from JSON -> Python -> Telegraf config -> Go -> C++ and each level does an escape
 "Processor\\UtilizationPercentage" : {"plugin":"cpu_vmi", "field":"Processor\\\\\\\\UtilizationPercentage", "module":"processor"},
 "Computer\\Heartbeat" : {"plugin":"cpu_heartbeat_vmi", "field":"Computer\\\\\\\\Heartbeat", "module":"processor"},
 
@@ -60,6 +61,7 @@ name_map = {
 
 # VM Insights
 # "Network\ReadBytesPerSecond", "Network\WriteBytesPerSecond"
+# 8 slashes because this goes from JSON -> Python -> Telegraf config -> Go -> C++ and each level does an escape
 "Network\\ReadBytesPerSecond" : {"plugin":"net_recv_vmi", "field":"Network\\\\\\\\ReadBytesPerSecond", "op":"rate", "module":"network"},
 "Network\\WriteBytesPerSecond" : {"plugin":"net_sent_vmi", "field":"Network\\\\\\\\WriteBytesPerSecond", "op":"rate", "module":"network"},
 
@@ -92,6 +94,7 @@ name_map = {
 "Pages/sec" : {"plugin":"kernel_vmstat", "field":"total_pages", "op":"rate", "module":"memory"},
 
 # VM Insights
+# 8 slashes because this goes from JSON -> Python -> Telegraf config -> Go -> C++ and each level does an escape
 "Memory\\AvailableMB" : {"plugin":"mem_vmi", "field":"Memory\\\\\\\\AvailableMB", "module":"memory"},
 "Memory\\AvailablePercentage" : {"plugin":"mem_vmi", "field":"Memory\\\\\\\\AvailablePercentage", "module":"memory"},
 
@@ -124,6 +127,7 @@ name_map = {
 "Disk Writes/sec" : {"plugin":"diskio", "field":"writes", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 
 # VM Insights
+# 8 slashes because this goes from JSON -> Python -> Telegraf config -> Go -> C++ and each level does an escape
 "LogicalDisk\\FreeSpaceMB" : {"plugin":"disk_vmi", "field":"LogicalDisk\\\\\\\\FreeSpaceMB", "module":"filesystem"},
 "LogicalDisk\\FreeSpacePercentage" : {"plugin":"disk_vmi", "field":"LogicalDisk\\\\\\\\FreeSpacePercentage", "module":"filesystem"}, #Need to calculate percentage
 "LogicalDisk\\Status" : {"plugin":"disk_vmi", "field":"LogicalDisk\\\\\\\\Status", "module":"filesystem"}, #Need to calculate percentage
