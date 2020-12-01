@@ -16,12 +16,20 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+import sys
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+
 import json
 import os
 from telegraf_utils.telegraf_name_map import name_map
 import subprocess
 import signal
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from shutil import copyfile, rmtree
 import time
 import metrics_ext_utils.metrics_constants as metrics_constants
@@ -451,7 +459,7 @@ def is_running(is_lad):
 
     proc = subprocess.Popen(["ps  aux | grep telegraf | grep -v grep"], stdout=subprocess.PIPE, shell=True)
     output = proc.communicate()[0]
-    if telegraf_bin in output:
+    if telegraf_bin in output.decode('utf-8', 'ignore'):
         return True
     else:
         return False
@@ -494,7 +502,7 @@ def stop_telegraf_service(is_lad):
                 # Check if the process running is indeed telegraf, ignore if the process output doesn't contain telegraf
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
-                if telegraf_bin in output:
+                if telegraf_bin in output.decode('utf-8', 'ignore'):
                     os.kill(int(pid), signal.SIGKILL)
                 else:
                     return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)
@@ -665,9 +673,9 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     data = None
     while retries <= max_retries:
 
-        req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
-        res = urllib2.urlopen(req)
-        data = json.loads(res.read())
+        req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
+        res = urllib.request.urlopen(req)
+        data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "compute" not in data:
             retries += 1
