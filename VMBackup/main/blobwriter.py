@@ -25,6 +25,7 @@ except ImportError:
     import urllib.parse as urlparse
 from common import CommonVariables
 from HttpUtil import HttpUtil
+from Utils import HandlerUtil
 
 class BlobProperties():
     def __init__(self, blobType, contentLength):
@@ -74,10 +75,13 @@ class BlobWriter(object):
                         retry_times = 0
                     else:
                         self.hutil.log("blob failed to write")
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                 else:
                     self.hutil.log("bloburi is None")
                     retry_times = 0
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
             except Exception as e:
+                HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                 self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
             self.hutil.log("retry times is " + str(retry_times))
             retry_times = retry_times - 1
@@ -147,7 +151,9 @@ class BlobWriter(object):
                         retry_times = 0
                     else:
                         self.hutil.log("WritePageBlob: page-blob failed to write")
+                        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                 except Exception as e:
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                     self.hutil.log("WritePageBlob: Failed to write to page-blob with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
                 self.hutil.log("WritePageBlob: retry times is " + str(retry_times))
                 retry_times = retry_times - 1

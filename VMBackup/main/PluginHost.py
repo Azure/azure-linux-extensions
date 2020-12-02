@@ -2,6 +2,7 @@ import time
 import sys
 import os
 import threading
+import platform
 try:
     import ConfigParser as ConfigParsers
 except ImportError:
@@ -71,12 +72,17 @@ class PluginHost(object):
         self.preScriptResult = []
         self.postScriptCompleted = []
         self.postScriptResult = []
+        self.pollTime = 3
 
     def pre_check(self):
         self.logger.log('Loading script modules now...',True,'Info')
         errorCode = CommonVariables.PrePost_PluginStatus_Success
         dobackup = True
         fsFreeze_on = True
+
+        # NS-BSD is already hardened, no checks and no freeze
+        if 'NS-BSD' in platform.system():
+            return errorCode, dobackup, False
 
         if not os.path.isfile(self.configLocation):
             self.logger.log('Plugin host Config file does not exist in the location ' + self.configLocation, True)
@@ -144,7 +150,8 @@ class PluginHost(object):
                     plugin = __import__(pname)
 
                     self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath,maxTimeOut=self.timeoutInSeconds))
-                    errorCode,dobackup,fsFreeze_on = self.plugins[self.noOfPlugins].validate_scripts()
+                    errorCode,dobackup,fsFreeze_on, self.pollTime = self.plugins[self.noOfPlugins].validate_scripts()
+                    self.logger.log('Validate Scripts output: errorCode - {0} dobackup - {1} fsFreeze_on - {2} pollTime - {3}'.format(errorCode, dobackup, fsFreeze_on, self.pollTime), True)
                     self.noOfPlugins = self.noOfPlugins + 1
                     self.pluginName.append(pname)
                     self.preScriptCompleted.append(False)
@@ -178,7 +185,7 @@ class PluginHost(object):
         permissions = '777'
         try:
             permissions = oct(os.stat(filename)[ST_MODE])[-3:]
-            self.logger.log('Permisisons  of the file ' + filename + ' are ' + permissions,True)
+            self.logger.log('Permissions of the file ' + filename + ' are ' + permissions,True)
         except Exception as err:
             errMsg = 'Error in fetching permissions of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
@@ -199,8 +206,8 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,((self.timeoutInSeconds)/5)+2): #waiting 10 more seconds to escape race condition between Host and script timing out
-            time.sleep(5)
+        for i in range(0, int(self.timeoutInSeconds/self.pollTime) + 2): #waiting 10 more seconds to escape race condition between Host and script timing out
+            time.sleep(self.pollTime)
             flag = True
             for j in range(0,self.noOfPlugins):
                 flag = flag & self.preScriptCompleted[j]
@@ -246,8 +253,8 @@ class PluginHost(object):
             curr = curr + 1
 
         flag = True
-        for i in range(0,((self.timeoutInSeconds)/5)+2): #waiting 10 more seconds to escape race condition between Host and script timing out
-            time.sleep(5)
+        for i in range(0, int(self.timeoutInSeconds/self.pollTime) + 2): #waiting 10 more seconds to escape race condition between Host and script timing out
+            time.sleep(self.pollTime)
             flag = True
             for j in range(0,self.noOfPlugins):
                 flag = flag & self.postScriptCompleted[j]

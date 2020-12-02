@@ -2,11 +2,11 @@
   {
     "version": 1.0,
     "handlerManifest": {
-      "disableCommand": "./vmaccess.py -disable",
-      "enableCommand": "./vmaccess.py -enable",
-      "installCommand": "./vmaccess.py -install",
-      "uninstallCommand": "./vmaccess.py -uninstall",
-      "updateCommand": "./vmaccess.py -update",
+      "disableCommand": "extension_shim.sh -c ./vmaccess.py -d",
+      "enableCommand": "extension_shim.sh -c ./vmaccess.py  -e",
+      "installCommand": "extension_shim.sh -c ./vmaccess.py  -i",
+      "uninstallCommand": "extension_shim.sh -c ./vmaccess.py -u",
+      "updateCommand": "extension_shim.sh -c ./vmaccess.py -p",
       "rebootAfterInstall": false,
       "reportHeartbeat": false
     }

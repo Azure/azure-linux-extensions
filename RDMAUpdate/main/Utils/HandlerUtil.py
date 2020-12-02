@@ -252,7 +252,7 @@ class HandlerUtility:
 
     def exit_if_seq_smaller(self):
         if(self.is_seq_smaller()):
-            self.log("Current sequence number, " + self._context._seq_no + ", is not greater than the sequnce number of the most recent executed configuration. Exiting...")
+            self.log("Current sequence number, " + self._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Exiting...")
             sys.exit(0)
         self.save_seq()
 

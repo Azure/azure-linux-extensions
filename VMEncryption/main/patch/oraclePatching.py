@@ -74,6 +74,9 @@ class oraclePatching(redhatPatching):
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/usr/bin/umount'
 
+    def install_adal(self):
+        pass
+
     def install_extras(self):
         common_extras = ['cryptsetup','lsscsi']
         for extra in common_extras:

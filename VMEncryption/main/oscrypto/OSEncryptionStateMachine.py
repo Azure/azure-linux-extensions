@@ -93,3 +93,6 @@ class OSEncryptionStateMachine(object):
     def start_encryption(self):
         self.skip_encryption()
         self.log_machine_state()
+
+    def _reboot(self):
+        self.command_executor.Execute('reboot')

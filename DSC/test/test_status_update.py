@@ -68,15 +68,21 @@ class TestStatusUpdate(unittest.TestCase):
         status_file = 'status/0.status'
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = MockUtil(self)
-        dsc.update_statusfile(status_file, '123','345')
+
+        class cresponse: deserialized_data= { "AccountName" : "test", "ResourceGroupName" : "rgName", "SubscriptionId" : "testsubid" }
+
+        dsc.update_statusfile(status_file, '123','345', cresponse)
         self.verify_nodeid_vmuuid(status_file)
         
     def test_is_statusfile_update_idempotent(self):
         status_file = 'status/0.status'
         dsc.distro_category = dsc.get_distro_category()
         dsc.hutil = MockUtil(self)
-        dsc.update_statusfile(status_file, '123','345')
-        dsc.update_statusfile(status_file, '123','345')
+
+        class cresponse: deserialized_data= { "AccountName" : "test", "ResourceGroupName" : "rgName", "SubscriptionId" : "testsubid" }
+
+        dsc.update_statusfile(status_file, '123','345', cresponse)
+        dsc.update_statusfile(status_file, '123','345', cresponse)
         self.verify_nodeid_vmuuid(status_file)
 
     def test_is_statusfile_update_register(self):
