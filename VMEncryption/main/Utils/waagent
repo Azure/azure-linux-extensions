@@ -2389,6 +2389,98 @@ class FreeBSDDistro(AbstractDistro):
 
 
 ############################################################
+#   marinerDistro
+############################################################    
+mariner_systemd_service = """\
+[Unit]
+Description=Azure Linux Agent
+After=network.target
+After=sshd.service
+ConditionFileIsExecutable=/usr/sbin/waagent
+ConditionPathExists=/etc/waagent.conf
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/waagent -daemon
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+class marinerDistro(AbstractDistro):
+    """
+    Mariner Distro concrete class
+    Put Mariner specific behavior here...
+    """
+
+    def __init__(self):
+        super(marinerDistro, self).__init__()
+        self.agent_service_name = 'waagent'
+        self.service_cmd = '/usr/bin/systemctl'
+        self.requiredDeps += ["dhcp-client"]
+        self.init_script_file = '/usr/lib/systemd/system/' + self.agent_service_name + '.service'
+        self.init_file = mariner_systemd_service
+        self.grubKernelBootOptionsFile = '/etc/default/grub'
+        self.grubKernelBootOptionsLine = 'GRUB_CMDLINE_LINUX='
+    
+    def installAgentServiceScriptFiles(self):
+        SetFileContents(self.init_script_file, self.init_file)
+        os.chmod(self.init_script_file, 0o644)
+        return Run(self.service_cmd + ' daemon-reload')
+    
+        def registerAgentService(self):
+        self.installAgentServiceScriptFiles()
+        return Run(self.service_cmd + ' enable ' + self.agent_service_name)
+
+    def uninstallAgentService(self):
+        """
+        Call service subsystem to remove waagent script.
+        """
+        return Run(self.service_cmd + ' disable ' + self.agent_service_name)
+
+    def unregisterAgentService(self):
+        """
+        Calls self.stopAgentService and call self.uninstallAgentService()
+        """
+        self.stopAgentService()
+        self.uninstallAgentService()
+    
+    def startAgentService(self):
+        """
+        Service call to start the Agent service
+        """
+        return Run(self.service_cmd + ' start ' + self.agent_service_name)
+
+    def stopAgentService(self):
+        """
+        Service call to stop the Agent service
+        """
+        return Run(self.service_cmd + ' stop ' + self.agent_service_name, False)
+
+    def restartSshService(self):
+        """
+        Service call to re(start) the SSH service
+        """
+        sshRestartCmd = self.service_cmd + " " + self.ssh_service_restart_option + " " + self.ssh_service_name
+        retcode = Run(sshRestartCmd)
+        if retcode > 0:
+            Error("Failed to restart SSH service with return code:" + str(retcode))
+        return retcode
+
+    def checkPackageInstalled(self, p):
+        if Run("tdnf list installed " + p, chk_err=False):
+            return 0
+        else:
+            return 1
+    
+    def checkPackageUpdateable(self, p):
+        if Run("tdnf check-update | grep " + p, chk_err=False):
+            return 1
+        else:
+            return 0
+
+
+############################################################
 # END DISTRO CLASS DEFS
 ############################################################  
 

@@ -1935,6 +1935,12 @@ def daemon_encrypt():
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
+        elif distro_name == 'Mariner' and distro_version == '1.0':
+            from oscrypto.mariner_10 import Mariner10EncryptionStateMachine
+            os_encryption = Mariner10EncryptionStateMachine(hutil=hutil,
+                                                            distro_patcher=DistroPatcher,
+                                                            logger=logger,
+                                                            encryption_environment=encryption_environment)
         else:
             message = "OS volume encryption is not supported on {0} {1}".format(distro_name,
                                                                                 distro_version)
