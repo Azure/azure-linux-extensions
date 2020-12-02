@@ -129,14 +129,29 @@ private:
     std::string _taskName;
 };
 
-
-struct ResetBlockListOwner
+// Used to synchronize access to a BlockList. A std::shared_ptr<BlockListOwner> should stay alive
+// while exclusive access to the BlockList is needed across tasks/threads. The wrapping 
+// std::shared_ptr<BlockListOwner> will provide copy counting, and will only deconstruct
+// the BlockListOwner when the last instance of the wrapping std::shared_ptr<BlockListOwner> is 
+// deconstructed.
+struct BlockListOwner
 {
     std::shared_ptr<BlockListT> _blockList;
-    ResetBlockListOwner(std::shared_ptr<BlockListT> blockList) : _blockList(blockList) {}
-    ~ResetBlockListOwner()
+    const std::string _ownerName;
+    const std::string _requestId;
+
+    BlockListOwner(std::shared_ptr<BlockListT> blockList, const std::string& ownerName, const std::string& requestId) : 
+        _blockList(blockList), _ownerName(ownerName), _requestId(requestId)
     {
-        Trace trace(Trace::JsonBlob, "ResetBlockListOwner::~ResetBlockListOwner");
+        Trace trace(Trace::JsonBlob, "BlockListOwner::BlockListOwner");
+        TRACEINFO(trace, "Attempting to set block list owner for " << _requestId << " to " << _ownerName);
+        _blockList->LockIfOwnedByNoneThenSetOwner(_ownerName);
+        TRACEINFO(trace, "Set block list owner for " << _requestId << " to " << _ownerName);
+    }
+    ~BlockListOwner()
+    {
+        Trace trace(Trace::JsonBlob, "BlockListOwner::~BlockListOwner");
+        TRACEINFO(trace, "Resetting block list owner for " << _requestId << " (currently " << _ownerName << ")");
         _blockList->ResetOwnerAndNotify();
     }
 };
@@ -177,10 +192,9 @@ XJsonBlobRequest::Send(
 	            .get_block_blob_reference(req->_blobName);
 
         // Start only when the mutex is not owned by any other request.
-        // Owner name really doesn't matter as long as it's non-empty.
-        TRACEINFO(trace, "Before LockIfOwnedByNoneThenSetOwner (with owner=\"" << req->_blobName << "\")");
-        std::unique_lock<std::mutex> lock(req->_blockList->LockIfOwnedByNoneThenSetOwner(req->_blobName));
-        TRACEINFO(trace, "After LockIfOwnedByNoneThenSetOwner");
+        // Owner name really doesn't matter as long as it's non-empty. 
+        // requestId is only for logging.
+        auto blockListOwner = std::make_shared<BlockListOwner>(req->_blockList, req->_blobName, req->_requestId);
 
         XJsonBlobRequest::UploadNewBlockAsync(req)
         .then([req]() -> pplx::task<void>
@@ -196,19 +210,20 @@ XJsonBlobRequest::Send(
 
             return XJsonBlobBlockCountsMgr::GetInstance().WriteBlockCountAsync(req->_containerName, req->_blobName, req->_blockList->get().size());
         })
-        .then([req](pplx::task<void> prev_task)
+        // Copy capture the BlockListOwner so that it stays alive through this
+        // continuation task.
+        .then([req, blockListOwner](pplx::task<void> prev_task)
         {
             // This is a task-based continuation, so this task will be executed
             // even if any previous task throws.
 
             Trace trace(Trace::JsonBlob, "XJBR::Send final continuation task, req id=" + req->_requestId);
 
-            ResetBlockListOwner resetBlockListOwner(req->_blockList); // Destructor will reset BL owner
-
             try {
                 // Wait, to handle prev async task exceptions right away
                 prev_task.wait();
 
+                // There were no exceptions if we reached this point.
                 if (trace.IsActive()) {
                     TRACEINFO(trace, "Added new block to blob [" << req->_blobName << "]. Now there are "
                             << req->_blockList->get().size() << " blocks in the blob.");
@@ -231,6 +246,9 @@ XJsonBlobRequest::Send(
 	}
 	catch (const std::exception& e) {
 	    Logger::LogError(std::string("Exception generated while starting async blob write: ").append(e.what()));
+	}
+	catch (...) {
+	    Logger::LogError("Unknown exception generated while starting async blob write");
 	}
 }
 
@@ -366,16 +384,15 @@ XJsonBlobRequest::ReconstructBlockListIfNeeded(std::shared_ptr<XJsonBlobRequest>
 
     // Start only when the mutex is not owned by any other request.
     // Owner name really doesn't matter as long as it's non-empty.
-    TRACEINFO(trace, "Before LockIfOwnedByNoneThenSetOwner (with owner=\"" << req->_requestId << "\")");
-    std::unique_lock<std::mutex> lock(req->_blockList->LockIfOwnedByNoneThenSetOwner(req->_requestId));
-    TRACEINFO(trace, "After LockIfOwnedByNoneThenSetOwner");
+    auto blockListOwner = std::make_shared<BlockListOwner>(req->_blockList, req->_blobName, req->_requestId);
 
+    // Copy capture the BlockListOwner so that it stays alive through the
+    // continuation task.
     XJsonBlobBlockCountsMgr::GetInstance().ReadBlockCountAsync(req->_containerName, req->_blobName)
-    .then([req](pplx::task<size_t> prev_task)
+    .then([req, blockListOwner](pplx::task<size_t> prev_task)
     {
         Trace trace(Trace::JsonBlob, "XJBR::ReconstructBlockListIfNeeded continuation");
-
-        ResetBlockListOwner resetBlockListOwner(req->_blockList); // Destructor will reset BL owner
+        TRACEINFO(trace, "In XJBR::ReconstructBlockListIfNeeded continuation.");
 
         try {
             auto blockCount = prev_task.get();
@@ -415,6 +432,7 @@ XJsonBlobRequest::ReconstructBlockListIfNeeded(std::shared_ptr<XJsonBlobRequest>
                     "Block list can't be reconstructed");
         }
     });
+    TRACEINFO(trace, "After ReadBlockCountAsync.");
 }
 
 

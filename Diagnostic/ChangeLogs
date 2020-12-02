@@ -1,3 +1,6 @@
+2020-11-06: LAD-3.0.131
+    - Fix issue #1262: Crashing bug caused by task synchronization issue in XJsonBlobRequest
+
 2020-07-01: LAD-3.0.129
     - Fix issue #499 : Need a better error message if LAD protectedSettings is missing
     - Fix issue #944 : Allow installing LAD without storage account sink
