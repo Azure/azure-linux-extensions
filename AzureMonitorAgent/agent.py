@@ -283,6 +283,7 @@ def install():
     # Decide the mode
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         hutil_log_info("Detecting Auto-Config mode.")
+        default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = "AuthMSIToken"
         return 0, ""
     elif protected_settings is None or len(protected_settings) == 0:
         default_configs["ENABLE_MCS"] = "true"
