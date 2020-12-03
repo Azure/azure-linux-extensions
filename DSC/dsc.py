@@ -146,7 +146,7 @@ def check_supported_OS():
                        'red hat' : ['6', '7'], # Redhat
                        'debian' : ['8'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'oracle' : ['6', '7'] # Oracle
+                       'oracle' : ['6', '7'], # Oracle
                        'suse' : ['11', '12'], #SLES
                        'opensuse' : ['13', '42.3'] #OpenSuse
     }
