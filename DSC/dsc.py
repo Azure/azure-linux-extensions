@@ -206,10 +206,10 @@ def install():
         hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception as e:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
-                                  message="failed to install an extension with error: {0} and stacktrace: {1}".format(
+                                  message="failed to install DSC extension with error: {0} and stacktrace: {1}".format(
                                       str(e), traceback.format_exc()))
         hutil.error(
-            "Failed to install the extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            "Failed to install DSC extension with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Install', 'error', '1', 'Install Failed.')
 
 
@@ -308,7 +308,7 @@ def send_heart_beat_msg_to_agent_service(status_event_type):
         while retry_count <= 5 and canRetry:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                                       message="In send_heart_beat_msg_to_agent_service method")
-            code, output = run_cmd("python /opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py")
+            code, output, stderr = run_cmd("python /opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py")
             if code == 0 and "RefreshMode=Pull" in output:
                 waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                                           message="sends heartbeat message in pullmode")
@@ -443,12 +443,30 @@ def update():
 
 
 def run_cmd(cmd):
-    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    proc.wait()
-    output = proc.stdout.read()
-    code = proc.returncode
-    return code, output
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, close_fds=True)
+    exit_code = proc.wait()
+    stdout, stderr = proc.communicate()
+    return exit_code, stdout, stderr
 
+def run_dpkg_cmd_with_retry(cmd):
+    """
+    Attempts to run the cmd - if it fails, checks to see if dpkg is locked by another
+    process, if so, it will sleep for 5 seconds and then try running the command again.
+    If dpkg is still locked, then it will return the DPKGLockedErrorCode which won't
+    count against our SLA numbers.
+    """
+    exit_code, output, stderr = run_cmd(cmd)
+    if not exit_code == 0:
+        dpkg_locked = is_dpkg_locked(exit_code, stderr)
+        if dpkg_locked:
+            # Try one more time:
+            time.sleep(5)
+            exit_code, output, stderr = run_cmd(cmd)
+            dpkg_locked = is_dpkg_locked(exit_code, stderr)
+            if dpkg_locked:
+                exit_code = DPKGLockedErrorCode
+
+    return exit_code, output, stderr
 
 def get_config(key):
     if key in public_settings:
@@ -502,15 +520,15 @@ def deb_remove_old_oms_package(package_name, version):
 
 
 def deb_get_pkg_version(package_name):
-    code, output = run_cmd('dpkg -s ' + package_name + ' | grep Version:')
+    code, output, stderr = run_dpkg_cmd_with_retry('dpkg -s ' + package_name + ' | grep Version:')
     if code == 0:
-        code, output = run_cmd("dpkg -s " + package_name + " | grep Version: | awk '{print $2}'")
+        code, output, stderr = run_dpkg_cmd_with_retry("dpkg -s " + package_name + " | grep Version: | awk '{print $2}'")
         if code == 0:
             return output
 
 
 def rpm_remove_incomptible_dsc_package():
-    code, version = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" dsc')
+    code, version, stderr = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" dsc')
     if code == 0 and is_incomptible_dsc_package(version):
         rpm_uninstall_package('dsc')
 
@@ -521,7 +539,7 @@ def rpm_remove_old_oms_package(package_name, version):
 
 
 def rpm_check_old_oms_package(package_name, version):
-    code, output = run_cmd('rpm -q ' + package_name)
+    code, output, stderr = run_cmd('rpm -q ' + package_name)
     if code == 0 and is_old_oms_server(package_name):
         return True
     return False
@@ -559,7 +577,7 @@ def compare_pkg_version(system_package_version, major_version, minor_version, bu
 
 
 def rpm_check_pkg_exists(package_name, major_version, minor_version, build, release):
-    code, output = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" ' + package_name)
+    code, output, stderr = run_cmd('rpm -q --queryformat "%{VERSION}.%{RELEASE}" ' + package_name)
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                               message="package name: " + package_name + ";  existing package version:" + output)
     hutil.log("package name: " + package_name + ";  existing package version:" + output)
@@ -572,13 +590,13 @@ def rpm_install_pkg(package_path, package_name, major_version, minor_version, bu
         # package is already installed
         return
     else:
-        code, output = run_cmd('rpm -Uvh ' + package_path)
+        code, output, stderr = run_cmd('rpm -Uvh ' + package_path)
         if code == 0:
             hutil.log(package_name + ' is installed successfully')
         else:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                       message="Failed to install RPM package :" + package_path)
-            raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
+             raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package_name, output, stderr))
 
 
 def deb_install_pkg(package_path, package_name, major_version, minor_version, build, release, install_options):
@@ -591,14 +609,16 @@ def deb_install_pkg(package_path, package_name, major_version, minor_version, bu
         return
     else:
         cmd = 'dpkg -i ' + install_options + ' ' + package_path
-        code, output = run_cmd(cmd)
+        code, output, stderr = run_dpkg_cmd_with_retry(cmd)
         if code == 0:
             hutil.log(package_name + ' version ' + str(major_version) + '.' + str(minor_version) + '.' + str(
                 build) + '.' + str(release) + ' is installed successfully')
+        elif code == DPKGLockedErrorCode:
+            hutil.do_exit(DPKGLockedErrorCode, 'Install', 'error', str(DPKGLockedErrorCode), 'Install failed because the package manager on the VM is currently locked. Please try installing again.')
         else:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=False,
                                       message="Failed to install debian package :" + package_path)
-            raise Exception('Failed to install package {0}: {1}'.format(package_name, output))
+            raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package_name, output, stderr))
 
 
 def install_package(package):
@@ -612,35 +632,35 @@ def install_package(package):
 
 def zypper_package_install(package):
     hutil.log('zypper --non-interactive in ' + package)
-    code, output = run_cmd('zypper --non-interactive in ' + package)
+    code, output, stderr = run_cmd('zypper --non-interactive in ' + package)
     if code == 0:
         hutil.log('Package ' + package + ' is installed successfully')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="Failed to install zypper package :" + package)
-        raise Exception('Failed to install package {0}: {1}'.format(package, output))
+         raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
 
 
 def yum_package_install(package):
     hutil.log('yum install -y ' + package)
-    code, output = run_cmd('yum install -y ' + package)
+    code, output, stderr = run_cmd('yum install -y ' + package)
     if code == 0:
         hutil.log('Package ' + package + ' is installed successfully')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="Failed to install yum package :" + package)
-        raise Exception('Failed to install package {0}: {1}'.format(package, output))
+        raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
 
 
 def apt_package_install(package):
     hutil.log('apt-get install -y --force-yes ' + package)
-    code, output = run_cmd('apt-get install -y --force-yes ' + package)
+    code, output, stderr = run_cmd('apt-get install -y --force-yes ' + package)
     if code == 0:
         hutil.log('Package ' + package + ' is installed successfully')
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="Failed to install apt package :" + package)
-        raise Exception('Failed to install package {0}: {1}'.format(package, output))
+        raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
 
 
 def get_openssl_version():
@@ -662,7 +682,7 @@ def get_openssl_version():
 
 def start_omiservice():
     run_cmd('/opt/omi/bin/service_control start')
-    code, output = run_cmd('service omid status')
+    code, output, stderr =run_cmd('service omid status')
     if code == 0:
         hutil.log('Service omid is started')
     else:
@@ -815,9 +835,9 @@ def apply_dsc_configuration(config_file_path):
     cmd = '/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path
     waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True,
                               message='running the cmd: ' + cmd)
-    code, output = run_cmd(cmd)
+    code, output, stderr = run_cmd(cmd)
     if code == 0:
-        code, output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
+        code, output, stderr = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
         return output
     else:
         error_msg = 'Failed to apply MOF configuration: stdout: {0}, stderr: {1}'.format(output, stderr)
@@ -830,9 +850,9 @@ def apply_dsc_meta_configuration(config_file_path):
     cmd = '/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path
     waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True,
                               message='running the cmd: ' + cmd)
-    code, output = run_cmd(cmd)
+    code, output, stderr = run_cmd(cmd)
     if code == 0:
-        code, output = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
+        code, output, stderr = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
         return output
     else:
         error_msg = 'Failed to apply Meta MOF configuration: stdout: {0}, stderr: {1}'.format(output, stderr)
@@ -966,7 +986,7 @@ def check_dsc_configuration(current_config):
 def install_module(file_path):
     install_package('unzip')
     cmd = '/opt/microsoft/dsc/Scripts/InstallModule.py ' + file_path
-    code, output = run_cmd(cmd)
+    code, output, stderr = run_cmd(cmd)
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op="InstallModuleInProgress",
                               isSuccess=True,
@@ -988,7 +1008,7 @@ def install_module(file_path):
 def remove_module():
     module_name = get_config('ResourceName')
     cmd = '/opt/microsoft/dsc/Scripts/RemoveModule.py ' + module_name
-    code, output = run_cmd(cmd)
+    code, output, stderr = run_cmd(cmd)
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op="RemoveModuleInProgress",
                               isSuccess=True,
@@ -1018,7 +1038,7 @@ def uninstall_package(package_name):
 
 def deb_uninstall_package(package_name):
     cmd = 'dpkg -P ' + package_name
-    code, output = run_cmd(cmd)
+    code, output, stderr = run_dpkg_cmd_with_retry(cmd)
     if code == 0:
         hutil.log('Package ' + package_name + ' was removed successfully')
     elif code == DPKGLockedErrorCode:
@@ -1031,7 +1051,7 @@ def deb_uninstall_package(package_name):
 
 def rpm_uninstall_package(package_name):
     cmd = 'rpm -e ' + package_name
-    code, output = run_cmd(cmd)
+    code, output, stderr = run_cmd(cmd)
     if code == 0:
         hutil.log('Package ' + package_name + ' was removed successfully')
     else:
@@ -1080,7 +1100,7 @@ def register_automation(registration_key, registation_url, node_configuration_na
                               op="RegisterInProgress",
                               isSuccess=True,
                               message="Registration URL " + registation_url + "Optional parameters to Registration" + optional_parameters)
-    code, output = run_cmd(cmd + optional_parameters)
+    code, output, stderr = run_cmd(cmd + optional_parameters)
     if not code == 0:
         error_msg = '(03109)Failed to register with Azure Automation DSC: stdout: {0}, stderr: {1}'.format(output, stderr)
         hutil.error(error_msg)
