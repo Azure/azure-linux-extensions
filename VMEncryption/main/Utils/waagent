@@ -2428,7 +2428,7 @@ class marinerDistro(AbstractDistro):
         os.chmod(self.init_script_file, 0o644)
         return Run(self.service_cmd + ' daemon-reload')
     
-        def registerAgentService(self):
+    def registerAgentService(self):
         self.installAgentServiceScriptFiles()
         return Run(self.service_cmd + ' enable ' + self.agent_service_name)
 
