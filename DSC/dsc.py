@@ -56,7 +56,7 @@ dsc_release = 926
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.71.0.0"
+extension_handler_version = "2.71.1.0"
 
 # Error codes
 UnsupportedDistro = 51 #excludes from SLA
@@ -146,6 +146,7 @@ def check_supported_OS():
                        'red hat' : ['6', '7'], # Redhat
                        'debian' : ['8'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
+                       'oracle' : ['6', '7'], # Oracle
                        'suse' : ['11', '12'], #SLES
                        'opensuse' : ['13', '42.3'] #OpenSuse
     }
