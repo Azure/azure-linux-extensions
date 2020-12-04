@@ -23,13 +23,9 @@ import sys
 import traceback
 
 from Common import CommonVariables
-try:
-    from configparser import ConfigParser #python3+
-except ImportError:
-    import ConfigParser #python2
-
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
+
 
 class EncryptionConfig(object):
     def __init__(self, encryption_environment, logger):
@@ -83,7 +79,7 @@ class EncryptionConfig(object):
         u_vol_val = self.get_cfg_val(self.volume_type)
         u_seq_key = CommonVariables.SecretSeqNum
         u_seq_val = self.get_cfg_val(self.secret_seq_num)
-        
+
         # construct kvp collection
         command = ConfigKeyValuePair(u_pfn_key, u_pfn_val)
         key_value_pairs.append(command)
@@ -103,7 +99,7 @@ class EncryptionConfig(object):
                 new_name = "{0}_{1}".format(self.encryption_environment.encryption_config_file_path, time_stamp)
                 os.rename(self.encryption_environment.encryption_config_file_path, new_name)
             else:
-                self.logger.log(msg=("the config file not exist: {0}".format(self.encryption_environment.encryption_config_file_path)), level = CommonVariables.WarningLevel)
+                self.logger.log(msg=("the config file not exist: {0}".format(self.encryption_environment.encryption_config_file_path)), level=CommonVariables.WarningLevel)
             if clear_parameter_file:
                 if os.path.exists(self.encryption_environment.extension_parameter_file_path):
                     self.logger.log(msg="archiving the encryption parameter file: {0}".format(self.encryption_environment.extension_parameter_file_path))
@@ -111,8 +107,8 @@ class EncryptionConfig(object):
                     new_name = "{0}_{1}".format(self.encryption_environment.extension_parameter_file_path, time_stamp)
                     os.rename(self.encryption_environment.extension_parameter_file_path, new_name)
                 else:
-                    self.logger.log(msg=("the parameter file not exist: {0}".format(self.encryption_environment.extension_parameter_file_path)), level = CommonVariables.InfoLevel)
+                    self.logger.log(msg=("the parameter file not exist: {0}".format(self.encryption_environment.extension_parameter_file_path)), level=CommonVariables.InfoLevel)
             return True
         except OSError as e:
-            self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(printable(e),traceback.format_exc()))
+            self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(printable(e), traceback.format_exc()))
             return False

@@ -143,7 +143,11 @@ class EncryptionSettingsUtil(object):
 
         self.logger.log("device items which will be used to find vhds to stamp: {0}".format(all_dev_items_real_paths))
 
-        root_device_path = os.path.realpath(os.path.join(CommonVariables.azure_symlinks_dir, "root"))
+        root_device_path = os.path.join(CommonVariables.azure_symlinks_dir, "root")
+        if os.path.exists(root_device_path):
+            root_device_path = os.path.realpath(root_device_path)
+        else:
+            root_device_path = os.path.realpath(os.path.join(CommonVariables.azure_symlinks_dir, "scsi0/lun0"))
         root_vhd_needs_stamping = disk_util.is_parent_of_any(root_device_path, all_dev_items_real_paths)
 
         # Get disk data from disk_util

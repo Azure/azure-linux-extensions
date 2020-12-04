@@ -12,9 +12,10 @@ from .test_utils import mock_dir_structure, MockDistroPatcher
 from .console_logger import ConsoleLogger
 from .test_utils import mock_dir_structure, MockDistroPatcher
 try:
-    import unittest.mock as mock # python 3+
+    import unittest.mock as mock  # python 3+
 except ImportError:
-    import mock # python2
+    import mock  # python2
+
 
 class Test_Disk_Util(unittest.TestCase):
     def setUp(self):
@@ -33,11 +34,41 @@ class Test_Disk_Util(unittest.TestCase):
     @mock.patch("os.path.isdir")
     @mock.patch("os.listdir")
     @mock.patch("os.path.exists")
+    def test_get_scsi0_device_names(self, exists_mock, listdir_mock, isdir_mock):
+        artifical_dir_structure = {
+            "/dev/disk/azure": ["root", "root-part1", "root-part2", "scsi1", "scsi0"],
+            os.path.join("/dev/disk/azure", "scsi1"): ["lun0", "lun0-part1", "lun0-part2", "lun1-part1", "lun1"],  # These devices should get ignored for this method
+            os.path.join("/dev/disk/azure", "scsi0"): ["lun0", "lun0-part1", "lun0-part2", "lun1-part1", "lun1", "lun2", "lun2-par1"]
+            }
+
+        mock_dir_structure(artifical_dir_structure, isdir_mock, listdir_mock, exists_mock)
+        scsi0_path = os.path.join("/dev/disk/azure", "scsi0")
+
+        device_names_actual = self.disk_util.get_scsi0_device_names()
+        device_names_expected = [
+            os.path.join(scsi0_path, "lun0"),
+            os.path.join(scsi0_path, "lun1"),
+            os.path.join(scsi0_path, "lun2")
+        ]
+        self.assertListEqual(device_names_expected, device_names_actual)
+
+        artifical_dir_structure[os.path.join("/dev/disk/azure", "scsi0")].append("random file")  # this should not change expected result
+        device_names_actual = self.disk_util.get_scsi0_device_names()
+        self.assertListEqual(device_names_expected, device_names_actual)
+
+        artifical_dir_structure[os.path.join("/dev/disk/azure", "scsi0")] = []
+        device_names_actual = self.disk_util.get_scsi0_device_names()
+        self.assertListEqual([], device_names_actual)
+
+    @mock.patch("os.path.isdir")
+    @mock.patch("os.listdir")
+    @mock.patch("os.path.exists")
     def test_get_controller_and_lun_numbers(self, exists_mock, listdir_mock, isdir_mock):
 
         artifical_dir_structure = {
-            "/dev/disk/azure": ["root", "root-part1", "root-part2", "scsi1"],
-            os.path.join("/dev/disk/azure", "scsi1"): ["lun0", "lun0-part1", "lun0-part2", "lun1-part1", "lun1"]
+            "/dev/disk/azure": ["root", "root-part1", "root-part2", "scsi1", "scsi0"],
+            os.path.join("/dev/disk/azure", "scsi1"): ["lun0", "lun0-part1", "lun0-part2", "lun1-part1", "lun1"],
+            os.path.join("/dev/disk/azure", "scsi0"): ["lun0", "lun0-part1", "lun0-part2", "lun1-part1", "lun1"]  # These devices should get ignored for this method
             }
 
         mock_dir_structure(artifical_dir_structure, isdir_mock, listdir_mock, exists_mock)
@@ -135,7 +166,7 @@ class Test_Disk_Util(unittest.TestCase):
         self.assertEqual(cmd_exc_mock.call_count, 1)
 
     @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
-    def test_is_device_mounted(self, get_luks_header_mock):
+    def test_luks_dump_keyslots(self, get_luks_header_mock):
         get_luks_header_mock.return_value = """
 LUKS header information
 Version:        2
