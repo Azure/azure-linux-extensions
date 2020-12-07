@@ -207,8 +207,6 @@ EventHubUploader::Upload()
             // item could be re-queued based on process result.
             ProcessData(std::move(item));
             UploadInterruptionPoint();
-            usleep(500000); // wait for some time to avoid flood azure service.
-            UploadInterruptionPoint();
         }
     }
     catch(UploadInterruptionException&) {

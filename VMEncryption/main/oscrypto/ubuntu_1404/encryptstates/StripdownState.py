@@ -80,7 +80,7 @@ class StripdownState(OSEncryptionState):
                 f.write("service walinuxagent restart\n")
             self.command_executor.Execute('at -f /restart-wala.sh now + 1 minutes', True)
 
-            self.context.hutil.do_exit(exit_code=0,
+            self.context.hutil.do_exit(exit_code=CommonVariables.encryption_failed,
                                        operation='EnableEncryptionOSVolume',
                                        status=CommonVariables.extension_error_status,
                                        code=CommonVariables.encryption_failed,

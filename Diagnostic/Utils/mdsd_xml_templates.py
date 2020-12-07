@@ -59,20 +59,22 @@ per_RouteEvent_tmpl = """
 
 derived_event = """
 <DerivedEvent duration="{interval}" eventName="{target}" isFullName="true" source="{source}" storeType="{type}"/>
+
 """
 
 
-lad_query = '<LADQuery columnName="CounterName" columnValue="Value" partitionKey="" />'
+lad_query = '<LADQuery columnName="CounterName" columnValue="Average" partitionKey="" />'
 
 
 obo_field = '<OboDirectPartitionField name="{name}" value="{value}" />'
 
+# OMI is not used anymore
 
 entire_xml_cfg_tmpl = """
 <MonitoringManagement eventVersion="2" namespace="" timestamp="2017-03-27T19:45:00.000" version="1.0">
   <Accounts>
-    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
-    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" />
+    <Account account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" blobEndpoint="" />
+    <SharedAccessSignature account="" isDefault="true" key="" moniker="moniker" tableEndpoint="" blobEndpoint="" />
   </Accounts>
 
   <Management defaultRetentionInDays="90" eventVolume="">
@@ -93,12 +95,11 @@ entire_xml_cfg_tmpl = """
     <MdsdEvents>
     </MdsdEvents>
 
-    <OMI>
-    </OMI>
-
     <DerivedEvents>
     </DerivedEvents>
   </Events>
+
+  <!--  OMI is not used anymore -->
 
   <EventStreamingAnnotations>
   </EventStreamingAnnotations>

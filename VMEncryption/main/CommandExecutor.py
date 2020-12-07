@@ -25,6 +25,7 @@ import shlex
 import sys
 
 from subprocess import *
+from threading import Timer
 
 class ProcessCommunicator(object):
     def __init__(self):
@@ -36,7 +37,7 @@ class CommandExecutor(object):
     def __init__(self, logger):
         self.logger = logger
 
-    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None, suppress_logging=False):
+    def Execute(self, command_to_execute, raise_exception_on_failure=False, communicator=None, input=None, suppress_logging=False, timeout=0):
         if type(command_to_execute) == unicode:
             command_to_execute = command_to_execute.encode('ascii', 'ignore')
 
@@ -44,6 +45,8 @@ class CommandExecutor(object):
             self.logger.log("Executing: {0}".format(command_to_execute))
         args = shlex.split(command_to_execute)
         proc = None
+        timer = None
+        return_code = None
 
         try:
             proc = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE, close_fds=True)
@@ -55,8 +58,19 @@ class CommandExecutor(object):
                     self.logger.log("Process creation failed: " + str(e))
                 return -1
 
-        stdout, stderr = proc.communicate(input=input)
-        return_code = proc.returncode
+        def timeout_process():
+            proc.kill()
+            self.logger.log("Command {0} didn't finish in {1} seconds. Timing it out".format(command_to_execute, timeout))
+
+        try:
+            if timeout>0:
+                timer = Timer(timeout, timeout_process)
+                timer.start()
+            stdout, stderr = proc.communicate(input=input)
+        finally:
+            if timer is not None:
+                timer.cancel()
+            return_code = proc.returncode
 
         if isinstance(communicator, ProcessCommunicator):
             communicator.stdout, communicator.stderr = stdout, stderr

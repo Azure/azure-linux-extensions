@@ -5,11 +5,11 @@
 
 """Urllib2 HttpClient."""
 
-import httplib
+import http.client
 import socket
 import time
 import traceback
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 from httpclient import *
 
@@ -26,7 +26,7 @@ except ImportError:
     ssl = None
 
 
-class HttpsClientHandler(urllib2.HTTPSHandler):
+class HttpsClientHandler(urllib.request.HTTPSHandler):
     """Https handler to enable attaching cert/key to request. Also used to disable strict cert verification for
     testing.
     """
@@ -42,7 +42,7 @@ class HttpsClientHandler(urllib2.HTTPSHandler):
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-        urllib2.HTTPSHandler.__init__(self, context=ssl_context)  # Context can be None here
+        urllib.request.HTTPSHandler.__init__(self, context=ssl_context)  # Context can be None here
 
     def https_open(self, req):
         return self.do_open(self.get_https_connection, req, context=self._context)
@@ -61,9 +61,9 @@ class HttpsClientHandler(urllib2.HTTPSHandler):
         """
         socket.setdefaulttimeout(180)
         if self.cert_path is None or self.key_path is None:
-            return httplib.HTTPSConnection(host, timeout=timeout, context=context)
+            return http.client.HTTPSConnection(host, timeout=timeout, context=context)
         else:
-            return httplib.HTTPSConnection(host, cert_file=self.cert_path, key_file=self.key_path, timeout=timeout,
+            return http.client.HTTPSConnection(host, cert_file=self.cert_path, key_file=self.key_path, timeout=timeout,
                                            context=context)
 
 
@@ -74,7 +74,7 @@ def request_retry_handler(func):
             try:
                 ret = func(*args, **kwargs)
                 return ret
-            except Exception, exception:
+            except Exception as exception:
                 if iteration >= max_retry_count - 1:
                     raise RetryAttemptExceededException(traceback.format_exc())
                 elif SSL_MODULE_NAME in sys.modules:
@@ -113,12 +113,12 @@ class Urllib2HttpClient(HttpClient):
             :param method:
         """
         https_handler = HttpsClientHandler(self.cert_path, self.key_path, self.insecure)
-        opener = urllib2.build_opener(https_handler)
+        opener = urllib.request.build_opener(https_handler)
         if self.proxy_configuration is not None:
-            proxy_handler = urllib2.ProxyHandler({'http': self.proxy_configuration,
+            proxy_handler = urllib.request.ProxyHandler({'http': self.proxy_configuration,
                                                   'https': self.proxy_configuration})
             opener.add_handler(proxy_handler)
-        req = urllib2.Request(url, data=data, headers=headers)
+        req = urllib.request.Request(url, data=data, headers=headers)
         req.get_method = lambda: method
         response = opener.open(req, timeout=30)
         opener.close()
@@ -140,7 +140,7 @@ class Urllib2HttpClient(HttpClient):
 
         try:
             response = self.issue_request(url, headers=headers, method=self.GET)
-        except urllib2.HTTPError:
+        except urllib.error.HTTPError:
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 
@@ -167,7 +167,7 @@ class Urllib2HttpClient(HttpClient):
 
         try:
             response = self.issue_request(url, headers=headers, method=self.POST, data=serial_data)
-        except urllib2.HTTPError:
+        except urllib.error.HTTPError:
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 
@@ -194,7 +194,7 @@ class Urllib2HttpClient(HttpClient):
 
         try:
             response = self.issue_request(url, headers=headers, method=self.PUT, data=serial_data)
-        except urllib2.HTTPError:
+        except urllib.error.HTTPError:
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 
@@ -221,7 +221,7 @@ class Urllib2HttpClient(HttpClient):
 
         try:
             response = self.issue_request(url, headers=headers, method=self.DELETE, data=serial_data)
-        except urllib2.HTTPError:
+        except urllib.error.HTTPError:
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 

@@ -27,6 +27,7 @@ from Common import *
 from ConfigParser import ConfigParser
 from ConfigUtil import ConfigUtil
 from ConfigUtil import ConfigKeyValuePair
+import os.path
 
 # parameter format should be like this:
 #{"command":"enableencryption","query":[{"source_scsi_number":"[5:0:0:0]","target_scsi_number":"[5:0:0:2]"},{"source_scsi_number":"[5:0:0:1]","target_scsi_number":"[5:0:0:3]"}],
@@ -156,14 +157,14 @@ class ExtensionParameter(object):
             self.logger.log("Failed to archive encryption config with error: {0}, stack trace: {1}".format(e, traceback.format_exc()))
             return False
 
-    def _is_encrypt_command(command):
+    def _is_encrypt_command(self, command):
         return command in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]
 
     def config_changed(self):
         if (self.command or self.get_command()) and \
            (self.command != self.get_command() and \
            # Even if the commands are not exactly the same, if they're both encrypt commands, don't consider this a change
-           not (_is_encrypt_command(self.command) and _is_encrypt_command(self.get_command()))):
+           not (self._is_encrypt_command(self.command) and self._is_encrypt_command(self.get_command()))):
             self.logger.log('Current config command {0} differs from effective config command {1}'.format(self.command, self.get_command()))
             return True
 
@@ -198,8 +199,10 @@ class ExtensionParameter(object):
             self.logger.log('Current config KeyEncryptionAlgorithm {0} differs from effective config KeyEncryptionAlgorithm {1}'.format(self.KeyEncryptionAlgorithm, self.get_kek_algorithm()))
             return True
 
-        bek_passphrase_file = self.bek_util.get_bek_passphrase_file(self.encryption_config)
-        bek_passphrase = file(bek_passphrase_file).read()
+        bek_passphrase_file_name = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        bek_passphrase = None
+        if bek_passphrase_file_name is not None and os.path.exists(bek_passphrase_file_name):
+            bek_passphrase = file(bek_passphrase_file_name).read()
 
         if (self.passphrase and bek_passphrase) and \
            (self.passphrase != bek_passphrase):

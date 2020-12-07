@@ -19,7 +19,7 @@
 import os
 import unittest
 
-import vmaccess
+from VMAccess import vmaccess
 from Utils.WAAgentUtil import waagent
 
 waagent.LoggerInit('/tmp/test.log','/dev/stdout')

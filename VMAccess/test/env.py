@@ -27,7 +27,7 @@ if os.path.exists(manifestFile):
     jsonData = open(manifestFile)
     manifest = json.load(jsonData)
     jsonData.close()
-    extName="{0}-{1}".format(manifest[0]["name"], manifest[0]["version"])
+    extName="{0}-{1}".format("VMAccess", manifest[0]["version"])
     print("Start test: %s" % extName)
 
     extDir=os.path.join("/var/lib/waagent", extName)

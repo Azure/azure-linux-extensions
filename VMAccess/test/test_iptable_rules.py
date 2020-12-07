@@ -17,8 +17,8 @@
 # limitations under the License.
 
 import unittest
-import env
-import vmaccess
+from VMAccess.test import env
+from VMAccess import vmaccess
 import os
 from Utils.WAAgentUtil import waagent
 

@@ -1,4 +1,4 @@
-include HandlerManifest.json manifest.xml
+include HandlerManifest.json manifest.xml extension_shim.sh
 recursive-include main/oscrypto/91ade *.sh
 recursive-include main/oscrypto/91ade *.rules
 recursive-include main/oscrypto/rhel_68/encryptpatches *.patch
