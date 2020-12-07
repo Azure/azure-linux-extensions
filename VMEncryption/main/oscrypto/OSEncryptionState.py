@@ -32,6 +32,7 @@ from DiskUtil import *
 from CryptMountConfigUtil import *
 from EncryptionConfig import *
 
+
 class OSEncryptionState(object):
     def __init__(self, state_name, context):
         super(OSEncryptionState, self).__init__()
@@ -154,8 +155,9 @@ class OSEncryptionState(object):
 
         # search for matching mount point item
         for mp_item in self.disk_util.get_mount_items():
-            if dev == os.lstat(mp_item["dest"]).st_dev:
-                result = mp_item["src"]
+            if os.path.exists(mp_item["dest"]):
+                if dev == os.lstat(mp_item["dest"]).st_dev:
+                    result = mp_item["src"]
 
         return result
 
@@ -216,7 +218,7 @@ class OSEncryptionState(object):
     def _is_uuid(self, s):
         try:
             UUID(s)
-        except:
+        except Exception:
             return False
         else:
             return True
