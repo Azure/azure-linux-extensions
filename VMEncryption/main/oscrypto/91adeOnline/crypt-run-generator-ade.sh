@@ -18,4 +18,10 @@ if command -v systemctl >/dev/null; then
     systemctl start boot.mount
     systemctl start cryptsetup.target
 fi
+
+if [ -b /dev/mapper/osencrypt ]; then
+    umount /boot
+    umount /bek
+fi
+
 exit 0

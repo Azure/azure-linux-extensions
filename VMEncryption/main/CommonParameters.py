@@ -19,6 +19,7 @@
 import json
 import os
 
+
 class CommonParameters:
     def __init__(self):
         self.file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "common_parameters.json")
@@ -46,5 +47,6 @@ class CommonParameters:
     def save(self):
         with open(self.file_path, 'w') as outfile:
             json.dump(self.json_object, outfile)
+
 
 inst = CommonParameters()
