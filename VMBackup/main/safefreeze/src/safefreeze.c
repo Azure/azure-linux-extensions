@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
     {
         char *mountPoint = argv[i + 2];
         logger("Freezing: %s\n", mountPoint);
-        
+
         if (ioctl(fileSystemDescriptors[i], FIFREEZE, 0) != 0)
         {
             int errsv = errno;
@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
         JUMPWITHSTATUS(EXIT_FAILURE);
     }
 
-    time_t starttime,currenttime; 
+    time_t starttime,currenttime;
     currenttime=time(NULL);
     starttime=time(NULL);
     for (i = 0; i < timeout; i++)
@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
         logger("Inconsistent snapshot because of SLEEP failure \n");
         JUMPWITHSTATUS(2);
     }
-    
+
 CLEANUP:
 
     if (fileSystemDescriptors != NULL)
