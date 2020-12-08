@@ -146,12 +146,12 @@ int main(int argc, char *argv[])
     }
 
     logger("****** 2. Binary Freeze Started \n");
-
+    sync();
     for (i = 0; i < numFileSystems; i++)
     {
         char *mountPoint = argv[i + 2];
         logger("Freezing: %s\n", mountPoint);
-        sync();
+        
         if (ioctl(fileSystemDescriptors[i], FIFREEZE, 0) != 0)
         {
             int errsv = errno;
