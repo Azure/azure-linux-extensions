@@ -239,7 +239,7 @@ def create_core_components_configs():
     ladconfig = configurator._ladCfg()
     sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladconfig, 'performanceCounters')
     for name in sinks:
-        sink = configurator._sink_configs.get_sink_by_name(name)
+        sink = configurator._sink_configs_public.get_sink_by_name(name)
         if sink is not None:
             if sink['name'] == 'AzMonSink':
                 enable_metrics_ext = True
