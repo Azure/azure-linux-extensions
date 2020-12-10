@@ -84,7 +84,6 @@ class LadConfigAll:
         self._logger_error = logger_error
         self._telegraf_me_url = metrics_constants.lad_metrics_extension_influx_udp_url
         self._telegraf_mdsd_url = metrics_constants.telegraf_influx_url
-        self._enable_metrics_extension = False
 
         # Generated logging configs place holders
         self._fluentd_syslog_src_config = None
@@ -97,7 +96,11 @@ class LadConfigAll:
 
         self._mdsd_config_xml_tree = ET.ElementTree(ET.fromstring(mxt.entire_xml_cfg_tmpl))
         self._sink_configs = LadUtil.SinkConfiguration()
-        self._sink_configs.insert_from_config(self._ext_settings.read_public_config('sinksConfig'))
+        self._sink_configs.insert_from_config(self._ext_settings.read_protected_config('sinksConfig'))
+
+        # Reading the AzMonSink info from the public config. 
+        self._sink_configs_public = LadUtil.SinkConfiguration()
+        self._sink_configs_public.insert_from_config(self._ext_settings.read_public_config('sinksConfig'))
         # If we decide to also read sinksConfig from ladCfg, do it first, so that private settings override
 
         # Get encryption settings
@@ -218,8 +221,6 @@ class LadConfigAll:
             sink = self._sink_configs.get_sink_by_name(name)
             if sink is None:
                 self._logger_log("Ignoring sink '{0}' for which no definition was found".format(name))
-            elif sink['name'] == 'AzMonSink':
-                self._enable_metrics_extension = True
             elif sink['type'] == 'EventHub':
                 if 'sasURL' in sink:
                     self._add_streaming_annotation(source, sink['sasURL'])
@@ -382,7 +383,11 @@ class LadConfigAll:
                         '(see extension error logs for more details)'
 
             #Only enable Metrics if AzMonSink is in the config
-            if self._enable_metrics_extension:
+            azmonsink = self._sink_configs_public.get_sink_by_name("AzMonSink")
+            if azmonsink is None:
+                self._logger_log("Did not find AzMonSink in public config. Will not set up custom metrics through ME.")
+            else:
+                self._logger_log("Found AzMonSink in public config. Setting up custom metrics through ME.")
                 me_handler.setup_me(True)
 
         except Exception as e:
