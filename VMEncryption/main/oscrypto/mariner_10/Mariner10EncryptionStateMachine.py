@@ -2,7 +2,7 @@
 #
 # VM Backup extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2020 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,40 +22,33 @@
 import inspect
 import os
 import sys
-import traceback
-from time import sleep
 
 scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 maindir = os.path.abspath(os.path.join(scriptdir, '../../'))
 sys.path.append(maindir)
-sixdir = os.path.abspath(os.path.join(scriptdir, '../../six'))
-sys.path.append(sixdir)
 transitionsdir = os.path.abspath(os.path.join(scriptdir, '../../transitions'))
 sys.path.append(transitionsdir)
-from oscrypto import *
-from .encryptstates import *
-from Common import *
-from CommandExecutor import *
-from DiskUtil import *
-from transitions import *
+
+from oscrypto import OSEncryptionStateMachine
+from .encryptstates import PrereqState, PatchBootSystemState, ResumeEncryptionState
+from CommandExecutor import ProcessCommunicator
+from transitions import State, Machine
+
 
 class Mariner10EncryptionStateMachine(OSEncryptionStateMachine):
     states = [
         State(name='uninitialized'),
         State(name='prereq', on_enter='on_enter_state'),
-        State(name='selinux', on_enter='on_enter_state'),
-        State(name='stripdown', on_enter='on_enter_state'),
-        State(name='unmount_oldroot', on_enter='on_enter_state'),
-        State(name='encrypt_block_device', on_enter='on_enter_state'),
         State(name='patch_boot_system', on_enter='on_enter_state'),
-        State(name='completed'),
+        State(name='resume_encryption', on_enter='on_enter_state'),
+        State(name='completed')
     ]
 
     transitions = [
         {
-            'trigger': 'skip_encryption',
+            'trigger': 'skip_to_resume_encryption',
             'source': 'uninitialized',
-            'dest': 'completed'
+            'dest': 'resume_encryption'
         },
         {
             'trigger': 'enter_prereq',
@@ -63,49 +56,22 @@ class Mariner10EncryptionStateMachine(OSEncryptionStateMachine):
             'dest': 'prereq'
         },
         {
-            'trigger': 'enter_selinux',
-            'source': 'prereq',
-            'dest': 'selinux',
-            'before': 'on_enter_state',
-            'conditions': 'should_exit_previous_state'
-        },
-        {
-            'trigger': 'enter_stripdown',
-            'source': 'selinux',
-            'dest': 'stripdown',
-            'before': 'on_enter_state',
-            'conditions': 'should_exit_previous_state'
-        },
-        {
-            'trigger': 'enter_unmount_oldroot',
-            'source': 'stripdown',
-            'dest': 'unmount_oldroot',
-            'before': 'on_enter_state',
-            'conditions': 'should_exit_previous_state'
-        },
-        {
-            'trigger': 'retry_unmount_oldroot',
-            'source': 'unmount_oldroot',
-            'dest': 'unmount_oldroot',
-            'before': 'on_enter_state'
-        },
-        {
-            'trigger': 'enter_encrypt_block_device',
-            'source': 'unmount_oldroot',
-            'dest': 'encrypt_block_device',
-            'before': 'on_enter_state',
-            'conditions': 'should_exit_previous_state'
-        },
-        {
             'trigger': 'enter_patch_boot_system',
-            'source': 'encrypt_block_device',
+            'source': 'prereq',
             'dest': 'patch_boot_system',
             'before': 'on_enter_state',
             'conditions': 'should_exit_previous_state'
         },
         {
-            'trigger': 'stop_machine',
+            'trigger': 'enter_resume_encryption',
             'source': 'patch_boot_system',
+            'dest': 'resume_encryption',
+            'before': 'on_enter_state',
+            'conditions': 'should_exit_previous_state'
+        },
+        {
+            'trigger': 'stop_machine',
+            'source': 'resume_encryption',
             'dest': 'completed',
             'conditions': 'should_exit_previous_state'
         },
@@ -123,11 +89,8 @@ class Mariner10EncryptionStateMachine(OSEncryptionStateMachine):
 
         self.state_objs = {
             'prereq': PrereqState(self.context),
-            'selinux': SelinuxState(self.context),
-            'stripdown': StripdownState(self.context),
-            'unmount_oldroot': UnmountOldrootState(self.context),
-            'encrypt_block_device': EncryptBlockDeviceState(self.context),
             'patch_boot_system': PatchBootSystemState(self.context),
+            'resume_encryption': ResumeEncryptionState(self.context),
         }
 
         self.state_machine = Machine(model=self,
@@ -141,9 +104,12 @@ class Mariner10EncryptionStateMachine(OSEncryptionStateMachine):
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
         if '/dev/mapper/osencrypt' in proc_comm.stdout:
-            self.logger.log("OS volume is already encrypted")
+            self.logger.log("OS volume is already mounted from /dev/mapper/osencrypt")
 
-            self.skip_encryption()
+            self.skip_to_resume_encryption()
+            self.log_machine_state()
+
+            self.stop_machine()
             self.log_machine_state()
 
             return
@@ -153,52 +119,11 @@ class Mariner10EncryptionStateMachine(OSEncryptionStateMachine):
         self.enter_prereq()
         self.log_machine_state()
 
-        self.enter_selinux()
-        self.log_machine_state()
-
-        self.enter_stripdown()
-        self.log_machine_state()
-        
-        oldroot_unmounted_successfully = False
-        attempt = 1
-
-        while not oldroot_unmounted_successfully:
-            self.logger.log("Attempt #{0} to unmount /oldroot".format(attempt))
-
-            try:
-                if attempt == 1:
-                    self.enter_unmount_oldroot()
-                elif attempt > 10:
-                    raise Exception("Could not unmount /oldroot in 10 attempts")
-                else:
-                    self.retry_unmount_oldroot()
-
-                self.log_machine_state()
-            except Exception as e:
-                message = "Attempt #{0} to unmount /oldroot failed with error: {1}, stack trace: {2}".format(attempt,
-                                                                                                             e,
-                                                                                                             traceback.format_exc())
-                self.logger.log(msg=message)
-                self.hutil.do_status_report(operation='EnableEncryptionOSVolume',
-                                            status=CommonVariables.extension_error_status,
-                                            status_code=str(CommonVariables.unmount_oldroot_error),
-                                            message=message)
-
-                sleep(10)
-                if attempt > 10:
-                    raise Exception(message)
-            else:
-                oldroot_unmounted_successfully = True
-            finally:
-                attempt += 1
-        
-        self.enter_encrypt_block_device()
-        self.log_machine_state()
-
         self.enter_patch_boot_system()
         self.log_machine_state()
-        
-        self.stop_machine()
+
+        self.enter_resume_encryption()
         self.log_machine_state()
 
-        self._reboot()
+        self.stop_machine()
+        self.log_machine_state()

@@ -1,5 +1,5 @@
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2020 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,17 +19,11 @@
 import inspect
 import os
 import sys
-import traceback
-from time import sleep
 
 scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 oscryptodir = os.path.abspath(os.path.join(scriptdir, '../../'))
 sys.path.append(oscryptodir)
 
-from OSEncryptionState import *
-from PrereqState import *
-from SelinuxState import *
-from StripdownState import *
-from UnmountOldrootState import *
-from EncryptBlockDeviceState import *
-from PatchBootSystemState import *
+from .PrereqState import PrereqState
+from .PatchBootSystemState import PatchBootSystemState
+from .ResumeEncryptionState import ResumeEncryptionState
