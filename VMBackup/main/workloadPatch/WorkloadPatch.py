@@ -410,6 +410,7 @@ class WorkloadPatch:
                         return None
                     if config.has_option("workload", 'command_path'):                        
                         self.command = config.get("workload", 'command_path')
+                        self.command = self.command+"/"
                         self.logger.log("WorkloadPatch: config workload command "+ self.command)
                     if config.has_option("workload", 'credString'):
                         self.cred_string = config.get("workload", 'credString')
