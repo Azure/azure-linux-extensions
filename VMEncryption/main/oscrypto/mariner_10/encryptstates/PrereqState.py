@@ -2,7 +2,7 @@
 #
 # VM Backup extension
 #
-# Copyright 2015 Microsoft Corporation
+# Copyright 2020 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 #
 
 from OSEncryptionState import OSEncryptionState
-import re
+
 
 class PrereqState(OSEncryptionState):
     def __init__(self, context):
@@ -45,7 +45,7 @@ class PrereqState(OSEncryptionState):
         distro_info = self.context.distro_patcher.distro_info
         self.context.logger.log("Distro info: {0}".format(distro_info))
 
-        if ((distro_info[0] == 'mariner' and distro_info[1] == '1.0')):
+        if ((distro_info[0] == 'Mariner' and distro_info[1] == '1.0')):
             self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
                                                                                       distro_info[1]))
         else:
@@ -54,26 +54,7 @@ class PrereqState(OSEncryptionState):
 
         self.context.distro_patcher.install_extras()
 
-        self._patch_waagent()
-        self.command_executor.Execute('systemctl daemon-reload', True)
-
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit prereq state")
 
         return super(PrereqState, self).should_exit()
-
-    def _patch_waagent(self):
-        self.context.logger.log("Patching waagent")
-
-        contents = None
-
-        with open('/usr/lib/systemd/system/waagent.service', 'r') as f:
-            contents = f.read()
-
-        contents = re.sub(r'\[Service\]\n', '[Service]\nKillMode=process\n', contents)
-
-        with open('/usr/lib/systemd/system/waagent.service', 'wb') as f:
-            f.write(contents.encode("utf-8"))
-
-        self.context.logger.log("waagent patched successfully")
-
