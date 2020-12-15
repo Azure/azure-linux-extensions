@@ -66,8 +66,8 @@ class Backuplogger(object):
 
     def log_to_con(self, msg):
         try:
-            with open(self.con_path, "w") as C :
-                message = filter(lambda x : x in string.printable, msg)
+            with open(self.con_path, "wb") as C :
+                message = "".join(list(filter(lambda x : x in string.printable, msg)))
                 C.write(message.encode('ascii','ignore'))
         except IOError as e:
             pass
