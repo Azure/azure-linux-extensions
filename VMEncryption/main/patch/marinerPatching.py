@@ -62,7 +62,7 @@ class marinerPatching(AbstractPatching):
         self.umount_path = '/usr/bin/umount'
 
     def install_cryptsetup(self):
-        packages = ['cryptsetup']
+        packages = ['cryptsetup', 'cryptsetup-reencrypt']
 
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             return_code = self.command_executor.Execute("tdnf install -y " + " ".join(packages), timeout=100)
@@ -80,6 +80,7 @@ class marinerPatching(AbstractPatching):
     def install_extras(self):
         packages = ['at',
                     'cryptsetup',
+                    'cryptsetup-reencrypt',
                     'lsscsi',
                     'lvm2',
                     'patch',
