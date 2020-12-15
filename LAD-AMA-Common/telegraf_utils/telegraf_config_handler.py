@@ -694,6 +694,14 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
 
     az_resource_id = data["compute"]["resourceId"]
 
+    # If the instance is VMSS then trim the last two values from the resource id ie - "/virtualMachines/0"
+    # Since ME expects the resource id in a particular format. For egs -
+    # IMDS returned ID - /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>/virtualMachines/0
+    # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
+    if "virtualMachineScaleSets" in az_resource_id: 
+        temp  = az_resource_id.split("/")
+        az_resource_id = "/".join(temp[:-2])
+
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup Telegraf.")
         return False
