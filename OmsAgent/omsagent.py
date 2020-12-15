@@ -588,8 +588,14 @@ def enable():
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
 
-    # detect opinsights domain using IMDS
-    domain = get_azure_cloud_domain()
+    # get domain from protected settings
+    domain = protected_settings.get('domain')
+    if domain is None:
+        # detect opinsights domain using IMDS
+        domain = get_azure_cloud_domain()
+    else:
+        hutil_log_info("Domain retrieved from protected settings '{0}'".format(domain))
+
     domainParam = ''
     if domain:
         domainParam = '-d {0}'.format(domain)
