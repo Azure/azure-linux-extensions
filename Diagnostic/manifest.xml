@@ -2,7 +2,7 @@
 <ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
   <ProviderNameSpace>Microsoft.Azure.Diagnostics</ProviderNameSpace>
   <Type>LinuxDiagnostic</Type>
-  <Version>3.0.129</Version>
+  <Version>4.0.3</Version>
   <Label>Microsoft Azure Diagnostic Extension for Linux Virtual Machines</Label>
   <HostingResources>VmRole</HostingResources>
   <MediaLink></MediaLink>

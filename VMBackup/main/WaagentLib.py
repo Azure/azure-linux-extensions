@@ -262,9 +262,9 @@ class AbstractDistro(object):
                 if os.path.exists(f) and FindStringInFile(f,
                                                           r'^[^#]*?send\s*host-name.*?(<hostname>|gethostname[(,)])') == None:
                     r = ReplaceFileContentsAtomic('/etc/dhcp/dhclient.conf', "send host-name \"" + name + "\";\n"
-                                                  + "\n".join(filter(lambda a: not a.startswith("send host-name"),
+                                                  + "\n".join(list(filter(lambda a: not a.startswith("send host-name"),
                                                                      GetFileContents('/etc/dhcp/dhclient.conf').split(
-                                                                         '\n'))))
+                                                                         '\n')))))
         except:
             return 1
         return r
@@ -342,7 +342,7 @@ class AbstractDistro(object):
         filepath = "/etc/shadow"
         ReplaceFileContentsAtomic(filepath, "root:*LOCK*:14600::::::\n"
                                   + "\n".join(
-            filter(lambda a: not a.startswith("root:"), GetFileContents(filepath).split('\n'))))
+            list(filter(lambda a: not a.startswith("root:"), GetFileContents(filepath).split('\n')))))
         os.chmod(filepath, self.shadow_file_mode)
         if self.isSelinuxSystem():
             self.setSelinuxContext(filepath, 'system_u:object_r:shadow_t:s0')
@@ -643,8 +643,8 @@ class gentooDistro(AbstractDistro):
         try:
             if (os.path.isfile(self.hostname_file_path)):
                 r = ReplaceFileContentsAtomic(self.hostname_file_path, "hostname=\"" + name + "\"\n"
-                                              + "\n".join(filter(lambda a: not a.startswith("hostname="),
-                                                                 GetFileContents(self.hostname_file_path).split("\n"))))
+                                              + "\n".join(list(filter(lambda a: not a.startswith("hostname="),
+                                                                 GetFileContents(self.hostname_file_path).split("\n")))))
         except:
             return 1
         return r
@@ -944,14 +944,14 @@ class redhatDistro(AbstractDistro):
             if os.path.isfile(filepath):
                 ReplaceFileContentsAtomic(filepath, "HOSTNAME=" + name + "\n"
                                           + "\n".join(
-                    filter(lambda a: not a.startswith("HOSTNAME"), GetFileContents(filepath).split('\n'))))
+                    list(filter(lambda a: not a.startswith("HOSTNAME"), GetFileContents(filepath).split('\n')))))
 
         ethernetInterface = MyDistro.GetInterfaceName()
         filepath = "/etc/sysconfig/network-scripts/ifcfg-" + ethernetInterface
         if os.path.isfile(filepath):
             ReplaceFileContentsAtomic(filepath, "DHCP_HOSTNAME=" + name + "\n"
                                       + "\n".join(
-                filter(lambda a: not a.startswith("DHCP_HOSTNAME"), GetFileContents(filepath).split('\n'))))
+                list(filter(lambda a: not a.startswith("DHCP_HOSTNAME"), GetFileContents(filepath).split('\n')))))
         return 0
 
     def installAgentServiceScriptFiles(self):
@@ -1549,7 +1549,7 @@ class fedoraDistro(redhatDistro):
         if os.path.isfile(filepath):
             ReplaceFileContentsAtomic(filepath, "DHCP_HOSTNAME=" + name + "\n"
                                       + "\n".join(
-                filter(lambda a: not a.startswith("DHCP_HOSTNAME"), GetFileContents(filepath).split('\n'))))
+                list(filter(lambda a: not a.startswith("DHCP_HOSTNAME"), GetFileContents(filepath).split('\n')))))
         return 0
 
     def installAgentServiceScriptFiles(self):
@@ -1850,7 +1850,7 @@ class FreeBSDDistro(AbstractDistro):
         l = mac.split(':')
         r = []
         for i in l:
-            r.append(string.atoi(i, 16))
+            r.append(int(i, 16))
         return r
 
     def GetFreeBSDEthernetInfo(self):
@@ -2047,10 +2047,10 @@ class FreeBSDDistro(AbstractDistro):
         if os.path.exists('/usr/local/etc/logrotate.d/'):
             SetFileContents("/usr/local/etc/logrotate.d/waagent", WaagentLogrotate)
         filepath = "/etc/ssh/sshd_config"
-        ReplaceFileContentsAtomic(filepath, "\n".join(filter(lambda a: not
+        ReplaceFileContentsAtomic(filepath, "\n".join(list(filter(lambda a: not
         a.startswith("ClientAliveInterval"),
                                                              GetFileContents(filepath).split(
-                                                                 '\n'))) + "\nClientAliveInterval 180\n")
+                                                                 '\n')))) + "\nClientAliveInterval 180\n")
         Log("Configured SSH client probing to keep connections alive.")
         # ApplyVNUMAWorkaround()
         return 0
@@ -2071,7 +2071,7 @@ class FreeBSDDistro(AbstractDistro):
             ovfxml = ovfxml[
                      3:]  # BOM is not stripped. First three bytes are > 128 and not unicode chars so we ignore them.
         ovfxml = ovfxml.strip(chr(0x00))
-        ovfxml = "".join(filter(lambda x: ord(x) < 128, ovfxml))
+        ovfxml = "".join(list(filter(lambda x: ord(x) < 128, ovfxml)))
         ovfxml = re.sub(r'</Environment>.*\Z', '', ovfxml, 0, re.DOTALL)
         ovfxml += '</Environment>'
         SetFileContents(location + "/ovf-env.xml", ovfxml)
@@ -2499,9 +2499,9 @@ def SimpleLog(file_path, message):
     t = time.localtime()
     t = "%04u/%02u/%02u %02u:%02u:%02u " % (t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
     lines = re.sub(re.compile(r'^(.)', re.MULTILINE), t + r'\1', message)
-    with open(file_path, "a") as F:
-        lines = filter(lambda x: x in string.printable, lines)
-        F.write(lines.encode('ascii', 'ignore') + "\n")
+    with open(file_path, "ab") as F:
+        lines = "".join(list(filter(lambda x: x in string.printable, lines)))
+        F.write((lines + "\n").encode('ascii','ignore'))
 
 
 class Logger(object):
@@ -2535,9 +2535,9 @@ class Logger(object):
         """
         if self.file_path:
             try:
-                with open(self.file_path, "a") as F:
-                    message = filter(lambda x: x in string.printable, message)
-                    F.write(message.encode('ascii', 'ignore') + "\n")
+                with open(self.file_path, "ab") as F:
+                    message = "".join(list(filter(lambda x: x in string.printable, message)))
+                    F.write((message + "\n").encode('ascii','ignore'))
             except IOError as e:
                 ##print e
                 pass
@@ -2550,9 +2550,9 @@ class Logger(object):
         """
         if self.con_path:
             try:
-                with open(self.con_path, "w") as C:
-                    message = filter(lambda x: x in string.printable, message)
-                    C.write(message.encode('ascii', 'ignore') + "\n")
+                with open(self.con_path, "wb") as C:
+                    message = "".join(list(filter(lambda x: x in string.printable, message)))
+                    C.write((message + "\n").encode('ascii','ignore'))
             except IOError as e:
                 pass
 
@@ -2764,7 +2764,7 @@ class Util(object):
                     (resp.status == httplibs.OK or \
                                  resp.status == httplibs.CREATED or \
                                  resp.status == httplibs.ACCEPTED):
-                return resp;
+                return resp
 
             if resp is not None and resp.status == httplibs.GONE:
                 raise HttpResourceGoneError("Http resource gone.")
@@ -2774,7 +2774,7 @@ class Util(object):
             Error("HTTP Req: Data={0}".format(data))
             Error("HTTP Req: Header={0}".format(headers))
             if resp is None:
-                Error("HTTP Err: response is empty.".format(retry))
+                Error("HTTP Err: response is empty. {0}".format(retry))
             else:
                 Error("HTTP Err: Status={0}".format(resp.status))
                 Error("HTTP Err: Reason={0}".format(resp.reason))
@@ -3860,7 +3860,7 @@ class ExtensionsConfig(object):
 
         if os.path.exists(handler_state_file):
             handler_state = GetFileContents(handler_state_file).lower()
-        if HandlerStatusToAggStatus.has_key(handler_state):
+        if handler_state in HandlerStatusToAggStatus:
             agg_state = HandlerStatusToAggStatus[handler_state]
         if reportHeartbeat:
             if os.path.exists(heartbeat_file):

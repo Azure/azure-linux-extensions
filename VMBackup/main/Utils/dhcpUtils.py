@@ -315,7 +315,7 @@ class DefaultOSUtil(object):
         self.logger.log("examine /proc/net/route for primary interface")
         with open('/proc/net/route') as routing_table:
             idx = 0
-            for header in filter(lambda h: len(h) > 0, routing_table.readline().strip(" \n").split("\t")):
+            for header in list(filter(lambda h: len(h) > 0, routing_table.readline().strip(" \n").split("\t"))):
                 if header == hdr_iface:
                     idx_iface = idx
                 elif header == hdr_dest:
