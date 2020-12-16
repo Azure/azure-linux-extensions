@@ -129,10 +129,11 @@ class CommonVariables:
     FailedWorkloadAuthorizationMissing = 505
     FailedWorkloadConnectionError = 506
     FailedWorkloadIPCDirectoryMissing = 507
-    FailedWorkloadDatabaseNotOpen = 508
+    FailedWorkloadDatabaseStatusChanged = 508
     FailedWorkloadQuiescingError = 509
     FailedWorkloadQuiescingTimeout = 510
     FailedWorkloadDatabaseInNoArchiveLog = 511
+    FailedWorkloadLogModeChanged = 512
 
     """
     Consistency-Types
