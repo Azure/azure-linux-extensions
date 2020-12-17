@@ -235,7 +235,7 @@ class ResourceDiskUtil(object):
         """ remove any default snaps found that block resource disk encryption """ 
         is_snap = bool(self.executor.Execute('test -f /usr/bin/snap',False,None,None,True) == 0)
         if is_snap:            
-            logger.log('snap available, removing lxd, core18, and snapd if installed')
+            self.logger.log('snap available, removing lxd, core18, and snapd if installed')
             is_snap_lxd = bool(self.executor.ExecuteInBash('snap list | grep -q lxd',False,None,None,True) == 0)
             is_snap_core18 = bool(self.executor.ExecuteInBash('snap list | grep -q core18',False,None,None,True) == 0)
             is_snap_snapd = bool(self.executor.ExecuteInBash('snap list | grep -q snapd',False,None,None,True) == 0)
@@ -246,20 +246,20 @@ class ResourceDiskUtil(object):
             if is_snap_snapd:
                 self.executor.Execute('snap remove snapd',False)
         else:
-            logger.log('snap not detected, nothing to remove')
+            self.logger.log('snap not detected, nothing to remove')
 
     def _restore_snaps(self):
         """ restore any default snaps removed prior to resource disk encryption """
         if is_snap:
-            logger.log('snap available, restoring lxd, core18, snapd if removed')
+            self.logger.log('snap available, restoring lxd, core18, snapd if removed')
             if is_snap_snapd:
-                command_executor.Execute('snap install snapd',False)
+                self.executor.Execute('snap install snapd',False)
             if is_snap_core18:
-                command_executor.Execute('snap install core18',False)
+                self.executor.Execute('snap install core18',False)
             if is_snap_lxd:
-                command_executor.Execute('snap install lxd',False)
+                self.executor.Execute('snap install lxd',False)
         else:
-            logger.log('snap not detected, nothing to restore')
+            self.logger.log('snap not detected, nothing to restore')
 
     def try_remount(self):
         """ mount the resource disk if not already mounted"""
