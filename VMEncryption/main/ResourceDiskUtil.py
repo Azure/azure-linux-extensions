@@ -233,30 +233,30 @@ class ResourceDiskUtil(object):
 
     def _remove_snaps(self):
         """ remove any default snaps found that block resource disk encryption """ 
-        is_snap = bool(self.executor.Execute('test -f /usr/bin/snap',False,None,None,True) == 0)
-        if is_snap:            
+        self.is_snap = bool(self.executor.Execute('test -f /usr/bin/snap',False,None,None,True) == 0)
+        if self.is_snap:            
             self.logger.log('snap available, removing lxd, core18, and snapd if installed')
-            is_snap_lxd = bool(self.executor.ExecuteInBash('snap list | grep -q lxd',False,None,None,True) == 0)
-            is_snap_core18 = bool(self.executor.ExecuteInBash('snap list | grep -q core18',False,None,None,True) == 0)
-            is_snap_snapd = bool(self.executor.ExecuteInBash('snap list | grep -q snapd',False,None,None,True) == 0)
-            if is_snap_lxd:
+            self.is_snap_lxd = bool(self.executor.ExecuteInBash('snap list | grep -q lxd',False,None,None,True) == 0)
+            self.is_snap_core18 = bool(self.executor.ExecuteInBash('snap list | grep -q core18',False,None,None,True) == 0)
+            self.is_snap_snapd = bool(self.executor.ExecuteInBash('snap list | grep -q snapd',False,None,None,True) == 0)
+            if self.is_snap_lxd:
                 self.executor.Execute('snap remove lxd',False)
-            if is_snap_core18:
+            if self.is_snap_core18:
                 self.executor.Execute('snap remove core18',False)
-            if is_snap_snapd:
+            if self.is_snap_snapd:
                 self.executor.Execute('snap remove snapd',False)
         else:
             self.logger.log('snap not detected, nothing to remove')
 
     def _restore_snaps(self):
         """ restore any default snaps removed prior to resource disk encryption """
-        if is_snap:
+        if self.is_snap:
             self.logger.log('snap available, restoring lxd, core18, snapd if removed')
-            if is_snap_snapd:
+            if self.is_snap_snapd:
                 self.executor.Execute('snap install snapd',False)
-            if is_snap_core18:
+            if self.is_snap_core18:
                 self.executor.Execute('snap install core18',False)
-            if is_snap_lxd:
+            if self.is_snap_lxd:
                 self.executor.Execute('snap install lxd',False)
         else:
             self.logger.log('snap not detected, nothing to restore')
