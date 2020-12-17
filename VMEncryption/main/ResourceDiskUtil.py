@@ -37,6 +37,12 @@ class ResourceDiskUtil(object):
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
+    # save the state of snap on this system as needed for removal and restore
+    is_snap = False
+    is_snap_lxd = False
+    is_snap_core18 = False
+    is_snap_snapd = False
+
     def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info):
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
@@ -225,6 +231,36 @@ class ResourceDiskUtil(object):
         cmd = 'dd if=/dev/urandom of=' + self.RD_DEV_PATH + ' bs=512 count=20480'
         return self.executor.Execute(cmd) == CommonVariables.process_success
 
+    def _remove_snaps(self):
+        """ remove any default snaps found that block resource disk encryption """ 
+        is_snap = bool(self.executor.Execute('test -f /usr/bin/snap',False,None,None,True) == 0)
+        if is_snap:            
+            logger.log('snap available, removing lxd, core18, and snapd if installed')
+            is_snap_lxd = bool(self.executor.ExecuteInBash('snap list | grep -q lxd',False,None,None,True) == 0)
+            is_snap_core18 = bool(self.executor.ExecuteInBash('snap list | grep -q core18',False,None,None,True) == 0)
+            is_snap_snapd = bool(self.executor.ExecuteInBash('snap list | grep -q snapd',False,None,None,True) == 0)
+            if is_snap_lxd:
+                self.executor.Execute('snap remove lxd',False)
+            if is_snap_core18:
+                self.executor.Execute('snap remove core18',False)
+            if is_snap_snapd:
+                self.executor.Execute('snap remove snapd',False)
+        else:
+            logger.log('snap not detected, nothing to remove')
+
+    def _restore_snaps(self):
+        """ restore any default snaps removed prior to resource disk encryption """
+        if is_snap:
+            logger.log('snap available, restoring lxd, core18, snapd if removed')
+            if is_snap_snapd:
+                command_executor.Execute('snap install snapd',False)
+            if is_snap_core18:
+                command_executor.Execute('snap install core18',False)
+            if is_snap_lxd:
+                command_executor.Execute('snap install lxd',False)
+        else:
+            logger.log('snap not detected, nothing to restore')
+
     def try_remount(self):
         """ mount the resource disk if not already mounted"""
         self.logger.log("In try_remount")
@@ -290,6 +326,7 @@ class ResourceDiskUtil(object):
 
     def encrypt_format_mount(self):
         if self._resource_disk_exists():
+            self._remove_snaps()
             if not self.prepare():
                 self.logger.log("Failed to prepare VM for Resource Disk Encryption", CommonVariables.ErrorLevel)
                 return False
@@ -304,6 +341,7 @@ class ResourceDiskUtil(object):
                 return False
             # We haven't failed so far, lets just add the RD to crypttab
             self.add_resource_disk_to_crypttab()
+            self._restore_snaps()
         return True
 
     def add_resource_disk_to_crypttab(self):
