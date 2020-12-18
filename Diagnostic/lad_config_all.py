@@ -380,8 +380,8 @@ class LadConfigAll:
                     lad_query_instance_id = uuid_for_instance_id
                 self._set_xml_attr("instanceID", lad_query_instance_id, "Events/DerivedEvents/DerivedEvent/LADQuery")
             else:
-                return False, 'Unable to find resource id in the config. Failed to generate configs for Metrics in mdsd ' \
-                        '(see extension error logs for more details)'
+                self._logger_log('Unable to find resource id in the config. Failed to generate configs for Metrics in mdsd ' \
+                        '(see extension error logs for more details)')
 
             #Only enable Metrics if AzMonSink is in the config
             azmonsink = self._sink_configs_public.get_sink_by_name("AzMonSink")
