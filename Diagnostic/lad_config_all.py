@@ -358,12 +358,13 @@ class LadConfigAll:
             self._rsyslog_config = lad_logging_config_helper.get_rsyslog_config()
             self._syslog_ng_config = lad_logging_config_helper.get_syslog_ng_config()
             parsed_perf_settings = lad_logging_config_helper.parse_lad_perf_settings(lad_cfg)
-            self._telegraf_config, self._telegraf_namespaces = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True)
+            if len(parsed_perf_settings) > 0:
+                self._telegraf_config, self._telegraf_namespaces = telhandler.handle_config(parsed_perf_settings, self._telegraf_me_url, self._telegraf_mdsd_url, True)
 
-            #Handle the EH, JsonBlob and AzMonSink logic
-            self._update_metric_collection_settings(lad_cfg, self._telegraf_namespaces)
-            mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces)
-            copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_telegraf_config)
+                #Handle the EH, JsonBlob and AzMonSink logic
+                self._update_metric_collection_settings(lad_cfg, self._telegraf_namespaces)
+                mdsd_telegraf_config = lad_logging_config_helper.get_mdsd_telegraf_config(self._telegraf_namespaces)
+                copy_source_mdsdevent_eh_url_elems(self._mdsd_config_xml_tree, mdsd_telegraf_config)
 
             resource_id = self._ext_settings.get_resource_id()
             if resource_id:
