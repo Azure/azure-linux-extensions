@@ -215,7 +215,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         for grub_cfg_path in grub_cfg_paths:
             for arg in args_to_add:
-                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel DEFAULT -c {1}".format(arg, grub_cfg_path))
+                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1}".format(arg, grub_cfg_path))
 
-        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+="{0}"\n'.format(" ".join(args_to_add)),
+        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" {0} "\n'.format(" ".join(args_to_add)),
                                       '/etc/default/grub')
