@@ -16,7 +16,15 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import urllib2
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+import sys
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+    
+import urllib.request, urllib.error, urllib.parse
 import json
 import os
 from shutil import copyfile, rmtree
@@ -41,7 +49,7 @@ def is_running(is_lad):
 
     proc = subprocess.Popen(["ps  aux | grep MetricsExtension | grep -v grep"], stdout=subprocess.PIPE, shell=True)
     output = proc.communicate()[0]
-    if metrics_bin in output:
+    if metrics_bin in output.decode('utf-8', 'ignore'):
         return True
     else:
         return False
@@ -86,7 +94,7 @@ def stop_metrics_service(is_lad):
                 # Check if the process running is indeed MetricsExtension, ignore if the process output doesn't contain MetricsExtension
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
-                if metrics_ext_bin in output:
+                if metrics_ext_bin in output.decode('utf-8', 'ignore'):
                     os.kill(int(pid), signal.SIGKILL)
                 else:
                     return False, "Found a different process running with PID {0}. Failed to stop MetricsExtension.".format(pid)
@@ -142,9 +150,9 @@ def generate_Arc_MSI_token():
         while retries <= max_retries:
             arc_endpoint = metrics_utils.get_arc_endpoint()
             try:
-                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://management.azure.com/"
-                req = urllib2.Request(msiauthurl, headers={'Metadata':'true'})
-                res = urllib2.urlopen(req)
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://ingestion.monitor.azure.com/"
+                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.request.urlopen(req)
             except:
                 # The above request is expected to fail and add a key to the path - 
                 authkey_dir = "/var/opt/azcmagent/tokens/"
@@ -160,9 +168,9 @@ def generate_Arc_MSI_token():
                 with open(authkey_path, "r") as f:
                     key = f.read()
                 auth += key
-                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
-                res = urllib2.urlopen(req)
-                data = json.loads(res.read())
+                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
+                res = urllib.request.urlopen(req)
+                data = json.loads(res.read().decode('utf-8', 'ignore'))
 
             if not data or "access_token" not in data:
                 retries += 1
@@ -218,9 +226,9 @@ def generate_MSI_token():
             data = None
             while retries <= max_retries:
                 msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
-                req = urllib2.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
-                res = urllib2.urlopen(req)
-                data = json.loads(res.read())
+                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+                res = urllib.request.urlopen(req)
+                data = json.loads(res.read().decode('utf-8', 'ignore'))
 
                 if not data or "access_token" not in data:
                     retries += 1
@@ -495,9 +503,9 @@ def get_imds_values(is_lad):
     while retries <= max_retries:
 
         #query imds to get the required information
-        req = urllib2.Request(imdsurl, headers={'Metadata':'true'})
-        res = urllib2.urlopen(req)
-        data = json.loads(res.read())
+        req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
+        res = urllib.request.urlopen(req)
+        data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "compute" not in data:
             retries += 1
@@ -561,8 +569,16 @@ def setup_me(is_lad):
     aad_auth_url = ""
     amrurl = "https://management.azure.com/subscriptions/" + subscription_id + "?api-version=2014-04-01"
     try:
-        req = urllib2.Request(amrurl, headers={'Content-Type':'application/json'})
-        res = urllib2.urlopen(req)
+        req = urllib.request.Request(amrurl, headers={'Content-Type':'application/json'})
+
+        # urlopen alias in future backport is broken on py2.6, fails on urls with HTTPS - https://github.com/PythonCharmers/python-future/issues/167
+        # Using this hack of switching between py2 and 3 to avoid this
+        if sys.version_info < (2,7):
+            from urllib2 import HTTPError, Request, urlopen
+            urlopen(req)
+        else:
+            res = urllib.request.urlopen(req)
+
     except Exception as e:
         err_res = e.headers["WWW-Authenticate"]
         for line in err_res.split(","):

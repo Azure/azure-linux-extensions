@@ -56,6 +56,10 @@ class WorkloadPatch:
         self.scriptpath= "DefaultScripts"
         self.temp_script_folder= "/etc/azure"
         self.confParser()
+        self.pre_database_status = ""
+        self.pre_log_mode = ""
+        self.post_database_status = ""
+        self.post_log_mode = ""
 
     def pre(self):
         try:
@@ -115,17 +119,6 @@ class WorkloadPatch:
                 os.remove(self.outfile)
             else:
                 self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
-
-        global preWorkloadStatus
-        preWorkloadStatus = self.workloadStatus()
-        if "OPEN" in str(preWorkloadStatus):
-            self.logger.log("WorkloadPatch: Pre- WorkloadStatus is open")
-        elif "NOT APPLY" in str(preWorkloadStatus):
-            self.logger.log("WorkloadPatch: Pre- WorkloadStatus not apply")
-        else:
-            self.logger.log("WorkloadPatch: Pre- WorkloadStatus not open.")
-            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Pre- Workload not open"))
-            return None
         
         preSuccess = False
         
@@ -153,22 +146,45 @@ class WorkloadPatch:
             while True:
                 line= process.stdout.readline()
                 line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
-                if('BEGIN BACKUP succeeded' in line):
-                    preSuccess = True
-                    break
-                if('BEGIN BACKUP in NOARCHIVELOG' in line):
-                    self.logger.log("WorkloadPatch: No archive log mode for oracle")
-                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseInNoArchiveLog, "Workload in no archive log mode"))
-                    break
                 if(line != ''):
                     self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
                 else:
                     break
+                if('BEGIN BACKUP succeeded' in line):
+                    preSuccess = True
+                    break
+                if('LOG_MODE=' in line):
+                    line = line.replace('\n','')
+                    line_split = line.split('=')
+                    self.logger.log("WorkloadPatch: log mode set is "+line_split[1], True)
+                    if(line_split[1] == "ARCHIVELOG"):
+                        self.pre_log_mode = "ARCHIVELOG"
+                        self.logger.log("WorkloadPatch: Archive log mode for oracle")
+                    else:
+                        self.pre_log_mode = "NOARCHIVELOG" 
+                        self.logger.log("WorkloadPatch: No archive log mode for oracle")
+                if('STATUS=' in line):
+                    line = line.replace('\n', '')
+                    line_split = line.split('=')
+                    self.logger.log("WorkloadPatch: database status is "+line_split[1], True)
+                    if(line_split[1] == "OPEN"):
+                        self.pre_database_status = "OPEN"
+                        self.logger.log("WorkloadPatch: Database is open")
+                    else:##handle other DB status if required
+                        self.pre_database_status = "NOTOPEN"
+                        self.logger.log("WorkloadPatch: Database is not open")
+
+            if(self.pre_log_mode == "NOARCHIVELOG" and self.pre_database_status == "OPEN"):
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseInNoArchiveLog, "Workload in no archive log mode"))                
             if(preSuccess == True):
+                self.logger.log("WorkloadPatch: pre success is true")
                 self.timeoutDaemon()
+            elif(self.pre_database_status == "NOTOPEN"):
+                self.logger.log("WorkloadPatch: Database in closed status, backup can be app consistent")
             else:
-                self.logger.log("WorkloadPatch: Unsupported workload name")
+                self.logger.log("WorkloadPatch: Pre failed for oracle")
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPreError, "Workload Pre failed"))
+            
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
         elif 'postgres' in self.name.lower():
             self.logger.log("WorkloadPatch: Pre- Inside postgres pre")
@@ -199,7 +215,7 @@ class WorkloadPatch:
         global daemonProcess
         self.logger.log("WorkloadPatch: Entering post mode for master")
         try:
-            if self.ipc_folder != None: #IPCm based workloads
+            if self.ipc_folder != None and self.ipc_folder != "": #IPCm based workloads
                 if os.path.exists(self.outfile):
                     os.remove(self.outfile)
                 else:
@@ -219,19 +235,9 @@ class WorkloadPatch:
                     daemonProcess.kill()
         except Exception as e:
             self.logger.log("WorkloadPatch: exception in daemon process indentification" + str(e))
-
-        postWorkloadStatus = self.workloadStatus()
-        if postWorkloadStatus != preWorkloadStatus:
-            self.logger.log("WorkloadPatch: Pre and post database status different.")
-        if "OPEN" in str(postWorkloadStatus):
-            self.logger.log("WorkloadPatch: Post- Workload is open")
-        elif "NOT APPLY" in str(postWorkloadStatus):
-            self.logger.log("WorkloadPatch: Post- WorkloadStatus not apply")
-        else:
-            self.logger.log("WorkloadPatch: Post- Workload is not open")
-            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Post- Workload is not open"))
-            return None
         
+        postSuccess = False
+
         if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post master")
             postscript = os.path.join(self.temp_script_folder, self.scriptpath + "/postMysqlMaster.sql")
@@ -251,14 +257,46 @@ class WorkloadPatch:
             while True:
                 line= process.stdout.readline()
                 line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
-                if 'END BACKUP failed' in line:
-                    self.logger.log("WorkloadPatch: post failed")
-                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "Workload post failed but pre succeeded"))
-                    break
                 if(line != ''):
                     self.logger.log("WorkloadPatch: post completed with output "+line.rstrip(), True)
                 else:
                     break
+                if 'END BACKUP succeeded' in line:
+                    self.logger.log("WorkloadPatch: post succeeded")
+                    postSuccess = True
+                    break
+                if('LOG_MODE=' in line):
+                    line = line.replace('\n','')
+                    line_split = line.split('=')
+                    self.logger.log("WorkloadPatch: log mode set is "+line_split[1], True)
+                    if(line_split[1] == "ARCHIVELOG"):
+                        self.post_log_mode = "ARCHIVELOG"
+                        self.logger.log("WorkloadPatch: Archive log mode for oracle")
+                    else:
+                        self.post_log_mode = "NOARCHIVELOG" 
+                        self.logger.log("WorkloadPatch: No archive log mode for oracle")
+                if('STATUS=' in line):
+                    line = line.replace('\n', '')
+                    line_split = line.split('=')
+                    self.logger.log("WorkloadPatch: database status is "+line_split[1], True)
+                    if(line_split[1] == "OPEN"):
+                        self.post_database_status = "OPEN"
+                        self.logger.log("WorkloadPatch: Database is open")
+                    else:##handle other DB status if required
+                        self.post_database_status = "NOTOPEN"
+                        self.logger.log("WorkloadPatch: Database is not open")
+            if((self.pre_log_mode == "NOARCHIVELOG" and self.post_log_mode == "ARCHIVELOG") or (self.pre_log_mode == "ARCHIVELOG" and self.post_log_mode == "NOARCHIVELOG")):
+                self.logger.log("WorkloadPatch: Database log mode changed during backup")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadLogModeChanged, "Database log mode changed during backup"))
+            if(postSuccess == False):
+                if(self.pre_database_status == "NOTOPEN" and self.post_database_status == "NOTOPEN"):
+                    self.logger.log("WorkloadPatch: Database in closed status, backup is app consistent")
+                elif((self.pre_database_status == "OPEN" and self.post_database_status == "NOTOPEN") or (self.pre_database_status == "NOTOPEN" and self.post_database_status == "OPEN")):
+                    self.logger.log("WorkloadPatch: Database status changed during backup")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseStatusChanged, "Database status changed during backup"))
+                else:
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "Workload Post failed"))
+            
             self.logger.log("WorkloadPatch: Post- Completed")
             self.callLogBackup()
         elif 'postgres' in self.name.lower():
@@ -285,17 +323,6 @@ class WorkloadPatch:
                 os.remove(self.outfile)
             else:
                 self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
-        
-        global preWorkloadStatus
-        preWorkloadStatus = self.workloadStatus()
-        if "OPEN" in str(preWorkloadStatus):
-            self.logger.log("WorkloadPatch: Pre- WorkloadStatus is open")
-        elif "NOT APPLY" in str(preWorkloadStatus):
-            self.logger.log("WorkloadPatch: Pre- WorkloadStatus not apply")
-        else:
-            self.logger.log("WorkloadPatch: Pre- WorkloadStatus not open.")
-            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Pre- Workload not open"))
-            return None
 
         if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for preslave mysql")
@@ -307,17 +334,6 @@ class WorkloadPatch:
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
-        elif 'oracle' in self.name.lower():
-            self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
-            preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
-            args = "su - "+self.linux_user+" -c "+"\'"+preOracle+"\'"
-            process = subprocess.Popen(args, stdout=subprocess.PIPE)
-            wait_counter = 5
-            while process.poll() == None and wait_counter>0:
-                wait_counter -= 1
-                sleep(2)
-            self.timeoutDaemon()
-            self.logger.log("WorkloadPatch: Pre- Exiting pre mode for slave")
         #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
@@ -325,7 +341,7 @@ class WorkloadPatch:
          
     def postSlave(self):
         self.logger.log("WorkloadPatch: Entering post mode for slave")
-        if self.ipc_folder != None: #IPCm based workloads
+        if self.ipc_folder != None and self.ipc_folder != "":#IPCm based workloads
             if os.path.exists(self.outfile):
                 os.remove(self.outfile)
             else:
@@ -345,18 +361,6 @@ class WorkloadPatch:
             elif daemonProcess.poll() is None:
                 self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
                 daemonProcess.kill()
-        
-        postWorkloadStatus = self.workloadStatus()
-        if postWorkloadStatus != preWorkloadStatus:
-            self.logger.log("WorkloadPatch: Pre and post database status different.")
-        if "OPEN" in str(postWorkloadStatus):
-            self.logger.log("WorkloadPatch: Post- Workload is open")
-        elif "NOT APPLY" in str(postWorkloadStatus):
-            self.logger.log("WorkloadPatch: Post- WorkloadStatus not apply")
-        else:
-            self.logger.log("WorkloadPatch: Post- Workload is not open")
-            self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseNotOpen, "Post- Workload is not open"))
-            return None
 
         if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post slave")
@@ -364,15 +368,6 @@ class WorkloadPatch:
             args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
             self.logger.log("WorkloadPatch: command to execute: "+str(args))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
-        elif 'oracle' in self.name.lower():
-            self.logger.log("WorkloadPatch: Post- Inside oracle post")
-            postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
-            args =  "su - "+self.linux_user+" -c "+"\'"+postOracle+"\'"
-            process = subprocess.Popen(args, stdout=subprocess.PIPE)
-            while process.poll()==None:
-                sleep(1)
-            self.logger.log("WorkloadPatch: Post- Completed")
-            self.callLogbackup()
         #Add new workload support here
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
@@ -410,6 +405,7 @@ class WorkloadPatch:
                         return None
                     if config.has_option("workload", 'command_path'):                        
                         self.command = config.get("workload", 'command_path')
+                        self.command = self.command+"/"
                         self.logger.log("WorkloadPatch: config workload command "+ self.command)
                     if config.has_option("workload", 'credString'):
                         self.cred_string = config.get("workload", 'credString')
@@ -426,7 +422,9 @@ class WorkloadPatch:
                         self.ipc_folder = config.get("workload", 'ipc_folder')
                         self.logger.log("WorkloadPatch: config ipc folder "+ self.ipc_folder)
                     if config.has_option("workload", 'timeout'):
-                        self.timeout = config.get("workload", 'timeout')
+                        timeout = config.get("workload", 'timeout')
+                        if timeout != "" and timeout != None:
+                            self.timeout = timeout
                         self.logger.log("WorkloadPatch: config timeout of pre script "+ self.timeout)
                     if config.has_option("workload", 'linux_user'):
                         self.linux_user = config.get("workload", 'linux_user')
@@ -543,14 +541,6 @@ class WorkloadPatch:
                     break
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadConnectionError, "sql connection failed"))
         return None
-
-    def workloadStatus(self):
-        if 'oracle' in self.name.lower():
-            statusArgs =  "su - " + self.linux_user + " -c " +"'" + self.command + "sqlplus" +" -S -R 2 /nolog<<-EOF\nCONNECT / AS SYSBACKUP\nWHENEVER SQLERROR CONTINUE\nSELECT STATUS FROM V\$INSTANCE;\nEOF'"
-            oracleStatus = subprocess.check_output(statusArgs, shell=True)
-            self.logger.log("WorkloadPatch: workloadStatus- " + str(oracleStatus))
-            return oracleStatus
-        return "NOT APPLY"
 
     def thread_for_sql(self,args):
         self.logger.log("WorkloadPatch: command to execute: "+str(args))

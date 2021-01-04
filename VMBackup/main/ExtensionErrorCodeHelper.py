@@ -51,10 +51,11 @@ class ExtensionErrorCodeEnum():
     FailedWorkloadAuthorizationMissing = 505
     FailedWorkloadConnectionError = 506
     FailedWorkloadIPCDirectoryMissing = 507
-    FailedWorkloadDatabaseNotOpen = 508
+    FailedWorkloadDatabaseStatusChanged = 508
     FailedWorkloadQuiescingError = 509
     FailedWorkloadQuiescingTimeout = 510
     FailedWorkloadDatabaseInNoArchiveLog = 511
+    FailedWorkloadLogModeChanged = 512
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -107,10 +108,11 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedWorkloadAuthorizationMissing : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadConnectionError : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadIPCDirectoryMissing : Status.ExtVmHealthStateEnum.yellow,
-            ExtensionErrorCodeEnum.FailedWorkloadDatabaseNotOpen : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedWorkloadDatabaseStatusChanged : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadQuiescingError : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadQuiescingTimeout : Status.ExtVmHealthStateEnum.yellow,
-            ExtensionErrorCodeEnum.FailedWorkloadDatabaseInNoArchiveLog : Status.ExtVmHealthStateEnum.yellow
+            ExtensionErrorCodeEnum.FailedWorkloadDatabaseInNoArchiveLog : Status.ExtVmHealthStateEnum.yellow,
+            ExtensionErrorCodeEnum.FailedWorkloadLogModeChanged : Status.ExtVmHealthStateEnum.yellow
             }
 
     ExtensionErrorCodeNameDict = {
@@ -161,10 +163,11 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedWorkloadAuthorizationMissing : "FailedWorkloadAuthorizationMissing",
             ExtensionErrorCodeEnum.FailedWorkloadConnectionError : "FailedWorkloadConnectionError",
             ExtensionErrorCodeEnum.FailedWorkloadIPCDirectoryMissing : "FailedWorkloadIPCDirectoryMissing",
-            ExtensionErrorCodeEnum.FailedWorkloadDatabaseNotOpen : "FailedWorkloadDatabaseNotOpen",
+            ExtensionErrorCodeEnum.FailedWorkloadDatabaseStatusChanged : "FailedWorkloadDatabaseStatusChanged",
             ExtensionErrorCodeEnum.FailedWorkloadQuiescingError : "FailedWorkloadQuiescingError",
             ExtensionErrorCodeEnum.FailedWorkloadQuiescingTimeout : "FailedWorkloadQuiescingTimeout",
-            ExtensionErrorCodeEnum.FailedWorkloadDatabaseInNoArchiveLog : "FailedWorkloadDatabaseInNoArchiveLog"
+            ExtensionErrorCodeEnum.FailedWorkloadDatabaseInNoArchiveLog : "FailedWorkloadDatabaseInNoArchiveLog",
+            ExtensionErrorCodeEnum.FailedWorkloadLogModeChanged : "FailedWorkloadLogModeChanged"
             }
     
     @staticmethod
