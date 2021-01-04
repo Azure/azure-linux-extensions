@@ -146,7 +146,6 @@ int main(int argc, char *argv[])
     }
 
     logger("****** 2. Binary Freeze Started \n");
-    sync();
     for (i = 0; i < numFileSystems; i++)
     {
         char *mountPoint = argv[i + 2];
