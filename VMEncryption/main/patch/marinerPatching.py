@@ -79,15 +79,11 @@ class marinerPatching(AbstractPatching):
 
     def install_extras(self):
         packages = ['at',
-                    'cryptsetup',
                     'cryptsetup-reencrypt',
                     'lsscsi',
-                    'lvm2',
                     'patch',
-                    'procps-ng',
                     'psmisc',
                     'python-six',
-                    'util-linux',
                     'uuid']
 
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
