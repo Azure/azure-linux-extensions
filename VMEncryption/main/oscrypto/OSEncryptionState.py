@@ -198,8 +198,8 @@ class OSEncryptionState(object):
             ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
             ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
         ]
-        grub_cfg_paths = filter(os.path.exists, grub_cfg_paths[0])
-        grub_cfg_paths = filter(os.path.exists, grub_cfg_paths[1])
+
+        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
 
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
             for arg in args_to_add:
