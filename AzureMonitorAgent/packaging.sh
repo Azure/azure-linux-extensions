@@ -33,12 +33,15 @@ cp -r  ../LAD-AMA-Common/telegraf_utils .
 cp -r  ../Diagnostic/services .
 
 # cleanup packages, ext
-rm -rf packages MetricsExtensionBin
-mkdir -p packages MetricsExtensionBin
+rm -rf packages MetricsExtensionBin ext/future
+mkdir -p packages MetricsExtensionBin ext/future
 
 # copy shell bundle to packages/
 cp $input_path/azure-mdsd_$AGENT_VERSION* packages/
 cp $input_path/MetricsExtension MetricsExtensionBin/
+
+# copy just the source of python-future
+cp -r ext/python-future/src/* ext/future
 
 # sync the file copy
 sync
@@ -50,7 +53,7 @@ fi
 
 echo "Packaging extension $PACKAGE_NAME to $output_path"
 excluded_files="agent.version packaging.sh apply_version.sh update_version.sh"
-zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references"
+zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./ext/python-future/*"
 
 # cleanup newly added dir or files
 rm -rf Utils/ waagent

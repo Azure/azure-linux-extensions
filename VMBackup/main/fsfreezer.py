@@ -139,6 +139,7 @@ class FsFreezer:
         try:
             mounts_to_skip = self.hutil.get_strvalue_from_configfile('MountsToSkip','')
             self.logger.log("skipped mount :" + str(mounts_to_skip), True)
+            mounts_list_to_skip = mounts_to_skip.split(',')
         except Exception as e:
             errMsg='Failed to read from config, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True,'Warning')
@@ -152,7 +153,7 @@ class FsFreezer:
                 if(mount.mount_point == '/'):
                     self.root_seen = True
                     self.root_mount = mount
-                elif(mount.mount_point != mounts_to_skip and not self.should_skip(mount)):
+                elif(mount.mount_point not in mounts_list_to_skip and not self.should_skip(mount)):
                     if(self.skip_freeze == True):
                         self.skip_freeze = False
                     args.append(str(mount.mount_point))
