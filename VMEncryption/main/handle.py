@@ -189,7 +189,10 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
         extra_device_items=items_to_encrypt,
         disk_util=disk_util)
 
-    settings.post_to_wireserver(data)
+    if len(data.get('Disks')) > 0:
+        settings.post_to_wireserver(data)
+    else:
+        logger.log("No disk found for stamping. Skipping stamping request.")
 
     filenames = []
     for disk in data.get("Disks", []):
@@ -933,6 +936,14 @@ def perform_migration(disk_util, existing_passphrase_file, encryption_config):
         logger.log("Migration: Fatal Exception thrown during migration")
         logger.log(traceback.format_exc())
         msg = e.message
+        try:
+            logger.log("Try clearing stamped encryption settings in case of failure.")
+            settings_util = EncryptionSettingsUtil(logger)
+            settings_util.clear_encryption_settings(disk_util)
+        except Exception:
+            # Do not fail if clear encryption settings fail in dual pass
+            logger.log("Failed to clear encryption settings from disk")
+            pass
         hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='Migrate',
                       status=CommonVariables.extension_error_status,
