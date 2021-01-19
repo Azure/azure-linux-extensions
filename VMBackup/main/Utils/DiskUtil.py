@@ -138,6 +138,7 @@ class DiskUtil(object):
         configfile = '/etc/azure/vmbackup.conf'
         command_user = ''
         alternate_user = False
+
         try :
             if os.path.exists(configfile):
                 config = ConfigParsers.ConfigParser()
@@ -152,11 +153,13 @@ class DiskUtil(object):
                     alternate_user = True
         except Exception as e:
             pass
+
         out_lsblk_output = None
         error_msg = None
         is_lsblk_path_wrong = False
         try:
             if (alternate_user):
+                self.logger.log("Switching to alternate user to run this lsblk command: " + str(command_user), True)
                 p = Popen(command_user, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             elif(dev_path is None):
                 p = Popen([str(lsblk_path), '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
