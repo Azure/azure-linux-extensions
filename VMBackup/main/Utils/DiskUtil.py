@@ -28,6 +28,10 @@ import glob
 from common import DeviceItem
 import Utils.HandlerUtil
 import traceback
+try:
+        import ConfigParser as ConfigParsers
+except ImportError:
+        import configparser as ConfigParsers
 
 class DiskUtil(object):
     def __init__(self, patching, logger):
@@ -131,11 +135,30 @@ class DiskUtil(object):
 
     def get_lsblk_pairs_output(self, lsblk_path, dev_path):
         self.logger.log("get_lsblk_pairs_output : getting the blk info from " + str(dev_path) + " using lsblk_path " + str(lsblk_path), True)
+        configfile = '/etc/azure/vmbackup.conf'
+        command_user = ''
+        alternate_user = False
+        try :
+            if os.path.exists(configfile):
+                config = ConfigParsers.ConfigParser()
+                config.read(configfile)
+                if config.has_option('lsblkUser','username'):
+                    lsblk_user = config.get('lsblkUser','username')
+                    command_user = "su - " + lsblk_user + " -c"
+                    if (dev_path is None):
+                        command_user = command_user + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'
+                    else:
+                        command_user = command_user + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE' + ' ' + dev_path
+                    alternate_user = True
+        except Exception as e:
+            pass
         out_lsblk_output = None
         error_msg = None
         is_lsblk_path_wrong = False
         try:
-            if(dev_path is None):
+            if (alternate_user):
+                p = Popen(command_user, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            elif(dev_path is None):
                 p = Popen([str(lsblk_path), '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
                 p = Popen([str(lsblk_path), '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
