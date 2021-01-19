@@ -160,7 +160,7 @@ class DiskUtil(object):
         try:
             if (alternate_user):
                 self.logger.log("Switching to alternate user to run this lsblk command: " + str(command_user), True)
-                p = Popen(command_user, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                p = Popen(command_user, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
             elif(dev_path is None):
                 p = Popen([str(lsblk_path), '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
