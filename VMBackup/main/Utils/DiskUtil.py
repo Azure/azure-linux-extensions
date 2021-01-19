@@ -147,9 +147,9 @@ class DiskUtil(object):
                     lsblk_user = config.get('lsblkUser','username')
                     command_user = "su - " + lsblk_user + " -c"
                     if (dev_path is None):
-                        command_user = command_user + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'
+                        command_user = command_user + ' \'' + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE' + '\''
                     else:
-                        command_user = command_user + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE' + ' ' + dev_path
+                        command_user = command_user + ' \'' + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE' + ' ' + dev_path + '\''
                     alternate_user = True
         except Exception as e:
             pass
