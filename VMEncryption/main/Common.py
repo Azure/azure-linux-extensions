@@ -203,7 +203,7 @@ class CommonVariables:
     error messages
     """
     migration_detached_header = "Not all data disks were encrypted using encrypt format all. Migration is not supported."
-    migration_detached_header_xfs = "One or more data disk were not encrypted using encrypt format all and has xfs filesystem. Migration is not supported."
+    migration_detached_header_xfs = "One or more data disks were not encrypted using encrypt format all and have xfs filesystem. Migration is not supported."
     migration_wrong_passphrase = "Passphrase validation failed. Please check your passphrase and try again."
 
 class TestHooks:
