@@ -32,6 +32,7 @@ from DiskUtil import *
 from CryptMountConfigUtil import *
 from EncryptionConfig import *
 
+
 class OSEncryptionState(object):
     def __init__(self, state_name, context):
         super(OSEncryptionState, self).__init__()
@@ -154,8 +155,9 @@ class OSEncryptionState(object):
 
         # search for matching mount point item
         for mp_item in self.disk_util.get_mount_items():
-            if dev == os.lstat(mp_item["dest"]).st_dev:
-                result = mp_item["src"]
+            if os.path.exists(mp_item["dest"]):
+                if dev == os.lstat(mp_item["dest"]).st_dev:
+                    result = mp_item["src"]
 
         return result
 
@@ -181,6 +183,30 @@ class OSEncryptionState(object):
         matches = re.findall(r'UUID=(.*?)\s+{0}\s+'.format(mountpoint), contents)
         if matches:
             return matches[0]
+
+    def _get_boot_uuid(self):
+        return self._parse_uuid_from_fstab('/boot')
+
+    def _add_kernelopts(self, args_to_add):
+        """
+        For EFI machines (Gen2) we want to use the EFI grub.cfg path
+        For BIOS machines (Gen1) we want to use the old grub.cfg path
+        But we can't tell at this stage easily which one to use if both are present. so we will just update both.
+        Moreover, in case somebody runs grub2-mkconfig on the machine we don't want the changes to get nuked out, we will update grub defaults file too.
+        """
+        grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
+            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
+        ]
+
+        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
+
+        for grub_cfg_path, grub_env_path in grub_cfg_paths:
+            for arg in args_to_add:
+                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
+
+        self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" {0} "\n'.format(" ".join(args_to_add)),
+                                      '/etc/default/grub')
 
     def _get_block_device_size(self, dev):
         if not os.path.exists(dev):
@@ -216,7 +242,7 @@ class OSEncryptionState(object):
     def _is_uuid(self, s):
         try:
             UUID(s)
-        except:
+        except Exception:
             return False
         else:
             return True
