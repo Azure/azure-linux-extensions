@@ -21,6 +21,7 @@ import Utils.HandlerUtil
 import threading
 import os
 from time import sleep
+import re
 try:
     import ConfigParser as ConfigParsers
 except ImportError:
@@ -60,13 +61,30 @@ class WorkloadPatch:
         self.pre_log_mode = ""
         self.post_database_status = ""
         self.post_log_mode = ""
+        self.instancelist_path = None
+        self.instance_list = []
+
+    def readOracleList(self,filePath):
+        re_db = re.compile(r'^(?P<DB>(\w+)):(?P<PATH>(/|\w+|\.)+):(Y|N)')
+        instanceList = []
+        with open('C:/Users/abgoya.FAREAST/Desktop/oratabfile.txt', 'r') as f:
+            for line in f:
+                line = line.strip()
+                re_db_match = re_db.search(line)
+                if re_db_match:
+                    db = re_db_match.group('DB')
+                    path = re_db_match.group('PATH')
+                    instanceList.append((db,path))
+        return instanceList
 
     def pre(self):
         try:
             self.logger.log("WorkloadPatch: Entering workload pre call")
             self.createTempScriptsFolder()
             if self.role == "master" and int(self.enforce_slave_only) == 0:
-                if len(self.dbnames) == 0 :
+                if self.instancelist_path!= None:
+                    self.preInstance()
+                elif len(self.dbnames) == 0 :
                     #pre at server level create fork process for child and append
                     self.preMaster()
                 else:
@@ -89,7 +107,9 @@ class WorkloadPatch:
         try:
             self.logger.log("WorkloadPatch: Entering workload post call")
             if self.role == "master":
-                if len(self.dbnames) == 0:
+                if len(self.instance_list) != 0:
+                    self.postInstance()
+                elif len(self.dbnames) == 0:
                     #post at server level to turn off readonly mode
                     self.postMaster()
                 else:
@@ -110,6 +130,87 @@ class WorkloadPatch:
             self.removeTempScriptsFolder()
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "exception in processing of postscript"))
 
+    def preInstance(self):
+        instance_list = self.readOracleList(self.instancelist_path)
+        for oracleInstance in instance_list:
+            oracle_sid = oracleInstance[0]
+            oracle_home = oracleInstance[1]
+            newEnv = os.environ.copy()
+            newEnv["ORACLE_SID"] = oracle_sid
+            newEnv["ORACLE_HOME"] = oracle_home
+            newEnv["PATH"] += os.pathsep + oracle_home
+            self.preMasterInstance(newEnv)
+
+    def preMasterInstance(self, newEnv = None):
+        global preSuccess
+        self.logger.log("WorkloadPatch: Entering pre mode for master")
+        if self.ipc_folder != None:
+            self.outfile = os.path.join(self.ipc_folder, "azbackupIPC.txt")
+            if os.path.exists(self.outfile):
+                os.remove(self.outfile)
+            else:
+                self.logger.log("WorkloadPatch: File for IPC does not exist at pre")
+                    
+        preSuccess = False
+        
+        if 'oracle' in self.name.lower():
+            self.logger.log("WorkloadPatch: Pre- Inside oracle pre")
+            preOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
+            args = "su - "+self.linux_user+" -c "+"\'"+preOracle+"\'"
+            self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
+
+            if (newEnv != None):
+                process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True, env=newEnv)
+            else:
+                process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
+            wait_counter = 5
+            while process.poll() == None and wait_counter>0:
+                wait_counter -= 1
+                sleep(2)
+            while True:
+                line= process.stdout.readline()
+                line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
+                if(line != ''):
+                    self.logger.log("WorkloadPatch: pre completed with output "+line.rstrip(), True)
+                else:
+                    break
+                if('BEGIN BACKUP succeeded' in line):
+                    preSuccess = True
+                    break
+                if('LOG_MODE=' in line):
+                    line = line.replace('\n','')
+                    line_split = line.split('=')
+                    self.logger.log("WorkloadPatch: log mode set is "+line_split[1], True)
+                    if(line_split[1] == "ARCHIVELOG"):
+                        self.pre_log_mode = "ARCHIVELOG"
+                        self.logger.log("WorkloadPatch: Archive log mode for oracle")
+                    else:
+                        self.pre_log_mode = "NOARCHIVELOG" 
+                        self.logger.log("WorkloadPatch: No archive log mode for oracle")
+                if('STATUS=' in line):
+                    line = line.replace('\n', '')
+                    line_split = line.split('=')
+                    self.logger.log("WorkloadPatch: database status is "+line_split[1], True)
+                    if(line_split[1] == "OPEN"):
+                        self.pre_database_status = "OPEN"
+                        self.logger.log("WorkloadPatch: Database is open")
+                    else:##handle other DB status if required
+                        self.pre_database_status = "NOTOPEN"
+                        self.logger.log("WorkloadPatch: Database is not open")
+
+            if(self.pre_log_mode == "NOARCHIVELOG" and self.pre_database_status == "OPEN"):
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseInNoArchiveLog, "Workload in no archive log mode"))                
+            if(preSuccess == True):
+                self.logger.log("WorkloadPatch: pre success is true")
+                self.timeoutDaemon(newEnv)
+            elif(self.pre_database_status == "NOTOPEN"):
+                self.logger.log("WorkloadPatch: Database in closed status, backup can be app consistent")
+            else:
+                self.logger.log("WorkloadPatch: Pre failed for oracle")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPreError, "Workload Pre failed"))
+            
+            self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
+            
     def preMaster(self):
         global preSuccess
         self.logger.log("WorkloadPatch: Entering pre mode for master")
@@ -210,7 +311,103 @@ class WorkloadPatch:
         else:
             self.logger.log("WorkloadPatch: Unsupported workload name")
             self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadInvalidWorkloadName, "Workload Not supported"))
+    
+    def postInstance(self):
+        for oracleInstance in self.instance_list:
+            oracle_sid = oracleInstance[0]
+            oracle_home = oracleInstance[1]
+            newEnv = os.environ.copy()
+            newEnv["ORACLE_SID"] = oracle_sid
+            newEnv["ORACLE_HOME"] = oracle_home
+            newEnv["PATH"] += os.pathsep + oracle_home
+            self.postMasterInstance(newEnv)
+    
+    def postMasterInstance(self, newEnv= None):
+        global daemonProcess
+        self.logger.log("WorkloadPatch: Entering post mode for master")
+        try:
+            if self.ipc_folder != None and self.ipc_folder != "": #IPCm based workloads
+                if os.path.exists(self.outfile):
+                    os.remove(self.outfile)
+                else:
+                    self.logger.log("WorkloadPatch: File for IPC does not exist at post")
+                if len(self.child) == 0 or self.child[0].poll() is not None:
+                    self.logger.log("WorkloadPatch: Not app consistent backup")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
+                elif self.child[0].poll() is None:
+                    self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+                    self.child[0].kill()
+            else: #non IPC based workloads
+                if daemonProcess is None or daemonProcess.poll() is not None:
+                    self.logger.log("WorkloadPatch: Not app consistent backup")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
+                elif daemonProcess.poll() is None:
+                    self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+                    daemonProcess.kill()
+        except Exception as e:
+            self.logger.log("WorkloadPatch: exception in daemon process indentification" + str(e))
+        
+        postSuccess = False
+
+        if 'oracle' in self.name.lower():
+            self.logger.log("WorkloadPatch: Post- Inside oracle post")
+            postOracle = self.command + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
+            args =  "su - "+self.linux_user+" -c "+"\'"+postOracle+"\'"
+            self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
+            if (newEnv!= None):
+                process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True, env= newEnv)
+            else:
+                process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
+            wait_counter = 5
+            while process.poll()==None and wait_counter>0:
+                wait_counter -= 1
+                sleep(2)
+            while True:
+                line= process.stdout.readline()
+                line = Utils.HandlerUtil.HandlerUtility.convert_to_string(line)
+                if(line != ''):
+                    self.logger.log("WorkloadPatch: post completed with output "+line.rstrip(), True)
+                else:
+                    break
+                if 'END BACKUP succeeded' in line:
+                    self.logger.log("WorkloadPatch: post succeeded")
+                    postSuccess = True
+                    break
+                if('LOG_MODE=' in line):
+                    line = line.replace('\n','')
+                    line_split = line.split('=')
+                    self.logger.log("WorkloadPatch: log mode set is "+line_split[1], True)
+                    if(line_split[1] == "ARCHIVELOG"):
+                        self.post_log_mode = "ARCHIVELOG"
+                        self.logger.log("WorkloadPatch: Archive log mode for oracle")
+                    else:
+                        self.post_log_mode = "NOARCHIVELOG" 
+                        self.logger.log("WorkloadPatch: No archive log mode for oracle")
+                if('STATUS=' in line):
+                    line = line.replace('\n', '')
+                    line_split = line.split('=')
+                    self.logger.log("WorkloadPatch: database status is "+line_split[1], True)
+                    if(line_split[1] == "OPEN"):
+                        self.post_database_status = "OPEN"
+                        self.logger.log("WorkloadPatch: Database is open")
+                    else:##handle other DB status if required
+                        self.post_database_status = "NOTOPEN"
+                        self.logger.log("WorkloadPatch: Database is not open")
+            if((self.pre_log_mode == "NOARCHIVELOG" and self.post_log_mode == "ARCHIVELOG") or (self.pre_log_mode == "ARCHIVELOG" and self.post_log_mode == "NOARCHIVELOG")):
+                self.logger.log("WorkloadPatch: Database log mode changed during backup")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadLogModeChanged, "Database log mode changed during backup"))
+            if(postSuccess == False):
+                if(self.pre_database_status == "NOTOPEN" and self.post_database_status == "NOTOPEN"):
+                    self.logger.log("WorkloadPatch: Database in closed status, backup is app consistent")
+                elif((self.pre_database_status == "OPEN" and self.post_database_status == "NOTOPEN") or (self.pre_database_status == "NOTOPEN" and self.post_database_status == "OPEN")):
+                    self.logger.log("WorkloadPatch: Database status changed during backup")
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseStatusChanged, "Database status changed during backup"))
+                else:
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPostError, "Workload Post failed"))
             
+            self.logger.log("WorkloadPatch: Post- Completed")
+            self.callLogBackup()
+
     def postMaster(self):
         global daemonProcess
         self.logger.log("WorkloadPatch: Entering post mode for master")
@@ -438,6 +635,9 @@ class WorkloadPatch:
                         self.logger.log("WorkloadPatch: config workload customer using custom script "+ self.custom_scripts_enabled)
                         if int(self.custom_scripts_enabled) == 1:
                             self.scriptpath= "CustomScripts"
+                    if config.has_option("workload", 'instancelist_path'):
+                        self.instancelist_path = config.get("workload", 'instancelist_path')
+                        self.logger.log("WorkloadPatch: config workload customer having multiple instances mentioned at path "+ self.instancelist_path)
                     if config.has_section("logbackup"):
                         self.logbackup = "enable"
                         self.logger.log("WorkloadPatch: Logbackup Enabled")
@@ -518,12 +718,16 @@ class WorkloadPatch:
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingError, "pre failed to quiesce"))
                 return None
         
-    def timeoutDaemon(self):
+    def timeoutDaemon(self, newEnv = None):
         global daemonProcess
         argsDaemon = "su - "+self.linux_user+" -c " + "'" + os.path.join(self.temp_script_folder, self.scriptpath + "/timeoutDaemon.sh")+" "+self.name+" "+self.command+" \""+self.cred_string+"\" "+self.timeout+" "+os.path.join(self.temp_script_folder, self.scriptpath + "'")
         devnull = open(os.devnull, 'w')
-        daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull, shell=True)
-            
+
+        if (newEnv != None):
+            daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull, shell=True, env=newEnv)
+        else:
+            daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull, shell=True)
+        
         wait_counter = 5
         while (daemonProcess is None or daemonProcess.poll() is not None) and wait_counter > 0:
             self.logger.log("WorkloadPatch: daemonProcess not created yet", True)
