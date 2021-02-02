@@ -124,7 +124,7 @@ class Backuplogger(object):
                         distro_str = self.hutil.patching.distro_info[0]
                     self.msg = "Distro Info:" + distro_str + "\n" + self.msg
                 self.msg = "Guest Agent Version is :" + waagent.GuestAgentVersion + "\n" + self.msg
-                log_to_blob = str(self.hutil.fetch_log_message()) + "Tail of previous logs:" + str(self.prev_log) + "Tail of shell script log:" + str(self.hutil.get_shell_script_log())
+                log_to_blob = str(self.hutil.fetch_log_message()) + "Tail of shell script log:" + str(self.hutil.get_shell_script_log())
             except Exception as e:
                 errMsg = 'Failed to get the waagent log with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
                 self.hutil.log(errMsg)
