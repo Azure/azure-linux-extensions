@@ -338,9 +338,9 @@ def start_metrics(is_lad):
         az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
 
         if is_lad:
-            monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
+            monitoringAccount = "custommetric_"+ subscription_id
         else:
-            monitoringAccount = "CUSTOMMETRIC_"+ subscription_id + "_" + location
+            monitoringAccount = "custommetric_"+ subscription_id + "_" + location
 
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
@@ -612,9 +612,9 @@ def setup_me(is_lad):
         f.write(me_conf)
 
     if is_lad:
-        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
+        me_monitoring_account = "custommetric_"+ subscription_id
     else:
-        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + "_" +location
+        me_monitoring_account = "custommetric_"+ subscription_id + "_" +location
 
     custom_conf_path = me_config_dir + me_monitoring_account +"_MonitoringAccount_Configuration.json"
     with open(custom_conf_path, "w") as f:
