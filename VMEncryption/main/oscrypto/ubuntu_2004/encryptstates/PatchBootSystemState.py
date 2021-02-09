@@ -132,19 +132,6 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('cp {0} /usr/share/initramfs-tools/hooks/luksheader'.format(injectscriptpath), True)
         self.command_executor.Execute('chmod +x /usr/share/initramfs-tools/hooks/luksheader', True)
 
-        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-        patchesdir = os.path.join(scriptdir, '../encryptpatches')
-        patchpath = os.path.join(patchesdir, 'ubuntu_2004_initramfs.patch')
-
-        if not os.path.exists(patchpath):
-            message = "Patch not found at path: {0}".format(patchpath)
-            self.context.logger.log(message)
-            raise Exception(message)
-        else:
-            self.context.logger.log("Patch found at path: {0}".format(patchpath))
-        
-        self.command_executor.ExecuteInBash('patch -b -d /usr/share/initramfs-tools/hooks -p1 <{0}'.format(patchpath), True)
-
         os_volume = None
         if os.path.exists(CommonVariables.az_symlink_os_volume) and os.path.realpath(CommonVariables.az_symlink_os_volume) == os.path.realpath(self.rootfs_block_device):
             os_volume = CommonVariables.az_symlink_os_volume
@@ -153,6 +140,11 @@ class PatchBootSystemState(OSEncryptionState):
         
         entry = 'osencrypt {0} none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'.format(os_volume)
         self._append_contents_to_file(entry, '/etc/crypttab')
+
+        # TODO
+        # before updating grub, config needs to be changed to target osencrypt
+        # remove 40-force grub config rule added by cloudinit with outdated UUID
+        # update grub cmdline to root to /dev/mapper/osencrypt
 
         self.command_executor.Execute('update-initramfs -u -k all', True)
         self.command_executor.Execute('update-grub', True)
