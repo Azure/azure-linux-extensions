@@ -97,9 +97,12 @@ class PrereqState(OSEncryptionState):
 
     def _snap_stop(self):
         self.context.logger.log('stop snaps and unmount')
-        self.command_executor.Execute('snap stop lxd',False)
-        self.command_executor.ExecuteInBash('umount `lsblk -r -o MOUNTPOINT | grep /snap/lxd`',False)
-        self.command_executor.Execute('snap stop core18',False)
-        self.command_executor.ExecuteInBash('umount `lsblk -r -o MOUNTPOINT | grep /snap/core18`',False)
-        self.command_executor.Execute('snap stop snapd',False)
-        self.command_executor.ExecuteInBash('umount `lsblk -r -o MOUNTPOINT | grep /snap/snapd`',False)
+
+        # stop all snapd services until next system restart to release file handles
+        self.command_executor.ExecuteInBash("for line in `systemctl list-unit-files | grep snap | grep -Eo '^[^ ]+'`; do printf 'stopping $line \n'; systemctl stop $line; done");
+        self.command_executor.ExecuteInBash("for line in `systemctl list-unit-files | grep snap | grep -Eo '^[^ ]+'`; do printf '$line '; systemctl is-active $line; done");
+
+        # unmount default snap created mountpoints in base image
+        self.command_executor.ExecuteInBash('for MP in `lsblk -r -o MOUNTPOINT | grep /snap/lxd`;do umount "$MP";done',False)
+        self.command_executor.ExecuteInBash('for MP in `lsblk -r -o MOUNTPOINT | grep /snap/core18`;do umount "$MP";done',False)
+        self.command_executor.ExecuteInBash('for MP in `lsblk -r -o MOUNTPOINT | grep /snap/snapd`;do umount "$MP";done',False)
