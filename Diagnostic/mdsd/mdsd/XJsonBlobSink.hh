@@ -35,7 +35,7 @@ public:
 
     T& get() { return _object; }
 
-    std::unique_lock<std::mutex>&& LockIfOwnedByNoneThenSetOwner(const std::string& ownerName)
+    void LockIfOwnedByNoneThenSetOwner(const std::string& ownerName)
     {
         if (ownerName.empty()) {
             throw std::invalid_argument("Passed ownerName is empty in ObjectWithOwnership::LockIfOwnedByNoneThenSetOwner");
@@ -44,7 +44,6 @@ public:
         std::unique_lock<std::mutex> lock(_mutex);
         _cv.wait(lock, [this]{ return _ownerName.empty(); });
         _ownerName = ownerName;
-        return std::move(lock);
     }
 
     // Caller must make sure that the set owner is itself.
