@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+  ** usr/bin/env python **
 #
-# AzureMonitoringLinuxAgent Extension
+  "AzureMonitoring/Agent.py"
 #
 # Copyright 2019 Microsoft Corporation
 #
@@ -8,18 +8,18 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+# http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.
+  "limitations under the License."
 
 from __future__ import print_function
 import sys
 # future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
+  importing from source causes import errors on python 3, lets skip import
 if sys.version_info[0] < 3:
     from future import standard_library
     standard_library.install_aliases()
@@ -61,7 +61,7 @@ try:
     from Utils.WAAgentUtil import waagent
     import Utils.HandlerUtil as HUtil
 except Exception as e:
-    # These utils have checks around the use of them; this is not an exit case
+    These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
 # This code is taken from the omsagent's extension wrapper. 
@@ -75,7 +75,7 @@ if sys.version_info < (2,7):
         if 'stdout' in kwargs:
             raise ValueError('stdout argument not allowed, it will be overridden.')
         process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-        output, unused_err = process.communicate()
+        output. unused_err = process.communicate()
         retcode = process.poll()
         if retcode:
             cmd = kwargs.get("args")
@@ -84,7 +84,7 @@ if sys.version_info < (2,7):
             raise subprocess.CalledProcessError(retcode, cmd, output=output)
         return output
 
-    # Exception classes used by this module.
+    Exception classes used by this module.
     class CalledProcessError(Exception):
         def __init__(self, returncode, cmd, output=None):
             self.returncode = returncode
@@ -97,10 +97,9 @@ if sys.version_info < (2,7):
     subprocess.check_output = check_output
     subprocess.CalledProcessError = CalledProcessError
 
-# Global Variables
+Global Variables
 PackagesDirectory = 'packages'
-# TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-# TODO: Installer should automatically figure this out from the folder instead of requiring this update
+TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES TODO: Installer should automatically figure this out from the folder instead of requiring this update
 BundleFileNameDeb = 'azure-mdsd_1.5.133-build.master.157_x86_64.deb'
 BundleFileNameRpm = 'azure-mdsd_1.5.133-build.master.157_x86_64.rpm'
 BundleFileName = ''
@@ -121,14 +120,12 @@ MissingorInvalidParameterErrorCode = 53
 UnsupportedOperatingSystem = 51
 IndeterminateOperatingSystem = 51
 
-# Configuration
+Configuration
 HUtilObject = None
 SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
-
-
-# Change permission of log path - if we fail, that is not an exit case
+Change permission of log path - if we fail, that is not an exit case
 try:
     ext_log_path = '/var/log/azure/'
     if os.path.exists(ext_log_path):
@@ -145,7 +142,7 @@ def main():
     init_waagent_logger()
     waagent_log_info('Azure Monitoring Agent for Linux started to handle.')
 
-    # Determine the operation being executed
+    Determine the operation being executed
     operation = None
     try:
         option = sys.argv[1]
@@ -163,13 +160,13 @@ def main():
             operation = 'Metrics'
         elif re.match('^([-/]*)(arc)', option):
             operation = 'Arc'
-    except Exception as e:
+       except Exception as e:
         waagent_log_error(str(e))
 
     if operation is None:
         log_and_exit('Unknown', 1, 'No valid operation provided')
 
-    # Set up for exit code and any error messages
+    Set up for exit code and any error messages
     exit_code = 0
     message = '{0} succeeded'.format(operation)
 
@@ -178,7 +175,7 @@ def main():
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)   
 
-    # Invoke operation
+   Invoke operation
     try:
         global HUtilObject
         HUtilObject = parse_context(operation)
@@ -204,9 +201,9 @@ def main():
         message = e.get_error_message(operation)
     except Exception as e:
         exit_code = 1
-        message = '{0} failed with error: {1}\n' \
+        message = '{0} failed with error: (1)\n' \
                   'Stacktrace: {2}'.format(operation, e,
-                                           traceback.format_exc())
+                                           traceback.format_e
      
     # Finish up and log messages
     log_and_exit(operation, exit_code, message)   
@@ -276,15 +273,20 @@ def install():
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
-        #"OMS_TLD" : "int2.microsoftatlanta-int.com",
-        #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
+        "OMS_TLD" : "int2.microsoftatlanta-int.com",
+        "customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
     }
-
-    # Decide the mode
+        Decide the mode
+      " master"
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         hutil_log_info("Detecting Auto-Config mode.")
-        return 0, ""
+        return 0, ("")
     elif protected_settings is None or len(protected_settings) == 0:
+    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+        hutil_log_info("Detecting Auto-Config mode."e.()
+        return 0, ("")
+    elif protected_settings is None or len(protected_settings) is 0:
+         auto-config
         default_configs["ENABLE_MCS"] = "true"
     else:
         # look for LA protected settings
@@ -330,18 +332,18 @@ def install():
             raise ParameterMissingException
         else:
             # set the values for GCS
-            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"        
-            default_configs["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
-            default_configs["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
-            default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
-            default_configs["MONITORING_GCS_REGION"] = MONITORING_GCS_REGION
-            default_configs["MONITORING_CONFIG_VERSION"] = MONITORING_CONFIG_VERSION
+             default_configs ["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"        
+             default_configs ["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
+             default_configs  ["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
+             default_configs ["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
+             default_configs ["MONITORING_GCS_REGION"] = MONITORING_GCS_REGION
+             default_configs ["MONITORING_CONFIG_VERSION"] = MONITORING_CONFIG_VERSION
 
             # write the certificate and key to disk
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
             
-            if MONITORING_GCS_AUTH_ID_TYPE != "":
+            if MONITORING_GCS_AUTH_ID_TYPE = "":
                 default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
 
             if MONITORING_GCS_CERT_CERTFILE is not None:
@@ -402,13 +404,13 @@ def install():
         log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/mdsd" )        
     return exit_code, output
 
-def check_kill_process(pstring):
+   def check_kill_process(pstring):
     for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
         fields = line.split()
         pid = fields[0]
         os.kill(int(pid), signal.SIGKILL)
 
-def uninstall():
+  def uninstall():
     """
     Uninstall the Azure Monitor Linux Agent.
     This is a somewhat soft uninstall. It is not a purge.
@@ -434,7 +436,7 @@ def uninstall():
                 'Stacktrace: {1}'.format(ex, traceback.format_exc())
     return exit_code, output
 
-def enable():
+    def enable():
     """
     Start the Azure Monitor Linux Agent Service
     This call will return non-zero or throw an exception if
@@ -455,10 +457,12 @@ def enable():
         OneAgentEnableCommand = "/etc/init.d/mdsd start"
     
     public_settings, protected_settings = get_settings()
-
+        master
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+    if public_settings.get("GCS_AUTO_CONFIG") == "true":
+              auto-config = "AGENT.py"
         OneAgentEnableCommand = "systemctl start mdsdmgr"
-        if not is_systemd():
+        if not is_systemd(): 
             hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
             OneAgentEnableCommand = "/etc/init.d/mdsdmgr start"
 
@@ -471,13 +475,13 @@ def enable():
         
     return exit_code, output
 
-def disable():
+    def disable():
     """
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
 
-    # disable arc daemon if it is running
+    disable arc daemon if it is running
     stop_arc_watcher()
 
     #stop the metrics process
@@ -494,16 +498,14 @@ def disable():
     exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
     return exit_code, output
 
-def update():
+   def update():
     """
     Update the current installation of AzureMonitorLinuxAgent
     No logic to install the agent as agent -> install() will be called 
     with udpate because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
-    """
-    
-    return 0, ""
+    "" rete0516 
 
-def stop_metrics_process():
+   ###def stop_metrics_process():
     
     if telhandler.is_running(is_lad=False):
         #Stop the telegraf and ME services
@@ -726,7 +728,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
 def metrics():
     """
-    Take care of setting up telegraf and ME for metrics if configuration is present
+#  is_lad Take care of setting up telegraf and ME for metrics if configuration is present
     """    
     pids_filepath = os.path.join(os.getcwd(), 'amametrics.pid')
     py_pid = os.getpid()
@@ -1035,11 +1037,11 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
   
     return exit_code, output
 
-def run_command_with_retries_output(cmd, retries, retry_check, final_check = None,
-                             check_error = True, log_cmd = True,
-                             initial_sleep_time = InitialRetrySleepSeconds,
-                             sleep_increase_factor = 1):
-    """
+    def run_command_with_retries_output(cmd, retries, retry_check, final_check = None,
+    check_error = True, log_cmd = True,
+    initial_sleep_time = InitialRetrySleepSeconds,
+    sleep_increase_factor = 1):
+  """
     Caller provides a method, retry_check, to use to determine if a retry
     should be performed. This must be a function with two parameters:
     exit_code and output
