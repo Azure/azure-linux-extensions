@@ -56,12 +56,12 @@ class WorkloadPatch:
         self.custom_scripts_enabled = 0
         self.scriptpath= "DefaultScripts"
         self.temp_script_folder= "/etc/azure"
+        self.configuration_path = None
         self.confParser()
         self.pre_database_status = ""
         self.pre_log_mode = ""
         self.post_database_status = ""
         self.post_log_mode = ""
-        self.configuration_path = None
         self.instance_list = []
 
     def readOracleList(self,filePath):
@@ -133,17 +133,11 @@ class WorkloadPatch:
         self.readOracleList(self.configuration_path)
         for index in range(len(self.instance_list)):
             oracleInstance = self.instance_list[index]
-            oracle_sid = oracleInstance["sid"]
             oracle_home = oracleInstance["home"]
             commandPath = os.path.join(oracle_home,'bin') + "/"
-            newEnv = os.environ.copy()
-            newEnv["ORACLE_SID"] = oracle_sid
-            newEnv["ORACLE_HOME"] = oracle_home
-            newEnv["PATH"] += os.pathsep + commandPath
-            newEnv["ORACLE_UNQNAME"] = oracle_sid
-            self.preMasterInstance(newEnv, commandPath, index)
+            self.preMasterInstance(commandPath, index)
 
-    def preMasterInstance(self, newEnv = None, commandPath = None, instanceIndex = 0):
+    def preMasterInstance(self, commandPath = None, instanceIndex = 0):
         global preSuccess
         self.logger.log("WorkloadPatch: Entering pre mode for master")
         if self.ipc_folder != None:
@@ -156,11 +150,13 @@ class WorkloadPatch:
         preSuccess = False
         
         if 'oracle' in self.name.lower():
-            self.logger.log("WorkloadPatch: Pre- Inside oracle pre for instance with SID: " + self.instance_list[instanceIndex]["sid"] + " HOME: " + self.instance_list[instanceIndex]["home"])
+            oracleInstance = self.instance_list[instanceIndex]
+            self.logger.log("WorkloadPatch: Pre- Inside oracle pre for instance with SID: " + oracleInstance["sid"] + " HOME: " + oracleInstance["home"])
             preOracle = commandPath + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/preOracleMaster.sql ")
-            args = "su - "+self.linux_user+" -c "+"\'"+preOracle+"\'"
+            envExport = "export ORACLE_SID=" + oracleInstance["sid"] + "; export ORACLE_HOME=" + oracleInstance["home"] + "; export PATH=" + oracleInstance["home"] + "/bin:${PATH}; export ORACLE_UNQNAME=" + oracleInstance["sid"] + "; " 
+            args = "su - "+self.linux_user+" -c "+"\'"+ envExport + preOracle+"\'"
             self.logger.log("WorkloadPatch: argument passed for pre script:"+str(args))
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True, env=newEnv)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
 
             self.instance_list[instanceIndex]["pid"] = process.pid
             wait_counter = 5
@@ -203,7 +199,7 @@ class WorkloadPatch:
             if(preSuccess == True):
                 self.logger.log("WorkloadPatch: pre success is true")
                 self.instance_list[instanceIndex]["preSuccess"] = True
-                self.timeoutDaemon(newEnv, commandPath)
+                self.timeoutDaemon(instanceIndex, commandPath)
             elif(self.pre_database_status == "NOTOPEN"):
                 self.logger.log("WorkloadPatch: Database in closed status, backup can be app consistent")
             else:
@@ -316,49 +312,34 @@ class WorkloadPatch:
     def postInstance(self):
         for index in range(len(self.instance_list)):
             oracleInstance = self.instance_list[index]
-            oracle_sid = oracleInstance[0]
-            oracle_home = oracleInstance[1]
+            oracle_home = oracleInstance["home"]
             commandPath = os.path.join(oracle_home,'bin') + "/"
-            newEnv = os.environ.copy()
-            newEnv["ORACLE_SID"] = oracle_sid
-            newEnv["ORACLE_HOME"] = oracle_home
-            newEnv["PATH"] += os.pathsep + commandPath
-            newEnv["ORACLE_UNQNAME"] = oracle_sid
-            self.postMasterInstance(newEnv, commandPath, index)
+            self.postMasterInstance(commandPath, index)
     
-    def postMasterInstance(self, newEnv = None, commandPath = None, instanceIndex = 0):
+    def postMasterInstance(self, commandPath = None, instanceIndex = 0):
         global daemonProcess
+        daemonProcess = self.instance_list[instanceIndex]["daemonProcess"]
         self.logger.log("WorkloadPatch: Entering post mode for master")
         try:
-            if self.ipc_folder != None and self.ipc_folder != "": #IPCm based workloads
-                if os.path.exists(self.outfile):
-                    os.remove(self.outfile)
-                else:
-                    self.logger.log("WorkloadPatch: File for IPC does not exist at post")
-                if len(self.child) == 0 or self.child[0].poll() is not None:
-                    self.logger.log("WorkloadPatch: Not app consistent backup")
-                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
-                elif self.child[0].poll() is None:
-                    self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
-                    self.child[0].kill()
-            else: #non IPC based workloads
-                if daemonProcess is None or daemonProcess.poll() is not None:
-                    self.logger.log("WorkloadPatch: Not app consistent backup")
-                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
-                elif daemonProcess.poll() is None:
-                    self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
-                    daemonProcess.kill()
+            if daemonProcess is None or daemonProcess.poll() is not None:
+                self.logger.log("WorkloadPatch: Not app consistent backup")
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
+            elif daemonProcess.poll() is None:
+                self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
+                daemonProcess.kill()
         except Exception as e:
             self.logger.log("WorkloadPatch: exception in daemon process indentification" + str(e))
         
         postSuccess = False
 
         if 'oracle' in self.name.lower():
-            self.logger.log("WorkloadPatch: Post- Inside oracle post for instance with SID: " + self.instance_list[instanceIndex]["sid"] + " HOME: " + self.instance_list[instanceIndex]["home"])
+            oracleInstance = self.instance_list[instanceIndex]
+            self.logger.log("WorkloadPatch: Post- Inside oracle post for instance with SID: " + oracleInstance["sid"] + " HOME: " + oracleInstance["home"])
             postOracle = commandPath + "sqlplus" + " -S -R 2 /nolog @" + os.path.join(self.temp_script_folder, self.scriptpath + "/postOracleMaster.sql ")
-            args =  "su - "+self.linux_user+" -c "+"\'"+postOracle+"\'"
+            envExport = "export ORACLE_SID=" + oracleInstance["sid"] + "; export ORACLE_HOME=" + oracleInstance["home"] + "; export PATH=" + oracleInstance["home"] + "/bin:${PATH}; export ORACLE_UNQNAME=" + oracleInstance["sid"] + "; " 
+            args =  "su - "+self.linux_user+" -c "+"\'"+ envExport + postOracle+"\'"
             self.logger.log("WorkloadPatch: argument passed for post script:"+str(args))
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True, env= newEnv)
+            process = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
             wait_counter = 5
             while process.poll()==None and wait_counter>0:
                 wait_counter -= 1
@@ -720,7 +701,7 @@ class WorkloadPatch:
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingError, "pre failed to quiesce"))
                 return None
         
-    def timeoutDaemon(self, newEnv = None, commandPath = None):
+    def timeoutDaemon(self, instanceIndex = None, commandPath = None):
         global daemonProcess
 
         if (commandPath!= None):
@@ -729,11 +710,14 @@ class WorkloadPatch:
             argsDaemon = "su - "+self.linux_user+" -c " + "'" + os.path.join(self.temp_script_folder, self.scriptpath + "/timeoutDaemon.sh")+" "+self.name+" "+self.command+" \""+self.cred_string+"\" "+self.timeout+" "+os.path.join(self.temp_script_folder, self.scriptpath + "'")
         devnull = open(os.devnull, 'w')
 
-        if (newEnv != None):
-            daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull, shell=True, env=newEnv)
+        if (instanceIndex != None):
+            oracleInstance = self.instance_list[instanceIndex]
+            envExport = "export ORACLE_SID=" + oracleInstance["sid"] + "; export ORACLE_HOME=" + oracleInstance["home"] + "; export PATH=" + oracleInstance["home"] + "/bin:${PATH}; export ORACLE_UNQNAME=" + oracleInstance["sid"] + "; " 
+            argsDaemon = envExport + argsDaemon
+            daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull, shell=True)
+            self.instance_list[instanceIndex]["daemonProcess"] = daemonProcess
         else:
             daemonProcess = subprocess.Popen(argsDaemon, stdout=devnull, stderr=devnull, shell=True)
-        
         wait_counter = 5
         while (daemonProcess is None or daemonProcess.poll() is not None) and wait_counter > 0:
             self.logger.log("WorkloadPatch: daemonProcess not created yet", True)
