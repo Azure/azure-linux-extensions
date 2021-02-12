@@ -140,7 +140,7 @@ class Watcher(object):
         with open(temp_fn,'w+') as fh:
             fh.write(event)
 
-        fn_template = '/var/lib/waagent/events/{}.tld'
+        fn_template = '/var/lib/waagent/events/{0}.tld'
         fn = fn_template.format(offset)
         while os.path.isfile(fn):
             offset += 1
@@ -167,19 +167,19 @@ class Watcher(object):
 
                         {{
                         "name": "Operation",
-                        "value": "{}"
+                        "value": "{0}"
                 }},
                         {{
                         "name": "OperationSuccess",
-                        "value": {}
+                        "value": {1}
                 }},
                         {{
                         "name": "Message",
-                        "value": "{}"
+                        "value": "{2}"
                 }},
                         {{
                         "name": "Duration",
-                        "value": {}
+                        "value": {3}
                 }}
             ]
             }}"""
