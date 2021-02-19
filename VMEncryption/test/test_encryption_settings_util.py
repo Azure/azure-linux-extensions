@@ -11,6 +11,31 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         self.logger = console_logger.ConsoleLogger()
         self.es_util = EncryptionSettingsUtil.EncryptionSettingsUtil(self.logger)
 
+    def _mock_open_with_read_data_dict(self, open_mock, read_data_dict):
+        open_mock.content_dict = read_data_dict
+
+        def _open_side_effect(filename, mode, *args, **kwargs):
+            read_data = open_mock.content_dict.get(filename)
+            mock_obj = mock.mock_open(read_data=read_data)
+            handle = mock_obj.return_value
+
+            def write_handle(data, *args, **kwargs):
+                if 'a' in mode:
+                    open_mock.content_dict[filename] += data
+                else:
+                    open_mock.content_dict[filename] = data
+
+            def write_lines_handle(data, *args, **kwargs):
+                if 'a' in mode:
+                    open_mock.content_dict[filename] += "".join(data)
+                else:
+                    open_mock.content_dict[filename] = "".join(data)
+            handle.write.side_effect = write_handle
+            handle.writelines.side_effect = write_lines_handle
+            return handle
+
+        open_mock.side_effect = _open_side_effect
+
     @mock.patch('time.sleep') # To speed up this test.
     @mock.patch('os.path.isfile', return_value=True)
     @mock.patch('main.EncryptionSettingsUtil.EncryptionSettingsUtil.get_http_util')
@@ -39,3 +64,28 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         get_http_util.return_value.Call.return_value = None # Make it so that the HTTP call returns nothing
         self.assertRaises(Exception, self.es_util.post_to_wireserver, data)
         self.assertEqual(get_http_util.return_value.Call.call_count, 3)
+
+    @mock.patch('os.path.exists')
+    @mock.patch('__builtin__.open')
+    def test_get_wireserver_endpoint_uri_valid_ip(self, open_mock, exists_mock):
+        exists_mock.return_value = True
+        self._mock_open_with_read_data_dict(open_mock, {Common.CommonVariables.wireserver_endpoint_file: '1.2.3.4'})
+        endpoint_uri = self.es_util.get_wireserver_endpoint_uri()
+        expected_endpoint_uri = 'http://1.2.3.4' + Common.CommonVariables.wireserver_endpoint_uri
+        self.assertEqual(endpoint_uri, expected_endpoint_uri)
+
+    @mock.patch('os.path.exists')
+    @mock.patch('__builtin__.open')
+    def test_get_wireserver_endpoint_uri_invalid_ip(self, open_mock, exists_mock):
+        exists_mock.return_value = True
+        self._mock_open_with_read_data_dict(open_mock, {Common.CommonVariables.wireserver_endpoint_file: '12.34'})
+        endpoint_uri = self.es_util.get_wireserver_endpoint_uri()
+        expected_endpoint_uri = 'http://' + Common.CommonVariables.static_wireserver_IP + Common.CommonVariables.wireserver_endpoint_uri
+        self.assertEqual(endpoint_uri, expected_endpoint_uri)
+
+    @mock.patch('os.path.exists')
+    def test_get_wireserver_endpoint_uri_no_endpoint_file(self, exists_mock):
+        exists_mock.return_value = False
+        endpoint_uri = self.es_util.get_wireserver_endpoint_uri()
+        expected_endpoint_uri = 'http://' + Common.CommonVariables.static_wireserver_IP + Common.CommonVariables.wireserver_endpoint_uri
+        self.assertEqual(endpoint_uri, expected_endpoint_uri)
