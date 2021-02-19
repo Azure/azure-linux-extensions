@@ -122,7 +122,7 @@ class UbuntuPatching(AbstractPatching):
                     filtered_crypttab_lines.append(line)
                     continue
 
-                if crypttab_parts[0] == 'osencrypt' and crypttab_parts[1] == '/dev/sda1' and 'keyscript=/usr/sbin/azure_crypt_key.sh' in line:
+                if crypttab_parts[0] == 'osencrypt' and (crypttab_parts[1] == '/dev/sda1' or crypttab_parts[1].startswith(CommonVariables.disk_by_id_root)) and 'keyscript=/usr/sbin/azure_crypt_key.sh' in line:
                     self.logger.log("Found osencrypt entry to update.")
                     if os.path.exists('/dev/disk/azure/root-part1'):
                         filtered_crypttab_lines.append(CommonVariables.osencrypt_crypttab_line_ubuntu)
