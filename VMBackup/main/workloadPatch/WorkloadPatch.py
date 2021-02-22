@@ -195,7 +195,7 @@ class WorkloadPatch:
                         self.logger.log("WorkloadPatch: Database is not open")
 
             if(self.pre_log_mode == "NOARCHIVELOG" and self.pre_database_status == "OPEN"):
-                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseInNoArchiveLog, "Workload in no archive log mode"))                
+                self.instance_list[instanceIndex]["noArchive"] = True
             if(preSuccess == True):
                 self.logger.log("WorkloadPatch: pre success is true")
                 self.instance_list[instanceIndex]["preSuccess"] = True
@@ -204,8 +204,7 @@ class WorkloadPatch:
                 self.logger.log("WorkloadPatch: Database in closed status, backup can be app consistent")
             else:
                 self.logger.log("WorkloadPatch: Pre failed for oracle")
-                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPreError, "Workload Pre failed"))
-            
+                
             self.logger.log("WorkloadPatch: Pre- Exiting pre mode for master")
             
     def preMaster(self):
@@ -314,8 +313,13 @@ class WorkloadPatch:
             oracleInstance = self.instance_list[index]
             oracle_home = oracleInstance["home"]
             commandPath = os.path.join(oracle_home,'bin') + "/"
-            self.postMasterInstance(commandPath, index)
-    
+            if (oracleInstance["preSuccess"] == True):
+                self.postMasterInstance(commandPath, index)
+            else:
+                if (oracleInstance["noArchive"] == True):
+                    self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseInNoArchiveLog, "Workload in no archive log mode"))                
+                self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadPreError, "Workload Pre failed for SID: " + oracleInstance["sid"]))
+            
     def postMasterInstance(self, commandPath = None, instanceIndex = 0):
         global daemonProcess
         daemonProcess = self.instance_list[instanceIndex]["daemonProcess"]
