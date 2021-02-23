@@ -73,7 +73,7 @@ class WorkloadPatch:
                 if re_db_match:
                     db = re_db_match.group('DB')
                     path = re_db_match.group('PATH')
-                    curr_dict = {"sid": db, "home": path, "preSuccess": False, "postSuccess": False}
+                    curr_dict = {"sid": db, "home": path, "preSuccess": False, "postSuccess": False, "noArchive": False, "dbOpen": True}
                     self.instance_list.append(curr_dict)
 
     def pre(self):
@@ -192,6 +192,7 @@ class WorkloadPatch:
                         self.logger.log("WorkloadPatch: Database is open")
                     else:##handle other DB status if required
                         self.pre_database_status = "NOTOPEN"
+                        self.instance_list[instanceIndex]["dbOpen"] = False
                         self.logger.log("WorkloadPatch: Database is not open")
 
             if(self.pre_log_mode == "NOARCHIVELOG" and self.pre_database_status == "OPEN"):
@@ -313,7 +314,7 @@ class WorkloadPatch:
             oracleInstance = self.instance_list[index]
             oracle_home = oracleInstance["home"]
             commandPath = os.path.join(oracle_home,'bin') + "/"
-            if (oracleInstance["preSuccess"] == True):
+            if ((oracleInstance["preSuccess"] == True or oracleInstance["dbOpen"] == False)):
                 self.postMasterInstance(commandPath, index)
             else:
                 if (oracleInstance["noArchive"] == True):
@@ -322,10 +323,13 @@ class WorkloadPatch:
             
     def postMasterInstance(self, commandPath = None, instanceIndex = 0):
         global daemonProcess
-        daemonProcess = self.instance_list[instanceIndex]["daemonProcess"]
+
+        if "daemonProcess" in self.instance_list[instanceIndex]:
+            daemonProcess = self.instance_list[instanceIndex]["daemonProcess"]
+
         self.logger.log("WorkloadPatch: Entering post mode for master")
         try:
-            if daemonProcess is None or daemonProcess.poll() is not None:
+            if (self.instance_list[instanceIndex]["dbOpen"] == True) and (daemonProcess is None or daemonProcess.poll() is not None):
                 self.logger.log("WorkloadPatch: Not app consistent backup")
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
             elif daemonProcess.poll() is None:
@@ -380,13 +384,13 @@ class WorkloadPatch:
                     else:##handle other DB status if required
                         self.post_database_status = "NOTOPEN"
                         self.logger.log("WorkloadPatch: Database is not open")
-            if((self.pre_log_mode == "NOARCHIVELOG" and self.post_log_mode == "ARCHIVELOG") or (self.pre_log_mode == "ARCHIVELOG" and self.post_log_mode == "NOARCHIVELOG")):
+            if((oracleInstance["noArchive"] == True and self.post_log_mode == "ARCHIVELOG") or (oracleInstance["noArchive"] == False and self.post_log_mode == "NOARCHIVELOG")):
                 self.logger.log("WorkloadPatch: Database log mode changed during backup")
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadLogModeChanged, "Database log mode changed during backup"))
             if(postSuccess == False):
-                if(self.pre_database_status == "NOTOPEN" and self.post_database_status == "NOTOPEN"):
+                if(oracleInstance["dbOpen"] == False and self.post_database_status == "NOTOPEN"):
                     self.logger.log("WorkloadPatch: Database in closed status, backup is app consistent")
-                elif((self.pre_database_status == "OPEN" and self.post_database_status == "NOTOPEN") or (self.pre_database_status == "NOTOPEN" and self.post_database_status == "OPEN")):
+                elif((oracleInstance["dbOpen"] == True and self.post_database_status == "NOTOPEN") or (oracleInstance["dbOpen"] == False and self.post_database_status == "OPEN")):
                     self.logger.log("WorkloadPatch: Database status changed during backup")
                     self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadDatabaseStatusChanged, "Database status changed during backup"))
                 else:
@@ -411,7 +415,7 @@ class WorkloadPatch:
                     self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
                     self.child[0].kill()
             else: #non IPC based workloads
-                if daemonProcess is None or daemonProcess.poll() is not None:
+                if (self.pre_database_status != "NOTOPEN") and (daemonProcess is None or daemonProcess.poll() is not None):
                     self.logger.log("WorkloadPatch: Not app consistent backup")
                     self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
                 elif daemonProcess.poll() is None:
@@ -538,7 +542,7 @@ class WorkloadPatch:
                 self.logger.log("WorkloadPatch: pre connection still running. Sending kill signal")
                 self.child[0].kill()
         else: #non IPC based workloads
-            if daemonProcess is None or daemonProcess.poll() is not None:
+            if (self.pre_database_status != "NOTOPEN") and (daemonProcess is None or daemonProcess.poll() is not None):
                 self.logger.log("WorkloadPatch: Not app consistent backup")
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadQuiescingTimeout,"not app consistent"))
                 return
