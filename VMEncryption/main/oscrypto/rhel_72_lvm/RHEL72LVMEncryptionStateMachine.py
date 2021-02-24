@@ -203,5 +203,8 @@ class RHEL72LVMEncryptionStateMachine(OSEncryptionStateMachine):
         
         self.stop_machine()
         self.log_machine_state()
-
-        self._reboot()
+        
+        return_code = self.command_executor.Execute('reboot', timeout=120)
+        if return_code == -9:
+            self.logger.log("Reboot didn't complete in 2 minutes. Trying force reboot.")
+            self.command_executor.Execute('systemctl --force reboot')
