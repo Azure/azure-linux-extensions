@@ -196,9 +196,9 @@ class FsFreezer:
                 except Exception as e:
                     self.logger.log("Failed to open file or aquire lock:  "+ str(e),True)
                     self.isAquireLockSucceeded = False
-                    self.getLockRetry= getLockRetry + 1
+                    self.getLockRetry= self.getLockRetry + 1
                     time.sleep(1)
-                    if(getLockRetry == maxGetLockRetry - 1):
+                    if(self.getLockRetry == self.maxGetLockRetry - 1):
                         time.sleep(30)
                 self.logger.log("Retry to aquire lock count: "+ str(self.getLockRetry),True)
 
