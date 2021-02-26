@@ -215,10 +215,10 @@ class FsFreezer:
                     file.close()
                 except:
                     pass
-                try:
-                    os.remove("/etc/azure/filelock")
-                except:
-                    pass
+            try:
+                os.remove("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile")
+            except:
+                pass
 
             self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
