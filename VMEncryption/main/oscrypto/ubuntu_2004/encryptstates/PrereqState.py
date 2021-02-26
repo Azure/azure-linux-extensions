@@ -58,7 +58,7 @@ class PrereqState(OSEncryptionState):
         self._patch_walinuxagent()
         self.command_executor.Execute('systemctl daemon-reload', True)
 
-        self._copy_key_script()        
+        self._copy_ade_scripts()        
         self._snap_stop()
 
     def should_exit(self):
@@ -81,26 +81,46 @@ class PrereqState(OSEncryptionState):
 
         self.context.logger.log("walinuxagent patched successfully")
 
-    def _copy_key_script(self):
-        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-        encryptscriptsdir = os.path.join(scriptdir, '../encryptscripts')
-        keyscriptpath = os.path.join(encryptscriptsdir, 'azure_crypt_key.sh')
+    def _copy_ade_scripts(self):
+        # Copy Ubuntu 20.04 specific hook and boot scripts for ADE into position
+        # Subsequent update-initramfs calls will use these to build the new initramfs
+        # http://manpages.ubuntu.com/manpages/focal/en/man7/initramfs-tools.7.html
 
-        if not os.path.exists(keyscriptpath):
-            message = "Key script not found at path: {0}".format(keyscriptpath)
+        script_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        encrypt_scripts_dir = os.path.join(script_dir,'../encryptscripts/')
+        
+        # hook script
+        hook_script_name = 'crypt-ade-hook'
+        hook_script_source = os.path.join(script_dir, encrypt_scripts_dir, hook_script_name)
+        hook_script_dest = os.path.join('/usr/share/initramfs-tools/hooks/', hook_script_name)
+        if not os.path.exists(hook_script_source):
+            message = "Hook script not found at path: {0}".format(hook_script_source)
             self.context.logger.log(message)
             raise Exception(message)
         else:
-            self.context.logger.log("Key script found at path: {0}".format(keyscriptpath))
+            self.context.logger.log("Hook script found at path: {0}".format(hook_script_source))
+        self.command_executor.Execute('cp {0} {1}'.format(hook_script_source,hook_script_dest), True)
+        self.command_executor.Execute('chmod +x {0}'.format(hook_script_dest), True)
 
-        self.command_executor.Execute('cp {0} /usr/sbin/azure_crypt_key.sh'.format(keyscriptpath), True)
+        # boot script
+        boot_script_name = 'crypt-ade-boot'
+        boot_script_source = os.path.join(script_dir, encrypt_scripts_dir, boot_script_name)
+        boot_script_dest = os.path.join('/usr/share/initramfs-tools/scripts/init-premount/', boot_script_name)
+        if not os.path.exists(boot_script_source):
+            message = "Boot script not found at path: {0}".format(boot_script_source)
+            self.context.logger.log(message)
+            raise Exception(message)
+        else:
+            self.context.logger.log("Boot script found at path: {0}".format(boot_script_source))
+        self.command_executor.Execute('cp {0} {1}'.format(boot_script_source,boot_script_dest), True)
+        self.command_executor.Execute('chmod +x {0}'.format(boot_script_dest), True)
 
     def _snap_stop(self):
         self.context.logger.log('stop snaps and unmount')
 
         # stop all snapd services until next system restart to release file handles
-        self.command_executor.ExecuteInBash("for line in `systemctl list-unit-files | grep snap | grep -Eo '^[^ ]+'`; do printf 'stopping $line \n'; systemctl stop $line; done");
-        self.command_executor.ExecuteInBash("for line in `systemctl list-unit-files | grep snap | grep -Eo '^[^ ]+'`; do printf '$line '; systemctl is-active $line; done");
+        self.command_executor.ExecuteInBash("for line in `systemctl list-unit-files | grep snap | grep -Eo '^[^ ]+'`; do printf 'stopping %s\n' $line; systemctl stop $line; done");
+        self.command_executor.ExecuteInBash("for line in `systemctl list-unit-files | grep snap | grep -Eo '^[^ ]+'`; do printf '%s ' $line; systemctl is-active $line; done");
 
         # unmount default snap created mountpoints in base image
         self.command_executor.ExecuteInBash('for MP in `lsblk -r -o MOUNTPOINT | grep /snap/lxd`;do umount "$MP";done',False)

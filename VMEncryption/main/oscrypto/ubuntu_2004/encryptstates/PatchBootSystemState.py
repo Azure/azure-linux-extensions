@@ -118,6 +118,7 @@ class PatchBootSystemState(OSEncryptionState):
     def _modify_pivoted_oldroot(self):
         self.context.logger.log("Pivoted into oldroot successfully")
 
+        # set up hook script to copy new LUKS header to /boot/luks/osluksheader when updating initramfs
         scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
         encryptscriptsdir = os.path.join(scriptdir, '../encryptscripts')
         injectscriptpath = os.path.join(encryptscriptsdir, 'inject_luks_header.sh')
@@ -132,21 +133,28 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('cp {0} /usr/share/initramfs-tools/hooks/luksheader'.format(injectscriptpath), True)
         self.command_executor.Execute('chmod +x /usr/share/initramfs-tools/hooks/luksheader', True)
 
+        # get the azure symlink to os volume (eg, '/dev/disk/azure/root-part1')
         os_volume = None
-        if os.path.exists(CommonVariables.az_symlink_os_volume) and os.path.realpath(CommonVariables.az_symlink_os_volume) == os.path.realpath(self.rootfs_block_device):
-            os_volume = CommonVariables.az_symlink_os_volume
+        az_symlink_os_volume = self._get_az_symlink_os_volume()
+        if os.path.exists(az_symlink_os_volume) and os.path.realpath(az_symlink_os_volume) == os.path.realpath(self.rootfs_block_device):
+            os_volume = az_symlink_os_volume
         else:
             os_volume = self.rootfs_block_device
         
-        entry = 'osencrypt {0} none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'.format(os_volume)
+        # append osencrypt entry to /etc/crypttab 
+        entry = 'osencrypt {0} /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'.format(os_volume)
         self._append_contents_to_file(entry, '/etc/crypttab')
 
-        # TODO
-        # before updating grub, config needs to be changed to target osencrypt
-        # remove 40-force grub config rule added by cloudinit with outdated UUID
-        # update grub cmdline to root to /dev/mapper/osencrypt
-
+        # prior to updating initramfs, PrereqState.py copies hook and boot scripts into place
         self.command_executor.Execute('update-initramfs -u -k all', True)
+
+        # prior to updating grub, do the following: 
+        # - remove the 40-force-partuuid.cfg file added by cloudinit, since it references the old boot partition
+        # - set grub cmdline to use root=/dev/mapper/osencrypt
+        self.command_executor.Execute("rm -f /etc/default/grub.d/40-force-partuuid.cfg", True)
+        self.command_executor.Execute("sed -i 's/GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"root=\/dev\/mapper\/osencrypt /g' /etc/default/grub", True)
+
+        # now update grub and re-install
         self.command_executor.Execute('update-grub', True)
         self.command_executor.Execute('grub-install --recheck --force {0}'.format(self.rootfs_disk), True)
 
