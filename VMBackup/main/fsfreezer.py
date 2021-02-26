@@ -235,8 +235,8 @@ class FsFreezer:
                     self.logger.log(error_msg, True, 'Error')
                 elif (self.isAquireLockSucceeded == False):
                     error_msg="Mount Points already freezed by some other processor"
-                    freeze_result.errors.append(errMsg)
-                    self.logger.log(errMsg,True,'Error')
+                    freeze_result.errors.append(error_msg)
+                    self.logger.log(error_msg,True,'Error')
                 else:
                     error_msg="freeze failed for some mount"
                     freeze_result.errors.append(error_msg)
