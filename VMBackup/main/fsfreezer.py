@@ -181,7 +181,8 @@ class FsFreezer:
 
             while self.getLockRetry < self.maxGetLockRetry:
                 try:
-                    os.mkdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock')
+                    if not os.path.isdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock'):
+                        os.mkdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock')
                     file = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
                     self.logger.log("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file opened Sucessfully",True)
                     try:
