@@ -1,0 +1,30 @@
+#!/bin/sh
+# -*- mode: shell-script; indent-tabs-mode: nil; sh-basic-offset: 4; -*-
+# ex: ts=8 sw=4 sts=4 et filetype=sh
+#set -x
+
+PREREQS=""
+
+prereqs() { echo "$PREREQS"; }
+
+case "$1" in
+    prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+# This ADE hook script adds two mount points and /etc/fstab entries to initramfs
+# so the LUKS header and key file are available for the boot script to use prior 
+# to calling cryptsetup to open the underlying root device /dev/mapper/osencrypt
+# The boot script is: /usr/share/initramfs-tools/scripts/init-premount/crypt-ade 
+
+BOOTUUID=$(findmnt -fn -o UUID /boot)
+
+mkdir -p $DESTDIR/boot
+mkdir -p $DESTDIR/mnt/azure_bek_disk
+
+echo "/dev/disk/by-uuid/$BOOTUUID /boot ext2 defaults 0 0" >> "$DESTDIR/etc/fstab"
+echo "/dev/disk/by-label/BEK\\x20VOLUME /mnt/azure_bek_disk auto defaults 0 0" >> "$DESTDIR/etc/fstab"
+
+exit 0
