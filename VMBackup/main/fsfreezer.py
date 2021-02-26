@@ -26,6 +26,7 @@ import sys
 import signal
 import traceback
 import threading
+import fcntl
 from common import CommonVariables
 from Utils.ResourceDiskUtil import ResourceDiskUtil
 
@@ -120,6 +121,9 @@ class FsFreezer:
         self.mount_open_failed = False
         self.resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
         self.skip_freeze= True
+        self.isAquireLockSucceeded = True
+        self.getLockRetry = 0
+        self.maxGetLockRetry = 5
 
     def should_skip(self, mount):
         resource_disk_mount_point= self.resource_disk.get_resource_disk_mount_point()
@@ -172,7 +176,49 @@ class FsFreezer:
                 self.logger.enforce_local_flag(True)
             else:
                 self.logger.enforce_local_flag(False) 
-            sig_handle=self.freeze_handler.startproc(args)
+
+            start_time = datetime.datetime.utcnow()
+
+            while self.getLockRetry < self.maxGetLockRetry:
+                try:
+                    os.mkdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock')
+                    file = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
+                    self.logger.log("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file opened Sucessfully",True)
+                    try:
+                        fcntl.lockf(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        self.logger.log("Aquiring lock succeeded",True)
+                        self.isAquireLockSucceeded = True
+                        break
+                    except Exception as ex:
+                        file.close()
+                        raise ex
+                except Exception as e:
+                    self.logger.log("Failed to open file or aquire lock:  "+ str(e),True)
+                    self.isAquireLockSucceeded = False
+                    self.getLockRetry= getLockRetry + 1
+                    time.sleep(1)
+                    if(getLockRetry == maxGetLockRetry - 1):
+                        time.sleep(30)
+                self.logger.log("Retry to aquire lock count: "+ str(self.getLockRetry),True)
+
+            end_time = datetime.datetime.utcnow()
+            self.logger.log("Wait time to aquire lock "+ str(end_time - start_time),True)
+
+            
+            sig_handle = None
+            if (self.isAquireLockSucceeded == True):
+                sig_handle=self.freeze_handler.startproc(args)
+                self.thaw_safe()
+                try:
+                    fcntl.lockf(file, fcntl.LOCK_UN)
+                    file.close()
+                except:
+                    pass
+                try:
+                    os.remove("/etc/azure/filelock")
+                except:
+                    pass
+
             self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
                 if (self.freeze_handler.child is not None):
@@ -186,6 +232,10 @@ class FsFreezer:
                     error_msg=CommonVariables.unable_to_open_err_string
                     freeze_result.errors.append(error_msg)
                     self.logger.log(error_msg, True, 'Error')
+                elif (self.isAquireLockSucceeded == False):
+                    error_msg="Mount Points already freezed by some other processor"
+                    freeze_result.errors.append(errMsg)
+                    self.logger.log(errMsg,True,'Error')
                 else:
                     error_msg="freeze failed for some mount"
                     freeze_result.errors.append(error_msg)
