@@ -124,7 +124,7 @@ class HttpUtil(object):
 
             if(isHostCall or self.proxyHost == None or self.proxyPort != None):
                 if(isHostCall):
-                    connection = httplibs.HTTPConnection(sasuri_obj.hostname, timeout = 10) # making call with port 80 to make it http call
+                    connection = httplibs.HTTPConnection(sasuri_obj.hostname, timeout = 20) # making call with port 80 to make it http call
                 else:
                     connection = httplibs.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
                 self.logger.log("Details of sas uri object  hostname: " + str(sasuri_obj.hostname) + " path: " + str(sasuri_obj.path))
