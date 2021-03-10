@@ -444,14 +444,26 @@ class HandlerUtility:
 
         if message is None:
             message = ""
+        
+        if operation is None:
+            operation = ""
 
-        message = filter(lambda c: c in string.printable, message)
-        message = message.encode('ascii', 'ignore')
+        # Status message should of format Ext Name, Ext version, Operation Message
+        # It is done to better track operation success/failures
+        # For dual pass it is only done for Migrate operation
+        if operation == 'Migrate':
+            formatted_message = "[{0}] [{1}] {2} {3}".format(CommonVariables.extension_name, CommonVariables.extension_version, operation, message)
+        else:
+            formatted_message = message
+
+
+        formatted_message = filter(lambda c: c in string.printable, formatted_message)
+        formatted_message = formatted_message.encode('ascii', 'ignore')
 
         self.log("[StatusReport ({0})] op: {1}".format(latest_seq, operation))
         self.log("[StatusReport ({0})] status: {1}".format(latest_seq, status))
         self.log("[StatusReport ({0})] code: {1}".format(latest_seq, status_code))
-        self.log("[StatusReport ({0})] msg: {1}".format(latest_seq, message))
+        self.log("[StatusReport ({0})] msg: {1}".format(latest_seq, formatted_message))
 
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
@@ -464,7 +476,7 @@ class HandlerUtility:
                 "code" : status_code,
                 "formattedMessage" : {
                     "lang" : "en-US",
-                    "message" : message
+                    "message" : formatted_message
                 }
             }
         }]
@@ -518,7 +530,8 @@ class HandlerUtility:
             self.log("Can't update status: " + str(e))
         if message:
             # Remove newline character so that msg is printed in one line
-            strip_msg = message.replace('\n', ' ')
+            # Replace double quotes with single quotes so that guest agent telemetry can parse it
+            strip_msg = message.replace('\n', ' ').replace('"', "'")
             self.log("Exited with message {0}".format(strip_msg))
         sys.exit(exit_code)
 

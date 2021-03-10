@@ -143,6 +143,14 @@ def disable_encryption():
         decryption_marker.volume_type = extension_parameter.VolumeType
         decryption_marker.commit()
 
+        try:
+            settings_util = EncryptionSettingsUtil(logger)
+            settings_util.clear_encryption_settings(disk_util)
+        except Exception:
+            # Do not fail if clear encryption settings fail in dual pass
+            logger.log("Failed to clear encryption settings from disk")
+            pass
+
         hutil.do_exit(exit_code=0,
                       operation='DisableEncryption',
                       status=CommonVariables.extension_success_status,
@@ -181,7 +189,10 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
         extra_device_items=items_to_encrypt,
         disk_util=disk_util)
 
-    settings.post_to_wireserver(data)
+    if len(data.get('Disks')) > 0:
+        settings.post_to_wireserver(data)
+    else:
+        logger.log("No disk found for stamping. Skipping stamping request.")
 
     filenames = []
     for disk in data.get("Disks", []):
@@ -695,10 +706,18 @@ def enable_encryption():
                                   encryption_config=encryption_config,
                                   passphrase_file=existing_passphrase_file)
         else:
-            logger.log(msg="EncryptionConfig is present, but could not get the BEK file.",
-                       level=CommonVariables.WarningLevel)
-            hutil.redo_last_status()
-            exit_without_status_report()
+            msg="EncryptionConfig is present, but could not get the key file."
+            try:
+                hutil.redo_last_status()
+                logger.log(msg=msg, level=CommonVariables.WarningLevel)
+                exit_without_status_report()
+            except Exception:
+                logger.log(msg=msg, level=CommonVariables.ErrorLevel)
+                hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                              operation='EnableEncyption',
+                              status=CommonVariables.extension_error_status,
+                              code=str(CommonVariables.configuration_error),
+                              message=msg)
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
@@ -917,6 +936,14 @@ def perform_migration(disk_util, existing_passphrase_file, encryption_config):
         logger.log("Migration: Fatal Exception thrown during migration")
         logger.log(traceback.format_exc())
         msg = e.message
+        try:
+            logger.log("Try clearing stamped encryption settings in case of failure.")
+            settings_util = EncryptionSettingsUtil(logger)
+            settings_util.clear_encryption_settings(disk_util)
+        except Exception:
+            # Do not fail if clear encryption settings fail in dual pass
+            logger.log("Failed to clear encryption settings from disk")
+            pass
         hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='Migrate',
                       status=CommonVariables.extension_error_status,
@@ -1761,7 +1788,8 @@ def daemon_encrypt():
              (distro_name == 'redhat' and distro_version == '7.4') or
              (distro_name == 'redhat' and distro_version == '7.5') or
              (distro_name == 'redhat' and distro_version == '7.6') or
-             (distro_name == 'redhat' and distro_version == '7.7')) and
+             (distro_name == 'redhat' and distro_version == '7.7') or
+             (distro_name == 'redhat' and distro_version == '7.8')) and
            (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1772,7 +1800,8 @@ def daemon_encrypt():
               (distro_name == 'centos' and distro_version.startswith('7.4')) or
               (distro_name == 'centos' and distro_version.startswith('7.5')) or
               (distro_name == 'centos' and distro_version.startswith('7.6')) or
-              (distro_name == 'centos' and distro_version.startswith('7.7'))) and
+              (distro_name == 'centos' and distro_version.startswith('7.7')) or
+              (distro_name == 'centos' and distro_version.startswith('7.8'))) and
               (disk_util.is_os_disk_lvm() or os.path.exists('/volumes.lvm'))):
             from oscrypto.rhel_72_lvm import RHEL72LVMEncryptionStateMachine
             os_encryption = RHEL72LVMEncryptionStateMachine(hutil=hutil,
@@ -1785,6 +1814,8 @@ def daemon_encrypt():
               (distro_name == 'redhat' and distro_version == '7.5') or
               (distro_name == 'redhat' and distro_version == '7.6') or
               (distro_name == 'redhat' and distro_version == '7.7') or
+              (distro_name == 'redhat' and distro_version == '7.8') or
+              (distro_name == 'centos' and distro_version.startswith('7.8')) or
               (distro_name == 'centos' and distro_version.startswith('7.7')) or
               (distro_name == 'centos' and distro_version.startswith('7.6')) or
               (distro_name == 'centos' and distro_version.startswith('7.5')) or

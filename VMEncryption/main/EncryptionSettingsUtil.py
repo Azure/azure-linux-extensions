@@ -182,14 +182,39 @@ class EncryptionSettingsUtil(object):
         from HttpUtil import HttpUtil
         return HttpUtil(self.logger)
 
+    def get_wireserver_endpoint_uri(self):
+
+        wireserver_endpoint_file = CommonVariables.wireserver_endpoint_file
+        wireserver_IP = None
+        wireserver_endpoint_uri = CommonVariables.wireserver_endpoint_uri
+
+        if os.path.exists(wireserver_endpoint_file):
+            with open(wireserver_endpoint_file, 'r') as wip:
+                wireserver_IP = wip.readline().strip()
+                self.logger.log("wireserver_IP found in {0} = {1}".format(wireserver_endpoint_file, wireserver_IP))
+
+                # validate the IP address found in wireserver_endpoint_file
+                if re.match('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', wireserver_IP) is None:
+                    wireserver_IP = None
+                    self.logger.log("wireserver_IP found in file is not valid.")
+
+        if wireserver_IP is None:
+            self.logger.log("Using static wireServer_IP from CommonVariables")
+            wireserver_IP = CommonVariables.static_wireserver_IP
+
+        wireserver_endpoint = "http://" + wireserver_IP + wireserver_endpoint_uri
+        self.logger.log("wireserver_endpoint = {0}".format(wireserver_endpoint))
+        return wireserver_endpoint
+
     def _post_to_wireserver_helper(self, msg_data, http_util):
 
         retry_count_max = 3
         retry_count = 0
+        wireserver_endpoint_uri = self.get_wireserver_endpoint_uri()
         while retry_count < retry_count_max:
             try:
                 result = http_util.Call(method='POST',
-                                        http_uri=CommonVariables.wireserver_endpoint,
+                                        http_uri=wireserver_endpoint_uri,
                                         headers=CommonVariables.wireprotocol_msg_headers,
                                         data=msg_data,
                                         use_https=False)
@@ -221,3 +246,51 @@ class EncryptionSettingsUtil(object):
         # V3 message content
         msg_data = CommonVariables.wireprotocol_msg_template_v3.format(settings_json_blob=json.dumps(data))
         self._post_to_wireserver_helper(msg_data, http_util)
+
+    def clear_encryption_settings(self, disk_util):
+        """
+        Clear settings by calling DisableEncryption operation via wire server
+
+        finds all azure data disks and clears their encryption settings
+        """
+
+        self.logger.log("Clearing encryption settings for all data drives")
+
+        data_disk_controller_ids_and_luns = disk_util.get_all_azure_data_disk_controller_and_lun_numbers()
+
+        # validate machine name string or use empty string
+        machine_name = socket.gethostname()
+        if re.match('^[\\w-]+$', machine_name) is None:
+            machine_name = ''
+
+        def controller_id_and_lun_to_settings_data(scsi_controller, lun_number):
+            return {
+                "ControllerType": "SCSI",
+                "ControllerId": scsi_controller,
+                "SlotId": lun_number,
+                "Volumes": [{
+                    "VolumeType": "DataVolume",
+                    "ProtectorFileName": "nullProtector.bek",
+                    "SecretTags": self._dict_to_name_value_array({
+                        "DiskEncryptionKeyFileName": "nullProtector.bek",
+                        "MachineName": machine_name})
+                    }]
+                }
+
+        protectors_null = []
+
+        data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
+                                    for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
+
+        data = {"DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
+                "DiskEncryptionOperation": "DisableEncryption",
+                "Disks": data_disks_settings_data,
+                "KekAlgorithm": "",
+                "Protectors": protectors_null,
+                "KekUrl": "",
+                "KekVaultResourceId": "",
+                "KeyVaultResourceId": "",
+                "KeyVaultUrl": ""}
+        self.logger.log("Settings to be sent for clear_encryption_settings: " + json.dumps(data, sort_keys=True, indent=4))
+        self.post_to_wireserver(data)
+        return

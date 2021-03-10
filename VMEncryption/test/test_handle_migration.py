@@ -9,6 +9,7 @@ from main.DiskUtil import DiskUtil
 from console_logger import ConsoleLogger
 from test_utils import MockDistroPatcher
 from main.Utils.HandlerUtil import HandlerUtility
+from main.EncryptionSettingsUtil import EncryptionSettingsUtil
 
 class TestHandleMigration(unittest.TestCase):
     def setup(self):
@@ -135,7 +136,8 @@ class TestHandleMigration(unittest.TestCase):
     @mock.patch("main.DiskUtil.DiskUtil")
     @mock.patch("main.handle.exit_without_status_report", return_value=None)
     @mock.patch("main.Utils.HandlerUtil.HandlerUtility")
-    def test_perform_migration(self, mock_handler_util, mock_exit, mock_disk_util, mock_stamp, mock_mig_allow):
+    @mock.patch("main.EncryptionSettingsUtil.EncryptionSettingsUtil.clear_encryption_settings", return_value=None)
+    def test_perform_migration(self, ces_mock, mock_handler_util, mock_exit, mock_disk_util, mock_stamp, mock_mig_allow):
 
         def _do_exit_side_effect(exit_code, operation, status, code, message):
             _do_exit_side_effect.exit_message = message
@@ -156,8 +158,9 @@ class TestHandleMigration(unittest.TestCase):
         handle.perform_migration(mock_disk_util, "mock_passphrase_file", None)
         self.assertEquals(_do_exit_side_effect.exit_message, "Dummy Error")
 
-        # Case 3: disk stamping throws exception
+        # Case 3: disk stamping throws exception. Ensure clear encryption settings is called
         mock_mig_allow.return_value = True, None
         mock_stamp.side_effect = Exception("Dummy Exception")
         handle.perform_migration(mock_disk_util, "mock_passphrase_file", None)
         self.assertEquals(_do_exit_side_effect.exit_message, "Dummy Exception")
+        self.assertEquals(ces_mock.call_count, 1)

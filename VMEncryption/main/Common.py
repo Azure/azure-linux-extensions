@@ -46,6 +46,7 @@ class CommonVariables:
     azure_symlinks_dir = '/dev/disk/azure'
     disk_by_id_root = '/dev/disk/by-id'
     disk_by_uuid_root = '/dev/disk/by-uuid'
+    az_symlink_os_volume = '/dev/disk/azure/root-part1'
     encryption_key_mount_point = '/mnt/azure_bek_disk/'
     bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'
     bek_fstab_line_template_ubuntu_14 = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nobootwait 0 0\n'
@@ -57,7 +58,12 @@ class CommonVariables:
     """
     encryption_key_file_name = 'LinuxPassPhraseFileName'
 
-    wireserver_endpoint = "http://169.254.169.254:80/machine?comp=diskEncryptionData"
+    """
+    Find more on Azure wire service IP address here: "https://docs.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16"
+    """
+    static_wireserver_IP = '168.63.129.16'
+    wireserver_endpoint_file = '/var/lib/waagent/WireServerEndpoint'
+    wireserver_endpoint_uri = ':80/machine?comp=diskEncryptionData'
     wireprotocol_msg_headers = {
         "Content-Type": "text/xml",
         "x-ms-version": "2015-04-05"
@@ -197,8 +203,8 @@ class CommonVariables:
     """
     error messages
     """
-    migration_detached_header = "One or more data disk use detached LUKS header. Migration is not supported."
-    migration_detached_header_xfs = "One or more data disk use detached LUKS header with xfs filesystem. Migration is not supported."
+    migration_detached_header = "Not all data disks were encrypted using encrypt format all. Migration is not supported."
+    migration_detached_header_xfs = "One or more data disks were not encrypted using encrypt format all and have xfs filesystem. Migration is not supported."
     migration_wrong_passphrase = "Passphrase validation failed. Please check your passphrase and try again."
 
 class TestHooks:
