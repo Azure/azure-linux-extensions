@@ -200,8 +200,11 @@ def zip(src, dst):
     zf.close()
 
 final_folder_path = target_zip_file_location + target_folder_name
-# manually copy .json files since setup will only copy .py files by default
+# setup will only copy .py files by default, so add non-python files to the zip
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
+copy2(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/crypt-ade-boot', final_folder_path+'/' + main_folder + '/oscrypto/ubuntu_2004/encryptscripts')
+copy2(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/crypt-ade-hook', final_folder_path+'/' + main_folder + '/oscrypto/ubuntu_2004/encryptscripts')
+copy2(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/inject_luks_header.sh', final_folder_path+'/' + main_folder + '/oscrypto/ubuntu_2004/encryptscripts')
 zip(final_folder_path, target_zip_file_path)
 
