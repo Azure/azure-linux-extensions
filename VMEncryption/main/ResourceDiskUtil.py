@@ -37,10 +37,6 @@ class ResourceDiskUtil(object):
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
-    # save the presence of snap and lxd as needed for disabling/enabling during resource disk encryption
-    is_snap = False
-    is_snap_lxd = False
-
     def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info):
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
@@ -138,6 +134,7 @@ class ResourceDiskUtil(object):
         self.disk_util.umount(self.RD_MOUNT_POINT)
         self.disk_util.umount(CommonVariables.encryption_key_mount_point)
         self.disk_util.umount('/mnt')
+        self._try_unmount_lxd()
         self.disk_util.make_sure_path_exists(CommonVariables.encryption_key_mount_point)
         self.disk_util.mount_by_label("BEK VOLUME", CommonVariables.encryption_key_mount_point, "fmask=077")
 
@@ -229,20 +226,13 @@ class ResourceDiskUtil(object):
         cmd = 'dd if=/dev/urandom of=' + self.RD_DEV_PATH + ' bs=512 count=20480'
         return self.executor.Execute(cmd) == CommonVariables.process_success
 
-    def _disable_lxd(self):
-        """ disable lxd to end any process holding file handle to resource disk """
-        self.is_snap = bool(self.executor.Execute('test -f /usr/bin/snap',False,None,None,True) == 0)
-        if self.is_snap:            
-            self.is_snap_lxd = bool(self.executor.ExecuteInBash('snap list | grep -q lxd',False,None,None,True) == 0)
-            if self.is_snap_lxd:
-                self.logger.log('snap present, disabling lxd prior to unmount')
-                self.executor.Execute('snap disable lxd',False)
-
-    def _enable_lxd(self):
-        """ reenable lxd if it was disabled in prior step"""
-        if self.is_snap and self.is_snap_lxd:
-            self.logger.log('snap is present and lxd was enabled previously ... re-enabling lxd')
-            self.executor.Execute('snap enable lxd',False)
+    def _try_unmount_lxd(self):
+        if bool(self.executor.Execute('test -f /run/snapd/ns/lxd.mnt',False,None,None,True) == 0):
+            self.logger.log('/run/snapd/ns/lxd.mnt found, try umount /mnt from lxd namespace')
+            return bool(self.executor.Execute('nsenter --mount=/run/snapd/ns/lxd.mnt umount /mnt',False,None,None,False) == 0)
+        else:
+            # nothing to unmount
+            return True
 
     def try_remount(self):
         """ mount the resource disk if not already mounted"""
@@ -309,7 +299,6 @@ class ResourceDiskUtil(object):
 
     def encrypt_format_mount(self):
         if self._resource_disk_exists():
-            self._disable_lxd()
             if not self.prepare():
                 self.logger.log("Failed to prepare VM for Resource Disk Encryption", CommonVariables.ErrorLevel)
                 return False
@@ -324,7 +313,6 @@ class ResourceDiskUtil(object):
                 return False
             # We haven't failed so far, lets just add the RD to crypttab
             self.add_resource_disk_to_crypttab()
-            self._enable_lxd()
         return True
 
     def add_resource_disk_to_crypttab(self):
