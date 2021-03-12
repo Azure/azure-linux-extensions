@@ -307,8 +307,6 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
                           MockDistroPatcher('Ubuntu', '12.04', ''), {"os" : "NotEncrypted"})
         self.assertRaises(Exception, self.cutil.is_supported_os, {CommonVariables.VolumeTypeKey: "ALL"},
                           MockDistroPatcher('redhat', '6.7', ''), {"os" : "NotEncrypted"})
-        self.assertRaises(Exception, self.cutil.is_supported_os, {CommonVariables.VolumeTypeKey: "ALL"},
-                          MockDistroPatcher('centos', '7.9', ''), {"os" : "NotEncrypted"})
         # test exception is not raised for supported OS
         self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
                                    MockDistroPatcher('Ubuntu', '18.04', ''), {"os" : "NotEncrypted"})
