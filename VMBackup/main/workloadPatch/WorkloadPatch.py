@@ -65,7 +65,7 @@ class WorkloadPatch:
         self.instance_list = []
 
     def readOracleList(self,filePath):
-        re_db = re.compile(r'^(?P<DB>(\w+)):(?P<PATH>(/|\w+|\.)+):(Y|N)')
+        re_db = re.compile(r'^(?P<DB>(\w+)):(?P<PATH>(/|\w+|\.)+)(:(\w*))?')
         with open(filePath, 'r') as f:
             for line in f:
                 line = line.strip()
