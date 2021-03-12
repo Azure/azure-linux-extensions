@@ -244,3 +244,21 @@ class TestResourceDiskUtil(unittest.TestCase):
     def test_encrypt_format_mount_resource_disk_does_not_exist(self, mock_prepare, mock_resource_disk_exists):
         self.assertEqual(self.resource_disk.encrypt_format_mount(), True)
         self.assertEqual(mock_prepare.call_count, 0)
+
+    @mock.patch('CommandExecutor.CommandExecutor.Execute')
+    def test_try_unmount_lxd_exists_true(self, mock_execute):
+        mock_execute.side_effect = [0,0]
+        self.assertEqual(self.resource_disk._try_unmount_lxd(), True)
+        self.assertEqual(mock_execute.call_count, 2)
+
+    @mock.patch('CommandExecutor.CommandExecutor.Execute')
+    def test_try_unmount_lxd_exists_false(self, mock_execute):
+        mock_execute.side_effect = [0,1]
+        self.assertEqual(self.resource_disk._try_unmount_lxd(), False)
+        self.assertEqual(mock_execute.call_count, 2)
+
+    @mock.patch('CommandExecutor.CommandExecutor.Execute')
+    def test_try_unmount_lxd_does_not_exist(self, mock_execute):
+        mock_execute.side_effect = [1]
+        self.assertEqual(self.resource_disk._try_unmount_lxd(), True)
+        self.assertEqual(mock_execute.call_count, 1)
