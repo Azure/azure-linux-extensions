@@ -142,7 +142,7 @@ class DiskUtil(object):
         """
         size_shrink_to is in sector (512 byte)
         """
-        shrinkfs_cmd = self.distro_patcher.resize2fs_path + ' ' + str(dev_path) + ' ' + str(size_shrink_to) + 's'
+        shrinkfs_cmd = self.distro_patcher.resize2fs_path + ' ' + str(dev_path) + ' ' + str(int(size_shrink_to)) + 's'
         return self.command_executor.Execute(shrinkfs_cmd)
 
     def check_shrink_fs(self, dev_path, size_shrink_to):

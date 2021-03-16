@@ -73,9 +73,9 @@ class TransactionalCopyTask(object):
                        + ' if=' + self.source_dev_full_path \
                        + ' of=' + self.encryption_environment.copy_slice_item_backup_file \
                        + ' bs=' + str(block_size_of_slice_item_backup) \
-                       + ' skip=' + str(original_device_skip_count + skip_of_slice_item_backup_file) \
-                       + ' seek=' + str(skip_of_slice_item_backup_file) \
-                       + ' count=' + str(left_count)
+                       + ' skip=' + str(int(original_device_skip_count + skip_of_slice_item_backup_file)) \
+                       + ' seek=' + str(int(skip_of_slice_item_backup_file)) \
+                       + ' count=' + str(int(left_count))
 
                 return_code = self.command_executer.Execute(dd_cmd)
                 if return_code != CommonVariables.process_success:
@@ -84,9 +84,9 @@ class TransactionalCopyTask(object):
             dd_cmd = str(self.copy_command) \
                    + ' if=' + self.encryption_environment.copy_slice_item_backup_file \
                    + ' of=' + self.destination \
-                   + ' bs=' + str(block_size_of_slice_item_backup) \
-                   + ' seek=' + str(original_device_skip_count) \
-                   + ' count=' + str(total_count)
+                   + ' bs=' + str(int(block_size_of_slice_item_backup)) \
+                   + ' seek=' + str(int(original_device_skip_count)) \
+                   + ' count=' + str(int(total_count))
 
             return_code = self.command_executer.Execute(dd_cmd)
             if return_code != CommonVariables.process_success:
@@ -240,9 +240,9 @@ class TransactionalCopyTask(object):
         dd_cmd = str(self.copy_command) \
                + ' if=' + from_device \
                + ' of=' + self.slice_file_path \
-               + ' bs=' + str(block_size) \
-               + ' skip=' + str(skip) \
-               + ' count=' + str(count)
+               + ' bs=' + str(int(block_size)) \
+               + ' skip=' + str(int(skip)) \
+               + ' count=' + str(int(count))
 
         return_code = self.command_executer.Execute(dd_cmd)
         if return_code != CommonVariables.process_success:
@@ -257,8 +257,8 @@ class TransactionalCopyTask(object):
             backup_slice_item_cmd = str(self.copy_command) \
                                   + ' if=' + self.slice_file_path \
                                   + ' of=' + self.encryption_environment.copy_slice_item_backup_file \
-                                  + ' bs=' + str(block_size) \
-                                  + ' count=' + str(count)
+                                  + ' bs=' + str(int(block_size)) \
+                                  + ' count=' + str(int(count))
             backup_slice_args = shlex.split(backup_slice_item_cmd)
             backup_process = Popen(backup_slice_args)
             self.logger.log("backup_slice_item_cmd is:{0}".format(backup_slice_item_cmd))
@@ -266,7 +266,7 @@ class TransactionalCopyTask(object):
             """
             third, copy the data in the middle cache to the target device.
             """
-            dd_cmd = str(self.copy_command) + ' if=' + self.slice_file_path + ' of=' + to_device + ' bs=' + str(block_size) + ' seek=' + str(seek) + ' count=' + str(count)
+            dd_cmd = str(self.copy_command) + ' if=' + self.slice_file_path + ' of=' + to_device + ' bs=' + str(int(block_size)) + ' seek=' + str(int(seek)) + ' count=' + str(int(count))
             return_code = self.command_executer.Execute(dd_cmd)
             if return_code != CommonVariables.process_success:
                 self.logger.log(msg=("{0} is: {1}".format(dd_cmd, return_code)), level = CommonVariables.ErrorLevel)
