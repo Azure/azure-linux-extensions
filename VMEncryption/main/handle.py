@@ -1119,7 +1119,7 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
     mapper_name = ongoing_item_config.get_mapper_name()
     device_size = ongoing_item_config.get_device_size()
 
-    luks_header_size = CommonVariables.luks_header_size
+    luks_header_size = disk_util.get_luks_header_size()
     size_shrink_to = (device_size - luks_header_size) / CommonVariables.sector_size
 
     while current_phase != CommonVariables.EncryptionPhaseDone:
@@ -1502,11 +1502,7 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                                  ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_without_separate_header_file")
 
-    proc_comm = ProcessCommunicator()
-    executor = CommandExecutor(logger)
-    executor.Execute(DistroPatcher.cryptsetup_path + " luksDump " + crypt_item.dev_path, communicator=proc_comm)
-
-    luks_header_size = int(re.findall(r"Payload.*?(\d+)", proc_comm.stdout)[0]) * CommonVariables.sector_size
+    luks_header_size = disk_util.get_luks_header_size(crypt_item.dev_path)
 
     if raw_device_item.size - mapper_device_item.size != luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),

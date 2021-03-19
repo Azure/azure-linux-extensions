@@ -5,6 +5,7 @@ import json
 from DiskUtil import DiskUtil
 from EncryptionEnvironment import EncryptionEnvironment
 from Common import DeviceItem
+from Common import CommonVariables
 from CommandExecutor import CommandExecutor
 from .console_logger import ConsoleLogger
 from .test_utils import mock_dir_structure, MockDistroPatcher
@@ -222,3 +223,134 @@ Tokens:
 """
         keyslots = self.disk_util.luks_dump_keyslots("/dev/path", "/path/to/header")
         self.assertEqual(keyslots, [False, True, False, True, False])
+
+    @mock.patch("DiskUtil.DiskUtil._get_cryptsetup_version")
+    def test_get_luks_header_size_v202(self, ver_mock):
+        # simulate distros with cryptsetup versions earlier than 2.1.0 (eg., Ubuntu 18.04)
+        ver_mock.return_value = "cryptsetup 2.0.2"
+        header_size = self.disk_util.get_luks_header_size()
+        self.assertEqual(header_size, CommonVariables.luks_header_size)
+
+    @mock.patch("DiskUtil.DiskUtil._get_cryptsetup_version")
+    def test_get_luks_header_size_v210(self, ver_mock):
+        # simulate cryptsetup 2.1.0 (first version of cryptsetup defaulting to LUKS2)
+        ver_mock.return_value = "cryptsetup 2.1.0"
+        header_size = self.disk_util.get_luks_header_size()
+        self.assertEqual(header_size, CommonVariables.luks_header_size_v2)    
+    
+    @mock.patch("DiskUtil.DiskUtil._get_cryptsetup_version")
+    def test_get_luks_header_size_v222(self, ver_mock):
+        # versions of distros with cryptsetup later than 2.1.0 (eg., Ubuntu 20.04)
+        ver_mock.return_value = "cryptsetup 2.2.2"
+        header_size = self.disk_util.get_luks_header_size()
+        self.assertEqual(header_size, CommonVariables.luks_header_size_v2)           
+    
+    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    def test_get_luks_header_size_luks1(self, lghd_mock):
+        lghd_mock.return_value = """
+LUKS header information for /dev/sdd
+
+Version:        1
+Cipher name:    aes
+Cipher mode:    xts-plain64
+Hash spec:      sha256
+Payload offset: 4096
+MK bits:        256
+MK digest:      14 99 43 09 07 b0 aa 29 f2 1a dc 91 b2 e9 48 4a f1 0e c9 ff
+MK salt:        88 f5 b8 f5 9a 23 8e 66 00 8a 64 5a c0 dc ee a7
+                92 47 13 5f ea 13 28 21 4a 63 e6 94 3b 70 be e6
+MK iterations:  158490
+UUID:           fd29764c-a935-4702-b2d5-4f4ff70438d9
+
+Key Slot 0: ENABLED
+        Iterations:             2535854
+        Salt:                   30 44 f7 f6 8b f0 80 e9 a4 3f 0e 0d 65 72 a6 af
+                                6d 16 56 6e 77 1b 2c 81 75 82 ba 0b 8c 79 13 29
+        Key material offset:    8
+        AF stripes:             4000
+Key Slot 1: DISABLED
+Key Slot 2: DISABLED
+Key Slot 3: DISABLED
+Key Slot 4: DISABLED
+Key Slot 5: DISABLED
+Key Slot 6: DISABLED
+Key Slot 7: DISABLED"""        
+        header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
+        self.assertEqual(header_size, CommonVariables.luks_header_size)
+
+    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    def test_get_luks_header_size_luks2(self, lghd_mock):
+        lghd_mock.return_value = """
+LUKS header information
+Version:        2
+Epoch:          3
+Metadata area:  16384 [bytes]
+Keyslots area:  16744448 [bytes]
+UUID:           580ebe05-308f-4437-a5e4-133e3e6e756b
+Label:          (no label)
+Subsystem:      (no subsystem)
+Flags:          (no flags)
+
+Data segments:
+    0: crypt
+        offset: 16777216 [bytes]
+        length: (whole device)
+        cipher: aes-xts-plain64
+        sector: 512 [bytes]
+
+Keyslots:
+    0: luks2
+        Key:        512 bits
+        Priority:   normal
+        Cipher:     aes-xts-plain64
+        Cipher key: 512 bits
+        PBKDF:      argon2i
+        Time cost:  4
+        Memory:     543393
+        Threads:    2
+        Salt:       9d 5d ba 40 57 8b 41 fc 68 90 7b 5a a6 fa ef 06
+                    ae b9 d8 27 01 55 1d d4 32 c9 a0 1e ee a8 81 22
+        AF stripes: 4000
+        AF hash:    sha256
+        Area offset:32768 [bytes]
+        Area length:258048 [bytes]
+        Digest ID:  0
+Tokens:
+Digests:
+    0: pbkdf2
+        Hash:       sha256
+        Iterations: 100054
+        Salt:       5b 28 b9 bd fc 4d 47 7f e5 a7 d7 b8 a7 dd d5 99
+                    4c 3a a5 91 02 52 74 46 48 10 2e 1f 51 25 1a 8f
+        Digest:     fc 5d 6f 20 2c 6c 89 7e 79 eb d6 3b 46 19 0f 0a
+                5e 62 0d a3 48 77 a2 19 22 56 a9 ad 5a 94 e3 62"""        
+        header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
+        self.assertEqual(header_size, CommonVariables.luks_header_size_v2)
+
+    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil._extract_luks_version_from_dump")
+    def test_get_luks_header_size_bad_version(self, ver_mock, dump_mock):
+        # log error, return None if LUKS version is outside of supported {1,2}
+        ver_mock.return_value = "4"
+        dump_mock.return_value = ""
+        header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
+        self.assertEqual(header_size, None)
+
+    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil._extract_luks_version_from_dump")
+    def test_get_luks_header_size_luks1_badoffset(self, ver_mock, dump_mock):
+        # log error, return None if LUKS1 offset is not found in header dump
+        ver_mock.return_value = "1"
+        dump_mock.return_value = ""
+        header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
+        self.assertEqual(header_size, None)
+
+    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil._extract_luks_version_from_dump")
+    def test_get_luks_header_size_luks2_badoffset(self, ver_mock, dump_mock):
+        # log error, return None if LUKS2 offset is not found in header dump
+        ver_mock.return_value = "2"
+        dump_mock.return_value = ""
+        header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
+        self.assertEqual(header_size, None)
+
