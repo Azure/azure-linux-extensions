@@ -32,7 +32,7 @@ from TransactionalCopyTask import TransactionalCopyTask
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CommonVariables, LvmItem, DeviceItem
 from io import open
-
+from distutils.version import LooseVersion
 
 class DiskUtil(object):
     os_disk_lvm = None
@@ -246,6 +246,13 @@ class DiskUtil(object):
             if len(splits) == 2 and len(splits[1]) == 36:
                 return splits[1]
         return None
+
+    def _get_cryptsetup_version(self):
+        # get version of currently installed cryptsetup
+        cryptsetup_cmd = "{0} --version".format(self.distro_patcher.cryptsetup_path)
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute(cryptsetup_cmd, communicator=proc_comm, raise_exception_on_failure=True)
+        return proc_comm.stdout
 
     def _extract_luks_version_from_dump(self, luks_dump_out):
         lines = luks_dump_out.split("\n")
@@ -1069,3 +1076,49 @@ class DiskUtil(object):
                         device = d.split(':')[1]
                         break
         return device
+
+    def get_luks_header_size(self, device_path=None):
+        if device_path is None:
+            # LUKS2 headers are the default in cryptsetup 2.1.0 and higher
+            cryptsetup_ver = self._get_cryptsetup_version()
+            if LooseVersion(cryptsetup_ver) >= LooseVersion('cryptsetup 2.1.0'):
+                return CommonVariables.luks_header_size_v2
+            else:
+                return CommonVariables.luks_header_size
+        else:
+            # Parse the luksDump output to identify what LUKS version the header is
+            # The dump file contents contain the offset to the first data segment (payload)
+            # which is in turn equal to the size of the LUKS header prior to that
+            # https://gitlab.com/cryptsetup/cryptsetup/-/wikis/FrequentlyAskedQuestions#2-setup
+
+            # Dump the in place LUKS header and version
+            luksDump = self._luks_get_header_dump(device_path)
+            luksVer = self._extract_luks_version_from_dump(luksDump)
+
+            if luksVer and int(luksVer) == 1:
+                # parse V1 LUKS dump format to get the offset in sectors, then convert to bytes
+                # V1 file format example:
+                #   Payload offset: 4096
+                result = re.findall(r"Payload.*?(\d+)", luksDump)
+                if result:
+                    offset_in_sectors = int(result[0])
+                    header_size = offset_in_sectors * CommonVariables.sector_size
+                else:
+                    self.logger.log("LUKS V1 payload offset not found", level=CommonVariables.ErrorLevel)
+                    header_size = None
+            elif luksVer and int(luksVer) == 2:
+                # parse V2 LUKS dump format which provides offset to first data segment in bytes
+                # V2 file format example:
+                #	Data segments:
+	            #   0: crypt
+                #       offset: 16777216 [bytes]
+                result = re.findall(r"0:\s+crypt\s+offset:\s?(\d+)",luksDump)
+                if result:
+                    header_size = int(result[0])
+                else:
+                    header_size = None
+            else:
+                self.logger.log("LUKS header version not found", level=CommonVariables.ErrorLevel)
+                header_size = None
+
+            return header_size
