@@ -1104,7 +1104,7 @@ class DiskUtil(object):
                     offset_in_sectors = int(result[0])
                     header_size = offset_in_sectors * CommonVariables.sector_size
                 else:
-                    self.logger.log("LUKS V1 payload offset not found", level=CommonVariables.ErrorLevel)
+                    self.logger.log("LUKS1 payload offset not found", level=CommonVariables.ErrorLevel)
                     header_size = None
             elif luksVer and int(luksVer) == 2:
                 # parse V2 LUKS dump format which provides offset to first data segment in bytes
@@ -1114,6 +1114,7 @@ class DiskUtil(object):
                 #       offset: 16777216 [bytes]
                 result = re.findall(r"0:\s+crypt\s+offset:\s?(\d+)",luksDump)
                 if result:
+                    self.logger.log("LUKS2 data segment offset not found", level=CommonVariables.ErrorLevel)
                     header_size = int(result[0])
                 else:
                     header_size = None
