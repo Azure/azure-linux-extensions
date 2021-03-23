@@ -352,9 +352,6 @@ def daemon():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
-        backup_logger.log("BlobUri "+ para_parser.statusBlobUri)
-        backup_logger.log("Log Blob Uri "+ para_parser.logsBlobUri)
-        sys.exit(0)
         hutil.update_settings_file()
 
         if(bool(public_settings) == False and not protected_settings):

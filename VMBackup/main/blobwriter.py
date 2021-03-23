@@ -26,6 +26,8 @@ except ImportError:
 from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import HandlerUtil
+from itertools import takewhile
+import string
 
 class BlobProperties():
     def __init__(self, blobType, contentLength):
@@ -276,28 +278,28 @@ class BlobWriter(object):
                 retry_times = 3
                 while(retry_times > 0):
                     try:
-                        http_util = HttpUtil()
+                        http_util = HttpUtil(self.hutil)
                         sasuri_obj = urlparse.urlparse(blobUri)
                         headers = {}
                         result, httpResp, errMsg, responseBody = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers, responseBodyRequired = True)
                         retry_times = 0
                     except Exception as e:
-                        print ("verifyBlobContentLengthIsZero: Failed to get blob content with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
-                        print ("verifyBlobContentLengthIsZero: retry times is " + str(retry_times))
+                        self.hutil.log("verifyBlobContentLengthIsZero: Failed to get blob content with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+                        self.hutil.log("verifyBlobContentLengthIsZero: retry times is " + str(retry_times))
                         retry_times = retry_times - 1
                 if(responseBody is not None):
                     printable = set(string.printable)  
                     readResponseBody = ''.join(takewhile(lambda x: x in printable, responseBody))
                     blobContentLength = len(readResponseBody)
-                    print ("verifyBlobContentLengthIsZero: Content Length of blob: " + str(blobContentLength))
+                    self.hutil.log("verifyBlobContentLengthIsZero: Content Length of blob: " + str(blobContentLength))
                     if(blobContentLength == 0):
                         return True
                     else:
                         return False
                 else:
-                    print ("verifyBlobContentLengthIsZero: blob properties is null")
+                    self.hutil.log("verifyBlobContentLengthIsZero: blob properties is null")
             else:
-                print ("verifyBlobContentLengthIsZero: bloburi is None")
+                self.hutil.log("verifyBlobContentLengthIsZero: bloburi is None")
         except Exception as e:
-            print ("verifyBlobContentLengthIsZero: Failed to get the blob content length with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+            self.hutil.log("verifyBlobContentLengthIsZero: Failed to get the blob content length with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         return True
