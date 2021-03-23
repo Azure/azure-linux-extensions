@@ -268,4 +268,36 @@ class BlobWriter(object):
                 contentLength = httpResp.getheader('Content-Length')
                 blobProperties = BlobProperties(blobType, contentLength)
         return blobProperties
-
+    
+    def verifyBlobContentLengthIsZero(self, blobUri):
+        try:
+            responseBody = ""
+            if(blobUri is not None):
+                retry_times = 3
+                while(retry_times > 0):
+                    try:
+                        http_util = HttpUtil()
+                        sasuri_obj = urlparse.urlparse(blobUri)
+                        headers = {}
+                        result, httpResp, errMsg, responseBody = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers, responseBodyRequired = True)
+                        retry_times = 0
+                    except Exception as e:
+                        print ("verifyBlobContentLengthIsZero: Failed to get blob content with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+                        print ("verifyBlobContentLengthIsZero: retry times is " + str(retry_times))
+                        retry_times = retry_times - 1
+                if(responseBody is not None):
+                    printable = set(string.printable)  
+                    readResponseBody = ''.join(takewhile(lambda x: x in printable, responseBody))
+                    blobContentLength = len(readResponseBody)
+                    print ("verifyBlobContentLengthIsZero: Content Length of blob: " + str(blobContentLength))
+                    if(blobContentLength == 0):
+                        return True
+                    else:
+                        return False
+                else:
+                    print ("verifyBlobContentLengthIsZero: blob properties is null")
+            else:
+                print ("verifyBlobContentLengthIsZero: bloburi is None")
+        except Exception as e:
+            print ("verifyBlobContentLengthIsZero: Failed to get the blob content length with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        return True
