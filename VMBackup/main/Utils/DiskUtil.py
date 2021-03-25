@@ -30,9 +30,28 @@ import Utils.HandlerUtil
 import traceback
 
 class DiskUtil(object):
+    __instance__ = None
+    patching = None
+    logger = None
+    mount_output = None
+
+
     def __init__(self, patching, logger):
-        self.patching = patching
-        self.logger = logger
+
+        if DiskUtil.__instance__ is None:
+            self.patching = patching
+            self.logger = logger
+            self.mount_output = None
+            DiskUtil.__instance__ = self
+        else:
+            raise Exception("You cannot create another DiskUtil class")
+
+    @staticmethod
+    def get_instance(patching, logger):
+        if not DiskUtil.__instance__:
+            DiskUtil(patching, logger)
+
+        return DiskUtil.__instance__
 
     def get_device_items_property(self, lsblk_path, dev_name, property_name):
         get_property_cmd = lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
@@ -349,25 +368,30 @@ class DiskUtil(object):
         return file_systems_info
 
     def get_mount_output(self):
-        # Get the output on the mount command
-        self.logger.log("getting the mount-points info using mount command ", True)
-        mount_path = self.patching.mount_path
-        is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-        if (is_mount_path_wrong == True):
-            if self.patching.usr_flag == 1:
-                self.logger.log("mount path is wrong.removing /usr prefix", True, 'Warning')
-                mount_path = "/bin/mount"
-            else:
-                self.logger.log("mount path is wrong.Adding /usr prefix", True, 'Warning')
-                mount_path = "/usr/bin/mount"
+        if self.mount_output is not None:
+            return self.mount_output
+        else :
+            # Get the output on the mount command
+            self.logger.log("getting the mount-points info using mount command ", True)
+            mount_path = self.patching.mount_path
             is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-        # if mount_path was still wrong, mount_path using "which" command
-        if (is_mount_path_wrong == True):
-            self.logger.log("mount path is wrong. finding path using which command", True, 'Warning')
-            out_which_output, which_error_msg = self.get_which_command_result('mount')
-            # get mount command output
-            if (out_which_output is not None):
-                 mount_path = str(out_which_output)
-                 is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-        return out_mount_output
+            if (is_mount_path_wrong == True):
+                if self.patching.usr_flag == 1:
+                    self.logger.log("mount path is wrong.removing /usr prefix", True, 'Warning')
+                    mount_path = "/bin/mount"
+                else:
+                    self.logger.log("mount path is wrong.Adding /usr prefix", True, 'Warning')
+                    mount_path = "/usr/bin/mount"
+                is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
+            # if mount_path was still wrong, mount_path using "which" command
+            if (is_mount_path_wrong == True):
+                self.logger.log("mount path is wrong. finding path using which command", True, 'Warning')
+                out_which_output, which_error_msg = self.get_which_command_result('mount')
+                # get mount command output
+                if (out_which_output is not None):
+                     mount_path = str(out_which_output)
+                     is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
+
+            self.mount_output = out_mount_output
+            return out_mount_output
 
