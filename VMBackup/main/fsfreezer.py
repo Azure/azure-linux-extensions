@@ -127,7 +127,7 @@ class FsFreezer:
         self.maxGetLockRetry = 5
 
     def should_skip(self, mount):
-        if(resource_disk_mount_point is not None and mount.mount_point == self.resource_disk_mount_point):
+        if(self.resource_disk_mount_point is not None and mount.mount_point == self.resource_disk_mount_point):
             return True
         elif((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop' ):
             return False
