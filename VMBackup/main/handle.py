@@ -106,36 +106,6 @@ def status_report_to_file(file_report_msg):
     backup_logger.log("file status report message:",True)
     backup_logger.log(file_report_msg,True)
 
-def IsEmptyStatusBlob():
-    global backup_logger,hutil,para_parser
-    UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
-    if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
-        try:
-            if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
-                blobWriter = BlobWriter(hutil)
-                res = blobWriter.verifyBlobContentLengthIsZero(para_parser.statusBlobUri)
-                if(res == False):                
-                    backup_logger.log("IsEmptyStatusBlob: status blob is not empty",True)
-                    para_parser.statusBlobUri = None
-        except Exception as e:
-            err_msg='IsEmptyStatusBlob: cannot verify if status blob is empty'+traceback.format_exc()
-            backup_logger.log(err_msg, True, 'Warning')
-
-def IsEmptyLogBlob():
-    global backup_logger,hutil,para_parser
-    UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
-    if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
-        try:
-            if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
-                blobWriter = BlobWriter(hutil)
-                res = blobWriter.verifyBlobContentLengthIsZero(para_parser.logsBlobUri)
-                if(res == False):                
-                    backup_logger.log("IsEmptyLogBlob: log blob is not empty",True)
-                    para_parser.logsBlobUri = None
-        except Exception as e:
-            err_msg='IsEmptyLogBlob: cannot verify if log blob is empty'+traceback.format_exc()
-            backup_logger.log(err_msg, True, 'Warning')
-
 def status_report_to_blob(blob_report_msg):
     global backup_logger,hutil,para_parser
     UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
@@ -415,8 +385,9 @@ def daemon():
                 temp_msg='Transitioning state in extension'
                 blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
                 status_report_to_file(file_report_msg)
-                IsEmptyStatusBlob()
-                IsEmptyLogBlob()
+                blobWriter = BlobWriter(hutil)
+                blobWriter.IsEmptyStatusBlob(hutil, para_parser)
+                blobWriter.IsEmptyLogBlob(hutil, para_parser)
                 status_report_to_blob(blob_report_msg)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
@@ -661,7 +632,8 @@ def enable():
         temp_result=CommonVariables.error
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
         error_msg = 'Failed to call the daemon'
-        IsEmptyLogBlob()
+        blobWriter = BlobWriter(hutil)
+        blobWriter.IsEmptyStatusBlob(hutil, para_parser)
         exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
 def thread_for_log_upload():

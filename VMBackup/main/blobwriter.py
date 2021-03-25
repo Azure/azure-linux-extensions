@@ -270,7 +270,7 @@ class BlobWriter(object):
                 contentLength = httpResp.getheader('Content-Length')
                 blobProperties = BlobProperties(blobType, contentLength)
         return blobProperties
-    
+
     def verifyBlobContentLengthIsZero(self, blobUri):
         try:
             responseBody = ""
@@ -303,3 +303,30 @@ class BlobWriter(object):
         except Exception as e:
             self.hutil.log("verifyBlobContentLengthIsZero: Failed to get the blob content length with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
         return True
+
+    def IsEmptyStatusBlob(self, hutil, para_parser):
+        UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
+        if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
+            try:
+                if(para_parser is not None and para_parser.statusBlobUri is not None and para_parser.statusBlobUri != ""):
+                    res = self.verifyBlobContentLengthIsZero(para_parser.statusBlobUri)
+                    if(res == False):                
+                        self.hutil.log("IsEmptyStatusBlob: status blob is not empty")
+                        para_parser.statusBlobUri = None
+            except Exception as e:
+                err_msg='IsEmptyStatusBlob: cannot verify if status blob is empty'+traceback.format_exc()
+                self.hutil.log(err_msg)
+
+    def IsEmptyLogBlob(self, hutil, para_parser):
+        UploadStatusAndLog = hutil.get_strvalue_from_configfile('UploadStatusAndLog','True')        
+        if(UploadStatusAndLog == None or UploadStatusAndLog == 'True'):
+            try:
+                if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
+                    res = self.verifyBlobContentLengthIsZero(para_parser.logsBlobUri)
+                    if(res == False):                
+                        self.hutil.log("IsEmptyLogBlob: log blob is not empty")
+                        para_parser.logsBlobUri = None
+            except Exception as e:
+                err_msg='IsEmptyLogBlob: cannot verify if log blob is empty'+traceback.format_exc()
+                self.hutil.log(err_msg)
+
