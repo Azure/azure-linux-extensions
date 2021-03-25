@@ -124,6 +124,7 @@ class FsFreezer:
         self.isAquireLockSucceeded = True
         self.getLockRetry = 0
         self.maxGetLockRetry = 5
+        self.file = None
 
     def should_skip(self, mount):
         resource_disk_mount_point= self.resource_disk.get_resource_disk_mount_point()
@@ -183,15 +184,15 @@ class FsFreezer:
                 try:
                     if not os.path.isdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock'):
                         os.mkdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock')
-                    file = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
+                    self.file = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
                     self.logger.log("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file opened Sucessfully",True)
                     try:
-                        fcntl.lockf(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        fcntl.lockf(self.file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                         self.logger.log("Aquiring lock succeeded",True)
                         self.isAquireLockSucceeded = True
                         break
                     except Exception as ex:
-                        file.close()
+                        self.file.close()
                         raise ex
                 except Exception as e:
                     self.logger.log("Failed to open file or aquire lock:  "+ str(e),True)
@@ -205,20 +206,9 @@ class FsFreezer:
             end_time = datetime.datetime.utcnow()
             self.logger.log("Wait time to aquire lock "+ str(end_time - start_time),True)
 
-            
             sig_handle = None
             if (self.isAquireLockSucceeded == True):
                 sig_handle=self.freeze_handler.startproc(args)
-                self.thaw_safe()
-                try:
-                    fcntl.lockf(file, fcntl.LOCK_UN)
-                    file.close()
-                except:
-                    pass
-            try:
-                os.remove("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile")
-            except:
-                pass
 
             self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
@@ -248,10 +238,23 @@ class FsFreezer:
             self.logger.log(error_msg, True, 'Error')
         return freeze_result,timedout
 
+    def releaseFileLock(self):
+        if (self.isAquireLockSucceeded == True):
+            try:
+                fcntl.lockf(self.file, fcntl.LOCK_UN)
+                self.file.close()
+            except:
+                pass
+        try:
+            os.remove("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile")
+        except:
+            pass
+
     def thaw_safe(self):
         thaw_result = FreezeResult()
         unable_to_sleep = False
         if(self.skip_freeze == True):
+            self.releaseFileLock()
             return thaw_result, unable_to_sleep
         if(self.freeze_handler.child is None):
             self.logger.log("child already completed", True)
@@ -287,6 +290,7 @@ class FsFreezer:
             self.log_binary_output()
             self.logger.log(error_msg, True, 'Error')
         self.logger.enforce_local_flag(True)
+        self.releaseFileLock()
         return thaw_result, unable_to_sleep
 
     def log_binary_output(self):
