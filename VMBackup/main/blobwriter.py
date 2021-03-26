@@ -46,6 +46,7 @@ class BlobWriter(object):
             # get the blob type
             if(blobUri is not None):
                 blobProperties = self.GetBlobProperties(blobUri)
+                blobType = "pageblob"
 
                 if(blobProperties is not None):
                     blobType = blobProperties.blobType

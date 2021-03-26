@@ -44,7 +44,7 @@ class DiskUtil(object):
             self.mount_output = None
             DiskUtil.__instance__ = self
         else:
-            raise Exception("You cannot create another DiskUtil class")
+            return DiskUtil.__instance__
 
     @staticmethod
     def get_instance(patching, logger):
@@ -391,7 +391,6 @@ class DiskUtil(object):
                 if (out_which_output is not None):
                      mount_path = str(out_which_output)
                      is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-
             self.mount_output = out_mount_output
             return out_mount_output
 
