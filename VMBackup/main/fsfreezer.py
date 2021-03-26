@@ -124,7 +124,7 @@ class FsFreezer:
         self.isAquireLockSucceeded = True
         self.getLockRetry = 0
         self.maxGetLockRetry = 5
-        self.file = None
+        self.safeFreezelockFile = None
 
     def should_skip(self, mount):
         resource_disk_mount_point= self.resource_disk.get_resource_disk_mount_point()
@@ -184,15 +184,15 @@ class FsFreezer:
                 try:
                     if not os.path.isdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock'):
                         os.mkdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock')
-                    self.file = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
+                    self.safeFreezelockFile = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
                     self.logger.log("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file opened Sucessfully",True)
                     try:
-                        fcntl.lockf(self.file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        fcntl.lockf(self.safeFreezelockFile, fcntl.LOCK_EX | fcntl.LOCK_NB)
                         self.logger.log("Aquiring lock succeeded",True)
                         self.isAquireLockSucceeded = True
                         break
                     except Exception as ex:
-                        self.file.close()
+                        self.safeFreezelockFile.close()
                         raise ex
                 except Exception as e:
                     self.logger.log("Failed to open file or aquire lock:  "+ str(e),True)
@@ -241,8 +241,8 @@ class FsFreezer:
     def releaseFileLock(self):
         if (self.isAquireLockSucceeded == True):
             try:
-                fcntl.lockf(self.file, fcntl.LOCK_UN)
-                self.file.close()
+                fcntl.lockf(self.safeFreezelockFile, fcntl.LOCK_UN)
+                self.safeFreezelockFile.close()
             except Exception as e:
                 self.logger.log("Failed to unlock:  "+ str(e),True)
         try:
