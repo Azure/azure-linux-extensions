@@ -243,18 +243,17 @@ class FsFreezer:
             try:
                 fcntl.lockf(self.file, fcntl.LOCK_UN)
                 self.file.close()
-            except:
-                pass
+            except Exception as e:
+                self.logger.log("Failed to unlock:  "+ str(e),True)
         try:
             os.remove("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile")
-        except:
-            pass
+        except Exception as e:
+            self.logger.log("Failed to delete /etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file:  "+ str(e),True)
 
     def thaw_safe(self):
         thaw_result = FreezeResult()
         unable_to_sleep = False
         if(self.skip_freeze == True):
-            self.releaseFileLock()
             return thaw_result, unable_to_sleep
         if(self.freeze_handler.child is None):
             self.logger.log("child already completed", True)
