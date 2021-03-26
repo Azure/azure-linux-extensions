@@ -195,7 +195,7 @@ class FsFreezer:
                         self.safeFreezelockFile.close()
                         raise ex
                 except Exception as e:
-                    self.logger.log("Failed to open file or aquire lock:  "+ str(e),True)
+                    self.logger.log("Failed to open file or aquire lock: %s, stack trace: %s" % (str(e), traceback.format_exc()),True)
                     self.isAquireLockSucceeded = False
                     self.getLockRetry= self.getLockRetry + 1
                     time.sleep(1)
@@ -244,11 +244,11 @@ class FsFreezer:
                 fcntl.lockf(self.safeFreezelockFile, fcntl.LOCK_UN)
                 self.safeFreezelockFile.close()
             except Exception as e:
-                self.logger.log("Failed to unlock:  "+ str(e),True)
+                self.logger.log("Failed to unlock: %s, stack trace: %s" % (str(e), traceback.format_exc()),True)
         try:
             os.remove("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile")
         except Exception as e:
-            self.logger.log("Failed to delete /etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file:  "+ str(e),True)
+            self.logger.log("Failed to delete /etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file: %s, stack trace: %s" % (str(e), traceback.format_exc()),True)
 
     def thaw_safe(self):
         thaw_result = None
