@@ -381,7 +381,6 @@ def install():
                     for var in list(default_configs.keys()):
                         # use a split to avoid matching defaults found in the value of other settings
                         if var in line.split('=')[0]:
-                            line = "export " + var + "=" + default_configs[var] + "\n"
                             vars_set.add(var)
                             break
                     new_data += line
