@@ -251,46 +251,50 @@ class FsFreezer:
             self.logger.log("Failed to delete /etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file:  "+ str(e),True)
 
     def thaw_safe(self):
-        thaw_result = FreezeResult()
+        thaw_result = None
         unable_to_sleep = False
-        if(self.skip_freeze == True):
-            return thaw_result, unable_to_sleep
-        if(self.freeze_handler.child is None):
-            self.logger.log("child already completed", True)
-            self.logger.log("****** 7. Error - Binary Process Already Completed", True)
-            error_msg = 'snapshot result inconsistent'
-            thaw_result.errors.append(error_msg)
-        elif(self.freeze_handler.child.poll() is None):
-            self.logger.log("child process still running")
-            self.logger.log("****** 7. Sending Thaw Signal to Binary")
-            self.freeze_handler.child.send_signal(signal.SIGUSR1)
-            for i in range(0,30):
-                if(self.freeze_handler.child.poll() is None):
-                    self.logger.log("child still running sigusr1 sent")
-                    time.sleep(1)
-                else:
-                    break
-            self.logger.enforce_local_flag(True)
-            self.log_binary_output()
-            if(self.freeze_handler.child.returncode!=0):
-                error_msg = 'snapshot result inconsistent as child returns with failure'
-                thaw_result.errors.append(error_msg)
-                self.logger.log(error_msg, True, 'Error')
-        else:
-            self.logger.log("Binary output after process end when no thaw sent: ", True)
-            if(self.freeze_handler.child.returncode==2):
-                error_msg = 'Unable to execute sleep'
-                thaw_result.errors.append(error_msg)
-                unable_to_sleep = True
-            else:
+        try:
+            thaw_result = FreezeResult()
+            if(self.skip_freeze == True):
+                return thaw_result, unable_to_sleep
+            if(self.freeze_handler.child is None):
+                self.logger.log("child already completed", True)
+                self.logger.log("****** 7. Error - Binary Process Already Completed", True)
                 error_msg = 'snapshot result inconsistent'
                 thaw_result.errors.append(error_msg)
-            self.logger.enforce_local_flag(True)
-            self.log_binary_output()
-            self.logger.log(error_msg, True, 'Error')
-        self.logger.enforce_local_flag(True)
-        self.releaseFileLock()
+            elif(self.freeze_handler.child.poll() is None):
+                self.logger.log("child process still running")
+                self.logger.log("****** 7. Sending Thaw Signal to Binary")
+                self.freeze_handler.child.send_signal(signal.SIGUSR1)
+                for i in range(0,30):
+                    if(self.freeze_handler.child.poll() is None):
+                        self.logger.log("child still running sigusr1 sent")
+                        time.sleep(1)
+                    else:
+                        break
+                self.logger.enforce_local_flag(True)
+                self.log_binary_output()
+                if(self.freeze_handler.child.returncode!=0):
+                    error_msg = 'snapshot result inconsistent as child returns with failure'
+                    thaw_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
+            else:
+                self.logger.log("Binary output after process end when no thaw sent: ", True)
+                if(self.freeze_handler.child.returncode==2):
+                    error_msg = 'Unable to execute sleep'
+                    thaw_result.errors.append(error_msg)
+                    unable_to_sleep = True
+                else:
+                    error_msg = 'snapshot result inconsistent'
+                    thaw_result.errors.append(error_msg)
+                self.logger.enforce_local_flag(True)
+                self.log_binary_output()
+                self.logger.log(error_msg, True, 'Error')
+            self.logger.enforce_local_flag(True) 
+        finally:
+            self.releaseFileLock()
         return thaw_result, unable_to_sleep
+
 
     def log_binary_output(self):
         self.logger.log("============== Binary output traces start ================= ", True)
