@@ -20,8 +20,9 @@ import os
 import sys
 import io
 
-from time import sleep
-from OSEncryptionState import *
+from OSEncryptionState import OSEncryptionState
+from CommandExecutor import ProcessCommunicator
+from Common import CommonVariables
 
 
 class PatchBootSystemState(OSEncryptionState):
@@ -33,12 +34,12 @@ class PatchBootSystemState(OSEncryptionState):
 
         if not super(PatchBootSystemState, self).should_enter():
             return False
-        
+
         self.context.logger.log("Performing enter checks for patch_boot_system state")
 
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('umount /oldroot', True)
-                
+
         return True
 
     def enter(self):
@@ -48,6 +49,7 @@ class PatchBootSystemState(OSEncryptionState):
         self.context.logger.log("Entering patch_boot_system state")
 
         self.command_executor.Execute('mount /boot', False)
+        self.command_executor.Execute('mount /boot/efi', False)
         self.command_executor.Execute('mount /dev/mapper/osencrypt /oldroot', True)
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.Execute('mkdir /oldroot/memroot', True)
@@ -111,7 +113,7 @@ class PatchBootSystemState(OSEncryptionState):
         if sys.version_info[0] < 3:
             if isinstance(contents, str):
                 contents = contents.decode('utf-8')
-        
+
         with io.open(path, 'a') as f:
             f.write(contents)
 
