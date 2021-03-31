@@ -19,7 +19,7 @@ import Utils.extensionutils as eu
 import unittest
 
 
-class TestScriptUtil(unittest.TestCase):
+class TestEncode(unittest.TestCase):
     def test_encode(self):
         contents = eu.get_file_contents('mock_sshd_config')
         encoded_contents = eu.encode_for_writing_to_file(contents)
