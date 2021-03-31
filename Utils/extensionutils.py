@@ -69,6 +69,9 @@ def create_dir(dir_path, user, mode):
 def encode_for_writing_to_file(contents):
     if type(contents) == str:
         if sys.version_info[0] >= 3:
+            """
+            utf-8 is a superset of ASCII and latin-1
+            """
             return contents.encode('utf-8')
         elif sys.version_info[0] == 2:
             """
