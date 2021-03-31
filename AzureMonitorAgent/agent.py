@@ -807,7 +807,7 @@ def stop_arc_watcher():
             for pids in f.readlines():
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
-                if "arc" in output:
+                if b"arc" in output:
                     kill_cmd = "kill " + pids 
                     run_command_and_log(kill_cmd)
         
