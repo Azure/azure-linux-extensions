@@ -68,16 +68,12 @@ def create_dir(dir_path, user, mode):
 
 def encode_for_writing_to_file(contents):
     if type(contents) == str:
-        if sys.version_info[0] >= 3:
+        if sys.version_info[0] == 3:
             """
             utf-8 is a superset of ASCII and latin-1
-            """
-            return contents.encode('utf-8')
-        elif sys.version_info[0] == 2:
-            """
             in python 2 str is an alias for bytes, no need to encode it again
             """
-            return contents
+            return contents.encode('utf-8')
     return contents
 
 
