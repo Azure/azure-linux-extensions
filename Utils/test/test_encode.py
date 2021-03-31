@@ -23,8 +23,8 @@ class TestScriptUtil(unittest.TestCase):
     def test_parse_args(self):
         contents = eu.get_file_contents('mock_sshd_config')
         encoded_contents = eu.encode_for_writing_to_file(contents)
-        known_non_ascii_character = encoded_contents[2353]
-        self.assertEquals(known_non_ascii_character, 0X9D)
+        known_non_ascii_character = b"%c" % encoded_contents[2353]
+        self.assertEqual(known_non_ascii_character, b'\x9d')
 
 
 if __name__ == '__main__':
