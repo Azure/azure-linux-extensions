@@ -107,6 +107,7 @@ BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
+PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
 
 # Commands
@@ -258,7 +259,7 @@ def install():
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
     print(PackageManager, " and ", BundleFileName)
-    OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)        
+    OneAgentInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
     hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
 
     # Retry, since install can fail due to concurrent package operations
@@ -890,6 +891,7 @@ def find_package_manager(operation):
     Checks if the dist is debian based or centos based and assigns the package manager accordingly
     """
     global PackageManager
+    global PackageManagerOptions
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
@@ -898,12 +900,17 @@ def find_package_manager(operation):
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
+            # OK to replace the /etc/default/mdsd, since the placeholders gets replaced again.
+            # Otherwise, the package manager prompts for action (Y/I/N/O/D/Z) [default=N]
+            PackageManagerOptions = "--force-confnew"
             BundleFileName = BundleFileNameDeb
             break
 
     for rpm_dist in rpm_set:
         if dist.lower().startswith(rpm_dist):
             PackageManager = "rpm"
+            # Same as above.
+            PackageManagerOptions = "--force"
             BundleFileName = BundleFileNameRpm
             break
 
