@@ -135,6 +135,13 @@ class DiskUtil(object):
 
     def get_lsblk_pairs_output(self, lsblk_path, dev_path):
         self.logger.log("get_lsblk_pairs_output : getting the blk info from " + str(dev_path) + " using lsblk_path " + str(lsblk_path), True)
+        
+        # If an alternate user is specified  in vmbackup.conf, run lsblk command through that user, not with root access. 
+        # Fixes issues found in some SUSE-related distros where lsblk command gets stuck with root access
+        # Sample vmbackup.conf file with such alternate user setting:
+        # [lsblkUser]
+        # username: vmadmin
+
         configfile = '/etc/azure/vmbackup.conf'
         command_user = ''
         alternate_user = False
