@@ -66,15 +66,26 @@ def create_dir(dir_path, user, mode):
     change_owner(dir_path, user)
 
 
+def encode_for_writing_to_file(contents):
+    if type(contents) == str:
+        if sys.version_info[0] >= 3:
+            return contents.encode('utf-8')
+        elif sys.version_info[0] == 2:
+            """
+            in python 2 str is an alias for bytes, no need to encode it again
+            """
+            return contents
+    return contents
+
+
 def set_file_contents(file_path, contents):
     """
     Write 'contents' to 'file_path'.
     """
-    if type(contents) == str:
-        contents = contents.encode('latin-1', 'ignore')
+    bytes_to_write = encode_for_writing_to_file(contents)
     try:
         with open(file_path, "wb+") as F:
-            F.write(contents)
+            F.write(bytes_to_write)
     except EnvironmentError as e:
         logger.error_with_prefix(
             'SetFileContents', 'Writing to file ' + file_path + ' Exception is ' + str(e))
@@ -86,14 +97,10 @@ def append_file_contents(file_path, contents):
     """
     Append 'contents' to 'file_path'.
     """
-    if type(contents) == str:
-        if sys.version_info[0] == 3:
-            contents = contents.encode('latin-1').decode('latin-1')
-        elif sys.version_info[0] == 2:
-            contents = contents.encode('latin-1')
+    bytes_to_write = encode_for_writing_to_file(contents)
     try:
-        with open(file_path, "a+") as F:
-            F.write(contents)
+        with open(file_path, "ab+") as F:
+            F.write(bytes_to_write)
     except EnvironmentError as e:
         logger.error_with_prefix(
             'AppendFileContents', 'Appending to file ' + file_path + ' Exception is ' + str(e))
@@ -123,10 +130,9 @@ def replace_file_with_contents_atomic(filepath, contents):
     Write 'contents' to 'filepath' by creating a temp file, and replacing original.
     """
     handle, temp = tempfile.mkstemp(dir=os.path.dirname(filepath))
-    if type(contents) == str:
-        contents = contents.encode('latin-1')
+    bytes_to_write = encode_for_writing_to_file(contents)
     try:
-        os.write(handle, contents)
+        os.write(handle, bytes_to_write)
     except EnvironmentError as e:
         logger.error_with_prefix(
             'ReplaceFileContentsAtomic', 'Writing to file ' + filepath + ' Exception is ' + str(e))
