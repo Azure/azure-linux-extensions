@@ -20,7 +20,7 @@ import unittest
 
 
 class TestScriptUtil(unittest.TestCase):
-    def test_parse_args(self):
+    def test_encode(self):
         contents = eu.get_file_contents('mock_sshd_config')
         encoded_contents = eu.encode_for_writing_to_file(contents)
         known_non_ascii_character = b"%c" % encoded_contents[2353]
