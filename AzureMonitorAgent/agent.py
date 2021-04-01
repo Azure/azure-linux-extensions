@@ -902,7 +902,7 @@ def find_package_manager(operation):
             PackageManager = "dpkg"
             # OK to replace the /etc/default/mdsd, since the placeholders gets replaced again.
             # Otherwise, the package manager prompts for action (Y/I/N/O/D/Z) [default=N]
-            PackageManagerOptions = "--force-confnew"
+            PackageManagerOptions = "--force-overwrite --force-confnew"
             BundleFileName = BundleFileNameDeb
             break
 
