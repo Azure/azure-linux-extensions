@@ -120,34 +120,22 @@ class PatchBootSystemState(OSEncryptionState):
     def _modify_pivoted_oldroot(self):
         self.context.logger.log("Pivoted into oldroot successfully")
 
-        # set up hook script to copy new LUKS header to /boot/luks/osluksheader when updating initramfs
-        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-        encryptscriptsdir = os.path.join(scriptdir, '../encryptscripts')
-        injectscriptpath = os.path.join(encryptscriptsdir, 'inject_luks_header.sh')
+        # copy hook and boot scripts to initramfs 
+        self._copy_ade_scripts()
 
-        if not os.path.exists(injectscriptpath):
-            message = "Inject-script not found at path: {0}".format(injectscriptpath)
+        root_partition_uuid = self._get_root_partuuid()
+        if root_partition_uuid:
+            # add root partition UUID to boot script cryptsetup command
+            self.command_executor.Execute("sed -i 's/ROOTPARTUUID/{0}/g' /usr/share/initramfs-tools/scripts/init-premount/crypt-ade-boot".format(root_partition_uuid), True)
+            # add root partition UUID to /etc/crypttab
+            entry = 'osencrypt /dev/disk/by-partuuid/{0} /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partition_uuid)
+            self._append_contents_to_file(entry, '/etc/crypttab')
+        else:
+            message = "Failed to get root partition UUID"
             self.context.logger.log(message)
             raise Exception(message)
-        else:
-            self.context.logger.log("Inject-script found at path: {0}".format(injectscriptpath))
 
-        self.command_executor.Execute('cp {0} /usr/share/initramfs-tools/hooks/luksheader'.format(injectscriptpath), True)
-        self.command_executor.Execute('chmod +x /usr/share/initramfs-tools/hooks/luksheader', True)
-
-        # get the azure symlink to os volume (eg, '/dev/disk/azure/root-part1')
-        os_volume = None
-        az_symlink_os_volume = self._get_az_symlink_os_volume()
-        if os.path.exists(az_symlink_os_volume) and os.path.realpath(az_symlink_os_volume) == os.path.realpath(self.rootfs_block_device):
-            os_volume = az_symlink_os_volume
-        else:
-            os_volume = self.rootfs_block_device
-        
-        # append osencrypt entry to /etc/crypttab 
-        entry = 'osencrypt {0} /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh'.format(os_volume)
-        self._append_contents_to_file(entry, '/etc/crypttab')
-
-        # prior to updating initramfs, PrereqState.py copies hook and boot scripts into place
+        # once hook and boot scripts are ready, update initramfs
         self.command_executor.Execute('update-initramfs -u -k all', True)
 
         # prior to updating grub, do the following: 
@@ -160,9 +148,43 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('update-grub', True)
         self.command_executor.Execute('grub-install --recheck --force {0}'.format(self.rootfs_disk), True)
 
-    def _get_uuid(self, partition_name):
+    def _get_root_partuuid(self):
         proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="blkid -s UUID -o value {0}".format(partition_name),
+        self.command_executor.Execute(command_to_execute="blkid -t LABEL=cloudimg-rootfs -o value -s PARTUUID",
                                       raise_exception_on_failure=True,
                                       communicator=proc_comm)
         return proc_comm.stdout.strip()
+
+    def _copy_ade_scripts(self):
+        # Copy Ubuntu 20.04 specific hook and boot scripts for ADE into position
+        # Subsequent update-initramfs calls will use these to build the new initramfs
+        # http://manpages.ubuntu.com/manpages/focal/en/man7/initramfs-tools.7.html
+
+        script_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        encrypt_scripts_dir = os.path.join(script_dir,'../encryptscripts/')
+
+        # hook script
+        hook_script_name = 'crypt-ade-hook'
+        hook_script_source = os.path.join(script_dir, encrypt_scripts_dir, hook_script_name)
+        hook_script_dest = os.path.join('/usr/share/initramfs-tools/hooks/', hook_script_name)
+        if not os.path.exists(hook_script_source):
+            message = "Hook script not found at path: {0}".format(hook_script_source)
+            self.context.logger.log(message)
+            raise Exception(message)
+        else:
+            self.context.logger.log("Hook script found at path: {0}".format(hook_script_source))
+        self.command_executor.Execute('cp {0} {1}'.format(hook_script_source,hook_script_dest), True)
+        self.command_executor.Execute('chmod +x {0}'.format(hook_script_dest), True)
+
+        # copy boot script and update with root partition uuid
+        boot_script_name = 'crypt-ade-boot'
+        boot_script_source = os.path.join(script_dir, encrypt_scripts_dir, boot_script_name)
+        boot_script_dest = os.path.join('/usr/share/initramfs-tools/scripts/init-premount/', boot_script_name)
+        if not os.path.exists(boot_script_source):
+            message = "Boot script not found at path: {0}".format(boot_script_source)
+            self.context.logger.log(message)
+            raise Exception(message)
+        else:
+            self.context.logger.log("Boot script found at path: {0}".format(boot_script_source))
+        self.command_executor.Execute('cp {0} {1}'.format(boot_script_source,boot_script_dest), True)
+        self.command_executor.Execute('chmod +x {0}'.format(boot_script_dest), True)
