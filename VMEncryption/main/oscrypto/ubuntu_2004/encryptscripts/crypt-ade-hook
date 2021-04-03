@@ -14,17 +14,20 @@ case "$1" in
     ;;
 esac
 
-# This ADE hook script adds two mount points and /etc/fstab entries to initramfs
-# so the LUKS header and key file are available for the boot script to use prior 
-# to calling cryptsetup to open the underlying root device /dev/mapper/osencrypt
-# The boot script is: /usr/share/initramfs-tools/scripts/init-premount/crypt-ade 
+. /usr/share/initramfs-tools/hook-functions
 
-BOOTUUID=$(findmnt -fn -o UUID /boot)
+# this hook script prepares the various boot script prerequisites
+# /usr/share/initramfs-tools/scripts/init-premount/crypt-ade-boot
 
+# add /etc/fstab entries and mount point directories
 mkdir -p $DESTDIR/boot
 mkdir -p $DESTDIR/mnt/azure_bek_disk
-
+BOOTUUID=$(findmnt -fn -o UUID /boot)
 echo "/dev/disk/by-uuid/$BOOTUUID /boot ext2 defaults 0 0" >> "$DESTDIR/etc/fstab"
 echo "/dev/disk/by-label/BEK\\x20VOLUME /mnt/azure_bek_disk auto defaults 0 0" >> "$DESTDIR/etc/fstab"
+
+# inject luks header
+mkdir -p ${DESTDIR}/boot/luks
+copy_exec /boot/luks/osluksheader /boot/luks
 
 exit 0

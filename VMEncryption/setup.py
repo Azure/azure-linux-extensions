@@ -205,6 +205,5 @@ copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/crypt-ade-boot', final_folder_path+'/' + main_folder + '/oscrypto/ubuntu_2004/encryptscripts')
 copy2(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/crypt-ade-hook', final_folder_path+'/' + main_folder + '/oscrypto/ubuntu_2004/encryptscripts')
-copy2(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/inject_luks_header.sh', final_folder_path+'/' + main_folder + '/oscrypto/ubuntu_2004/encryptscripts')
 zip(final_folder_path, target_zip_file_path)
 
