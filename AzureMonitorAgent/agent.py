@@ -16,6 +16,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
+import sys
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+
 import os
 import os.path
 import datetime
@@ -25,7 +34,6 @@ import grp
 import re
 import filecmp
 import stat
-import sys
 import traceback
 import time
 import platform
@@ -33,8 +41,7 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
 import shutil
 import crypt
 import xml.dom.minidom
@@ -48,6 +55,7 @@ from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
+import metrics_ext_utils.metrics_common_utils as metrics_utils
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -56,16 +64,50 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
+# This code is taken from the omsagent's extension wrapper. 
+# This same monkey patch fix is relevant for AMA extension as well.
+# This monkey patch duplicates the one made in the waagent import above.
+# It is necessary because on 2.6, the waagent monkey patch appears to be overridden
+# by the python-future subprocess.check_output backport.
+if sys.version_info < (2,7):
+    def check_output(*popenargs, **kwargs):
+        r"""Backport from subprocess module from python 2.7"""
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+        return output
+
+    # Exception classes used by this module.
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+    subprocess.check_output = check_output
+    subprocess.CalledProcessError = CalledProcessError
+
 # Global Variables
 PackagesDirectory = 'packages'
 # TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
 # TODO: Installer should automatically figure this out from the folder instead of requiring this update
-BundleFileNameDeb = 'azure-mdsd_1.5.124-build.master.89_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.124-build.master.89_x86_64.rpm'
+BundleFileNameDeb = 'azure-mdsd_1.5.133-build.master.157_x86_64.deb'
+BundleFileNameRpm = 'azure-mdsd_1.5.133-build.master.157_x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
+PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
 
 # Commands
@@ -78,6 +120,7 @@ DisableOneAgentServiceCommand = ''
 DPKGLockedErrorCode = 56
 MissingorInvalidParameterErrorCode = 53
 UnsupportedOperatingSystem = 51
+IndeterminateOperatingSystem = 51
 
 # Configuration
 HUtilObject = None
@@ -119,6 +162,8 @@ def main():
             operation = 'Update'
         elif re.match('^([-/]*)(metrics)', option):
             operation = 'Metrics'
+        elif re.match('^([-/]*)(arc)', option):
+            operation = 'Arc'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -130,7 +175,7 @@ def main():
     message = '{0} succeeded'.format(operation)
 
     exit_code = check_disk_space_availability()
-    if exit_code is not 0:
+    if exit_code != 0:
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)   
 
@@ -142,7 +187,7 @@ def main():
 
         # Exit code 1 indicates a general problem that doesn't have a more
         # specific error code; it often indicates a missing dependency
-        if exit_code is 1 and operation == 'Install':
+        if exit_code == 1 and operation == 'Install':
             message = 'Install failed with exit code 1. Please check that ' \
                       'dependencies are installed. For details, check logs ' \
                       'in /var/log/azure/Microsoft.Azure.Monitor' \
@@ -151,7 +196,7 @@ def main():
             message = 'Install failed with exit code {0} because the ' \
                       'package manager on the VM is currently locked: ' \
                       'please wait and try again'.format(DPKGLockedErrorCode)
-        elif exit_code is not 0:
+        elif exit_code != 0:
             message = '{0} failed with exit code {1} {2}'.format(operation,
                                                              exit_code, output)
 
@@ -188,7 +233,7 @@ def get_free_space_mb(dirname):
     Get the free space in MB in the directory path.
     """
     st = os.statvfs(dirname)
-    return st.f_bavail * st.f_frsize / 1024 / 1024
+    return (st.f_bavail * st.f_frsize) // (1024 * 1024)
 
 
 def is_systemd():
@@ -209,12 +254,12 @@ def install():
     exit_if_vm_not_supported('Install')
 
     public_settings, protected_settings = get_settings()
-    
+
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
-    print (PackageManager, " and ", BundleFileName)
-    OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)        
+    print(PackageManager, " and ", BundleFileName)
+    OneAgentInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
     hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
 
     # Retry, since install can fail due to concurrent package operations
@@ -222,59 +267,71 @@ def install():
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)    
     
-    default_configs = {        
+    default_configs = {   
+        "MDSD_LOG" : "/var/log",
+        "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
+        "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
+        "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
+        "MDSD_USE_LOCAL_PERSISTENCY" : "true",
         #"OMS_TLD" : "int2.microsoftatlanta-int.com",
         #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
     }
 
-    # decide the mode
-    if protected_settings is None or len(protected_settings) is 0:
+    # Decide the mode
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+        hutil_log_info("Detecting Auto-Config mode.")
+        return 0, ""
+    elif protected_settings is None or len(protected_settings) == 0:
         default_configs["ENABLE_MCS"] = "true"
     else:
         # look for LA protected settings
-        for var in protected_settings.keys():
+        for var in list(protected_settings.keys()):
             if "_key" in var or "_id" in var:
                 default_configs[var] = protected_settings.get(var)
         
         # check if required GCS params are available
         MONITORING_GCS_CERT_CERTFILE = None
-        if protected_settings.has_key("certificate"):
+        if "certificate" in protected_settings:
             MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
 
         MONITORING_GCS_CERT_KEYFILE = None
-        if protected_settings.has_key("certificateKey"):
+        if "certificateKey" in protected_settings:
             MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(protected_settings.get("certificateKey"))
 
         MONITORING_GCS_ENVIRONMENT = ""
-        if protected_settings.has_key("monitoringGCSEnvironment"):
+        if "monitoringGCSEnvironment" in protected_settings:
             MONITORING_GCS_ENVIRONMENT = protected_settings.get("monitoringGCSEnvironment")
 
         MONITORING_GCS_NAMESPACE = ""
-        if protected_settings.has_key("namespace"):
+        if "namespace" in protected_settings:
             MONITORING_GCS_NAMESPACE = protected_settings.get("namespace")
 
         MONITORING_GCS_ACCOUNT = ""
-        if protected_settings.has_key("monitoringGCSAccount"):
+        if "monitoringGCSAccount" in protected_settings:
             MONITORING_GCS_ACCOUNT = protected_settings.get("monitoringGCSAccount")
 
         MONITORING_GCS_REGION = ""
-        if protected_settings.has_key("monitoringGCSRegion"):
+        if "monitoringGCSRegion" in protected_settings:
             MONITORING_GCS_REGION = protected_settings.get("monitoringGCSRegion")
 
         MONITORING_CONFIG_VERSION = ""
-        if protected_settings.has_key("configVersion"):
+        if "configVersion" in protected_settings:
             MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
 
         MONITORING_GCS_AUTH_ID_TYPE = ""
-        if protected_settings.has_key("MONITORING_GCS_AUTH_ID_TYPE"):
-            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("MONITORING_GCS_AUTH_ID_TYPE")
+        if "monitoringGCSAuthIdType" in protected_settings:
+            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("monitoringGCSAuthIdType")
 
-        if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE is "")) or MONITORING_GCS_ENVIRONMENT is "" or MONITORING_GCS_NAMESPACE is "" or MONITORING_GCS_ACCOUNT is "" or MONITORING_GCS_REGION is "" or MONITORING_CONFIG_VERSION is "":
+        MONITORING_GCS_AUTH_ID = ""
+        if "monitoringGCSAuthId" in protected_settings:
+            MONITORING_GCS_AUTH_ID = protected_settings.get("monitoringGCSAuthId")
+
+        if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE == "")) or MONITORING_GCS_ENVIRONMENT == "" or MONITORING_GCS_NAMESPACE == "" or MONITORING_GCS_ACCOUNT == "" or MONITORING_GCS_REGION == "" or MONITORING_CONFIG_VERSION == "":
             waagent_log_error('Not all required GCS parameters are provided')
             raise ParameterMissingException
         else:
@@ -290,8 +347,11 @@ def install():
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
             
-            if MONITORING_GCS_AUTH_ID_TYPE is not "":
+            if MONITORING_GCS_AUTH_ID_TYPE != "":
                 default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
+
+            if MONITORING_GCS_AUTH_ID != "":
+                default_configs["MONITORING_GCS_AUTH_ID"] = MONITORING_GCS_AUTH_ID
 
             if MONITORING_GCS_CERT_CERTFILE is not None:
                 default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
@@ -319,14 +379,14 @@ def install():
             with open(config_file, "r") as f:
                 data = f.readlines()
                 for line in data:
-                    for var in default_configs.keys():
+                    for var in list(default_configs.keys()):
                         if var in line:
                             line = "export " + var + "=" + default_configs[var] + "\n"
                             vars_set.add(var)
                             break
                     new_data += line
             
-            for var in default_configs.keys():
+            for var in list(default_configs.keys()):
                 if var not in vars_set:
                     new_data += "export " + var + "=" + default_configs[var] + "\n"
 
@@ -392,16 +452,29 @@ def enable():
     """
     exit_if_vm_not_supported('Enable')
 
+    # Check if this is Arc VM and enable arc daemon if it is
+    if metrics_utils.is_arc_installed():
+        hutil_log_info("This VM is an Arc VM, Running the arc watcher daemon.")
+        start_arc_process()
+
     if is_systemd():
         OneAgentEnableCommand = "systemctl start mdsd"
     else:
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
         OneAgentEnableCommand = "/etc/init.d/mdsd start"
     
+    public_settings, protected_settings = get_settings()
+
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+        OneAgentEnableCommand = "systemctl start mdsdmgr"
+        if not is_systemd():
+            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
+            OneAgentEnableCommand = "/etc/init.d/mdsdmgr start"
+
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
 
-    if exit_code is 0:
+    if exit_code == 0:
         #start metrics process if enable is successful
         start_metrics_process()
         
@@ -412,6 +485,10 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
+
+    # disable arc daemon if it is running
+    stop_arc_watcher()
+
     #stop the metrics process
     stop_metrics_process()
 
@@ -441,33 +518,33 @@ def stop_metrics_process():
         #Stop the telegraf and ME services
         tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
         if tel_out:
-            HUtilObject.log(tel_msg)
+            hutil_log_info(tel_msg)
         else:
-            HUtilObject.error(tel_msg)
+            hutil_log_error(tel_msg)
         
         #Delete the telegraf and ME services
         tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
         if tel_rm_out:
-            HUtilObject.log(tel_rm_msg)
+            hutil_log_info(tel_rm_msg)
         else:
-            HUtilObject.error(tel_rm_msg)
+            hutil_log_error(tel_rm_msg)
     
     if me_handler.is_running(is_lad=False):
         me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
         if me_out:
-            HUtilObject.log(me_msg)
+            hutil_log_info(me_msg)
         else:
-            HUtilObject.error(me_msg)
+            hutil_log_error(me_msg)
 
         me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
         if me_rm_out:
-            HUtilObject.log(me_rm_msg)
+            hutil_log_info(me_rm_msg)
         else:
-            HUtilObject.error(me_rm_msg)
+            hutil_log_error(me_rm_msg)
 
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
-    # kill existing telemetry watcher
+    # kill existing metrics watcher
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
             for pids in f.readlines():
@@ -477,17 +554,17 @@ def stop_metrics_process():
 
 def start_metrics_process():
     """
-    Start telemetry process that performs periodic monitoring activities
+    Start metrics process that performs periodic monitoring activities
     :return: None
 
     """
     stop_metrics_process()
     
-    #start telemetry watcher
-    omsagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python', omsagent_filepath, '-metrics']
+    #start metrics watcher
+    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    HUtilObject.log('start watcher process '+str(args))
+    hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
 
 def metrics_watcher(hutil_error, hutil_log):
@@ -513,36 +590,66 @@ def metrics_watcher(hutil_error, hutil_log):
                     json_data = json.loads(data)  
                     
                     if len(json_data) == 0:
-                        last_crc = hashlib.sha256(data).hexdigest()                    
+                        last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
                         if telhandler.is_running(is_lad=False):
                             #Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
-                                HUtilObject.log(tel_msg)
+                                hutil_log(tel_msg)
                             else:
-                                HUtilObject.error(tel_msg)
+                                hutil_error(tel_msg)
 
                             #Delete the telegraf and ME services
                             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
                             if tel_rm_out:
-                                HUtilObject.log(tel_rm_msg)
+                                hutil_log(tel_rm_msg)
                             else:
-                                HUtilObject.error(tel_rm_msg)
+                                hutil_error(tel_rm_msg)
 
                         if me_handler.is_running(is_lad=False):
                             me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
                             if me_out:
-                                HUtilObject.log(me_msg)
+                                hutil_log(me_msg)
                             else:
-                                HUtilObject.error(me_msg)
+                                hutil_error(me_msg)
 
                             me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
                             if me_rm_out:
-                                HUtilObject.log(me_rm_msg)
+                                hutil_log(me_rm_msg)
                             else:
-                                HUtilObject.error(me_rm_msg)
+                                hutil_error(me_rm_msg)
                     else:
-                        crc = hashlib.sha256(data).hexdigest()                    
+                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
+
+                        if(crc != last_crc):
+                            # Resetting the me_msi_token_expiry_epoch variable if we set up ME again.
+                            me_msi_token_expiry_epoch = None
+                            hutil_log("Start processing metric configuration")
+                            hutil_log(data)
+
+                            telegraf_config, telegraf_namespaces = telhandler.handle_config(
+                                json_data, 
+                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port, 
+                                "unix:///var/run/mdsd/default_influx.socket",
+                                is_lad=False)
+
+                            me_handler.setup_me(is_lad=False)
+
+                            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
+                            if start_telegraf_out:
+                                hutil_log("Successfully started metrics-sourcer.")
+                            else:
+                                hutil_error(log_messages)
+
+
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                            if start_metrics_out:
+                                hutil_log("Successfully started metrics-extension.")
+                            else:
+                                hutil_error(log_messages)
+
+                            last_crc = crc
+                        
                         generate_token = False
                         me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
 
@@ -571,33 +678,6 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
                             else:
                                 hutil_error(log_messages)
-
-                        if(crc != last_crc):
-                            hutil_log("Start processing metric configuration")
-                            hutil_log(data)
-
-                            telegraf_config, telegraf_namespaces = telhandler.handle_config(
-                                json_data, 
-                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port, 
-                                "unix:///var/run/mdsd/default_influx.socket",
-                                is_lad=False)
-
-                            me_handler.setup_me(is_lad=False)
-
-                            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
-                            if start_telegraf_out:
-                                hutil_log("Successfully started metrics-sourcer.")
-                            else:
-                                hutil_error(log_messages)
-
-
-                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
-                            if start_metrics_out:
-                                hutil_log("Successfully started metrics-extension.")
-                            else:
-                                hutil_error(log_messages)
-
-                            last_crc = crc
 
                         telegraf_restart_retries = 0
                         me_restart_retries = 0
@@ -662,7 +742,44 @@ def metrics():
     with open(pids_filepath, 'w') as f:
         f.write(str(py_pid) + '\n')
 
-    watcher_thread = Thread(target = metrics_watcher, args = [HUtilObject.error, HUtilObject.log])
+    watcher_thread = Thread(target = metrics_watcher, args = [hutil_log_error, hutil_log_info])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
+
+
+def start_arc_process():
+    """
+    Start arc process that performs periodic monitoring activities
+    :return: None
+
+    """
+    hutil_log_info("stopping previously running arc process")
+    stop_arc_watcher()
+    hutil_log_info("starting arc process")
+    
+    #start arc watcher
+    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
+    args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-arc']
+    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+    hutil_log_info('start watcher process '+str(args))
+    subprocess.Popen(args, stdout=log, stderr=log)
+
+def start_arc_watcher():
+    """
+    Take care of starting arc_watcher daemon if the VM has arc running
+    """    
+    hutil_log_info("Starting the watcher")
+    print("Starting the watcher")
+    pids_filepath = os.path.join(os.getcwd(), 'amaarc.pid')
+    py_pid = os.getpid()
+    print("pid ", py_pid)
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+    hutil_log_info("Written all the pids")
+    print("Written all the pids")
+    watcher_thread = Thread(target = arc_watcher, args = [hutil_log_error, hutil_log_info])
     watcher_thread.start()
     watcher_thread.join()
 
@@ -675,8 +792,77 @@ operations = {'Disable' : disable,
               'Enable' : enable,
               'Update' : update,
               'Metrics' : metrics,
+              'Arc' : start_arc_watcher,
 }
 
+
+def stop_arc_watcher():
+    """
+    Take care of stopping arc_watcher daemon if the VM has arc running
+    """    
+    pids_filepath = os.path.join(os.getcwd(),'amaarc.pid')
+
+    # kill existing arc watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pids in f.readlines():
+                proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
+                output = proc.communicate()[0]
+                if "arc" in output:
+                    kill_cmd = "kill " + pids 
+                    run_command_and_log(kill_cmd)
+        
+        # Delete the file after to avoid clutter
+        os.remove(pids_filepath)
+
+def arc_watcher(hutil_error, hutil_log):
+    """
+    This is needed to override mdsd's syslog permissions restriction which prevents mdsd 
+    from reading temporary key files that are needed to make https calls to get an MSI token for arc during onboarding to download amcs config
+    This method spins up a process that will continuously keep refreshing that particular file path with valid keys
+    So that whenever mdsd needs to refresh it's MSI token, it is able to find correct keys there to make the https calls
+    """
+    # check every 25 seconds
+    sleepTime =  25
+
+    # sleep before starting the monitoring.
+    time.sleep(sleepTime)
+
+    while True:
+        try:
+            arc_token_mdsd_dir = "/etc/mdsd.d/arc_tokens/"
+            if not os.path.exists(arc_token_mdsd_dir):
+                os.makedirs(arc_token_mdsd_dir)
+            else:
+                # delete the existing keys as they might not be valid anymore
+                for filename in os.listdir(arc_token_mdsd_dir):
+                    filepath = arc_token_mdsd_dir + filename
+                    os.remove(filepath)
+
+            arc_endpoint = metrics_utils.get_arc_endpoint()
+            try:
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://monitor.azure.com/"
+                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.request.urlopen(req)
+            except:
+                # The above request is expected to fail and add a key to the path - 
+                authkey_dir = "/var/opt/azcmagent/tokens/"
+                if not os.path.exists(authkey_dir):
+                    raise Exception("Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir))
+                # Copy the tokens to mdsd accessible dir
+                for filename in os.listdir(authkey_dir):
+                    filepath = authkey_dir + filename
+                    print(filepath)
+                    shutil.copy(filepath, arc_token_mdsd_dir)
+                
+                # Change the ownership of the mdsd arc token dir to be accessible by syslog (since mdsd runs as syslog user)
+                os.system("chown -R syslog:syslog {0}".format(arc_token_mdsd_dir))
+
+        except Exception as e:
+            hutil_error('Error in arc watcher process while copying token for arc MSI auth queries. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
 
 def parse_context(operation):
     """
@@ -705,20 +891,26 @@ def find_package_manager(operation):
     Checks if the dist is debian based or centos based and assigns the package manager accordingly
     """
     global PackageManager
+    global PackageManagerOptions
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles"])
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
+            # OK to replace the /etc/default/mdsd, since the placeholders gets replaced again.
+            # Otherwise, the package manager prompts for action (Y/I/N/O/D/Z) [default=N]
+            PackageManagerOptions = "--force-overwrite --force-confnew"
             BundleFileName = BundleFileNameDeb
             break
 
     for rpm_dist in rpm_set:
         if dist.lower().startswith(rpm_dist):
             PackageManager = "rpm"
+            # Same as above.
+            PackageManagerOptions = "--force"
             BundleFileName = BundleFileNameRpm
             break
 
@@ -731,12 +923,22 @@ def find_vm_distro(operation):
     Finds the Linux Distribution this vm is running on. 
     """
     vm_dist = vm_id = vm_ver =  None
+    parse_manually = False
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
-        vm_dist, vm_ver, vm_id = platform.dist()
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except AttributeError:
+            hutil_log_info("Falling back to /etc/os-release distribution parsing")
+    # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
+    # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case 
+    try:
+        temp_vm_ver = int(vm_ver.split('.')[0])
+    except:
+        parse_manually = True
 
-    if not vm_dist and not vm_ver: # SLES 15 and others
+    if (not vm_dist and not vm_ver) or parse_manually: # SLES 15 and others
         try:
             with open('/etc/os-release', 'r') as fp:
                 for line in fp:
@@ -746,10 +948,9 @@ def find_vm_distro(operation):
                         vm_dist = vm_dist.replace('\"', '').replace('\n', '')
                     elif line.startswith('VERSION_ID='):
                         vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.split('.')[0]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
-            log_and_exit(operation, UndeterminateOperatingSystem, 'Undeterminate operating system')
+            log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
     return vm_dist, vm_ver
 
 
@@ -762,19 +963,19 @@ def is_vm_supported_for_extension(operation):
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Oracle, RHEL
-                       'oracle' : ['6', '7'], # Oracle
-                       'debian' : ['8', '9'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
+    supported_dists = {'redhat' : ['6', '7', '8'], # Rhel
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
+                       'oracle' : ['6', '7', '8'], # Oracle
+                       'debian' : ['8', '9', '10'], # Debian
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'] # SLES
     }
 
     vm_supported = False
     vm_dist, vm_ver = find_vm_distro(operation)
     # Find this VM distribution in the supported list
-    for supported_dist in supported_dists.keys():
+    for supported_dist in list(supported_dists.keys()):
         if not vm_dist.lower().startswith(supported_dist):
             continue
 
@@ -794,7 +995,7 @@ def is_vm_supported_for_extension(operation):
                 except IndexError:
                     vm_ver_match = False
                     break
-                if vm_ver_num is not supported_ver_num:
+                if vm_ver_num != supported_ver_num:
                     vm_ver_match = False
                     break
             if vm_ver_match:
@@ -829,14 +1030,14 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     """
     exit_code, output = run_get_output(cmd, check_error, log_cmd)
     if log_cmd:
-        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
+        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd.rstrip(), output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
         
     # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB	
     # take only the last 100 characters as extension cuts off after that	
     try:	
-        if exit_code is not 0:	
+        if exit_code != 0:	
             sys.stderr.write(output[-500:])        
 
         if "Permission denied" in output:
@@ -893,7 +1094,7 @@ def is_dpkg_locked(exit_code, output):
     If dpkg is locked, the output will contain a message similar to 'dpkg
     status database is locked by another process'
     """
-    if exit_code is not 0:
+    if exit_code != 0:
         dpkg_locked_search = r'^.*dpkg.+lock.*$'
         dpkg_locked_re = re.compile(dpkg_locked_search, re.M)
         if dpkg_locked_re.search(output):
@@ -964,8 +1165,8 @@ def get_settings():
             hutil_log_error('Unable to load handler settings from ' \
                             '{0}'.format(settings_path))
 
-        if (h_settings.has_key('protectedSettings')
-                and h_settings.has_key('protectedSettingsCertThumbprint')
+        if ('protectedSettings' in h_settings
+                and 'protectedSettingsCertThumbprint' in h_settings
                 and h_settings['protectedSettings'] is not None
                 and h_settings['protectedSettingsCertThumbprint'] is not None):
             encoded_settings = h_settings['protectedSettings']
@@ -1133,8 +1334,14 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
             output = e.output
+    
+    output = output.encode('utf-8')
 
-    return exit_code, output.encode('utf-8').strip()
+    # On python 3, encode returns a byte object, so we must decode back to a string
+    if sys.version_info >= (3,):
+        output = output.decode('utf-8', 'ignore')
+
+    return exit_code, output.strip()
 
 
 def init_waagent_logger():
@@ -1197,7 +1404,7 @@ def log_and_exit(operation, exit_code = 1, message = ''):
     """
     Log the exit message and perform the exit
     """
-    if exit_code is 0:
+    if exit_code == 0:
         waagent_log_info(message)
         hutil_log_info(message)
         exit_status = 'success'

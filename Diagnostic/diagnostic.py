@@ -237,12 +237,10 @@ def create_core_components_configs():
 
     global enable_metrics_ext
     ladconfig = configurator._ladCfg()
-    sinks = LadUtil.getFeatureWideSinksFromLadCfg(ladconfig, 'performanceCounters')
-    for name in sinks:
-        sink = configurator._sink_configs.get_sink_by_name(name)
-        if sink is not None:
-            if sink['name'] == 'AzMonSink':
-                enable_metrics_ext = True
+    sink = configurator._sink_configs_public.get_sink_by_name("AzMonSink")
+    if sink is not None:
+        if sink['name'] == 'AzMonSink':
+            enable_metrics_ext = True
 
     return configurator
 
@@ -527,8 +525,8 @@ def start_mdsd(configurator):
     tmp_env_dict = {}  # Need to get the additionally needed env vars (SSL_CERT_*) for this mdsd run as well...
     g_dist_config.extend_environment(tmp_env_dict)
     added_env_str = ' '.join('{0}={1}'.format(k, tmp_env_dict[k]) for k in tmp_env_dict)
-    config_validate_cmd = '{0}{1}{2} -v -c {3}'.format(added_env_str, ' ' if added_env_str else '',
-                                                       g_mdsd_bin_path, xml_file)
+    config_validate_cmd = '{0}{1}{2} -v -c {3} -r {4}'.format(added_env_str, ' ' if added_env_str else '',
+                                                       g_mdsd_bin_path, xml_file, g_ext_dir)
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
     if config_validate_cmd_status is not 0:
         # Invalid config. Log error and report success.

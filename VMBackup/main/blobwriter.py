@@ -45,12 +45,17 @@ class BlobWriter(object):
         try:
             # get the blob type
             if(blobUri is not None):
-                blobType = self.GetBlobType(blobUri)
+                blobProperties = self.GetBlobProperties(blobUri)
+                blobType = "pageblob"
+
+                if(blobProperties is not None):
+                    blobType = blobProperties.blobType
+
                 if (str(blobType).lower() == "pageblob"):
                     # Clear Page-Blob Contents
-                    self.ClearPageBlob(blobUri)
+                    self.ClearPageBlob(blobUri, blobProperties)
                     # Write to Page-Blob
-                    self.WritePageBlob(msg, blobUri)
+                    self.WritePageBlob(msg, blobUri, blobProperties)
                 else:
                     self.WriteBlockBlob(msg, blobUri)
             else:
@@ -58,7 +63,7 @@ class BlobWriter(object):
         except Exception as e:
             self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
 
-    def WriteBlockBlob(self,msg,blobUri):
+    def WriteBlockBlob(self,msg,blobUri,blobProperties):
         retry_times = 3
         while(retry_times > 0):
             try:
@@ -86,7 +91,7 @@ class BlobWriter(object):
             self.hutil.log("retry times is " + str(retry_times))
             retry_times = retry_times - 1
 
-    def WritePageBlob(self, message, blobUri):
+    def WritePageBlob(self, message, blobUri, blobProperties):
         if(blobUri is not None):
             retry_times = 3
             while(retry_times > 0):
@@ -98,7 +103,6 @@ class BlobWriter(object):
                     http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
                     # Get Blob-properties to know content-length
-                    blobProperties = self.GetBlobProperties(blobUri)
                     blobContentLength = int(blobProperties.contentLength)
                     self.hutil.log("WritePageBlob: contentLength:"+str(blobContentLength))
                     maxMsgLen = STATUS_BLOB_LIMIT_BYTES
@@ -160,7 +164,7 @@ class BlobWriter(object):
         else:
             self.hutil.log("WritePageBlob: bloburi is None")
 
-    def ClearPageBlob(self, blobUri):
+    def ClearPageBlob(self, blobUri, blobProperties):
         if(blobUri is not None):
             retry_times = 3
             while(retry_times > 0):
@@ -168,7 +172,6 @@ class BlobWriter(object):
                     http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
                     # Get Blob-properties to know content-length
-                    blobProperties = self.GetBlobProperties(blobUri)
                     contentLength = int(blobProperties.contentLength)
                     # Clear Pages
                     if(contentLength > 0):

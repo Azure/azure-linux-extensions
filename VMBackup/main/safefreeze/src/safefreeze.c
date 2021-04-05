@@ -146,7 +146,6 @@ int main(int argc, char *argv[])
     }
 
     logger("****** 2. Binary Freeze Started \n");
-
     for (i = 0; i < numFileSystems; i++)
     {
         char *mountPoint = argv[i + 2];
@@ -168,7 +167,7 @@ int main(int argc, char *argv[])
         JUMPWITHSTATUS(EXIT_FAILURE);
     }
 
-    time_t starttime,currenttime; 
+    time_t starttime,currenttime;
     currenttime=time(NULL);
     starttime=time(NULL);
     for (i = 0; i < timeout; i++)
@@ -195,7 +194,7 @@ int main(int argc, char *argv[])
         logger("Inconsistent snapshot because of SLEEP failure \n");
         JUMPWITHSTATUS(2);
     }
-    
+
 CLEANUP:
 
     if (fileSystemDescriptors != NULL)
