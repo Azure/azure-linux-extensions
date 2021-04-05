@@ -203,6 +203,6 @@ final_folder_path = target_zip_file_location + target_folder_name
 # setup will only copy .py files by default, so add non-python files to the zip
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
-copy_tree(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/', final_folder_path+'/'+main_folder+'/oscrypto/ubuntu_2004/encryptscripts/')
+copytree(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/', final_folder_path+'/'+main_folder+'/oscrypto/ubuntu_2004/encryptscripts/')
 zip(final_folder_path, target_zip_file_path)
 
