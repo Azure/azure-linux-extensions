@@ -23,7 +23,7 @@ class ResourceDiskUtil(object):
 
 	def __init__(self,patching,logger):
 		self.logger = logger
-		self.disk_util = DiskUtil(patching,logger)
+		self.disk_util = DiskUtil.get_instance(patching,logger)
 
 	
 	@staticmethod
@@ -136,7 +136,7 @@ class ResourceDiskUtil(object):
 			else:
 				partition=""
 
-			self.logger.log(("Resource disk partition: {0} ",partition),True)
+			self.logger.log("Resource disk partition: {0} ".format(partition),True)
 			if(option==0):
 				return partition
 
@@ -146,7 +146,7 @@ class ResourceDiskUtil(object):
 
 			if(mount_list is not None):
 				mount_point = self.get_mount_point(mountlist = mount_list, device = device)
-				self.logger.log(("Resource disk [{0}] is mounted [{1}]",partition,mount_point),True)
+				self.logger.log("Resource disk {0} is mounted {1}".format(partition,mount_point),True)
 				if mount_point:
 					return mount_point
 			return None
