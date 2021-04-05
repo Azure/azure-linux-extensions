@@ -33,6 +33,7 @@ import subprocess
 from distutils.core import setup
 from zipfile import ZipFile
 from shutil import copy2
+from shutil import copytree
 
 from main.Common import CommonVariables
 
