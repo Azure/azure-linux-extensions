@@ -385,6 +385,9 @@ def daemon():
                 temp_msg='Transitioning state in extension'
                 blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
                 status_report_to_file(file_report_msg)
+                blobWriter = BlobWriter(hutil)
+                blobWriter.IsEmptyStatusBlob(hutil, para_parser)
+                blobWriter.IsEmptyLogBlob(hutil, para_parser)
                 status_report_to_blob(blob_report_msg)
                 #partial logging before freeze
                 if(para_parser is not None and para_parser.logsBlobUri is not None and para_parser.logsBlobUri != ""):
@@ -629,6 +632,8 @@ def enable():
         temp_result=CommonVariables.error
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
         error_msg = 'Failed to call the daemon'
+        blobWriter = BlobWriter(hutil)
+        blobWriter.IsEmptyStatusBlob(hutil, para_parser)
         exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
 def thread_for_log_upload():
