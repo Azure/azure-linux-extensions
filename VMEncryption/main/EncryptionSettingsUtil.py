@@ -30,6 +30,8 @@ try:
     import http.client as httpclient #python3+
 except ImportError:
     import httplib as httpclient #python2
+
+import xml.etree.ElementTree as ET
     
 class EncryptionSettingsUtil(object):
     """ Provides capability to update encryption settings via wire server """
@@ -285,7 +287,14 @@ class EncryptionSettingsUtil(object):
                     http_util.connection.close()
                     # cast to httpclient constants to int for python2 + python3 compatibility
                     if result.status != int(httpclient.OK) and result.status != int(httpclient.ACCEPTED):
-                        raise Exception("Encryption settings post request was not accepted")
+                        reason = None
+                        root = ET.fromstring(result_content)
+                        detail_element = root.find('Details')
+                        if detail_element is not None and detail_element.text is not None:
+                            reason = detail_element.text
+                        else:
+                            reason = "Unknown"
+                        raise Exception("Encryption settings post request was not accepted. Error: {0}".format(reason))
                     return
                 else:
                     raise Exception("No response from encryption settings post request")
