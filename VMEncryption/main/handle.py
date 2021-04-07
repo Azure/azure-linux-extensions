@@ -610,7 +610,7 @@ def is_daemon_running():
     psproc = subprocess.Popen(['ps', 'aux'], stdout=subprocess.PIPE)
     pslist, _ = psproc.communicate()
 
-    for line in pslist.split("\n"):
+    for line in pslist.split(b'\n'):
         if handler_path in line and daemon_arg in line:
             return True
 
