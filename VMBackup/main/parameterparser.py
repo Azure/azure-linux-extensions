@@ -35,6 +35,7 @@ class ParameterParser(object):
         self.snapshotTaskToken = ''
         self.includedDisks = None
         self.includeLunList = []    #To be shared with HP
+        self.isVmgsBlobIncluded = None
 
         """
         get the public configuration
@@ -75,6 +76,8 @@ class ParameterParser(object):
             self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
         if(CommonVariables.includedDisks in self.public_config_obj.keys()):
             self.includedDisks = self.public_config_obj[CommonVariables.includedDisks]
+        if(CommonVariables.isVmgsBlobIncluded in self.public_config_obj.keys()):
+            self.isVmgsBlobIncluded = self.public_config_obj[CommonVariables.isVmgsBlobIncluded]
 
         """
         first get the protected configuration
