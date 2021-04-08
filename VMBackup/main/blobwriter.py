@@ -35,6 +35,7 @@ class BlobProperties():
         return ' blobType: ' + str(self.blobType) + ' contentLength: ' + str(self.contentLength)
 
 class BlobWriter(object):
+    blobEmptyDetails = {}
     """description of class"""
     def __init__(self, hutil):
         self.hutil = hutil
@@ -45,6 +46,9 @@ class BlobWriter(object):
         try:
             # get the blob type
             if(blobUri is not None):
+                if (self.IsEmptyBlob(blobUri) == False):
+                    raise Exception("Cannot perform write operation on a non empty blob")
+                
                 blobProperties = self.GetBlobProperties(blobUri)
                 blobType = "pageblob"
 
@@ -63,7 +67,7 @@ class BlobWriter(object):
         except Exception as e:
             self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
 
-    def WriteBlockBlob(self,msg,blobUri,blobProperties):
+    def WriteBlockBlob(self,msg,blobUri):
         retry_times = 3
         while(retry_times > 0):
             try:
@@ -271,4 +275,35 @@ class BlobWriter(object):
                 contentLength = httpResp.getheader('Content-Length')
                 blobProperties = BlobProperties(blobType, contentLength)
         return blobProperties
+
+    def VerifyIfBlobIsEmpty(self, blobUri):
+        try:
+            if(blobUri is not None):
+                blobProperties = self.GetBlobProperties(blobUri)
+                if (str(blobProperties.blobType).lower() == "pageblob"):
+                    self.hutil.log("VerifyIfBlobIsEmpty: Skipping for page blob")
+                    return True
+                    
+                self.hutil.log("VerifyIfBlobIsEmpty: Content Length of blob: " + str(blobProperties.contentLength))
+                if(int(blobProperties.contentLength) == 0):
+                    return True
+                else:
+                    return False
+            else:
+                self.hutil.log("VerifyIfBlobIsEmpty: bloburi is None")
+        except Exception as e:
+            self.hutil.log("VerifyIfBlobIsEmpty: Failed to get the blob content length with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        return True
+
+    def IsEmptyBlob(self, blobUri):
+        if (bool(BlobWriter.blobEmptyDetails) == True):
+            for key, value in BlobWriter.blobEmptyDetails.items():
+                self.hutil.log("Key: "+ key + " Value:"+ str(BlobWriter.blobEmptyDetails[key]))
+
+            if (key in BlobWriter.blobEmptyDetails.keys()):
+                return BlobWriter.blobEmptyDetails[key]
+        
+        isEmptyBlob = self.VerifyIfBlobIsEmpty(blobUri)
+        BlobWriter.blobEmptyDetails[blobUri] = isEmptyBlob
+        return isEmptyBlob
 
