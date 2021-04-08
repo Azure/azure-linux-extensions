@@ -287,13 +287,7 @@ class EncryptionSettingsUtil(object):
                     http_util.connection.close()
                     # cast to httpclient constants to int for python2 + python3 compatibility
                     if result.status != int(httpclient.OK) and result.status != int(httpclient.ACCEPTED):
-                        reason = None
-                        root = ET.fromstring(result_content)
-                        detail_element = root.find('Details')
-                        if detail_element is not None and detail_element.text is not None:
-                            reason = detail_element.text
-                        else:
-                            reason = "Unknown"
+                        reason = self.get_fault_reason(result_content)
                         raise Exception("Encryption settings post request was not accepted. Error: {0}".format(reason))
                     return
                 else:
@@ -305,6 +299,18 @@ class EncryptionSettingsUtil(object):
                     time.sleep(5)  # sleep for 5 seconds before retrying.
                 else:
                     raise e
+
+    def get_fault_reason(self, content_xml):
+        try:
+            xml_root = ET.fromstring(content_xml)
+        except:
+            self.logger.log("Exception occured while parsing error xml.")
+            return "Unknown"
+        detail_element = xml_root.find('Details')
+        if detail_element is not None and (detail_element.text is not None and len(detail_element.text) > 0):
+            return detail_element.text
+        else:
+            return "Unknown"
 
     def post_to_wireserver(self, data):
         """ Request EnableEncryption operation on settings file via wire server """
