@@ -26,8 +26,6 @@ except ImportError:
 from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import HandlerUtil
-from itertools import takewhile
-import string
 
 class BlobProperties():
     def __init__(self, blobType, contentLength):
