@@ -107,6 +107,7 @@ BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
+PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
 
 # Commands
@@ -253,12 +254,12 @@ def install():
     exit_if_vm_not_supported('Install')
 
     public_settings, protected_settings = get_settings()
-    
+
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
     print(PackageManager, " and ", BundleFileName)
-    OneAgentInstallCommand = "{0} -i {1}".format(PackageManager, bundle_path)        
+    OneAgentInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
     hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
 
     # Retry, since install can fail due to concurrent package operations
@@ -270,12 +271,13 @@ def install():
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
-        "MDSD_OPTIONS" : "\"-l -A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
+        "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
+        "MDSD_USE_LOCAL_PERSISTENCY" : "true",
         #"OMS_TLD" : "int2.microsoftatlanta-int.com",
         #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
     }
@@ -322,8 +324,12 @@ def install():
             MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
 
         MONITORING_GCS_AUTH_ID_TYPE = ""
-        if "MONITORING_GCS_AUTH_ID_TYPE" in protected_settings:
-            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("MONITORING_GCS_AUTH_ID_TYPE")
+        if "monitoringGCSAuthIdType" in protected_settings:
+            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("monitoringGCSAuthIdType")
+
+        MONITORING_GCS_AUTH_ID = ""
+        if "monitoringGCSAuthId" in protected_settings:
+            MONITORING_GCS_AUTH_ID = protected_settings.get("monitoringGCSAuthId")
 
         if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE == "")) or MONITORING_GCS_ENVIRONMENT == "" or MONITORING_GCS_NAMESPACE == "" or MONITORING_GCS_ACCOUNT == "" or MONITORING_GCS_REGION == "" or MONITORING_CONFIG_VERSION == "":
             waagent_log_error('Not all required GCS parameters are provided')
@@ -343,6 +349,9 @@ def install():
             
             if MONITORING_GCS_AUTH_ID_TYPE != "":
                 default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
+
+            if MONITORING_GCS_AUTH_ID != "":
+                default_configs["MONITORING_GCS_AUTH_ID"] = MONITORING_GCS_AUTH_ID
 
             if MONITORING_GCS_CERT_CERTFILE is not None:
                 default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
@@ -882,6 +891,7 @@ def find_package_manager(operation):
     Checks if the dist is debian based or centos based and assigns the package manager accordingly
     """
     global PackageManager
+    global PackageManagerOptions
     global BundleFileName
     dist, ver = find_vm_distro(operation)
 
@@ -890,12 +900,17 @@ def find_package_manager(operation):
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
+            # OK to replace the /etc/default/mdsd, since the placeholders gets replaced again.
+            # Otherwise, the package manager prompts for action (Y/I/N/O/D/Z) [default=N]
+            PackageManagerOptions = "--force-overwrite --force-confnew"
             BundleFileName = BundleFileNameDeb
             break
 
     for rpm_dist in rpm_set:
         if dist.lower().startswith(rpm_dist):
             PackageManager = "rpm"
+            # Same as above.
+            PackageManagerOptions = "--force"
             BundleFileName = BundleFileNameRpm
             break
 
