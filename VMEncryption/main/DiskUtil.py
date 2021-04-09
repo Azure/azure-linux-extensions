@@ -1018,19 +1018,56 @@ class DiskUtil(object):
             return False
 
     def get_azure_devices(self):
-        ide_devices = self.get_ide_devices()
+        device_names = []
         blk_items = []
+
+        # Get all IDE devices
+        ide_devices = self.get_ide_devices()
         for ide_device in ide_devices:
-            current_blk_items = self.get_device_items("/dev/" + ide_device)
+            device_names.append("/dev/" + ide_device)
+
+        # get all SCSI 0 devices
+        device_names += self.get_scsi0_device_names()
+
+        # some machines use special root dir symlinks instead of scsi0 symlinks
+        device_names += self.get_azure_symlinks_root_dir_devices()
+
+        # let us do some de-duping
+        device_names_realpaths = set(map(os.path.realpath, device_names))
+
+        for device_path in device_names_realpaths:
+            current_blk_items = self.get_device_items(device_path)
             for current_blk_item in current_blk_items:
                 blk_items.append(current_blk_item)
 
-        scsi0_devices = self.get_scsi0_device_names()
-        for scsi0_device in scsi0_devices:
-            current_blk_items = self.get_device_items(scsi0_device)
-            for current_blk_item in current_blk_items:
-                blk_items.append(current_blk_item)
         return blk_items
+
+    def get_azure_symlinks_root_dir_devices():
+        """
+        There is a directory that provide helpful persistent symlinks to important devices
+        We scrape the directory to identify "special" devices that should not be
+        encrypted along with other data disks
+        """
+
+        devices = []
+
+        azure_links_dir = CommonVariables.azure_symlinks_dir
+        if os.path.exists(azure_links_dir):
+            known_special_device_names = ["root", "resource"]
+            for device_name in known_special_device_names:
+                full_device_path = os.path.join(azure_links_dir, device_name)
+                if os.path.exists(full_device_path):
+                    devices.append(full_device_path)
+
+        azure_links_dir = CommonVariables.cloud_symlinks_dir
+        if os.path.exists(azure_links_dir):
+            known_special_device_names = ["azure_root", "azure_resource"]
+            for device_name in known_special_device_names:
+                full_device_path = os.path.join(azure_links_dir, device_name)
+                if os.path.exists(full_device_path):
+                    devices.append(full_device_path)
+
+        return devices
 
     def get_ide_devices(self):
         """

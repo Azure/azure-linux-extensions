@@ -29,7 +29,7 @@ class ResourceDiskUtil(object):
     """ Resource Disk Encryption Utilities """
 
     RD_MOUNT_POINT = '/mnt/resource'
-    RD_BASE_DEV_PATH = os.path.join(CommonVariables.azure_symlinks_dir, 'resource')
+    _RD_BASE_DEV_PATH_CACHE = ""
     RD_DEV_PATH = os.path.join(CommonVariables.azure_symlinks_dir, 'resource-part1')
     DEV_DM_PREFIX = '/dev/dm-'
     # todo: consolidate this and other key file path references
@@ -46,6 +46,31 @@ class ResourceDiskUtil(object):
         self.public_settings = public_settings
         self.distro_info = distro_info
 
+    def _get_rd_base_dev_path(self):
+        if self._RD_BASE_DEV_PATH_CACHE:
+            return self._RD_BASE_DEV_PATH_CACHE
+
+        dev_path_options = [
+            os.path.join(CommonVariables.azure_symlinks_dir, 'resource'),
+            os.path.join(CommonVariables.cloud_symlinks_dir, 'azure_resource'),
+            os.path.join(CommonVariables.azure_symlinks_dir, 'scsi0/lun1')
+        ]
+
+        for option in dev_path_options:
+            if os.path.exists(option):
+                self._RD_BASE_DEV_PATH_CACHE = option
+                self.logger.log("Setting RD_BASE_DEV_PATH to " + option)
+                return option
+
+        return self._RD_BASE_DEV_PATH_CACHE
+
+    def _get_rd_dev_path(self):
+        rd_base_path = self._get_rd_base_dev_path()
+        if rd_base_path:
+            return rd_base_path + "-part1"
+
+        return ""
+
     def _is_encrypt_format_all(self):
         """ return true if current encryption operation is EncryptFormatAll """
         encryption_operation = self.public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
@@ -58,12 +83,12 @@ class ResourceDiskUtil(object):
         """ checks if the device is set up with a luks header """
         if not self._resource_disk_partition_exists():
             return False
-        cmd = 'cryptsetup isLuks ' + self.RD_DEV_PATH
+        cmd = 'cryptsetup isLuks ' + self._get_rd_dev_path()
         return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def _resource_disk_exists(self):
         """ true if udev name for resource disk exists """
-        cmd = 'test -b ' + self.RD_BASE_DEV_PATH
+        cmd = 'test -b ' + self._get_rd_base_dev_path()
         if (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success:
             self.logger.log("Resource disk exists.")
             return True
@@ -72,12 +97,15 @@ class ResourceDiskUtil(object):
 
     def _resource_disk_partition_exists(self):
         """ true if udev name for resource disk partition exists """
-        cmd = 'test -b ' + self.RD_DEV_PATH
+        rd_dev_path = self._get_rd_dev_path()
+        if not rd_dev_path:
+            return False
+        cmd = 'test -b ' + rd_dev_path
         return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
 
     def _encrypt(self):
         """ use disk util with the appropriate device mapper """
-        return (int)(self.disk_util.encrypt_disk(dev_path=self.RD_DEV_PATH,
+        return (int)(self.disk_util.encrypt_disk(dev_path=self._get_rd_dev_path(),
                                                  passphrase_file=self.passphrase_filename,
                                                  mapper_name=self.RD_MAPPER_NAME,
                                                  header_file=None)) == CommonVariables.process_success
@@ -159,7 +187,7 @@ class ResourceDiskUtil(object):
         Retreive any device mapper device on the resource disk (e.g. /dev/dm-0).
         Can't imagine why there would be multiple device mappers here, but doesn't hurt to handle the case
         """
-        device_items = self.disk_util.get_device_items(self.RD_DEV_PATH)
+        device_items = self.disk_util.get_device_items(self._get_rd_dev_path())
         device_mappers = []
         mapper_device_types = ["raid0", "raid1", "raid5", "raid10", "lvm", "crypt"]
         for device_item in device_items:
@@ -208,7 +236,7 @@ class ResourceDiskUtil(object):
         if self._resource_disk_partition_exists():
             return True
         self.logger.log("resource disk partition does not exist", level='Info')
-        cmd = 'parted ' + self.RD_BASE_DEV_PATH + ' mkpart primary ext4 0% 100%'
+        cmd = 'parted ' + self._get_rd_base_dev_path() + ' mkpart primary ext4 0% 100%'
         if self.executor.ExecuteInBash(cmd) == CommonVariables.process_success:
             # wait for the corresponding udev name to become available
             for i in range(0, 10):
@@ -223,7 +251,7 @@ class ResourceDiskUtil(object):
         if not self._resource_disk_partition_exists():
             self.logger.log("resource partition does not exist, no header to clear")
             return True
-        cmd = 'dd if=/dev/urandom of=' + self.RD_DEV_PATH + ' bs=512 count=20480'
+        cmd = 'dd if=/dev/urandom of=' + self._get_rd_dev_path() + ' bs=512 count=20480'
         return self.executor.Execute(cmd) == CommonVariables.process_success
 
     def _try_unmount_lxd(self):
@@ -250,7 +278,7 @@ class ResourceDiskUtil(object):
                 return True
 
             if self._resource_disk_partition_exists() and self._is_luks_device():
-                self.disk_util.luks_open(passphrase_file=self.passphrase_filename, dev_path=self.RD_DEV_PATH, mapper_name=self.RD_MAPPER_NAME, header_file=None, uses_cleartext_key=False)
+                self.disk_util.luks_open(passphrase_file=self.passphrase_filename, dev_path=self._get_rd_dev_path(), mapper_name=self.RD_MAPPER_NAME, header_file=None, uses_cleartext_key=False)
                 self.logger.log("Trying to mount resource disk.")
                 mount_retval = self._mount_resource_disk(self.RD_MAPPER_PATH)
                 if mount_retval:
@@ -263,7 +291,7 @@ class ResourceDiskUtil(object):
             if self._is_plain_mounted():
                 self.logger.log("Resource disk already encrypted and mounted")
                 return True
-            return self._mount_resource_disk(self.RD_DEV_PATH)
+            return self._mount_resource_disk(self._get_rd_dev_path())
 
         # conditions required to re-mount were not met
         return False
@@ -318,13 +346,12 @@ class ResourceDiskUtil(object):
     def add_resource_disk_to_crypttab(self):
         self.logger.log("Adding resource disk to the crypttab file")
         crypt_item = CryptItem()
-        crypt_item.dev_path = self.RD_DEV_PATH
+        crypt_item.dev_path = self._get_rd_dev_path()
         crypt_item.mapper_name = self.RD_MAPPER_NAME
         crypt_item.uses_cleartext_key = False
         self.crypt_mount_config_util.remove_crypt_item(crypt_item)  # Remove old item in case it was already there
         self.crypt_mount_config_util.add_crypt_item_to_crypttab(crypt_item)
         self.add_to_fstab()
-
 
     def automount(self):
         """
@@ -341,7 +368,7 @@ class ResourceDiskUtil(object):
             return self.encrypt_format_mount()
         else:
             self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
-        
+
         return self._is_crypt_mounted() or self._is_plain_mounted()
 
     def encrypt_resource_disk(self):

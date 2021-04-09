@@ -84,6 +84,7 @@ class CommonVariables:
     dev_mapper_root = '/dev/mapper/'
     osmapper_name = 'osencrypt'
     azure_symlinks_dir = '/dev/disk/azure'
+    cloud_symlinks_dir = '/dev/disk/cloud'
     disk_by_id_root = '/dev/disk/by-id'
     disk_by_uuid_root = '/dev/disk/by-uuid'
 
