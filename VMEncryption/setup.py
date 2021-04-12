@@ -33,6 +33,7 @@ import subprocess
 from distutils.core import setup
 from zipfile import ZipFile
 from shutil import copy2
+from shutil import copytree
 
 from main.Common import CommonVariables
 
@@ -59,6 +60,8 @@ packages_array.append(oscrypto_folder + '/rhel_68')
 packages_array.append(oscrypto_folder + '/rhel_68/encryptstates')
 packages_array.append(oscrypto_folder + '/centos_68')
 packages_array.append(oscrypto_folder + '/centos_68/encryptstates')
+packages_array.append(oscrypto_folder + '/ubuntu_2004')
+packages_array.append(oscrypto_folder + '/ubuntu_2004/encryptstates')
 packages_array.append(oscrypto_folder + '/ubuntu_1604')
 packages_array.append(oscrypto_folder + '/ubuntu_1604/encryptstates')
 packages_array.append(oscrypto_folder + '/ubuntu_1404')
@@ -198,8 +201,8 @@ def zip(src, dst):
     zf.close()
 
 final_folder_path = target_zip_file_location + target_folder_name
-# manually copy .json files since setup will only copy .py files by default
+# setup will only copy .py files by default, so add non-python files to the zip
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
+copytree(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/', final_folder_path+'/'+main_folder+'/oscrypto/ubuntu_2004/encryptscripts/')
 zip(final_folder_path, target_zip_file_path)
-

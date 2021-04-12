@@ -610,7 +610,7 @@ def is_daemon_running():
     psproc = subprocess.Popen(['ps', 'aux'], stdout=subprocess.PIPE)
     pslist, _ = psproc.communicate()
 
-    for line in pslist.split("\n"):
+    for line in pslist.split(b'\n'):
         if handler_path in line and daemon_arg in line:
             return True
 
@@ -1119,7 +1119,7 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
     mapper_name = ongoing_item_config.get_mapper_name()
     device_size = ongoing_item_config.get_device_size()
 
-    luks_header_size = CommonVariables.luks_header_size
+    luks_header_size = disk_util.get_luks_header_size()
     size_shrink_to = (device_size - luks_header_size) / CommonVariables.sector_size
 
     while current_phase != CommonVariables.EncryptionPhaseDone:
@@ -1502,11 +1502,7 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
                                                  ongoing_item_config=None):
     logger.log(msg="decrypt_inplace_without_separate_header_file")
 
-    proc_comm = ProcessCommunicator()
-    executor = CommandExecutor(logger)
-    executor.Execute(DistroPatcher.cryptsetup_path + " luksDump " + crypt_item.dev_path, communicator=proc_comm)
-
-    luks_header_size = int(re.findall(r"Payload.*?(\d+)", proc_comm.stdout)[0]) * CommonVariables.sector_size
+    luks_header_size = disk_util.get_luks_header_size(crypt_item.dev_path)
 
     if raw_device_item.size - mapper_device_item.size != luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
@@ -1923,7 +1919,13 @@ def daemon_encrypt():
                                                            distro_patcher=DistroPatcher,
                                                            logger=logger,
                                                            encryption_environment=encryption_environment)
-        elif distro_name == 'Ubuntu' and distro_version in ['16.04', '18.04', '20.04']:
+        elif distro_name == 'Ubuntu' and distro_version in ['20.04']:
+            from oscrypto.ubuntu_2004 import Ubuntu2004EncryptionStateMachine
+            os_encryption = Ubuntu2004EncryptionStateMachine(hutil=hutil,
+                                                             distro_patcher=DistroPatcher,
+                                                             logger=logger,
+                                                             encryption_environment=encryption_environment)
+        elif distro_name == 'Ubuntu' and distro_version in ['16.04', '18.04']:
             from oscrypto.ubuntu_1604 import Ubuntu1604EncryptionStateMachine
             os_encryption = Ubuntu1604EncryptionStateMachine(hutil=hutil,
                                                              distro_patcher=DistroPatcher,

@@ -1,0 +1,23 @@
+#!/bin/sh
+set -x
+
+# init-premount script for ADE
+# uses cryptsetup to open encrypted root device /dev/mapper/osencrypt
+# prerequisites:
+#   - /usr/share/initramfs-tools/hooks/crypt-ade-hook has run
+#   - /etc/fstab file has been copied to initramfs
+#   - /etc/fstab includes an entry to mount /boot
+#   - /etc/fstab includes an entry to mount /mnt/azure_bek_disk
+#   - hook script will append cryptsetup and exit command
+
+PREREQS="udev"
+
+prereqs()
+{
+        echo $PREREQS
+}
+
+mount -a
+cryptsetup luksOpen /dev/disk/by-partuuid/ROOTPARTUUID osencrypt --header /boot/luks/osluksheader -d /mnt/azure_bek_disk/LinuxPassPhraseFileName
+
+exit 0

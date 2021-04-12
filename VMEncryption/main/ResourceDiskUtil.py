@@ -134,6 +134,7 @@ class ResourceDiskUtil(object):
         self.disk_util.umount(self.RD_MOUNT_POINT)
         self.disk_util.umount(CommonVariables.encryption_key_mount_point)
         self.disk_util.umount('/mnt')
+        self._try_unmount_lxd()
         self.disk_util.make_sure_path_exists(CommonVariables.encryption_key_mount_point)
         self.disk_util.mount_by_label("BEK VOLUME", CommonVariables.encryption_key_mount_point, "fmask=077")
 
@@ -224,6 +225,14 @@ class ResourceDiskUtil(object):
             return True
         cmd = 'dd if=/dev/urandom of=' + self.RD_DEV_PATH + ' bs=512 count=20480'
         return self.executor.Execute(cmd) == CommonVariables.process_success
+
+    def _try_unmount_lxd(self):
+        if bool(self.executor.Execute('test -f /run/snapd/ns/lxd.mnt',False,None,None,True) == 0):
+            self.logger.log('/run/snapd/ns/lxd.mnt found, try umount /mnt from lxd namespace')
+            return bool(self.executor.Execute('nsenter --mount=/run/snapd/ns/lxd.mnt umount /mnt',False,None,None,False) == 0)
+        else:
+            # nothing to unmount
+            return True
 
     def try_remount(self):
         """ mount the resource disk if not already mounted"""
