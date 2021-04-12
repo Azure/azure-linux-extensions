@@ -1,3 +1,22 @@
+1.2.0.83
+- add support for Ubuntu 20.04
+- fix python3 syntax in handle.py on update encryption settings change 
+- fix resize2fs syntax on distros with python3 + new cryptsetup version
+- fix systemctl crash on RHEL LVM
+
+1.2.0.75 
+- Add support for Gen2 VMs
+- Add support for RHEL 7.9
+- Yum update fix for RHEL 8
+
+1.2.0.72 
+- Add support for VM sizes without Resource Disks
+
+1.2.0.70
+-	Add support for Python3
+- Add support for RHEL 8
+- Enable Online encryption for RHEL 8 OS disk encryption
+
 1.1.0.52
 - Ubuntu WWN fix
 
