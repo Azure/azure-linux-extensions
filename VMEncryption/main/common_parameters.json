@@ -1,5 +1,5 @@
 {
-    "extension_version": "1.2.0.75",
+    "extension_version": "1.2.0.83",
     "extension_name": "AzureDiskEncryptionForLinux",
     "extension_provider_namespace": "Microsoft.Azure.Security"
 }
