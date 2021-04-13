@@ -1042,7 +1042,7 @@ class DiskUtil(object):
 
         return blk_items
 
-    def get_azure_symlinks_root_dir_devices():
+    def get_azure_symlinks_root_dir_devices(self):
         """
         There is a directory that provide helpful persistent symlinks to important devices
         We scrape the directory to identify "special" devices that should not be
