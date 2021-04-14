@@ -297,9 +297,6 @@ class BlobWriter(object):
 
     def IsEmptyBlob(self, blobUri):
         if (bool(BlobWriter.blobEmptyDetails) == True):
-            for key, value in BlobWriter.blobEmptyDetails.items():
-                self.hutil.log("Key: "+ key + " Value:"+ str(BlobWriter.blobEmptyDetails[key]))
-
             if (key in BlobWriter.blobEmptyDetails.keys()):
                 return BlobWriter.blobEmptyDetails[key]
         
