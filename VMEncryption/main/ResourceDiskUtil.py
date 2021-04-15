@@ -30,7 +30,6 @@ class ResourceDiskUtil(object):
 
     RD_MOUNT_POINT = '/mnt/resource'
     _RD_BASE_DEV_PATH_CACHE = ""
-    RD_DEV_PATH = os.path.join(CommonVariables.azure_symlinks_dir, 'resource-part1')
     DEV_DM_PREFIX = '/dev/dm-'
     # todo: consolidate this and other key file path references
     # (BekUtil.py, ExtensionParameter.py, and dracut patches)
