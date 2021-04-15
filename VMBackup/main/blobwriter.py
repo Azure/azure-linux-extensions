@@ -297,8 +297,8 @@ class BlobWriter(object):
 
     def IsEmptyBlob(self, blobUri):
         if (bool(BlobWriter.blobEmptyDetails) == True):
-            if (key in BlobWriter.blobEmptyDetails.keys()):
-                return BlobWriter.blobEmptyDetails[key]
+            if (blobUri in BlobWriter.blobEmptyDetails.keys()):
+                return BlobWriter.blobEmptyDetails[blobUri]
         
         isEmptyBlob = self.VerifyIfBlobIsEmpty(blobUri)
         BlobWriter.blobEmptyDetails[blobUri] = isEmptyBlob
