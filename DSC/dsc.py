@@ -58,6 +58,9 @@ package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
 extension_handler_version = "2.71.1.0"
+python_command = 'python3' if sys.version_info.major == 3 else 'python'
+dsc_script_path = '/opt/microsoft/dsc/Scripts/python3' if sys.version_info.major == 3 else '/opt/microsoft/dsc/Scripts'
+space_string = " "
 
 # Error codes
 UnsupportedDistro = 51 #excludes from SLA
@@ -152,8 +155,8 @@ def check_supported_OS():
                        'centos' : ['6', '7'], # CentOS
                        'red hat' : ['6', '7'], # Redhat
                        'debian' : ['8'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'oracle' : ['6', '7'], # Oracle
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
+                       'oracle' : ['6', '7', '8'], # Oracle
                        'suse' : ['11', '12'], #SLES
                        'opensuse' : ['13', '42.3'] #OpenSuse
     }
@@ -309,7 +312,7 @@ def send_heart_beat_msg_to_agent_service(status_event_type):
         while retry_count <= 5 and canRetry:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                                       message="In send_heart_beat_msg_to_agent_service method")
-            code, output, stderr = run_cmd("python /opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py")
+            code, output, stderr = run_cmd( python_command + space_string +  dsc_script_path + "/GetDscLocalConfigurationManager.py")
             if code == 0 and "RefreshMode=Pull" in output:
                 waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                                           message="sends heartbeat message in pullmode")
@@ -833,12 +836,12 @@ def prepare_download_dir(seq_no):
 
 
 def apply_dsc_configuration(config_file_path):
-    cmd = '/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path
+    cmd = dsc_script_path + '/StartDscConfiguration.py -configurationmof ' + config_file_path
     waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True,
                               message='running the cmd: ' + cmd)
     code, output, stderr = run_cmd(cmd)
     if code == 0:
-        code, output, stderr = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
+        code, output, stderr = run_cmd(dsc_script_path + '/GetDscConfiguration.py')
         return output
     else:
         error_msg = 'Failed to apply MOF configuration: stdout: {0}, stderr: {1}'.format(output, stderr)
@@ -848,12 +851,12 @@ def apply_dsc_configuration(config_file_path):
 
 
 def apply_dsc_meta_configuration(config_file_path):
-    cmd = '/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path
+    cmd = dsc_script_path + '/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path
     waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True,
                               message='running the cmd: ' + cmd)
     code, output, stderr = run_cmd(cmd)
     if code == 0:
-        code, output, stderr = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
+        code, output, stderr = run_cmd(dsc_script_path + '/GetDscLocalConfigurationManager.py')
         return output
     else:
         error_msg = 'Failed to apply Meta MOF configuration: stdout: {0}, stderr: {1}'.format(output, stderr)
@@ -986,7 +989,7 @@ def check_dsc_configuration(current_config):
 
 def install_module(file_path):
     install_package('unzip')
-    cmd = '/opt/microsoft/dsc/Scripts/InstallModule.py ' + file_path
+    cmd = dsc_script_path + '/InstallModule.py ' + file_path
     code, output, stderr = run_cmd(cmd)
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op="InstallModuleInProgress",
@@ -1008,7 +1011,7 @@ def install_module(file_path):
 
 def remove_module():
     module_name = get_config('ResourceName')
-    cmd = '/opt/microsoft/dsc/Scripts/RemoveModule.py ' + module_name
+    cmd = dsc_script_path + '/RemoveModule.py ' + module_name
     code, output, stderr = run_cmd(cmd)
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op="RemoveModuleInProgress",
@@ -1086,7 +1089,7 @@ def register_automation(registration_key, registation_url, node_configuration_na
         hutil.error(err_msg + "It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
         waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
         return 51, err_msg
-    cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey ' + registration_key \
+    cmd = dsc_script_path + '/Register.py' + ' --RegistrationKey ' + registration_key \
           + ' --ServerURL ' + registation_url
     optional_parameters = ""
     if node_configuration_name != '':
