@@ -481,8 +481,14 @@ def start_mdsd(configurator):
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
-    copy_env = os.environ
-    # Add MDSD_CONFIG_DIR  as an env variable since new mdsd master branch LAD doesnt create this dir
+    # mdsd http proxy setting
+    proxy_config = get_mdsd_proxy_config(waagent.HttpProxyConfigString, g_ext_settings, hutil.log)
+    if proxy_config:
+        # Add MDSD_http_proxy to current environment. Child processes will inherit its value.
+        os.environ['MDSD_http_proxy'] = proxy_config
+
+    copy_env = os.environ.copy()
+    # Add MDSD_CONFIG_DIR as an env variable since new mdsd master branch LAD doesnt create this dir
     mdsd_config_cache_dir = os.path.join(g_ext_dir, "config")
     copy_env["MDSD_CONFIG_DIR"] = mdsd_config_cache_dir
 
@@ -523,11 +529,6 @@ def start_mdsd(configurator):
     mdsd_stdout_stream = None
 
     g_dist_config.extend_environment(copy_env)
-
-    # mdsd http proxy setting
-    proxy_config = get_mdsd_proxy_config(waagent.HttpProxyConfigString, g_ext_settings, hutil.log)
-    if proxy_config:
-        copy_env['MDSD_http_proxy'] = proxy_config
 
     # Now prepare actual mdsd cmdline.
     command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -q {8} -S {7} -o {5}{6}'.format(
