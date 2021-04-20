@@ -19,6 +19,7 @@
 """ Unit tests for the ResourceDiskUtil module """
 
 import unittest
+import os
 
 from ResourceDiskUtil import ResourceDiskUtil
 from DiskUtil import DiskUtil
@@ -72,7 +73,7 @@ class TestResourceDiskUtil(unittest.TestCase):
                                     0,
                                     0]
         self.assertEqual(self.resource_disk._configure_waagent(), False)
-        self.assertEqual(mock_execute.call_count, 1) 
+        self.assertEqual(mock_execute.call_count, 1)
         self.assertEqual(self.resource_disk._configure_waagent(), True)
 
     def test_is_plain_mounted(self):
@@ -253,13 +254,13 @@ class TestResourceDiskUtil(unittest.TestCase):
 
     @mock.patch('CommandExecutor.CommandExecutor.Execute')
     def test_try_unmount_lxd_exists_true(self, mock_execute):
-        mock_execute.side_effect = [0,0]
+        mock_execute.side_effect = [0, 0]
         self.assertEqual(self.resource_disk._try_unmount_lxd(), True)
         self.assertEqual(mock_execute.call_count, 2)
 
     @mock.patch('CommandExecutor.CommandExecutor.Execute')
     def test_try_unmount_lxd_exists_false(self, mock_execute):
-        mock_execute.side_effect = [0,1]
+        mock_execute.side_effect = [0, 1]
         self.assertEqual(self.resource_disk._try_unmount_lxd(), False)
         self.assertEqual(mock_execute.call_count, 2)
 
@@ -268,3 +269,36 @@ class TestResourceDiskUtil(unittest.TestCase):
         mock_execute.side_effect = [1]
         self.assertEqual(self.resource_disk._try_unmount_lxd(), True)
         self.assertEqual(mock_execute.call_count, 1)
+
+    @mock.patch('os.path.exists')
+    def test_get_rd_base_dev_path(self, exists_mock):
+        dev_path_options = [
+            os.path.join(CommonVariables.azure_symlinks_dir, 'resource'),
+            os.path.join(CommonVariables.cloud_symlinks_dir, 'azure_resource'),
+            os.path.join(CommonVariables.azure_symlinks_dir, 'scsi0/lun1')
+        ]
+
+        exists_mock.side_effect = [True]
+        self.resource_disk._RD_BASE_DEV_PATH_CACHE = ""
+        rd_base_path = self.resource_disk._get_rd_base_dev_path()
+        self.assertEqual(dev_path_options[0], rd_base_path)
+
+        exists_mock.side_effect = [False, True]
+        self.resource_disk._RD_BASE_DEV_PATH_CACHE = ""
+        rd_base_path = self.resource_disk._get_rd_base_dev_path()
+        self.assertEqual(dev_path_options[1], rd_base_path)
+
+        exists_mock.side_effect = [False, False, True]
+        self.resource_disk._RD_BASE_DEV_PATH_CACHE = ""
+        rd_base_path = self.resource_disk._get_rd_base_dev_path()
+        self.assertEqual(dev_path_options[2], rd_base_path)
+
+        exists_mock.side_effect = [False, False, False]
+        self.resource_disk._RD_BASE_DEV_PATH_CACHE = ""
+        rd_base_path = self.resource_disk._get_rd_base_dev_path()
+        self.assertEqual("", rd_base_path)
+
+        exists_mock.side_effect = [False, False, False]
+        self.resource_disk._RD_BASE_DEV_PATH_CACHE = "test_base_dev_path"
+        rd_base_path = self.resource_disk._get_rd_base_dev_path()
+        self.assertEqual("test_base_dev_path", rd_base_path)

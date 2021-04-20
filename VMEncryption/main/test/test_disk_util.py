@@ -7,8 +7,6 @@ from EncryptionEnvironment import EncryptionEnvironment
 from Common import DeviceItem
 from Common import CommonVariables
 from CommandExecutor import CommandExecutor
-from .console_logger import ConsoleLogger
-from .test_utils import mock_dir_structure, MockDistroPatcher
 
 from .console_logger import ConsoleLogger
 from .test_utils import mock_dir_structure, MockDistroPatcher
@@ -64,6 +62,33 @@ class Test_Disk_Util(unittest.TestCase):
     @mock.patch("os.path.isdir")
     @mock.patch("os.listdir")
     @mock.patch("os.path.exists")
+    def test_get_azure_symlinks_root_dir_devices(self, exists_mock, listdir_mock, isdir_mock):
+        CommonVariables.azure_symlinks_dir
+        artifical_dir_structure = {
+            CommonVariables.azure_symlinks_dir: ["root", "root-part1", "root-part2", "scsi0"],
+            os.path.join(CommonVariables.azure_symlinks_dir, "scsi0"): ["lun0", "lun0-part1", "lun0-part2", "lun1-part1", "lun1", "lun2", "lun2-par1"]
+            }
+
+        mock_dir_structure(artifical_dir_structure, isdir_mock, listdir_mock, exists_mock)
+
+        device_names_actual = self.disk_util.get_azure_symlinks_root_dir_devices()
+        device_names_expected = [
+            os.path.join(CommonVariables.azure_symlinks_dir, "root")
+        ]
+        self.assertListEqual(device_names_expected, device_names_actual)
+
+        artifical_dir_structure[CommonVariables.azure_symlinks_dir] = ["scsi0"]  # no more stuff in here
+        artifical_dir_structure[CommonVariables.cloud_symlinks_dir] = ["azure_root", "azure_root-part1", "azure_resource"]  # move it to the cloud dir
+        device_names_actual = self.disk_util.get_azure_symlinks_root_dir_devices()
+        device_names_expected = [
+            os.path.join(CommonVariables.cloud_symlinks_dir, "azure_root"),
+            os.path.join(CommonVariables.cloud_symlinks_dir, "azure_resource")
+        ]
+        self.assertListEqual(device_names_expected, device_names_actual)
+
+    @mock.patch("os.path.isdir")
+    @mock.patch("os.listdir")
+    @mock.patch("os.path.exists")
     def test_get_controller_and_lun_numbers(self, exists_mock, listdir_mock, isdir_mock):
 
         artifical_dir_structure = {
@@ -88,6 +113,40 @@ class Test_Disk_Util(unittest.TestCase):
         artifical_dir_structure[os.path.join("/dev/disk/azure", "scsi1")] = []
         controller_and_lun_numbers = self.disk_util.get_all_azure_data_disk_controller_and_lun_numbers()
         self.assertListEqual([], controller_and_lun_numbers)
+
+    @mock.patch("DiskUtil.DiskUtil.get_device_items")
+    @mock.patch("os.path.realpath")
+    @mock.patch("DiskUtil.DiskUtil.get_ide_devices")
+    @mock.patch("DiskUtil.DiskUtil.get_scsi0_device_names")
+    @mock.patch("DiskUtil.DiskUtil.get_azure_symlinks_root_dir_devices")
+    def test_get_azure_devices(self, get_symlink_root_devs_mock, get_scsi0_mock, get_ide_mock, realpath_mock, get_device_items_mock):
+        realpath_mock.side_effect = lambda x: x
+        get_symlink_root_devs_mock.return_value = ["/dev/sda"]
+        get_scsi0_mock.return_value = ["/dev/sdb"]
+        get_ide_mock.return_value = ["sdc"]
+
+        get_device_items_dict = {
+            "/dev/sda": [self._create_device_item(name="sda")],
+            "/dev/sdb": [self._create_device_item(name="sdb")],
+            "/dev/sdc": [self._create_device_item(name="sdc")],
+        }
+        get_device_items_mock.side_effect = lambda x: get_device_items_dict[x]
+
+        azure_devices = self.disk_util.get_azure_devices()
+        self.assertItemsEqual(["sda", "sdb", "sdc"], map(lambda x: x.name, azure_devices))
+
+        # add a partition to sdb
+        get_device_items_dict["/dev/sdb"].append(self._create_device_item(name="sdb1"))
+
+        azure_devices = self.disk_util.get_azure_devices()
+        self.assertItemsEqual(["sda", "sdb", "sdb1", "sdc"], map(lambda x: x.name, azure_devices))
+
+        # change ide device to also be sda
+        get_ide_mock.return_value = ["sda"]
+
+        azure_devices = self.disk_util.get_azure_devices()
+        # There should only be one SDA, not two
+        self.assertItemsEqual(["sda", "sdb", "sdb1"], map(lambda x: x.name, azure_devices))
 
     @mock.patch("os.path.exists", return_value=False)
     @mock.patch("DiskUtil.EncryptionMarkConfig.config_file_exists", return_value=False)
@@ -236,15 +295,15 @@ Tokens:
         # simulate cryptsetup 2.1.0 (first version of cryptsetup defaulting to LUKS2)
         ver_mock.return_value = "cryptsetup 2.1.0"
         header_size = self.disk_util.get_luks_header_size()
-        self.assertEqual(header_size, CommonVariables.luks_header_size_v2)    
-    
+        self.assertEqual(header_size, CommonVariables.luks_header_size_v2)
+
     @mock.patch("DiskUtil.DiskUtil._get_cryptsetup_version")
     def test_get_luks_header_size_v222(self, ver_mock):
         # versions of distros with cryptsetup later than 2.1.0 (eg., Ubuntu 20.04)
         ver_mock.return_value = "cryptsetup 2.2.2"
         header_size = self.disk_util.get_luks_header_size()
-        self.assertEqual(header_size, CommonVariables.luks_header_size_v2)           
-    
+        self.assertEqual(header_size, CommonVariables.luks_header_size_v2)
+
     @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
     def test_get_luks_header_size_luks1(self, lghd_mock):
         lghd_mock.return_value = """
@@ -274,7 +333,7 @@ Key Slot 3: DISABLED
 Key Slot 4: DISABLED
 Key Slot 5: DISABLED
 Key Slot 6: DISABLED
-Key Slot 7: DISABLED"""        
+Key Slot 7: DISABLED"""
         header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
         self.assertEqual(header_size, CommonVariables.luks_header_size)
 
@@ -323,7 +382,7 @@ Digests:
         Salt:       5b 28 b9 bd fc 4d 47 7f e5 a7 d7 b8 a7 dd d5 99
                     4c 3a a5 91 02 52 74 46 48 10 2e 1f 51 25 1a 8f
         Digest:     fc 5d 6f 20 2c 6c 89 7e 79 eb d6 3b 46 19 0f 0a
-                5e 62 0d a3 48 77 a2 19 22 56 a9 ad 5a 94 e3 62"""        
+                5e 62 0d a3 48 77 a2 19 22 56 a9 ad 5a 94 e3 62"""
         header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
         self.assertEqual(header_size, CommonVariables.luks_header_size_v2)
 
@@ -353,4 +412,3 @@ Digests:
         dump_mock.return_value = ""
         header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
         self.assertEqual(header_size, None)
-

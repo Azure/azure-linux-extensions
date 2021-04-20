@@ -34,6 +34,7 @@ from Common import CommonVariables, LvmItem, DeviceItem
 from io import open
 from distutils.version import LooseVersion
 
+
 class DiskUtil(object):
     os_disk_lvm = None
     sles_cache = {}
@@ -1146,10 +1147,10 @@ class DiskUtil(object):
             elif luksVer and int(luksVer) == 2:
                 # parse V2 LUKS dump format which provides offset to first data segment in bytes
                 # V2 file format example:
-                #	Data segments:
-	            #   0: crypt
+                #   Data segments:
+                #   0: crypt
                 #       offset: 16777216 [bytes]
-                result = re.findall(r"0:\s+crypt\s+offset:\s?(\d+)",luksDump)
+                result = re.findall(r"0:\s+crypt\s+offset:\s?(\d+)", luksDump)
                 if result:
                     self.logger.log("LUKS2 data segment offset not found", level=CommonVariables.ErrorLevel)
                     header_size = int(result[0])
