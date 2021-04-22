@@ -806,7 +806,7 @@ def stop_arc_watcher():
     
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
-            for pids in f.readlines()
+            for pids in f.readlines():
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
                 if output and "arc" in output:
