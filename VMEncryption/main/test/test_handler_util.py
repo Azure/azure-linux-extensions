@@ -108,6 +108,18 @@ try:
         def test_do_parse_context_update_encryption_settings(self):
             self.assertIsNotNone(self.hutil.do_parse_context('UpdateEncryptionSettings'))
 
+        @mock.patch('EncryptionConfig.EncryptionConfig.get_secret_seq_num')
+        def test_update_encryption_settings_when_secret_seq_num_none(self,get_secret_seq_num):
+            # test update encryption settings when get_secret_seq_num is mocked to return None
+            get_secret_seq_num.return_value = None
+            self.assertIsNotNone(self.hutil.do_parse_context('UpdateEncryptionSettings'))
+
+        @mock.patch('EncryptionConfig.EncryptionConfig.get_secret_seq_num')
+        def test_update_encryption_settings_when_secret_seq_num_empty_string(self,get_secret_seq_num):
+            # test update encryption settings when get_secret_seq_num is mocked to return empty string
+            get_secret_seq_num.return_value = ""
+            self.assertIsNotNone(self.hutil.do_parse_context('UpdateEncryptionSettings'))
+
         def test_do_parse_context_update(self):
             self.assertIsNotNone(self.hutil.do_parse_context('Update'))
 
