@@ -50,3 +50,33 @@ class TestEncryptionSettingsUtil(unittest.TestCase):
         self.assertEqual(get_http_util.return_value.Call.call_count, 3)
         self.assertEqual(write_settings_file.call_count, 0)
 
+    def test_get_fault_reason_correct_xml(self):
+        mock_error_xml = "<?xml version='1.0' encoding='utf-8'?>\
+                          <Error xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xmlns:xsd='http://www.w3.org/2001/XMLSchema'>\
+                          <Code>BadRequest</Code>\
+                          <Message>The request contents are invalid or incomplete. Please refresh your resource cache and retry.</Message>\
+                          <Details>The fault reason was: '  0xc1425072  RUNTIME_E_KEYVAULT_SET_SECRET_FAILED  Failed to set secret to KeyVault '.</Details></Error>"
+        reason = self.es_util.get_fault_reason(mock_error_xml)
+        self.assertEqual(reason, "The fault reason was: '  0xc1425072  RUNTIME_E_KEYVAULT_SET_SECRET_FAILED  Failed to set secret to KeyVault '.")
+
+    def test_get_fault_reason_invalid_xml(self):
+        mock_invalid_xml = "This is inavlid xml"
+        reason = self.es_util.get_fault_reason(mock_invalid_xml)
+        self.assertEqual(reason, "Unknown")
+
+    def test_get_fault_reason_no_detail_element(self):
+        mock_error_xml = "<?xml version='1.0' encoding='utf-8'?>\
+                          <Error xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xmlns:xsd='http://www.w3.org/2001/XMLSchema'>\
+                          <Code>BadRequest</Code>\
+                          <Message>The request contents are invalid or incomplete. Please refresh your resource cache and retry.</Message></Error>"
+        reason = self.es_util.get_fault_reason(mock_error_xml)
+        self.assertEqual(reason, "Unknown")
+
+    def test_get_fault_reason_no_detail_element_text(self):
+        mock_error_xml = "<?xml version='1.0' encoding='utf-8'?>\
+                          <Error xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xmlns:xsd='http://www.w3.org/2001/XMLSchema'>\
+                          <Code>BadRequest</Code>\
+                          <Message>The request contents are invalid or incomplete. Please refresh your resource cache and retry.</Message>\
+                          <Details></Details></Error>"
+        reason = self.es_util.get_fault_reason(mock_error_xml)
+        self.assertEqual(reason, "Unknown")
