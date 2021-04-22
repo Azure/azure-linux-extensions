@@ -803,18 +803,14 @@ def stop_arc_watcher():
     pids_filepath = os.path.join(os.getcwd(),'amaarc.pid')
 
     # kill existing arc watcher
+    
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
             for pids in f.readlines():
-                proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
-                output = proc.communicate()[0]
-                if "arc" in output:
-                    kill_cmd = "kill " + pids 
-                    run_command_and_log(kill_cmd)
-        
-        # Delete the file after to avoid clutter
-        os.remove(pids_filepath)
-
+                kill_cmd = "kill " + pids
+                run_command_and_log(kill_cmd)
+                run_command_and_log("rm "+pids_filepath)
+    
 def arc_watcher(hutil_error, hutil_log):
     """
     This is needed to override mdsd's syslog permissions restriction which prevents mdsd 
