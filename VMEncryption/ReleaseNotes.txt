@@ -1,3 +1,9 @@
+1.2.0.84
+- add support for RHEL 8 SAP image
+- fix RD encryption in Gen2 VMs
+- add error message reporting for WireProtocol errors
+- fix an invalid literal bug
+
 1.2.0.83
 - add support for Ubuntu 20.04
 - fix python3 syntax in handle.py on update encryption settings change 
