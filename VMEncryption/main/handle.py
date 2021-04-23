@@ -260,7 +260,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     config_secret_seq = encryption_config.get_secret_seq_num()
-    if config_secret_seq is None:
+    if not config_secret_seq:
         current_secret_seq_num = -1
     else:
         current_secret_seq_num = int(config_secret_seq)
