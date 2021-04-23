@@ -1,7 +1,6 @@
 import unittest
 import os.path
 import json
-import sys
 
 from DiskUtil import DiskUtil
 from EncryptionEnvironment import EncryptionEnvironment
@@ -134,29 +133,20 @@ class Test_Disk_Util(unittest.TestCase):
         get_device_items_mock.side_effect = lambda x: get_device_items_dict[x]
 
         azure_devices = self.disk_util.get_azure_devices()
-        if sys.version_info[0] < 3:
-            self.assertItemsEqual(["sda", "sdb", "sdc"], map(lambda x: x.name, azure_devices))
-        else:
-            self.assertCountEqual(["sda", "sdb", "sdc"], map(lambda x: x.name, azure_devices))
+        self.assertItemsEqual(["sda", "sdb", "sdc"], map(lambda x: x.name, azure_devices))
 
         # add a partition to sdb
         get_device_items_dict["/dev/sdb"].append(self._create_device_item(name="sdb1"))
 
         azure_devices = self.disk_util.get_azure_devices()
-        if sys.version_info[0] < 3:
-            self.assertItemsEqual(["sda", "sdb", "sdb1", "sdc"], map(lambda x: x.name, azure_devices))
-        else:
-            self.assertCountEqual(["sda", "sdb", "sdb1", "sdc"], map(lambda x: x.name, azure_devices))
+        self.assertItemsEqual(["sda", "sdb", "sdb1", "sdc"], map(lambda x: x.name, azure_devices))
 
         # change ide device to also be sda
         get_ide_mock.return_value = ["sda"]
 
         azure_devices = self.disk_util.get_azure_devices()
         # There should only be one SDA, not two
-        if sys.version_info[0] < 3:
-            self.assertItemsEqual(["sda", "sdb", "sdb1"], map(lambda x: x.name, azure_devices))
-        else:
-            self.assertCountEqual(["sda", "sdb", "sdb1"], map(lambda x: x.name, azure_devices))
+        self.assertItemsEqual(["sda", "sdb", "sdb1"], map(lambda x: x.name, azure_devices))
 
     @mock.patch("os.path.exists", return_value=False)
     @mock.patch("DiskUtil.EncryptionMarkConfig.config_file_exists", return_value=False)
