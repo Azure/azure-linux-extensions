@@ -118,7 +118,7 @@ class FsFreezer:
         self.unfrozen_items = set()
         self.freeze_handler = FreezeHandler(self.logger, self.hutil)
         self.mount_open_failed = False
-        self.resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
+        resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
         self.resource_disk_mount_point = resource_disk.get_resource_disk_mount_point()
         self.skip_freeze= True
 
