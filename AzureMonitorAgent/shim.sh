@@ -29,7 +29,7 @@ then
     echo "No Python interpreter found, which is an AMA extension dependency. Please install Python 3, or Python 2 if the former is unavailable." >&2
     exit 52 # Missing Dependency
 else
-    ${PYTHON} --version
+    ${PYTHON} --version 2>&1
 fi
 
 PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}
