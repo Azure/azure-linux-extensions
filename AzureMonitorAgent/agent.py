@@ -267,10 +267,10 @@ def install():
                                          final_check = final_check_if_dpkg_locked)    
     
     default_configs = {   
-        "MDSD_LOG" : "/var/log",
+        "MDSD_LOG_DIR" : "/var/log/azure-monitoringagent",
         "MDSD_ROLE_PREFIX" : "/var/run/azure-monitoringagent/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/azure-monitoringagent",
-        "MDSD_OPTIONS" : "\"-A -c /etc/azure-monitoringagent.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/azure-monitoringagent.err -w $MDSD_LOG/azure-monitoringagent.warn -o $MDSD_LOG/azure-monitoringagent.info -q $MDSD_LOG/azure-monitoringagent.qos\"",
+        "MDSD_OPTIONS" : "\"-A -c /etc/azure-monitoringagent.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh\"",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
