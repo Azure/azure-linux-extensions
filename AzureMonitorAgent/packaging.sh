@@ -15,7 +15,7 @@ if [[ "$1" == "--help" ]]; then
     usage
     exit 0
 elif [[ ! -d $input_path ]]; then
-    echo "Deb/RPM files path '$input_path' not found"
+    echo "DEB/RPM files path '$input_path' not found"
     usage
     exit 1
 fi
@@ -37,7 +37,7 @@ rm -rf packages MetricsExtensionBin ext/future
 mkdir -p packages MetricsExtensionBin ext/future
 
 # copy shell bundle to packages/
-cp $input_path/azure-mdsd_$AGENT_VERSION* packages/
+cp $input_path/azure-monitoringagent_$AGENT_VERSION* packages/
 cp $input_path/MetricsExtension MetricsExtensionBin/
 
 # copy just the source of python-future

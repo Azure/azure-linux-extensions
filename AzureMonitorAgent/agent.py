@@ -2,7 +2,7 @@
 #
 # AzureMonitoringLinuxAgent Extension
 #
-# Copyright 2019 Microsoft Corporation
+# Copyright 2021 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,16 +99,15 @@ if sys.version_info < (2,7):
 
 # Global Variables
 PackagesDirectory = 'packages'
-# TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-# TODO: Installer should automatically figure this out from the folder instead of requiring this update
-BundleFileNameDeb = 'azure-mdsd_1.5.133-build.master.157_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.133-build.master.157_x86_64.rpm'
+# The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
+BundleFileNameDeb = 'azure-monitoringagent.deb'
+BundleFileNameRpm = 'azure-monitoringagent.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
 PackageManagerOptions = ''
-MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
+MdsdCounterJsonPath = '/etc/azure-monitoringagent.d/config-cache/metricCounters.json'
 
 # Commands
 OneAgentInstallCommand = ''
@@ -269,9 +268,9 @@ def install():
     
     default_configs = {   
         "MDSD_LOG" : "/var/log",
-        "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
-        "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
-        "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
+        "MDSD_ROLE_PREFIX" : "/var/run/azure-monitoringagent/default",
+        "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/azure-monitoringagent",
+        "MDSD_OPTIONS" : "\"-A -c /etc/azure-monitoringagent.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
@@ -354,22 +353,22 @@ def install():
                 default_configs["MONITORING_GCS_AUTH_ID"] = MONITORING_GCS_AUTH_ID
 
             if MONITORING_GCS_CERT_CERTFILE is not None:
-                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
-                fh = open("/etc/mdsd.d/gcscert.pem", "wb")
+                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/azure-monitoringagent.d/gcscert.pem"
+                fh = open("/etc/azure-monitoringagent.d/gcscert.pem", "wb")
                 fh.write(MONITORING_GCS_CERT_CERTFILE)
                 fh.close()
-                os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))  
+                os.chown("/etc/azure-monitoringagent.d/gcscert.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/azure-monitoringagent.d/gcscert.pem", 400))  
 
             if MONITORING_GCS_CERT_KEYFILE is not None:
-                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/mdsd.d/gcskey.pem"
-                fh = open("/etc/mdsd.d/gcskey.pem", "wb")
+                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/azure-monitoringagent.d/gcskey.pem"
+                fh = open("/etc/azure-monitoringagent.d/gcskey.pem", "wb")
                 fh.write(MONITORING_GCS_CERT_KEYFILE)
                 fh.close()
-                os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))  
+                os.chown("/etc/azure-monitoringagent.d/gcskey.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/azure-monitoringagent.d/gcskey.pem", 400))  
 
-    config_file = "/etc/default/mdsd"
+    config_file = "/etc/default/azure-monitoringagent"
     config_updated = False
     try:
         if os.path.isfile(config_file):
@@ -390,15 +389,15 @@ def install():
                 if var not in vars_set:
                     new_data += "export " + var + "=" + default_configs[var] + "\n"
 
-            with open("/etc/default/mdsd_temp", "w") as f:
+            with open("/etc/default/azure-monitoringagent_temp", "w") as f:
                 f.write(new_data)
                 config_updated = True if len(new_data) > 0 else False 
 
-            if not config_updated or not os.path.isfile("/etc/default/mdsd_temp"):
-                log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/mdsd")
+            if not config_updated or not os.path.isfile("/etc/default/azure-monitoringagent_temp"):
+                log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/azure-monitoringagent")
 
             os.remove(config_file)
-            os.rename("/etc/default/mdsd_temp", config_file)
+            os.rename("/etc/default/azure-monitoringagent_temp", config_file)
 
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
@@ -406,9 +405,9 @@ def install():
             os.system('chmod {1} {0}'.format(config_file, 400))  
 
         else:
-            log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/azure-monitoringagent" )        
     except:
-        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/mdsd" )        
+        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/azure-monitoringagent" )        
     return exit_code, output
 
 def check_kill_process(pstring):
@@ -425,9 +424,9 @@ def uninstall():
     """
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
-        OneAgentUninstallCommand = "dpkg -P azure-mdsd"
+        OneAgentUninstallCommand = "dpkg -P azure-monitoringagent"
     elif PackageManager == "rpm":
-        OneAgentUninstallCommand = "rpm -e azure-mdsd"
+        OneAgentUninstallCommand = "rpm -e azure-monitoringagent"
     else:
         log_and_exit(operation, UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(OneAgentUninstallCommand))
@@ -458,18 +457,18 @@ def enable():
         start_arc_process()
 
     if is_systemd():
-        OneAgentEnableCommand = "systemctl start mdsd"
+        OneAgentEnableCommand = "systemctl start azure-monitoringagent"
     else:
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
-        OneAgentEnableCommand = "/etc/init.d/mdsd start"
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azure-monitoringagent.")
+        OneAgentEnableCommand = "/etc/init.d/azure-monitoringagent start"
     
     public_settings, protected_settings = get_settings()
 
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        OneAgentEnableCommand = "systemctl start mdsdmgr"
+        OneAgentEnableCommand = "systemctl start azure-monitoringagentmgr"
         if not is_systemd():
-            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
-            OneAgentEnableCommand = "/etc/init.d/mdsdmgr start"
+            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azure-monitoringagentmgr.")
+            OneAgentEnableCommand = "/etc/init.d/azure-monitoringagentmgr start"
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(OneAgentEnableCommand)
@@ -494,11 +493,11 @@ def disable():
 
     #stop the Azure Monitor Linux Agent service
     if is_systemd():
-        DisableOneAgentServiceCommand = "systemctl stop mdsd"
+        DisableOneAgentServiceCommand = "systemctl stop azure-monitoringagent"
         
     else:
-        DisableOneAgentServiceCommand = "/etc/init.d/mdsd stop"
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop mdsd.")
+        DisableOneAgentServiceCommand = "/etc/init.d/azure-monitoringagent stop"
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop azure-monitoringagent.")
     
     exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
     return exit_code, output
@@ -630,7 +629,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data, 
                                 "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port, 
-                                "unix:///var/run/mdsd/default_influx.socket",
+                                "unix:///var/run/azure-monitoringagent/default_influx.socket",
                                 is_lad=False)
 
                             me_handler.setup_me(is_lad=False)
@@ -831,7 +830,7 @@ def arc_watcher(hutil_error, hutil_log):
 
     while True:
         try:
-            arc_token_mdsd_dir = "/etc/mdsd.d/arc_tokens/"
+            arc_token_mdsd_dir = "/etc/azure-monitoringagent.d/arc_tokens/"
             if not os.path.exists(arc_token_mdsd_dir):
                 os.makedirs(arc_token_mdsd_dir)
             else:
@@ -901,7 +900,7 @@ def find_package_manager(operation):
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
-            # OK to replace the /etc/default/mdsd, since the placeholders gets replaced again.
+            # OK to replace the /etc/default/azure-monitoringagent, since the placeholders gets replaced again.
             # Otherwise, the package manager prompts for action (Y/I/N/O/D/Z) [default=N]
             PackageManagerOptions = "--force-overwrite --force-confnew"
             BundleFileName = BundleFileNameDeb
