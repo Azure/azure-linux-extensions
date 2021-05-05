@@ -27,6 +27,7 @@ import signal
 import traceback
 import threading
 from common import CommonVariables
+from Utils.ResourceDiskUtil import ResourceDiskUtil
 
 def thread_for_binary(self,args):
     self.logger.log("Thread for binary is called",True)
@@ -117,9 +118,14 @@ class FsFreezer:
         self.unfrozen_items = set()
         self.freeze_handler = FreezeHandler(self.logger, self.hutil)
         self.mount_open_failed = False
+        resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
+        self.resource_disk_mount_point = resource_disk.get_resource_disk_mount_point()
+        self.skip_freeze= True
 
     def should_skip(self, mount):
-        if((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop'):
+        if(self.resource_disk_mount_point is not None and mount.mount_point == self.resource_disk_mount_point):
+            return True
+        elif((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop' ):
             return False
         else:
             return True
@@ -133,6 +139,7 @@ class FsFreezer:
         try:
             mounts_to_skip = self.hutil.get_strvalue_from_configfile('MountsToSkip','')
             self.logger.log("skipped mount :" + str(mounts_to_skip), True)
+            mounts_list_to_skip = mounts_to_skip.split(',')
         except Exception as e:
             errMsg='Failed to read from config, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True,'Warning')
@@ -146,7 +153,7 @@ class FsFreezer:
                 if(mount.mount_point == '/'):
                     self.root_seen = True
                     self.root_mount = mount
-                elif(mount.mount_point != mounts_to_skip and not self.should_skip(mount)):
+                elif(mount.mount_point not in mounts_list_to_skip and not self.should_skip(mount)):
                     if(self.skip_freeze == True):
                         self.skip_freeze = False
                     args.append(str(mount.mount_point))

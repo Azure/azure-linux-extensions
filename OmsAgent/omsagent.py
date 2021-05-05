@@ -17,16 +17,21 @@
 # limitations under the License.
 
 from __future__ import print_function
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
+import sys
+
+# future imports have no effect on python 3 (verified in official docs)
+# importing from source causes import errors on python 3, lets skip import
+if sys.version_info[0] < 3:
+    from future import standard_library
+    standard_library.install_aliases()
+    from builtins import str
+
 import os
 import os.path
 import signal
 import pwd
 import grp
 import re
-import sys
 import traceback
 import time
 import platform
@@ -47,11 +52,42 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
+# This monkey patch duplicates the one made in the waagent import above.
+# It is necessary because on 2.6, the waagent monkey patch appears to be overridden
+# by the python-future subprocess.check_output backport.
+if sys.version_info < (2,7):
+    def check_output(*popenargs, **kwargs):
+        r"""Backport from subprocess module from python 2.7"""
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise subprocess.CalledProcessError(retcode, cmd, output=output)
+        return output
+
+    # Exception classes used by this module.
+    class CalledProcessError(Exception):
+        def __init__(self, returncode, cmd, output=None):
+            self.returncode = returncode
+            self.cmd = cmd
+            self.output = output
+
+        def __str__(self):
+            return "Command '%s' returned non-zero exit status %d" % (self.cmd, self.returncode)
+
+    subprocess.check_output = check_output
+    subprocess.CalledProcessError = CalledProcessError
+
 # Global Variables
 ProceedOnSigningVerificationFailure = True
 PackagesDirectory = 'packages'
 keysDirectory = 'keys'
-BundleFileName = 'omsagent-1.13.1-0.universal.x64.sh'
+BundleFileName = 'omsagent-1.13.11-0.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -72,16 +108,29 @@ ExtensionStateSubdirectory = 'state'
 
 # Commands
 # Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
-# When releasing to FF/MC, comment the public OnboardCommandWithOptionalParams
-# and uncomment the corresponding FF/MC command
 InstallCommandTemplate = '{0} --upgrade'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
-OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}' # Public Cloud
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.us -w {1} -s {2} {3}' # Fairfax
-# OnboardCommandWithOptionalParams = '{0} -d opinsights.azure.cn -w {1} -s {2} {3}' # Mooncake
+OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
+
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
+
+# Cloud Environments
+PublicCloudName     = "AzurePublicCloud"
+FairfaxCloudName    = "AzureUSGovernmentCloud"
+MooncakeCloudName   = "AzureChinaCloud"
+USNatCloudName      = "USNat" # EX
+USSecCloudName      = "USSec" # RX
+DefaultCloudName    = PublicCloudName # Fallback
+
+CloudDomainMap = {
+    PublicCloudName:   "opinsights.azure.com",
+    FairfaxCloudName:  "opinsights.azure.us",
+    MooncakeCloudName: "opinsights.azure.cn",
+    USNatCloudName:    "opinsights.azure.eaglex.ic.gov",
+    USSecCloudName:    "opinsights.azure.microsoft.scloud"
+}
 
 # Error codes
 DPKGLockedErrorCode = 55 #56, temporary as it excludes from SLA
@@ -115,10 +164,6 @@ GUIDRegex = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 OAuthTokenResource = 'https://management.core.windows.net/'
 OMSServiceValidationEndpoint = 'https://global.oms.opinsights.azure.com/ManagedIdentityService.svc/Validate'
 AutoManagedWorkspaceCreationSleepSeconds = 20
-
-# vmResourceId Metadata Service
-VMResourceIDMetadataHost = '169.254.169.254'
-VMResourceIDMetadataEndpoint = 'http://{0}/metadata/instance?api-version=2017-12-01'.format(VMResourceIDMetadataHost)
 
 # agent permissions
 AgentUser='omsagent'
@@ -335,9 +380,9 @@ def start_telemetry_process():
 
     #start telemetry watcher
     omsagent_filepath = os.path.join(os.getcwd(),'omsagent.py')
-    args = ['python', omsagent_filepath, '-telemetry']
+    args = ['python{0}'.format(sys.version_info[0]), omsagent_filepath, '-telemetry']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    HUtilObject.log('start watcher process '+str(args))
+    hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
 
 def telemetry():
@@ -346,16 +391,17 @@ def telemetry():
     with open(pids_filepath, 'w') as f:
         f.write(str(py_pid) + '\n')
 
-    watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
+    if HUtilObject is not None:
+        watcher = watcherutil.Watcher(HUtilObject.error, HUtilObject.log)
 
-    watcher_thread = Thread(target = watcher.watch)
-    self_mon_thread = Thread(target = watcher.monitor_health)
+        watcher_thread = Thread(target = watcher.watch)
+        self_mon_thread = Thread(target = watcher.monitor_health)
 
-    watcher_thread.start()
-    self_mon_thread.start()
+        watcher_thread.start()
+        self_mon_thread.start()
 
-    watcher_thread.join()
-    self_mon_thread.join()
+        watcher_thread.join()
+        self_mon_thread.join()
 
     return 0, ""
 
@@ -369,15 +415,7 @@ def prepare_update():
 
     public_settings, _ = get_settings()
     workspaceId = public_settings.get('workspaceId')
-
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
-        detect_multiple_connections(workspaceId)
-
-    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId) 
+    etc_remove_path = os.path.join(EtcOMSAgentPath, workspaceId)
     etc_move_path = os.path.join(EtcOMSAgentPath, ExtensionStateSubdirectory, workspaceId)
     if (not os.path.isdir(etc_move_path)):
         shutil.move(etc_remove_path, etc_move_path)
@@ -416,11 +454,11 @@ def install():
     # Take the backup of the state for given workspace.
     restore_state(workspaceId)
 
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
+    # In the case where a SCOM connection is already present, we should not
+    # create conflicts by installing the OMSAgent packages
     stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
     if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
+            and stopOnMultipleConnections is True):
         detect_multiple_connections(workspaceId)
 
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
@@ -537,13 +575,6 @@ def enable():
         workspaceKey = protected_settings.get('workspaceKey')
         check_workspace_id_and_key(workspaceId, workspaceKey)
 
-    # In the case where a SCOM connection is already present or OMS is connected to another workspace,
-    # we should not create conflicts by installing the OMSAgent packages
-    stopOnMultipleConnections = public_settings.get('stopOnMultipleConnections')
-    if (stopOnMultipleConnections is not None
-            and stopOnMultipleConnections == "true"):
-        detect_multiple_connections(workspaceId)
-
     # Check if omsadmin script is available
     if not os.path.exists(OMSAdminPath):
         log_and_exit('Enable', EnableCalledBeforeSuccessfulInstall,
@@ -557,7 +588,19 @@ def enable():
     if proxy is not None:
         proxyParam = '-p {0}'.format(proxy)
 
-    optionalParams = '{0} {1}'.format(proxyParam, vmResourceIdParam)
+    # get domain from protected settings
+    domain = protected_settings.get('domain')
+    if domain is None:
+        # detect opinsights domain using IMDS
+        domain = get_azure_cloud_domain()
+    else:
+        hutil_log_info("Domain retrieved from protected settings '{0}'".format(domain))
+
+    domainParam = ''
+    if domain:
+        domainParam = '-d {0}'.format(domain)
+
+    optionalParams = '{0} {1} {2}'.format(domainParam, proxyParam, vmResourceIdParam)
     onboard_cmd = OnboardCommandWithOptionalParams.format(OMSAdminPath,
                                                           workspaceId,
                                                           workspaceKey,
@@ -643,16 +686,60 @@ def remove_workspace_configuration():
     shutil.rmtree(etc_remove_path, True)
     shutil.rmtree(var_remove_path, True)
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
+    
+def is_arc_installed():
+    """
+    Check if the system is on an Arc machine
+    """
+    # Using systemctl to check this since Arc only supports VMs that have systemd
+    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
+    return check_arc == 0
+
+def get_arc_endpoint():
+    """
+    Find the endpoint for Arc Hybrid IMDS
+    """
+    endpoint_filepath = '/lib/systemd/system.conf.d/azcmagent.conf'
+    endpoint = ''
+    try:
+        with open(endpoint_filepath, 'r') as f:
+            data = f.read()
+        endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+    except:
+        hutil_log_error('Unable to load Arc IMDS endpoint from {0}'.format(endpoint_filepath))
+    return endpoint
+
+def get_imds_endpoint():
+    """
+    Find the endpoint for IMDS, whether Arc or not
+    """
+    azure_imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
+    if (is_arc_installed()):
+        hutil_log_info('Arc is installed, loading Arc-specific IMDS endpoint')
+        imds_endpoint = get_arc_endpoint()
+        if imds_endpoint:
+            imds_endpoint += '/metadata/instance?api-version=2019-08-15'
+        else: 
+            # Fall back to the traditional IMDS endpoint; the cloud domain and VM
+            # resource id detection logic are resilient to failed queries to IMDS
+            imds_endpoint = azure_imds_endpoint
+            hutil_log_info('Falling back to default Azure IMDS endpoint')
+    else:
+        imds_endpoint = azure_imds_endpoint
+    
+    hutil_log_info('Using IMDS endpoint "{0}"'.format(imds_endpoint))
+    return imds_endpoint
 
 def get_vmresourceid_from_metadata():
-    req = urllib.request.Request(VMResourceIDMetadataEndpoint)
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     try:
         response = json.loads(urllib.request.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
-            return None #classic vm
+            return None # classic vm
 
         if response['compute']['vmScaleSetName']:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachineScaleSets/{2}/virtualMachines/{3}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['vmScaleSetName'],response['compute']['name'])
@@ -668,6 +755,48 @@ def get_vmresourceid_from_metadata():
     except:
         hutil_log_error('Unexpected error from Metadata service')
         return None
+
+def get_azure_environment_from_imds():
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
+    req.add_header('Metadata', 'True')
+
+    try:
+        response = json.loads(urllib.request.urlopen(req).read())
+
+        if ('compute' not in response or response['compute'] is None):
+            return None # classic vm
+
+        if ('azEnvironment' not in response['compute'] or response['compute']['azEnvironment'] is None):
+            return None # classic vm
+
+        return response['compute']['azEnvironment']
+    except urllib.error.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL ' \
+                        'failed with an HTTPError: {0}'.format(e))
+        hutil_log_info('Response from Metadata service: ' \
+                       '{0}'.format(e.read()))
+        return None
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+        return None
+
+def get_azure_cloud_domain():
+    try:
+        environment = get_azure_environment_from_imds()
+
+        if environment:
+            for cloud, domain in CloudDomainMap.items():
+                if environment.lower() == cloud.lower():
+                    hutil_log_info('Detected cloud environment "{0}" via IMDS. The domain "{1}" will be used.'.format(cloud, domain))
+                    return domain
+
+        hutil_log_info('Unknown cloud environment "{0}"'.format(environment))
+    except Exception as e:
+        hutil_log_error('Failed to detect cloud environment: {0}'.format(e))
+
+    hutil_log_info('Falling back to default domain "{0}"'.format(CloudDomainMap[DefaultCloudName]))
+    return CloudDomainMap[DefaultCloudName]
 
 def retrieve_managed_workspace(vm_resource_id):
     """
@@ -766,23 +895,27 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7', '8'], # RHEL
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7', '8'], # Oracle, RHEL
-                       'oracle' : ['6', '7'], # Oracle
+    supported_dists = {'redhat' : ['6', '7', '8'], 'red hat' : ['6', '7', '8'], 'rhel' : ['6', '7', '8'], # Red Hat
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'oracle' : ['6', '7', '8'], 'ol': ['6', '7', '8'], # Oracle
                        'debian' : ['8', '9'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'] # SLES
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
+                       'suse' : ['12', '15'], 'sles' : ['12', '15'] # SLES
     }
 
-    vm_supported = False
+    vm_dist, vm_ver, vm_supported = '', '', False
 
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
-        vm_dist, vm_ver, vm_id = platform.dist()
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except AttributeError:
+            hutil_log_info("Falling back to /etc/os-release distribution parsing")
 
-    if not vm_dist and not vm_ver: # SLES 15 and others
+    # Fallback if either of the above fail; on some (especially newer)
+    # distros, linux_distribution() and dist() are unreliable or deprecated
+    if not vm_dist and not vm_ver:
         try:
             with open('/etc/os-release', 'r') as fp:
                 for line in fp:
@@ -792,7 +925,6 @@ def is_vm_supported_for_extension():
                         vm_dist = vm_dist.replace('\"', '').replace('\n', '')
                     elif line.startswith('VERSION_ID='):
                         vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.split('.')[0]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             return vm_supported, 'Indeterminate operating system', ''
@@ -1115,7 +1247,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     """
     exit_code, output = run_get_output(cmd, check_error, log_cmd)
     if log_cmd:
-        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd, output))
+        hutil_log_info('Output of command "{0}": \n{1}'.format(cmd.rstrip(), output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
 
@@ -1592,12 +1724,19 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         try:
             output = subprocess.check_output(cmd, stderr = subprocess.STDOUT,
                                              shell = True)
+            output = output.decode('latin-1')
             exit_code = 0
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
-            output = e.output
+            output = e.output.decode('latin-1')
 
-    return exit_code, output.encode('utf-8').strip()
+    output = output.encode('utf-8', 'ignore')
+
+    # On python 3, encode returns a byte object, so we must decode back to a string
+    if sys.version_info >= (3,):
+        output = output.decode()
+
+    return exit_code, output.strip()
 
 
 def get_tenant_id_from_metadata_api(vm_resource_id):

@@ -35,6 +35,7 @@ class BlobProperties():
         return ' blobType: ' + str(self.blobType) + ' contentLength: ' + str(self.contentLength)
 
 class BlobWriter(object):
+    blobEmptyDetails = {}
     """description of class"""
     def __init__(self, hutil):
         self.hutil = hutil
@@ -45,12 +46,20 @@ class BlobWriter(object):
         try:
             # get the blob type
             if(blobUri is not None):
-                blobType = self.GetBlobType(blobUri)
+                if (self.IsEmptyBlob(blobUri) == False):
+                    raise Exception("Cannot perform write operation on a non empty blob")
+                
+                blobProperties = self.GetBlobProperties(blobUri)
+                blobType = "pageblob"
+
+                if(blobProperties is not None):
+                    blobType = blobProperties.blobType
+
                 if (str(blobType).lower() == "pageblob"):
                     # Clear Page-Blob Contents
-                    self.ClearPageBlob(blobUri)
+                    self.ClearPageBlob(blobUri, blobProperties)
                     # Write to Page-Blob
-                    self.WritePageBlob(msg, blobUri)
+                    self.WritePageBlob(msg, blobUri, blobProperties)
                 else:
                     self.WriteBlockBlob(msg, blobUri)
             else:
@@ -86,7 +95,7 @@ class BlobWriter(object):
             self.hutil.log("retry times is " + str(retry_times))
             retry_times = retry_times - 1
 
-    def WritePageBlob(self, message, blobUri):
+    def WritePageBlob(self, message, blobUri, blobProperties):
         if(blobUri is not None):
             retry_times = 3
             while(retry_times > 0):
@@ -98,7 +107,6 @@ class BlobWriter(object):
                     http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
                     # Get Blob-properties to know content-length
-                    blobProperties = self.GetBlobProperties(blobUri)
                     blobContentLength = int(blobProperties.contentLength)
                     self.hutil.log("WritePageBlob: contentLength:"+str(blobContentLength))
                     maxMsgLen = STATUS_BLOB_LIMIT_BYTES
@@ -160,7 +168,7 @@ class BlobWriter(object):
         else:
             self.hutil.log("WritePageBlob: bloburi is None")
 
-    def ClearPageBlob(self, blobUri):
+    def ClearPageBlob(self, blobUri, blobProperties):
         if(blobUri is not None):
             retry_times = 3
             while(retry_times > 0):
@@ -168,7 +176,6 @@ class BlobWriter(object):
                     http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
                     # Get Blob-properties to know content-length
-                    blobProperties = self.GetBlobProperties(blobUri)
                     contentLength = int(blobProperties.contentLength)
                     # Clear Pages
                     if(contentLength > 0):
@@ -268,4 +275,32 @@ class BlobWriter(object):
                 contentLength = httpResp.getheader('Content-Length')
                 blobProperties = BlobProperties(blobType, contentLength)
         return blobProperties
+
+    def VerifyIfBlobIsEmpty(self, blobUri):
+        try:
+            if(blobUri is not None):
+                blobProperties = self.GetBlobProperties(blobUri)
+                if (str(blobProperties.blobType).lower() == "pageblob"):
+                    self.hutil.log("VerifyIfBlobIsEmpty: Skipping for page blob")
+                    return True
+                    
+                self.hutil.log("VerifyIfBlobIsEmpty: Content Length of blob: " + str(blobProperties.contentLength))
+                if(int(blobProperties.contentLength) == 0):
+                    return True
+                else:
+                    return False
+            else:
+                self.hutil.log("VerifyIfBlobIsEmpty: bloburi is None")
+        except Exception as e:
+            self.hutil.log("VerifyIfBlobIsEmpty: Failed to get the blob content length with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
+        return True
+
+    def IsEmptyBlob(self, blobUri):
+        if (bool(BlobWriter.blobEmptyDetails) == True):
+            if (blobUri in BlobWriter.blobEmptyDetails.keys()):
+                return BlobWriter.blobEmptyDetails[blobUri]
+        
+        isEmptyBlob = self.VerifyIfBlobIsEmpty(blobUri)
+        BlobWriter.blobEmptyDetails[blobUri] = isEmptyBlob
+        return isEmptyBlob
 

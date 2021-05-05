@@ -55,7 +55,10 @@ import os
 import os.path
 import sys
 import re
-import imp
+try:
+    import imp as imp
+except ImportError:
+    import importlib as imp
 import base64
 import json
 import tempfile
@@ -101,6 +104,7 @@ class HandlerUtility:
         self.storageDetailsObj = None
         self.partitioncount = 0
         self.logging_file = None
+        self.pre_post_enabled = False
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -343,7 +347,7 @@ class HandlerUtility:
         try :
             value_str = str(value)
         except ValueError :
-            self.log('Not able to parse the read value as string, falling back to default value', True, 'Warning')
+            self.log('Not able to parse the read value as string, falling back to default value', 'Warning')
             value = default
 
         return value
@@ -358,7 +362,7 @@ class HandlerUtility:
         try :
             value_int = int(value)
         except ValueError :
-            self.log('Not able to parse the read value as int, falling back to default value', True, 'Warning')
+            self.log('Not able to parse the read value as int, falling back to default value', 'Warning')
             value = default
 
         return int(value)
@@ -550,6 +554,7 @@ class HandlerUtility:
         except Exception as e:
             errMsg = 'Failed to retrieve the wala version with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
+            os.chdir(cur_dir)
             waagent_version="Unknown"
             return waagent_version
 
@@ -601,10 +606,13 @@ class HandlerUtility:
 
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
+        workloads = self.get_workload_running()
         HandlerUtility.add_to_telemetery_data("guestAgentVersion",self.get_wala_version_from_command())
         HandlerUtility.add_to_telemetery_data("extensionVersion",self.get_extension_version())
         HandlerUtility.add_to_telemetery_data("osVersion",os_version)
         HandlerUtility.add_to_telemetery_data("kernelVersion",kernel_version)
+        HandlerUtility.add_to_telemetery_data("workloads",str(workloads))
+        HandlerUtility.add_to_telemetery_data("prePostEnabled", str(self.pre_post_enabled))
     
     def convert_telemetery_data_to_bcm_serializable_format(self):
         HandlerUtility.serializable_telemetry_data = []
@@ -783,6 +791,34 @@ class HandlerUtility:
                     uriHasSpecialCharacters = True
 
         return uriHasSpecialCharacters
+
+    def get_workload_running(self):
+        workloads = []
+        try:
+            dblist= ["mysqld","postgresql","oracle","cassandra",",mongo"] ## add all workload process name in lower case
+            if os.path.isdir("/proc"):
+                pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
+                for pid in pids:
+                    pname = open(os.path.join('/proc', pid, 'cmdline'), 'rb').read()
+                    for db in dblist :
+                        if db in str(pname).lower() and db not in workloads :
+                            self.log("workload running found with name : " + str(db))
+                            workloads.append(db)
+            return workloads
+        except Exception as e:
+            self.log("Unable to fetch running workloads" + str(e))
+            return workloads
+        
+    def set_pre_post_enabled(self):
+        self.pre_post_enabled = True
+        
+    @staticmethod
+    def convert_to_string(txt):
+        if sys.version_info > (3,):
+            txt = str(txt, encoding='utf-8', errors="backslashreplace")
+        else:
+            txt = str(txt)
+        return txt
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
