@@ -406,12 +406,11 @@ class FreezeSnapshotter(object):
             self.logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
             timespan = utcNow - commandStartTime
             MAX_TIMESPAN = 140 * 60 # in seconds
-            # handle the machine identity for the restoration scenario.
             total_span_in_seconds = self.timedelta_total_seconds(timespan)
-            self.logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
+            self.logger.log('timespan: ' + str(timespan) + ', total_span_in_seconds: ' + str(total_span_in_seconds) + ', MAX_TIMESPAN: ' + str(MAX_TIMESPAN))
 
             if total_span_in_seconds > MAX_TIMESPAN :
-                self.logger.log('CRP timeout limit has reached, will not take snapshot.')
+                self.logger.log('CRP timeout limit has reached, should abort.')
                 result = True
 
         return result
