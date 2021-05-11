@@ -44,7 +44,7 @@ ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.4.2-5.ssl_'
+omi_package_prefix = 'packages/omi-1.6.8-0.ssl_'
 dsc_package_prefix = 'packages/dsc-1.2.0-0.ssl_'
 omi_major_version = 1
 omi_minor_version = 4
@@ -114,8 +114,9 @@ def main():
         protected_settings = {}
 
     global distro_category
-    distro_category = get_distro_category()
-    check_supported_OS()
+    vm_supported, vm_dist, vm_ver = check_supported_OS()
+    distro_category = get_distro_category(vm_dist, vm_ver)
+    
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -130,10 +131,7 @@ def main():
             update()
 
 
-def get_distro_category():
-    distro_info = platform.dist()
-    distro_name = distro_info[0].lower()
-    distro_version = distro_info[1]
+def get_distro_category(distro_name,distro_version):
     if distro_name == 'ubuntu' or (distro_name == 'debian'):
         return DistroCategory.debian
     elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle':
@@ -151,13 +149,13 @@ def check_supported_OS():
     digits must match.
     All other distros not supported will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Redhat
-                       'debian' : ['8'], # Debian
+    supported_dists = {'redhat' : ['6', '7', '8'], # CentOS
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'red hat' : ['6', '7', '8'], # Redhat
+                       'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
-                       'oracle' : ['6', '7', '8'], # Oracle
-                       'suse' : ['11', '12'], #SLES
+                       'oracle' : ['6', '7'], # Oracle
+                       'suse' : ['11', '12', '15'], #SLES
                        'opensuse' : ['13', '42.3'] #OpenSuse
     }
     vm_supported = False
@@ -165,7 +163,27 @@ def check_supported_OS():
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
-        vm_dist, vm_ver, vm_id = platform.dist()
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except:
+            waagent.Log("Falling back to /etc/os-release distribution parsing")
+
+    # Fallback if either of the above fail; on some (especially newer)
+    # distros, linux_distribution() and dist() are unreliable or deprecated
+    if not vm_dist and not vm_ver:
+        try:
+            with open('/etc/os-release', 'r') as fp:
+                for line in fp:
+                    if line.startswith('ID='):
+                        vm_dist = line.split('=')[1]
+                        vm_dist = vm_dist.split('-')[0]
+                        vm_dist = vm_dist.replace('\"', '').replace('\n', '')
+                    elif line.startswith('VERSION_ID='):
+                        vm_ver = line.split('=')[1]
+                        vm_ver = vm_ver.replace('\"', '').replace('\n', '')
+        except:
+            waagent.Log('Indeterminate operating system')
+            return vm_supported, 'Indeterminate operating system', ''
 
     # Find this VM distribution in the supported list
     for supported_dist in supported_dists.keys():
@@ -196,6 +214,8 @@ def check_supported_OS():
     if not vm_supported:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Unsupported OS :" + vm_dist + "; distro_version: " + vm_ver)
         hutil.do_exit(UnsupportedDistro, 'Install', 'error', str(UnsupportedDistro), vm_dist + "; distro_version: " + vm_ver + ' is not supported.')
+    
+    return vm_supported, vm_dist, vm_ver
 
 
 def install():
@@ -363,14 +383,38 @@ def construct_node_extension_properties(lcmconfig, status_event_type):
     waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                               message="Getting properties")
     OMSCLOUD_ID = get_omscloudid()
-    distro_info = platform.dist()
-    if len(distro_info[1].split('.')) == 1:
-        major_version = distro_info[1].split('.')[0]
-        minor_version = 0
-    if len(distro_info[1].split('.')) >= 2:
-        major_version = distro_info[1].split('.')[0]
-        minor_version = distro_info[1].split('.')[1]
+    try:
+        vm_dist, vm_ver, vm_id = platform.linux_distribution()
+    except AttributeError:
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except AttributeError:
+            waagent.Log("Falling back to /etc/os-release distribution parsing")
 
+    # Fallback if either of the above fail; on some (especially newer)
+    # distros, linux_distribution() and dist() are unreliable or deprecated
+    if not vm_dist and not vm_ver:
+        try:
+            with open('/etc/os-release', 'r') as fp:
+                for line in fp:
+                    if line.startswith('ID='):
+                        vm_dist = line.split('=')[1]
+                        vm_dist = vm_dist.split('-')[0]
+                        vm_dist = vm_dist.replace('\"', '').replace('\n', '')
+                    elif line.startswith('VERSION_ID='):
+                        vm_ver = line.split('=')[1]
+                        vm_ver = vm_ver.replace('\"', '').replace('\n', '')
+        except:
+             waagent.Log('Indeterminate operating system')
+            vm_dist, vm_ver, vm_id = "Indeterminate operating system", "",""
+
+        if len(vm_ver.split('.')) == 1:
+            major_version = vm_ver.split('.')[0]
+            minor_version = 0
+        if len(vm_ver.split('.')) >= 2:
+            major_version = vm_ver.split('.')[0]
+            minor_version = vm_ver.split('.')[1]
+        
     VMUUID = get_vmuuid()
     node_config_names = get_lcm_config_setting('ConfigurationNames', lcmconfig)
     configuration_mode = get_lcm_config_setting("ConfigurationMode", lcmconfig)
@@ -393,7 +437,7 @@ def construct_node_extension_properties(lcmconfig, status_event_type):
             "Version": extension_handler_version
         },
         "OSProfile": {
-            "Name": distro_info[0],
+            "Name": vm_dist,
             "Type": "Linux",
             "MinorVersion": minor_version,
             "MajorVersion": major_version,
