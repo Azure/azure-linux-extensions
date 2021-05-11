@@ -57,7 +57,7 @@ dsc_release = 0
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.71.1.0"
+extension_handler_version = "3.0.0.0"
 python_command = 'python3' if sys.version_info.major == 3 else 'python'
 dsc_script_path = '/opt/microsoft/dsc/Scripts/python3' if sys.version_info.major == 3 else '/opt/microsoft/dsc/Scripts'
 space_string = " "
