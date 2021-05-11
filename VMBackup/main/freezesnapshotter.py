@@ -292,7 +292,7 @@ class FreezeSnapshotter(object):
                 run_status = 'error'
                 all_failed = True
                 all_snapshots_failed = True
-                self.logger.log('[takeSnapshotFromGuest] : Thawing as failing due to CRP timeout', True, 'Error')
+                self.logger.log('T:S takeSnapshotFromGuest : Thawing as failing due to CRP timeout', True, 'Error')
                 self.freezer.thaw_safe()
             elif(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
@@ -380,7 +380,7 @@ class FreezeSnapshotter(object):
             run_result = CommonVariables.FailedGuestAgentInvokedCommandTooLate
             run_status = 'error'
             all_failed = True
-            self.logger.log('[takeSnapshotFromOnlyHost] : Thawing as failing due to CRP timeout')
+            self.logger.log('T:S takeSnapshotFromOnlyHost : Thawing as failing due to CRP timeout', True, 'Error')
             self.freezer.thaw_safe()
         elif(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
             snap_shotter = HostSnapshotter(self.logger, self.hostIp)
