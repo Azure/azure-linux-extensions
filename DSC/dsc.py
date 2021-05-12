@@ -155,8 +155,7 @@ def check_supported_OS():
                        'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'oracle' : ['6', '7'], # Oracle
-                       'suse' : ['11', '12', '15'], #SLES
-                       'opensuse' : ['13', '42.3'] #OpenSuse
+                       'suse' : ['12', '15'] #SLES
     }
     vm_supported = False
 
@@ -716,12 +715,10 @@ def get_openssl_version():
     openssl_version = cmd_result[1].split()[1]
     if re.match('^1.0.*', openssl_version):
         return '100'
-    elif re.match('^0.9.8*', openssl_version):
-        return '098'
     elif re.match('^1.1.*', openssl_version):
         return '110'
     else:
-        error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 0.9.8*, 1.0.*, 1.1.*'
+        error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 1.0.*, 1.1.*'
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="System doesn't have supported OpenSSL version:" + openssl_version)
