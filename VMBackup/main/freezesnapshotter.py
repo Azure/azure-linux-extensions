@@ -398,20 +398,23 @@ class FreezeSnapshotter(object):
     def is_command_timedout(self, para_parser):
         result = False
 
-        if(para_parser is not None and para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
-            utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
-            self.logger.log('utcTicks in long format' + str(utcTicksLong))
-            commandStartTime = self.convert_time(utcTicksLong)
-            utcNow = datetime.datetime.utcnow()
-            self.logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
-            timespan = utcNow - commandStartTime
-            MAX_TIMESPAN = 140 * 60 # in seconds
-            total_span_in_seconds = self.timedelta_total_seconds(timespan)
-            self.logger.log('timespan: ' + str(timespan) + ', total_span_in_seconds: ' + str(total_span_in_seconds) + ', MAX_TIMESPAN: ' + str(MAX_TIMESPAN))
+        try:
+            if(para_parser is not None and para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
+                utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
+                self.logger.log('utcTicks in long format' + str(utcTicksLong))
+                commandStartTime = self.convert_time(utcTicksLong)
+                utcNow = datetime.datetime.utcnow()
+                self.logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
+                timespan = utcNow - commandStartTime
+                MAX_TIMESPAN = 140 * 60 # in seconds
+                total_span_in_seconds = self.timedelta_total_seconds(timespan)
+                self.logger.log('timespan: ' + str(timespan) + ', total_span_in_seconds: ' + str(total_span_in_seconds) + ', MAX_TIMESPAN: ' + str(MAX_TIMESPAN))
 
-            if total_span_in_seconds > MAX_TIMESPAN :
-                self.logger.log('CRP timeout limit has reached, should abort.')
-                result = True
+                if total_span_in_seconds > MAX_TIMESPAN :
+                    self.logger.log('CRP timeout limit has reached, should abort.')
+                    result = True
+        except Exception as e:
+            self.logger.log('T:S is_command_timedout : Exception %s, stack trace: %s' % (str(e), traceback.format_exc()))
 
         return result
 
