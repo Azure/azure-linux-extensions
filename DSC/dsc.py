@@ -404,7 +404,7 @@ def construct_node_extension_properties(lcmconfig, status_event_type):
                         vm_ver = line.split('=')[1]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
-             waagent.Log('Indeterminate operating system')
+            waagent.Log('Indeterminate operating system')
             vm_dist, vm_ver, vm_id = "Indeterminate operating system", "",""
 
         if len(vm_ver.split('.')) == 1:
