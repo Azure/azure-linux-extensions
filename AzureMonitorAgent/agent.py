@@ -64,7 +64,7 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
-# This code is taken from the omsagent's extension wrapper. 
+# This code is taken from the omsagent's extension wrapper.
 # This same monkey patch fix is relevant for AMA extension as well.
 # This monkey patch duplicates the one made in the waagent import above.
 # It is necessary because on 2.6, the waagent monkey patch appears to be overridden
@@ -99,8 +99,8 @@ if sys.version_info < (2,7):
 
 # Global Variables
 PackagesDirectory = 'packages'
-# TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-# TODO: Installer should automatically figure this out from the folder instead of requiring this update
+# This changes during release if there are changes to mdsd. The release pipeline
+# uses apply_version.sh to replace the below with the appropriate package names.
 BundleFileNameDeb = 'azure-mdsd_1.5.133-build.master.157_x86_64.deb'
 BundleFileNameRpm = 'azure-mdsd_1.5.133-build.master.157_x86_64.rpm'
 BundleFileName = ''
@@ -127,6 +127,26 @@ HUtilObject = None
 SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
+
+# Cloud Environments
+PublicCloudName     = "AzurePublicCloud"
+FairfaxCloudName    = "AzureUSGovernmentCloud"
+MooncakeCloudName   = "AzureChinaCloud"
+USNatCloudName      = "USNat" # EX
+USSecCloudName      = "USSec" # RX
+DefaultCloudName    = PublicCloudName # Fallback
+
+CloudDomainMap = {
+    PublicCloudName:   ".com",
+    FairfaxCloudName:  ".us",
+    MooncakeCloudName: ".cn",
+    USNatCloudName:    ".eaglex.ic.gov",
+    USSecCloudName:    ".microsoft.scloud"
+}
+
+# Endpoints, sans-domain(s)
+McsEndpoint   = "https://global.handler.control.monitor.azure"
+AzureEndpoint = "https://monitor.azure"
 
 
 # Change permission of log path - if we fail, that is not an exit case
@@ -290,13 +310,15 @@ def install():
         except:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )        
 
-    default_configs = {   
+    mcs_endpoint, azure_endpoint = get_endpoints()
+
+    default_configs = {
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
         "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
-        "MCS_ENDPOINT" : "https://global.handler.control.monitor.azure.com",
-        "AZURE_ENDPOINT" : "https://monitor.azure.com/",
+        "MCS_ENDPOINT" : mcs_endpoint,
+        "AZURE_ENDPOINT" : azure_endpoint,
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
@@ -1085,6 +1107,97 @@ def exit_if_vm_not_supported(operation):
         log_and_exit(operation, UnsupportedOperatingSystem, 'Unsupported operating system: ' \
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
+
+
+def is_arc_installed():
+    """
+    Check if this is an Arc machine
+    """
+    # Using systemctl to check this since Arc only supports VMs that have systemd
+    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
+    return check_arc == 0
+
+
+def get_arc_endpoint():
+    """
+    Find the endpoint for Arc IMDS
+    """
+    endpoint_filepath = '/lib/systemd/system.conf.d/azcmagent.conf'
+    endpoint = ''
+    try:
+        with open(endpoint_filepath, 'r') as f:
+            data = f.read()
+        endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+    except:
+        hutil_log_error('Unable to load Arc IMDS endpoint from {0}'.format(endpoint_filepath))
+    return endpoint
+
+
+def get_imds_endpoint():
+    """
+    Find the appropriate endpoint (Azure or Arc) for IMDS
+    """
+    azure_imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
+    if (is_arc_installed()):
+        hutil_log_info('Arc is installed, loading Arc-specific IMDS endpoint')
+        imds_endpoint = get_arc_endpoint()
+        if imds_endpoint:
+            imds_endpoint += '/metadata/instance?api-version=2019-08-15'
+        else:
+            # Fall back to the traditional IMDS endpoint; the cloud domain and VM
+            # resource id detection logic are resilient to failed queries to IMDS
+            imds_endpoint = azure_imds_endpoint
+            hutil_log_info('Falling back to default Azure IMDS endpoint')
+    else:
+        imds_endpoint = azure_imds_endpoint
+
+    hutil_log_info('Using IMDS endpoint "{0}"'.format(imds_endpoint))
+    return imds_endpoint
+
+
+def get_azure_environment_from_imds():
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
+    req.add_header('Metadata', 'True')
+
+    try:
+        response = json.loads(urllib.request.urlopen(req).read())
+
+        if ('compute' not in response or response['compute'] is None):
+            return None # classic vm
+
+        if ('azEnvironment' not in response['compute'] or response['compute']['azEnvironment'] is None):
+            return None # classic vm
+
+        return response['compute']['azEnvironment']
+    except urllib.error.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
+        hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
+        return None
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+        return None
+
+
+def get_endpoints():
+    """
+    Build and return the MCS and Azure endpoints based on the Azure environment
+    """
+    try:
+        environment = get_azure_environment_from_imds()
+
+        if environment:
+            for cloud, domain in CloudDomainMap.items():
+                if environment.lower() == cloud.lower():
+                    hutil_log_info('Detected cloud environment "{0}" via IMDS. The domain "{1}" will be used.'.format(cloud, domain))
+                    return McsEndpoint + domain, AzureEndpoint + domain
+
+        hutil_log_info('Unknown cloud environment "{0}"'.format(environment))
+    except Exception as e:
+        hutil_log_error('Failed to detect cloud environment: {0}'.format(e))
+
+    hutil_log_info('Falling back to default domain "{0}"'.format(CloudDomainMap[DefaultCloudName]))
+    return McsEndpoint + CloudDomainMap[DefaultCloudName], AzureEndpoint + CloudDomainMap[DefaultCloudName]
 
 
 def run_command_and_log(cmd, check_error = True, log_cmd = True):
