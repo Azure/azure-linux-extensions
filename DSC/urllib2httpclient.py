@@ -9,7 +9,14 @@ import http.client
 import socket
 import time
 import traceback
-import urllib.request, urllib.error, urllib.parse
+try:
+    from urllib.parse import urlparse, urlencode
+    from urllib.request import urlopen, Request, HTTPSHandler, build_opener, ProxyHandler
+    from urllib.error import HTTPError
+except ImportError:
+    from urlparse import urlparse
+    from urllib import urlencode
+    from urllib2 import urlopen, Request, HTTPError, HTTPSHandler, build_opener, ProxyHandler
 
 from httpclient import *
 
@@ -26,7 +33,7 @@ except ImportError:
     ssl = None
 
 
-class HttpsClientHandler(urllib.request.HTTPSHandler):
+class HttpsClientHandler(HTTPSHandler):
     """Https handler to enable attaching cert/key to request. Also used to disable strict cert verification for
     testing.
     """
@@ -42,7 +49,7 @@ class HttpsClientHandler(urllib.request.HTTPSHandler):
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-        urllib.request.HTTPSHandler.__init__(self, context=ssl_context)  # Context can be None here
+        HTTPSHandler.__init__(self, context=ssl_context)  # Context can be None here
 
     def https_open(self, req):
         return self.do_open(self.get_https_connection, req, context=self._context)
@@ -113,12 +120,12 @@ class Urllib2HttpClient(HttpClient):
             :param method:
         """
         https_handler = HttpsClientHandler(self.cert_path, self.key_path, self.insecure)
-        opener = urllib.request.build_opener(https_handler)
+        opener = build_opener(https_handler)
         if self.proxy_configuration is not None:
-            proxy_handler = urllib.request.ProxyHandler({'http': self.proxy_configuration,
+            proxy_handler = ProxyHandler({'http': self.proxy_configuration,
                                                   'https': self.proxy_configuration})
             opener.add_handler(proxy_handler)
-        req = urllib.request.Request(url, data=data, headers=headers)
+        req = Request(url, data=data, headers=headers)
         req.get_method = lambda: method
         response = opener.open(req, timeout=30)
         opener.close()
@@ -140,7 +147,7 @@ class Urllib2HttpClient(HttpClient):
 
         try:
             response = self.issue_request(url, headers=headers, method=self.GET)
-        except urllib.error.HTTPError:
+        except HTTPError:
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 
@@ -167,7 +174,7 @@ class Urllib2HttpClient(HttpClient):
 
         try:
             response = self.issue_request(url, headers=headers, method=self.POST, data=serial_data)
-        except urllib.error.HTTPError:
+        except HTTPError:
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 
@@ -194,7 +201,7 @@ class Urllib2HttpClient(HttpClient):
 
         try:
             response = self.issue_request(url, headers=headers, method=self.PUT, data=serial_data)
-        except urllib.error.HTTPError:
+        except HTTPError:
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 
@@ -221,7 +228,7 @@ class Urllib2HttpClient(HttpClient):
 
         try:
             response = self.issue_request(url, headers=headers, method=self.DELETE, data=serial_data)
-        except urllib.error.HTTPError:
+        except HTTPError:
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 

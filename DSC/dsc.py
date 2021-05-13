@@ -22,9 +22,14 @@ import re
 import subprocess
 import sys
 import traceback
-import urllib.request
-import urllib.error
-import urllib.parse
+try:
+    from urllib.parse import urlparse, urlencode
+    from urllib.request import urlopen, Request
+    from urllib.error import HTTPError
+except ImportError:
+    from urlparse import urlparse
+    from urllib import urlencode
+    from urllib2 import urlopen, Request, HTTPError
 import time
 import platform
 import json
@@ -817,12 +822,12 @@ def parse_blob_uri(blob_uri):
 
 
 def get_path_from_uri(uri):
-    uri = urllib.parse.urlparse(uri)
+    uri = urlparse(uri)
     return uri.path
 
 
 def get_host_base_from_uri(blob_uri):
-    uri = urllib.parse.urlparse(blob_uri)
+    uri = urlparse(blob_uri)
     netloc = uri.netloc
     if netloc is None:
         return None
@@ -857,7 +862,7 @@ def download_external_file(file_uri, download_dir):
 
 
 def download_and_save_file(uri, file_path):
-    src = urllib.request.urlopen(uri)
+    src = urlopen(uri)
     dest = open(file_path, 'wb')
     buf_size = 1024
     buf = src.read(buf_size)
