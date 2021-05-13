@@ -120,7 +120,7 @@ def main():
 
     global distro_category
     vm_supported, vm_dist, vm_ver = check_supported_OS()
-    distro_category = get_distro_category(vm_dist, vm_ver)
+    distro_category = get_distro_category(vm_dist.lower(), vm_ver.lower())
     
 
     for a in sys.argv[1:]:
@@ -137,11 +137,12 @@ def main():
 
 
 def get_distro_category(distro_name,distro_version):
-    if distro_name == 'ubuntu' or (distro_name == 'debian'):
+    if distro_name.startswith('ubuntu') or (distro_name.startswith('debian')):
         return DistroCategory.debian
-    elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle':
+    elif distro_name.startswith('centos') or distro_name.startswith('redhat') 
+        or distro_name.startswith('oracle') or distro_name.startswith('red hat'):
         return DistroCategory.redhat
-    elif distro_name == 'suse':
+    elif distro_name.startswith('suse'):
         return DistroCategory.suse 
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Unsupported distro :" + distro_name + "; distro_version: " + distro_version)
     hutil.do_exit(UnsupportedDistro, 'Install', 'error', str(UnsupportedDistro), distro_name + 'is not supported.')

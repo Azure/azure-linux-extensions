@@ -5,7 +5,10 @@
 
 """Urllib2 HttpClient."""
 
-import http.client
+try:
+    from http.client import HTTPSConnection
+except ImportError:
+    from httplib import HTTPSConnection
 import socket
 import time
 import traceback
@@ -68,9 +71,9 @@ class HttpsClientHandler(HTTPSHandler):
         """
         socket.setdefaulttimeout(180)
         if self.cert_path is None or self.key_path is None:
-            return http.client.HTTPSConnection(host, timeout=timeout, context=context)
+            return HTTPSConnection(host, timeout=timeout, context=context)
         else:
-            return http.client.HTTPSConnection(host, cert_file=self.cert_path, key_file=self.key_path, timeout=timeout,
+            return HTTPSConnection(host, cert_file=self.cert_path, key_file=self.key_path, timeout=timeout,
                                            context=context)
 
 

@@ -34,11 +34,11 @@ python hello.py --install
 function find_python(){
     local python_exec_command=$1
 
-    # Check if there is python defined.
-    if command -v python >/dev/null 2>&1 ; then
-        eval ${python_exec_command}="python"
+    # Check if there is python2 defined.
+    if command -v python2 >/dev/null 2>&1 ; then
+        eval ${python_exec_command}="python2"
     else
-        # Python was not found. Searching for Python3 now.
+        # Python2 was not found. Searching for Python3 now.
         if command -v python3 >/dev/null 2>&1 ; then
             eval ${python_exec_command}="python3"
         fi
