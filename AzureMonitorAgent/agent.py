@@ -266,7 +266,15 @@ def install():
     exit_code, output = run_command_with_retries_output(OneAgentInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)    
-    
+    # set task limits in suse
+    vm_dist, vm_ver = find_vm_distro('Install')
+    if vm_dist.lower().startswith('suse'):
+        run_command_and_log("mkdir -p /etc/systemd/system/mdsd.service.d")
+        run_command_and_log("touch /etc/systemd/system/mdsd.service.d/override.conf")
+        run_command_and_log("echo '[Service]' > /etc/systemd/system/mdsd.service.d/override.conf")
+        run_command_and_log("echo 'TasksMax=10000' >> /etc/systemd/system/mdsd.service.d/override.conf")
+        run_command_and_log("systemctl daemon-reload")
+        
     default_configs = {   
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
