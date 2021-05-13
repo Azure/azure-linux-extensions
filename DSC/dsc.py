@@ -643,7 +643,7 @@ def rpm_install_pkg(package_path, package_name, major_version, minor_version, bu
         else:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                       message="Failed to install RPM package :" + package_path)
-             raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package_name, output, stderr))
+            raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package_name, output, stderr))
 
 
 def deb_install_pkg(package_path, package_name, major_version, minor_version, build, release, install_options):
@@ -685,7 +685,7 @@ def zypper_package_install(package):
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="Failed to install zypper package :" + package)
-         raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
+        raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
 
 
 def yum_package_install(package):
