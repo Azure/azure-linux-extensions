@@ -139,8 +139,7 @@ def main():
 def get_distro_category(distro_name,distro_version):
     if distro_name.startswith('ubuntu') or (distro_name.startswith('debian')):
         return DistroCategory.debian
-    elif distro_name.startswith('centos') or distro_name.startswith('redhat') 
-        or distro_name.startswith('oracle') or distro_name.startswith('red hat'):
+    elif distro_name.startswith('centos') or distro_name.startswith('redhat') or distro_name.startswith('oracle') or distro_name.startswith('red hat'):
         return DistroCategory.redhat
     elif distro_name.startswith('suse'):
         return DistroCategory.suse 
