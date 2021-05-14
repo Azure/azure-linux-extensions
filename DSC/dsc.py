@@ -63,8 +63,8 @@ package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
 extension_handler_version = "3.0.0.0"
-python_command = 'python3' if sys.version_info.major == 3 else 'python'
-dsc_script_path = '/opt/microsoft/dsc/Scripts/python3' if sys.version_info.major == 3 else '/opt/microsoft/dsc/Scripts'
+python_command = 'python3' if sys.version_info >= (3,0) else 'python'
+dsc_script_path = '/opt/microsoft/dsc/Scripts/python3' if sys.version_info >= (3,0) else '/opt/microsoft/dsc/Scripts'
 space_string = " "
 
 # Error codes
@@ -141,7 +141,7 @@ def get_distro_category(distro_name,distro_version):
         return DistroCategory.debian
     elif distro_name.startswith('centos') or distro_name.startswith('redhat') or distro_name.startswith('oracle') or distro_name.startswith('red hat'):
         return DistroCategory.redhat
-    elif distro_name.startswith('suse'):
+    elif distro_name.startswith('suse') or distro_name.startswith('sles'):
         return DistroCategory.suse 
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Unsupported distro :" + distro_name + "; distro_version: " + distro_version)
     hutil.do_exit(UnsupportedDistro, 'Install', 'error', str(UnsupportedDistro), distro_name + 'is not supported.')
@@ -160,7 +160,8 @@ def check_supported_OS():
                        'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'oracle' : ['6', '7'], # Oracle
-                       'suse' : ['12', '15'] #SLES
+                       'suse' : ['12', '15'], #SLES
+                       'sles' : ['12', '15']
     }
     vm_supported = False
 
@@ -412,12 +413,12 @@ def construct_node_extension_properties(lcmconfig, status_event_type):
             waagent.Log('Indeterminate operating system')
             vm_dist, vm_ver, vm_id = "Indeterminate operating system", "",""
 
-        if len(vm_ver.split('.')) == 1:
-            major_version = vm_ver.split('.')[0]
-            minor_version = 0
-        if len(vm_ver.split('.')) >= 2:
-            major_version = vm_ver.split('.')[0]
-            minor_version = vm_ver.split('.')[1]
+    if len(vm_ver.split('.')) == 1:
+        major_version = vm_ver.split('.')[0]
+        minor_version = 0
+    if len(vm_ver.split('.')) >= 2:
+        major_version = vm_ver.split('.')[0]
+        minor_version = vm_ver.split('.')[1]
         
     VMUUID = get_vmuuid()
     node_config_names = get_lcm_config_setting('ConfigurationNames', lcmconfig)
