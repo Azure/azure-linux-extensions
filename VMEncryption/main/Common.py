@@ -198,6 +198,7 @@ class CommonVariables:
     backup_slice_file_error = 21
     unmount_oldroot_error = 22
     operation_lookback_failed = 23
+    luks_add_key_error = 24
     unknown_error = 100
 
     """
