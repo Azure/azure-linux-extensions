@@ -163,11 +163,7 @@ def check_supported_OS():
                        'suse' : ['12', '15'], #SLES
                        'sles' : ['12', '15']
     }
-    vm_supported = False
-
-    vm_dist = None
-    vm_ver = None
-    vm_id = None
+    vm_dist, vm_ver, vm_supported = '', '', False
     
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
@@ -393,9 +389,7 @@ def construct_node_extension_properties(lcmconfig, status_event_type):
                               message="Getting properties")
     OMSCLOUD_ID = get_omscloudid()
     
-    vm_dist = None
-    vm_ver = None
-    vm_id = None
+    vm_dist, vm_ver, vm_id = '', '', ''
     
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
@@ -508,8 +502,8 @@ def run_cmd(cmd):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, close_fds=True)
     exit_code = proc.wait()
     stdout, stderr = proc.communicate()
-    stdout = stdout.decode() if isinstance(stdout, bytes) else stdout
-    stderr = stderr.decode() if isinstance(stderr, bytes) else stderr
+    stdout = stdout.decode("ISO-8859-1") if isinstance(stdout, bytes) else stdout
+    stderr = stderr.decode("ISO-8859-1") if isinstance(stderr, bytes) else stderr
     return exit_code, stdout, stderr
 
 def run_dpkg_cmd_with_retry(cmd):
