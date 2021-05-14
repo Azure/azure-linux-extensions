@@ -12,6 +12,7 @@ except ImportError:
 import socket
 import time
 import traceback
+import sys
 try:
     from urllib.parse import urlparse, urlencode
     from urllib.request import urlopen, Request, HTTPSHandler, build_opener, ProxyHandler
@@ -172,7 +173,10 @@ class Urllib2HttpClient(HttpClient):
         if data is None:
             serial_data = ""
         else:
-            serial_data = self.json.dumps(data)
+            if sys.version_info >= (3,0):
+                serial_data = urlencode(data).encode("ISO-8859-1")
+            else:
+                serial_data = self.json.dumps(data)
             headers.update({self.CONTENT_TYPE_HEADER_KEY: self.APP_JSON_HEADER_VALUE})
 
         try:
@@ -199,7 +203,10 @@ class Urllib2HttpClient(HttpClient):
         if data is None:
             serial_data = ""
         else:
-            serial_data = self.json.dumps(data)
+            if sys.version_info >= (3,0):
+                serial_data = urlencode(data).encode("ISO-8859-1")
+            else:
+                serial_data = self.json.dumps(data)
             headers.update({self.CONTENT_TYPE_HEADER_KEY: self.APP_JSON_HEADER_VALUE})
 
         try:
