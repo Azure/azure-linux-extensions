@@ -265,16 +265,17 @@ def install():
     # Retry, since install can fail due to concurrent package operations
     exit_code, output = run_command_with_retries_output(OneAgentInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
-                                         final_check = final_check_if_dpkg_locked)    
-    # set task limits to max of 65K in suse 12 and 15
-    # based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
+                                         final_check = final_check_if_dpkg_locked)
+
+    # Set task limits to max of 65K in suse 12
+    # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
     vm_dist, vm_ver = find_vm_distro('Install')
     if vm_dist.lower().startswith('suse'):
         try:
             suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/mdsd.service.d")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
-            
+
             suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/mdsd.service.d/override.conf")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
@@ -283,7 +284,6 @@ def install():
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
 
-            
             suse_exit_code, suse_output = run_command_and_log("systemctl daemon-reload")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
