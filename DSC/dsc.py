@@ -165,6 +165,10 @@ def check_supported_OS():
     }
     vm_supported = False
 
+    vm_dist = None
+    vm_ver = None
+    vm_id = None
+    
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
@@ -388,6 +392,11 @@ def construct_node_extension_properties(lcmconfig, status_event_type):
     waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                               message="Getting properties")
     OMSCLOUD_ID = get_omscloudid()
+    
+    vm_dist = None
+    vm_ver = None
+    vm_id = None
+    
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
@@ -499,6 +508,8 @@ def run_cmd(cmd):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, close_fds=True)
     exit_code = proc.wait()
     stdout, stderr = proc.communicate()
+    stdout = stdout.decode() if isinstance(stdout, bytes) else stdout
+    stderr = stderr.decode() if isinstance(stderr, bytes) else stderr
     return exit_code, stdout, stderr
 
 def run_dpkg_cmd_with_retry(cmd):
@@ -718,6 +729,7 @@ def apt_package_install(package):
 
 def get_openssl_version():
     cmd_result = waagent.RunGetOutput("openssl version")
+    cmd_result = cmd_result.decode() if isinstance(cmd_result, bytes) else cmd_result
     openssl_version = cmd_result[1].split()[1]
     if re.match('^1.0.*', openssl_version):
         return '100'
