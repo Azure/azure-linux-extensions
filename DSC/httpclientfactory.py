@@ -43,7 +43,7 @@ class HttpClientFactory:
             An instance of Urllib2 if the installed Python version is or is above 2.7.9
         """
         if version_info[PY_MAJOR_VERSION] == 3:
-            from urllib3HttpClient import Urllib3HttpClient
+            from urllib3httpclient import Urllib3HttpClient
             return Urllib3HttpClient(self.cert, self.key, self.insecure, self.proxy_configuration)
         elif version_info[PY_MAJOR_VERSION] == 2 and version_info[PY_MINOR_VERSION] < 7:
             from urllib2httpclient import Urllib2HttpClient
