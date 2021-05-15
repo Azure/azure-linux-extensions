@@ -51,14 +51,14 @@ ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
 omi_package_prefix = 'packages/omi-1.6.8-0.ssl_'
-dsc_package_prefix = 'packages/dsc-1.2.0-0.ssl_'
+dsc_package_prefix = 'packages/dsc-1.2.1-0.ssl_'
 omi_major_version = 1
 omi_minor_version = 6
 omi_build = 8
 omi_release = 0
 dsc_major_version = 1
 dsc_minor_version = 2
-dsc_build = 0
+dsc_build = 1
 dsc_release = 0
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
