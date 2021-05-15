@@ -37,6 +37,7 @@ import datetime
 import serializerfactory
 import httpclient
 import urllib2httpclient
+import urllib3httpclient
 import httpclientfactory
 
 from azure.storage import BlobService
