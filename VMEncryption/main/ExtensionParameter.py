@@ -172,12 +172,12 @@ class ExtensionParameter(object):
             return True
 
         if (self.KeyEncryptionKeyURL or self.get_kek_url()) and \
-           (self._is_kv_equivalent(self.KeyEncryptionKeyURL, self.get_kek_url())):
+           (not self._is_kv_equivalent(self.KeyEncryptionKeyURL, self.get_kek_url())):
             self.logger.log('Current config KeyEncryptionKeyURL {0} differs from effective config KeyEncryptionKeyURL {1}'.format(self.KeyEncryptionKeyURL, self.get_kek_url()))
             return True
 
         if (self.KeyVaultURL or self.get_keyvault_url()) and \
-           (self._is_kv_equivalent(self.KeyVaultURL, self.get_keyvault_url())):
+           (not self._is_kv_equivalent(self.KeyVaultURL, self.get_keyvault_url())):
             self.logger.log('Current config KeyVaultURL {0} differs from effective config KeyVaultURL {1}'.format(self.KeyVaultURL, self.get_keyvault_url()))
             return True
 
