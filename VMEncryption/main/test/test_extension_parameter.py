@@ -42,7 +42,7 @@ class Test_EncryptionConfig(unittest.TestCase):
         self.extension_parameter = ExtensionParameter.ExtensionParameter(None, self.logger, None, EncryptionEnvironment.EncryptionEnvironment(None, self.logger), None, mock_public_settings)
 
     def test_kv_equivalent_true(self):
-        self.assertEqual(self.extension_parameter._is_kv_equivalent("https://asdf","https://asdf/"),True)
+        self.assertEqual(self.extension_parameter._is_kv_equivalent("https://ASDF","https://asdf"),True)
         self.assertEqual(self.extension_parameter._is_kv_equivalent("https://asdf","https://asdf/"),True)
         self.assertEqual(self.extension_parameter._is_kv_equivalent("https://asdf/","https://asdf"),True)
         self.assertEqual(self.extension_parameter._is_kv_equivalent("https://ASDF/","https://asdf"),True)
