@@ -38,7 +38,7 @@ class Test_EncryptionConfig(unittest.TestCase):
         #mock load_waagent before importing ExtensionParameter so that unit tests can run outside of Azure VM context
         import ExtensionParameter
         self.logger = ConsoleLogger()
-        mock_public_settings = json.loads('{"EncryptionOperation": ""}') #, "KeyEncryptionKeyURL": "", "KekVaultResourceId": "", "KeyEncryptionAlgorithm": "RSA-OAEP", "KeyVaultURL": "https://testkv.vault.azure.net/", "KeyVaultResourceId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrg/providers/Microsoft.KeyVault/vaults/testkv", "EncryptionOperation": "EnableEncryption"}')
+        mock_public_settings = json.loads('{"EncryptionOperation": ""}')
         self.extension_parameter = ExtensionParameter.ExtensionParameter(None, self.logger, None, EncryptionEnvironment.EncryptionEnvironment(None, self.logger), None, mock_public_settings)
 
     def test_kv_equivalent_true(self):
