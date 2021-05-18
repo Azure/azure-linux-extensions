@@ -42,7 +42,7 @@ class SizeCalculation(object):
 
     def get_loop_devices(self):
         global disk_util
-        disk_util = DiskUtil(patching = self.patching,logger = self.logger)
+        disk_util = DiskUtil.get_instance(patching = self.patching,logger = self.logger)
         if len(self.file_systems_info) == 0 :
             self.file_systems_info = disk_util.get_mount_file_systems()
         self.logger.log("file_systems list : ",True)

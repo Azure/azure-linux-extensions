@@ -29,7 +29,7 @@ then
     echo "No Python interpreter found, which is an OMS extension dependency. Please install either Python 2 or 3." >&2
     exit 52 # Missing Dependency
 else
-    ${PYTHON} --version
+    ${PYTHON} --version 2>&1
 fi
 
 PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}

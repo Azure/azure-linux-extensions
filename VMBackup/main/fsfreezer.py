@@ -118,12 +118,12 @@ class FsFreezer:
         self.unfrozen_items = set()
         self.freeze_handler = FreezeHandler(self.logger, self.hutil)
         self.mount_open_failed = False
-        self.resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
+        resource_disk= ResourceDiskUtil(patching = patching, logger = logger)
+        self.resource_disk_mount_point = resource_disk.get_resource_disk_mount_point()
         self.skip_freeze= True
 
     def should_skip(self, mount):
-        resource_disk_mount_point= self.resource_disk.get_resource_disk_mount_point()
-        if(resource_disk_mount_point is not None and mount.mount_point == resource_disk_mount_point):
+        if(self.resource_disk_mount_point is not None and mount.mount_point == self.resource_disk_mount_point):
             return True
         elif((mount.fstype == 'ext3' or mount.fstype == 'ext4' or mount.fstype == 'xfs' or mount.fstype == 'btrfs') and mount.type != 'loop' ):
             return False

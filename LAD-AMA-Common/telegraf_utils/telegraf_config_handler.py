@@ -165,8 +165,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 if not is_vmi_rate_counter:
                     is_vmi_rate_counter = telegraf_json[omiclass][plugin][field]["displayName"] in vmi_rate_counters_list
             
-            if is_vmi_rate_counter:
-                min_interval = "1s"
+            # if is_vmi_rate_counter:
+            #     min_interval = "1s"
                 
             if is_vmi or is_vmi_rate_counter:
                 splitResult = plugin.split('_')
@@ -197,10 +197,17 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             namespace = MetricsExtensionNamepsace
             if is_vmi or is_vmi_rate_counter:
                 namespace = "insights.virtualmachine"
+
+            if is_vmi_rate_counter:
+                # Adding "_rated" as a substring for vmi rate metrics to avoid renaming collisions
+                plugin_name = plugin + "_rated"
+            else:
+                plugin_name = plugin
+
             metricsext_rename_str += "\n[[processors.rename]]\n"
-            metricsext_rename_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
+            metricsext_rename_str += " "*2 + "namepass = [\"" + plugin_name + "\"]\n"
             metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-            metricsext_rename_str += " "*4 + "measurement = \"" + plugin + "\"\n"
+            metricsext_rename_str += " "*4 + "measurement = \"" + plugin_name + "\"\n"
             metricsext_rename_str += " "*4 + "dest = \"" + namespace + "\"\n"
 
             fields = ""
@@ -237,7 +244,9 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     else:
                         non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
 
-                #Aggregation perdiod needs to be double of interval/polling period for metrics for rate aggegation to work properly
+                # #Aggregation perdiod needs to be double of interval/polling period for metrics for rate aggegation to work properly
+                # This is only for metrics going to MDSD. for VMI metrics aggregation, 
+                # the requirement is to have ALL the metrics at 60 seconds and that is handled later by sourcing the VMI metrics that need to be aggregated at 30 seconds
                 if int(min_interval[:-1]) > 30:
                     min_agg_period = str(int(min_interval[:-1])*2)  #if the min interval is greater than 30, use the double value
                 else:
@@ -280,7 +289,6 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
                     aggregator_str += " "*2 + "stats = [" + ops + "]\n"
-                    aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
 
                 if non_rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
@@ -289,14 +297,23 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
                     aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
+            
             elif is_vmi_rate_counter:
+                # Aggregator config for MDSD
                 aggregator_str += "[[aggregators.basicstats]]\n"
                 aggregator_str += " "*2 + "namepass = [\"" + plugin + "_mdsd\"]\n"
-                aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
+                aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
                 aggregator_str += " "*2 + "drop_original = true\n"
                 aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\\\\\') + "]\n" #-2 to strip the last comma and space
-                aggregator_str += " "*2 + "stats = [" + ops + "]\n"
-                aggregator_str += " "*2 + "rate_period = \"" + min_agg_period + "s\"\n\n"
+                aggregator_str += " "*2 + "stats = [" + ops + "]\n\n"
+
+                # Aggregator config for ME
+                aggregator_str += "[[aggregators.mdmratemetrics]]\n"
+                aggregator_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
+                aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
+                aggregator_str += " "*2 + "drop_original = true\n"
+                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\\\\\') + "]\n" #-2 to strip the last comma and space
+                aggregator_str += " "*2 + "stats = [\"rate\"]\n\n"
 
                 
             if is_lad:
@@ -309,7 +326,15 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"
             if plugin == "cpu":
                 input_str += " "*2 + "report_active = true\n"
-            input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
+            
+            if is_vmi_rate_counter:  
+                # Rate interval needs to be atleast twice the regular sourcing interval for aggregation to work. 
+                # Since we want all the VMI metrics to be sent at the same interval as selected by the customer, To overcome the twice the min internval limitation, 
+                # We are sourcing the VMI metrics that need to be aggregated at half the selected frequency 
+                rated_min_interval = str(int(min_interval[:-1]) // 2) + "s" 
+                input_str += " "*2 + "interval = " + "\"" + rated_min_interval + "\"\n\n"
+            else:
+                input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
 
             config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
 

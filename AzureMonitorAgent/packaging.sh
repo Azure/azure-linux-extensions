@@ -43,6 +43,9 @@ cp $input_path/MetricsExtension MetricsExtensionBin/
 # copy just the source of python-future
 cp -r ext/python-future/src/* ext/future
 
+# make the shim.sh file executable
+chmod +x shim.sh
+
 # sync the file copy
 sync
 

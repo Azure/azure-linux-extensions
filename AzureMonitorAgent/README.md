@@ -1,7 +1,8 @@
 # AzureMonitorLinuxAgent Extension
 Allow the owner of the Azure Virtual Machines to install the Azure Monitor Linux Agent
 
-The extension is currently in Canary. The test versions naming scheme is 0.* . The latest version is 0.4
+# The Latest Version is 1.6.2
+The extension is currently in Public Preview and is accessible to all public cloud regions in Azure. 
 
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
