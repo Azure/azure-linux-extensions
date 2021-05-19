@@ -107,7 +107,7 @@ TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
 PackageManagerOptions = ''
-MdsdCounterJsonPath = '/etc/azure-monitoringagent.d/config-cache/metricCounters.json'
+MdsdCounterJsonPath = '/etc/opt/microsoft/azure-monitoringagent/config-cache/metricCounters.json'
 
 # Commands
 OneAgentInstallCommand = ''
@@ -216,7 +216,7 @@ def check_disk_space_availability():
     Check if there is the required space on the machine.
     """
     try:
-        if get_free_space_mb("/var") < 500 or get_free_space_mb("/etc") < 500 :
+        if get_free_space_mb("/var") < 500 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500 :
             # 52 is the exit code for missing dependency i.e. disk space
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             return 52
@@ -267,10 +267,11 @@ def install():
                                          final_check = final_check_if_dpkg_locked)    
     
     default_configs = {   
-        "MDSD_LOG_DIR" : "/var/log/azure-monitoringagent",
-        "MDSD_ROLE_PREFIX" : "/var/run/azure-monitoringagent/default",
+        "MDSD_CONFIG_DIR" : "/etc/opt/microsoft/azure-monitoringagent",
+        "MDSD_LOG_DIR" : "/var/opt/azure-monitoringagent/log",
+        "MDSD_ROLE_PREFIX" : "/run/azure-monitoringagent/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/azure-monitoringagent",
-        "MDSD_OPTIONS" : "\"-A -c /etc/azure-monitoringagent.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh\"",
+        "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azure-monitoringagent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh\"",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
@@ -353,20 +354,20 @@ def install():
                 default_configs["MONITORING_GCS_AUTH_ID"] = MONITORING_GCS_AUTH_ID
 
             if MONITORING_GCS_CERT_CERTFILE is not None:
-                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/azure-monitoringagent.d/gcscert.pem"
-                fh = open("/etc/azure-monitoringagent.d/gcscert.pem", "wb")
+                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/opt/microsoft/azure-monitoringagent/gcscert.pem"
+                fh = open("/etc/opt/microsoft/azure-monitoringagent/gcscert.pem", "wb")
                 fh.write(MONITORING_GCS_CERT_CERTFILE)
                 fh.close()
-                os.chown("/etc/azure-monitoringagent.d/gcscert.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/azure-monitoringagent.d/gcscert.pem", 400))  
+                os.chown("/etc/opt/microsoft/azure-monitoringagent/gcscert.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azure-monitoringagent/gcscert.pem", 400))  
 
             if MONITORING_GCS_CERT_KEYFILE is not None:
-                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/azure-monitoringagent.d/gcskey.pem"
-                fh = open("/etc/azure-monitoringagent.d/gcskey.pem", "wb")
+                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/opt/microsoft/azure-monitoringagent/gcskey.pem"
+                fh = open("/etc/opt/microsoft/azure-monitoringagent/gcskey.pem", "wb")
                 fh.write(MONITORING_GCS_CERT_KEYFILE)
                 fh.close()
-                os.chown("/etc/azure-monitoringagent.d/gcskey.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/azure-monitoringagent.d/gcskey.pem", 400))  
+                os.chown("/etc/opt/microsoft/azure-monitoringagent/gcskey.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azure-monitoringagent/gcskey.pem", 400))  
 
     config_file = "/etc/default/azure-monitoringagent"
     config_updated = False
@@ -407,7 +408,7 @@ def install():
         else:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/azure-monitoringagent" )        
     except:
-        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/azure-monitoringagent" )        
+        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/azure-monitoringagent" )
     return exit_code, output
 
 def check_kill_process(pstring):
@@ -629,7 +630,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data, 
                                 "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port, 
-                                "unix:///var/run/azure-monitoringagent/default_influx.socket",
+                                "unix:///run/azure-monitoringagent/default_influx.socket",
                                 is_lad=False)
 
                             me_handler.setup_me(is_lad=False)
@@ -830,7 +831,7 @@ def arc_watcher(hutil_error, hutil_log):
 
     while True:
         try:
-            arc_token_mdsd_dir = "/etc/azure-monitoringagent.d/arc_tokens/"
+            arc_token_mdsd_dir = "/etc/opt/microsoft/azure-monitoringagent/arc_tokens/"
             if not os.path.exists(arc_token_mdsd_dir):
                 os.makedirs(arc_token_mdsd_dir)
             else:
