@@ -542,16 +542,16 @@ def get_imds_values(is_lad):
 
 def get_metrics_extension_service_path():
     """
-    Utility method to get the service path in case /lib/systemd/system doesnt exist on the OS
+    Utility method to get the service path
     """
+    if os.path.exists("/etc/systemd/system"):
+        return metrics_constants.metrics_extension_service_path_etc
     if os.path.exists("/lib/systemd/system/"):
         return metrics_constants.metrics_extension_service_path
     elif os.path.exists("/usr/lib/systemd/system/"):
         return metrics_constants.metrics_extension_service_path_usr_lib
     else:
-        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
-
-
+        raise Exception("Systemd unit files do not exist at /etc/systemd/system, /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
 
 
 def setup_me(is_lad):
