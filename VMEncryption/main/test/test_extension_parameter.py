@@ -48,6 +48,29 @@ class Test_EncryptionConfig(unittest.TestCase):
         self.assertEqual(self.extension_parameter._is_kv_equivalent("https://ASDF/","https://asdf"),True)
         self.assertEqual(self.extension_parameter._is_kv_equivalent("https://asdf","https://ASDF/"),True)
 
+        kv_urls = [
+            'https://testkv1.vault.windows.net',
+            'https://testkv1.vault.windows.net/',
+            'https://testkv1.vault.windows.net:443',
+            'https://testkv1.vault.windows.net:443/'
+            ]
+
+        for i in range(len(kv_urls)):
+            self.assertEqual(self.extension_parameter._is_kv_equivalent(kv_urls[0],kv_urls[i].upper()),True)
+            self.assertEqual(self.extension_parameter._is_kv_equivalent(kv_urls[0].upper(),kv_urls[i]),True)
+
+
+        kek_urls = [
+            'https://testkv1.vault.windows.net/keys/kekname/00000000000000000000000000000000',
+            'https://testkv1.vault.windows.net/keys/kekname/00000000000000000000000000000000',
+            'https://testkv1.vault.windows.net:443/keys/kekname/00000000000000000000000000000000',
+            'https://testkv1.vault.windows.net:443/keys/kekname/00000000000000000000000000000000/'
+            ]
+
+        for i in range(len(kek_urls)):
+            self.assertEqual(self.extension_parameter._is_kv_equivalent(kek_urls[0],kek_urls[i].upper()),True)
+            self.assertEqual(self.extension_parameter._is_kv_equivalent(kek_urls[0].upper(),kek_urls[i]),True)
+
     def test_kv_equivalent_false(self):
         self.assertEqual(self.extension_parameter._is_kv_equivalent(None,"https://asdf"),False)
         self.assertEqual(self.extension_parameter._is_kv_equivalent("https://asdf",None),False)

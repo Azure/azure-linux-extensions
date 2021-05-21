@@ -98,6 +98,66 @@ class EncryptionSettingsUtil(object):
         padded_index = str(self.get_index()).zfill(2)
         return CommonVariables.encryption_settings_file_name_pattern.format(padded_index)
 
+    def check_kv_url(self, test_kv_url, message):
+        """basic sanity check of key vault url"""
+        expected = "https://keyvault-name}.{vault-endpoint}"
+        pattern = re.compile(r'^https://([a-zA-Z0-9\-]+)[\.]([a-zA-Z0-9\-\.]+)([/]?)$')
+        if not (test_kv_url and pattern.match(test_kv_url)):
+            raise Exception('\n' + message + '\nActual: ' + test_kv_url + '\nExpected: ' + expected + "\n")
+        return
+
+    def check_kek_url(self, test_kek_url, message):
+        """basic sanity check of the key vault key url"""
+        expected = "https://{keyvault-name}.{vault-endpoint}/keys/{object-name}/{object-version}"
+        pattern = re.compile(r'^https://([a-zA-Z0-9\-]+)[\.]([a-zA-Z0-9\-\.]+)/keys/([a-zA-Z0-9\-]+)/([a-zA-Z0-9]+)([/]?)$')
+        if not (test_kek_url and pattern.match(test_kek_url)):
+            raise Exception('\n' + message + '\nActual: ' + test_kek_url + '\nExpected: ' + expected + "\n")
+        return
+
+    def check_kv_id(self, test_kv_id, message):
+        """basic sanity check of the key vault id"""
+        expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}"
+        pattern = re.compile(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([a-zA-Z0-9\-\_]+)/providers/Microsoft.KeyVault/vaults/([a-zA-Z0-9\-\_]+)(/)?$')
+        if not (test_kv_id and pattern.match(test_kv_id)):
+            raise Exception('\n' + message + '\nActual: ' + test_kv_id + '\nExpected: ' + expected + "\n")
+        return
+
+    def get_kv_id_name(self, kv_id):
+        """extract key vault name from KV ID"""
+        match = re.search(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([a-zA-Z0-9\-\_]+)/providers/Microsoft.KeyVault/vaults/([a-zA-Z0-9\-\_]+)(/)?$', kv_id)
+        if match:
+            return match.group(3)
+        else:
+            return None
+
+    def get_kv_url_name(self, kv_url):
+        """extract key vault name from KV URL"""
+        match = re.search(r'^https://([a-zA-Z0-9\-]+)[\.]([a-zA-Z0-9\-\.]+)([/]?)$', kv_url)
+        if match:
+            return match.group(1)
+        else:
+            return None
+
+    def get_kek_url_name(self, kek_url):
+        """extract key vault name from kek url"""
+        match = re.search(r'^https://([a-zA-Z0-9\-]+)[\.]([a-zA-Z0-9\-\.]+)/keys/([a-zA-Z0-9\-]+)/([a-zA-Z0-9]+)([/]?)$', kek_url)
+        if match:
+            return match.group(1)
+        else:
+            return None
+
+    def check_kv_name(self, kv_id, kv_url, message):
+        """ensure KV ID vault name matches KV URL"""
+        if not (kv_id and kv_url and get_kv_id_name(kv_id).lower() == get_kv_url_name(kv_url).lower()):
+            raise Exception('\n' + message + '\nKey Vault ID: ' + kv_id + '\nKey Vault URL: ' + kv_url + '\n')
+        return
+
+    def check_kek_name(self, kek_kv_id, kek_url, message):
+        """ensure KEK KV ID vault name matches KEK URL vault name"""
+        if not (kek_kv_id and kek_url and get_kv_id_name(kek_kv_id).lower() == get_kek_url_name(kek_url).lower()):
+            raise Exception('\n' +message + '\nKEK Key Vault ID: ' + kek_kv_id + '\nKEK URL: ' + kek_url + '\n')
+        return
+
     def get_disk_items_from_crypt_items(self, crypt_items, disk_util):
         crypt_dev_items = []
         for crypt_item in crypt_items:
@@ -125,7 +185,22 @@ class EncryptionSettingsUtil(object):
         """ returns encryption settings object in format required by wire server """
 
         # validate key vault parameters prior to creating the encryption settings object
-        # self.validate_key_vault_params(kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm)
+        self.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
+        self.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
+        self.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
+        if kek_url:
+            self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
+            self.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
+            self.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
+            if kek_algorithm not in CommonVariables.encryption_algorithms:
+                if kek_algorithm:
+                    raise Exception("The KEK encryption algorithm requested was not recognized")
+                else:
+                    kek_algorithm = CommonVariables.default_encryption_algorithm
+                    self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
+        else:
+            if kek_kv_id:
+                raise Exception("The KEK KeyVault ID was specified but the KEK URL was missing")
 
         # create encryption settings object
         self.logger.log("Creating encryption settings object")

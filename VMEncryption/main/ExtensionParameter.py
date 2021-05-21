@@ -157,10 +157,14 @@ class ExtensionParameter(object):
         return command in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]
 
     def _is_kv_equivalent(self, a, b):
-        # ignore trailing slash if present, and ensure case insensitive string comparison for key vault and object name
+        # ignore single trailing slash if present and ensure case insensitive string comparison for key vault and object name
         # https://docs.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates#vault-name-and-object-name 
-        if a and a[-1] == '/': a = a.lower()[:-1]
-        if b and b[-1] == '/': b = b.lower()[:-1]
+        if a:
+            if a[-1] == '/': a = a[:-1]
+            a = a.lower()
+        if b:
+            b = b.lower()
+            if b[-1] == '/': b = b[:-1]
         return a==b
 
     def config_changed(self):
