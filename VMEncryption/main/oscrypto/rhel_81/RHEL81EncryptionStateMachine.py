@@ -127,3 +127,6 @@ class RHEL81EncryptionStateMachine(OSEncryptionStateMachine):
 
         self.stop_machine()
         self.log_machine_state()
+
+    def is_online_os_encryption_supported(self):
+        return True
