@@ -8,10 +8,19 @@ from .console_logger import ConsoleLogger
 from .test_utils import MockDistroPatcher
 try:
     builtins_open = "builtins.open"
-    import unittest.mock as mock # python3+
+    import unittest.mock as mock  # python3+
 except ImportError:
     builtins_open = "__builtin__.open"
-    import mock # python2
+    import mock  # python2
+
+
+class MockEncryptionStateMachine():
+    def __init__(self, is_online_compatible):
+        self.is_online_compatible = is_online_compatible
+
+    def is_online_os_encryption_supported(self):
+        return self.is_online_compatible
+
 
 class TestCheckUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
@@ -89,18 +98,30 @@ class TestCheckUtil(unittest.TestCase):
     def test_validate_volume_type_vmss(self, mock_is_vmss):
         # Then test for VMSS
         mock_is_vmss.return_value = True
-        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "DATA"})
-        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "Data"})
-        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "data"})
+        encryption_state_machine = MockEncryptionStateMachine(False)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "DATA"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "Data"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "data"}, encryption_state_machine)
         for vt in CommonVariables.SupportedVolumeTypesVMSS:
-            self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: vt})
+            self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: vt}, encryption_state_machine)
 
-        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "ALL"})
-        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "all"})
-        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "Os"})
-        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "OS"})
-        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "os"})
-        self.assertRaises(Exception, self.cutil.validate_volume_type, {})
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "ALL"}, encryption_state_machine)
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "all"}, encryption_state_machine)
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "Os"}, encryption_state_machine)
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "OS"}, encryption_state_machine)
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "os"}, encryption_state_machine)
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {}, encryption_state_machine)
+
+        encryption_state_machine = MockEncryptionStateMachine(True)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "DATA"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "Data"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "data"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "ALL"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "all"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "Os"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "OS"}, encryption_state_machine)
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "os"}, encryption_state_machine)
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {}, encryption_state_machine)
 
     @mock.patch('check_util.CheckUtil.validate_memory_os_encryption')
     @mock.patch('CommandExecutor.CommandExecutor.Execute', return_value=0)

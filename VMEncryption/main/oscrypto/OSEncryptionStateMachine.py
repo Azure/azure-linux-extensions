@@ -83,7 +83,7 @@ class OSEncryptionStateMachine(object):
                                                 distro_patcher=self.distro_patcher,
                                                 logger=self.logger,
                                                 encryption_environment=self.encryption_environment)
-        
+
         self.state_machine = Machine(model=self,
                                      states=OSEncryptionStateMachine.states,
                                      transitions=OSEncryptionStateMachine.transitions,
@@ -98,3 +98,7 @@ class OSEncryptionStateMachine(object):
 
     def _reboot(self):
         self.command_executor.Execute('reboot')
+
+    def is_online_os_encryption_supported(self):
+        # By default Online OS Encryption is not supported. Override if it always or conditionally is.
+        return False

@@ -20,16 +20,16 @@
 
 import os
 import os.path
-import re
 import json
 from Common import CommonVariables
 from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
 try:
-    from urllib.parse import urlparse #python3+
+    from urllib.parse import urlparse  # python3+
 except ImportError:
-    from urlparse import urlparse #python2
+    from urlparse import urlparse  # python2
+
 
 class CheckUtil(object):
     """Checks compatibility for disk encryption"""
@@ -89,10 +89,10 @@ class CheckUtil(object):
 
         try:
             parse_result = urlparse(test_url)
-        except:
+        except Exception:
             raise Exception(message + '\nMalformed URL: ' + test_url)
 
-        if not parse_result.scheme.lower() == "https" :
+        if not parse_result.scheme.lower() == "https":
             raise Exception('\n' + message + '\n URL should be https: ' + test_url + "\n")
 
         if not parse_result.netloc:
@@ -128,15 +128,15 @@ class CheckUtil(object):
 
         id_splits = test_id.lower().split('/')
 
-        if not (len(id_splits) >= 9 and \
-                id_splits[0] == "" and \
-                id_splits[1] == "subscriptions" and \
-                id_splits[2] != "" and \
-                id_splits[3] == "resourcegroups" and \
-                id_splits[4] != "" and \
-                id_splits[5] == "providers" and \
-                id_splits[6] == "microsoft.keyvault" and \
-                id_splits[7] == "vaults" and \
+        if not (len(id_splits) >= 9 and
+                id_splits[0] == "" and
+                id_splits[1] == "subscriptions" and
+                id_splits[2] != "" and
+                id_splits[3] == "resourcegroups" and
+                id_splits[4] != "" and
+                id_splits[5] == "providers" and
+                id_splits[6] == "microsoft.keyvault" and
+                id_splits[7] == "vaults" and
                 id_splits[8] != ""):
             raise Exception('\n' + message + '\nActual: ' + test_id + '\nExpected: ' + expected + "\n")
         return
@@ -172,13 +172,11 @@ class CheckUtil(object):
                 raise Exception(
                     "The KEK KeyVault ID was specified but the KEK URL was missing")
 
-    def validate_volume_type(self, public_settings):
+    def validate_volume_type(self, public_settings, encryption_state_machine=None):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         if encryption_operation in [CommonVariables.QueryEncryptionStatus]:
             # No need to validate volume type for Query Encryption Status operation
-            self.logger.log(
-                "Ignore validating volume type for {0}".format(
-                CommonVariables.QueryEncryptionStatus))
+            self.logger.log("Ignore validating volume type for {0}".format(CommonVariables.QueryEncryptionStatus))
             return
 
         volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
@@ -186,11 +184,15 @@ class CheckUtil(object):
         # get supported volume types
         instance = MetadataUtil(self.logger)
         if instance.is_vmss():
-            supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
+            if encryption_state_machine and encryption_state_machine.is_online_os_encryption_supported():
+                # All types are supported if OS is Online Compatible
+                supported_volume_types = CommonVariables.SupportedVolumeTypes
+            else:
+                supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
         else:
             supported_volume_types = CommonVariables.SupportedVolumeTypes
 
-        if not volume_type.lower() in [x.lower() for x in supported_volume_types] :
+        if not volume_type.lower() in [x.lower() for x in supported_volume_types]:
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_volume_types))
 
     def validate_lvm_os(self, public_settings):
@@ -213,8 +215,8 @@ class CheckUtil(object):
         #  run lvm check if volume type, encryption operation were specified and OS type is LVM
         detected = False
         # first, check if the root OS volume type is LVM
-        if ( encryption_operation and volume_type and 
-             os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0):
+        if (encryption_operation and volume_type and
+                os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0):
             # next, check that all required logical volume names exist (swaplv not required)
             lvlist = ['rootvg-tmplv',
                       'rootvg-usrlv',
@@ -233,7 +235,7 @@ class CheckUtil(object):
         try:
             executor = CommandExecutor(self.logger)
             executor.Execute("modprobe vfat", True)
-        except:
+        except Exception:
             raise RuntimeError('Incompatible system, prerequisite vfat module was not found.')
 
     def validate_memory_os_encryption(self, public_settings, encryption_status):
@@ -261,7 +263,7 @@ class CheckUtil(object):
             self.logger.log("OS volume already encrypted. Skipping OS encryption validation check.")
             return
         distro_name = DistroPatcher.distro_info[0]
-        distro_name = distro_name.replace('ubuntu','Ubuntu') # to upper if needed
+        distro_name = distro_name.replace('ubuntu', 'Ubuntu')  # to upper if needed
         distro_version = DistroPatcher.distro_info[1]
         supported_os_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'SupportedOS.json')
         with open(supported_os_file) as json_file:
@@ -278,7 +280,7 @@ class CheckUtil(object):
 
     def validate_volume_type_for_enable(self, public_settings, existing_volume_type):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-        if not encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+        if encryption_operation not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             self.logger.log("Current operation is not an enable. Skipping volume type validation.")
             return
         if not existing_volume_type:
@@ -293,10 +295,10 @@ class CheckUtil(object):
             return
         raise Exception('Moving from volume type {0} to volume type {1} is not allowed'.format(existing_volume_type, volume_type))
 
-    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher, existing_volume_type):
+    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher, existing_volume_type, encryption_state_machine=None):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
-        self.validate_volume_type(public_settings)
+        self.validate_volume_type(public_settings, encryption_state_machine)
         self.validate_lvm_os(public_settings)
         self.validate_vfat()
         self.validate_memory_os_encryption(public_settings, encryption_status)
