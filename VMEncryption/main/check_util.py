@@ -172,7 +172,7 @@ class CheckUtil(object):
                 raise Exception(
                     "The KEK KeyVault ID was specified but the KEK URL was missing")
 
-    def validate_volume_type(self, public_settings, encryption_state_machine):
+    def validate_volume_type(self, public_settings, encryption_state_machine=None):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         if encryption_operation in [CommonVariables.QueryEncryptionStatus]:
             # No need to validate volume type for Query Encryption Status operation
@@ -295,7 +295,7 @@ class CheckUtil(object):
             return
         raise Exception('Moving from volume type {0} to volume type {1} is not allowed'.format(existing_volume_type, volume_type))
 
-    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher, existing_volume_type, encryption_state_machine):
+    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher, existing_volume_type, encryption_state_machine=None):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings, encryption_state_machine)
