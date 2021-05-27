@@ -198,6 +198,7 @@ class FsFreezer:
                         break
                     except Exception as ex:
                         self.safeFreezelockFile.close()
+                        self.logger.log("Failed to aquire lock: %s, stack trace: %s" % (str(ex), traceback.format_exc()),True)
                         raise ex
                 except Exception as e:
                     self.logger.log("Failed to open file or aquire lock: %s, stack trace: %s" % (str(e), traceback.format_exc()),True)
