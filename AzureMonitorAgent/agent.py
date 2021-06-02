@@ -271,7 +271,7 @@ def install():
         "MDSD_LOG_DIR" : "/var/opt/microsoft/azure-monitoringagent/log",
         "MDSD_ROLE_PREFIX" : "/run/azure-monitoringagent/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/azure-monitoringagent",
-        "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azure-monitoringagent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh\"",
+        "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azure-monitoringagent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"",
         "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
         "AZURE_ENDPOINT" : "https://monitor.azure.com/",
         "ADD_REGION_TO_MCS_ENDPOINT" : "true",
