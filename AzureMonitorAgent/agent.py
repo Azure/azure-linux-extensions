@@ -144,9 +144,9 @@ CloudDomainMap = {
     USSecCloudName:    ".microsoft.scloud"
 }
 
-# Endpoints, sans-domain(s)
-McsEndpoint   = "https://global.handler.control.monitor.azure"
-AzureEndpoint = "https://monitor.azure"
+# Endpoints, sans-region/domain(s)
+McsEndpointTemplate   = "https://{0}.handler.control.monitor.azure{1}"
+AzureEndpointTemplate = "https://monitor.azure{0}/"
 
 
 # Change permission of log path - if we fail, that is not an exit case
@@ -308,18 +308,18 @@ def install():
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
         except:
-            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )        
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )
 
-    mcs_endpoint, azure_endpoint = get_endpoints()
+    mcs_regional_endpoint, mcs_global_endpoint, azure_endpoint = get_endpoints()
 
     default_configs = {
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
         "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
-        "MCS_ENDPOINT" : mcs_endpoint,
+        "MCS_REGIONAL_ENDPOINT" : mcs_regional_endpoint,
+        "MCS_GLOBAL_ENDPOINT" : mcs_global_endpoint,
         "AZURE_ENDPOINT" : azure_endpoint,
-        "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
         "MDSD_USE_LOCAL_PERSISTENCY" : "true",
@@ -1155,49 +1155,68 @@ def get_imds_endpoint():
     return imds_endpoint
 
 
-def get_azure_environment_from_imds():
+def get_azure_environment_and_region():
+    """
+    Retreive the Azure environment and region from Azure or Arc IMDS
+    """
     imds_endpoint = get_imds_endpoint()
     req = urllib.request.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
+    environment = region = None
+
     try:
         response = json.loads(urllib.request.urlopen(req).read())
 
-        if ('compute' not in response or response['compute'] is None):
-            return None # classic vm
-
-        if ('azEnvironment' not in response['compute'] or response['compute']['azEnvironment'] is None):
-            return None # classic vm
-
-        return response['compute']['azEnvironment']
+        if ('compute' in response):
+            if ('azEnvironment' in response['compute']):
+                environment = response['compute']['azEnvironment']
+            if ('location' in response['compute']):
+                region = response['compute']['location'].lower()
     except urllib.error.HTTPError as e:
         hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
         hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
-        return None
     except:
         hutil_log_error('Unexpected error from Metadata service')
-        return None
+
+    return environment, region
 
 
 def get_endpoints():
     """
-    Build and return the MCS and Azure endpoints based on the Azure environment
+    Build and return the Regional MCS, Global MCS, and Azure endpoints based on the Azure region and environment
     """
-    try:
-        environment = get_azure_environment_from_imds()
+    environment, region = get_azure_environment_and_region()
 
+    mcs_regional_endpoint = McsEndpointTemplate
+    mcs_global_endpoint = McsEndpointTemplate.format("global", "{0}")
+    azure_endpoint = AzureEndpointTemplate
+
+    if region:
+        hutil_log_info('Detected cloud region "{0}" via IMDS'.format(region))
+        mcs_regional_endpoint = mcs_regional_endpoint.format(region, "{0}")
+    else:
+        hutil_log_error('Unknown cloud region, falling back to _____')
+        mcs_regional_endpoint = mcs_regional_endpoint.format("", "{0}") # TODO what should this be?
+
+    try:
         if environment:
             for cloud, domain in CloudDomainMap.items():
                 if environment.lower() == cloud.lower():
-                    hutil_log_info('Detected cloud environment "{0}" via IMDS. The domain "{1}" will be used.'.format(cloud, domain))
-                    return McsEndpoint + domain, AzureEndpoint + domain
+                    hutil_log_info('Detected cloud environment "{0}" via IMDS; the domain "{1}" will be used'.format(cloud, domain))
+                    return mcs_regional_endpoint.format(domain), \
+                           mcs_global_endpoint.format(domain), \
+                           azure_endpoint.format(domain)
 
         hutil_log_info('Unknown cloud environment "{0}"'.format(environment))
     except Exception as e:
         hutil_log_error('Failed to detect cloud environment: {0}'.format(e))
 
-    hutil_log_info('Falling back to default domain "{0}"'.format(CloudDomainMap[DefaultCloudName]))
-    return McsEndpoint + CloudDomainMap[DefaultCloudName], AzureEndpoint + CloudDomainMap[DefaultCloudName]
+    default = CloudDomainMap[DefaultCloudName]
+    hutil_log_info('Falling back to default domain "{0}"'.format(default))
+    return mcs_regional_endpoint.format(default), \
+           mcs_global_endpoint.format(default), \
+           azure_endpoint.format(default)
 
 
 def run_command_and_log(cmd, check_error = True, log_cmd = True):
