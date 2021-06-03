@@ -289,8 +289,7 @@ def install():
                 return suse_exit_code, suse_output
         except:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )        
-        
-        
+
     default_configs = {   
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
@@ -312,7 +311,7 @@ def install():
         return 0, ""
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         default_configs["ENABLE_MCS"] = "true"
-        
+
         # fetch proxy settings
         if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
             default_configs["MDSD_PROXY_MODE"] = "application"
@@ -329,6 +328,26 @@ def install():
                 else:  
                     log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
 
+        # Determine Managed Identity (MI) settings
+        # Nomenclature: Managed System Identity (MSI), System-Assigned Identity (SAI), User-Assigned Identity (UAI)
+        # Unspecified MI scenario: MSI returns SAI token if exists, otherwise returns UAI token if exactly one UAI exists, otherwise failure
+        # Specified MI scenario: MSI returns token for specified MI
+        if public_settings is not None and "authentication" in public_settings and "managedIdentity" in public_settings.get("authentication"):
+            managedIdentity = public_settings.get("authentication").get("managedIdentity")
+
+            if "identifier-name" not in managedIdentity or "identifier-value" not in managedIdentity:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameters "identifier-name" and "identifier-value" are both required in authentication.managedIdentity public setting')
+
+            identifier_name = managedIdentity.get("identifier-name")
+            identifier_value = managedIdentity.get("identifier-value")
+
+            if identifier_name not in ["object_id", "client_id", "mi_res_id"]:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-name provided; must be "object_id", "client_id", or "mi_res_id"')
+
+            if not identifier_value:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-value provided; cannot be empty')
+
+            default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
     else:
         # look for LA protected settings
         for var in list(protected_settings.keys()):
@@ -377,7 +396,7 @@ def install():
             raise ParameterMissingException
         else:
             # set the values for GCS
-            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"        
+            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"
             default_configs["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
             default_configs["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
             default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
