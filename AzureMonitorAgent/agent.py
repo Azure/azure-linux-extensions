@@ -347,6 +347,11 @@ def install():
             if not identifier_value:
                 log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-value provided; cannot be empty')
 
+            if identifier_name in ["object_id", "client_id"]:
+                guid_re = re.compile(r'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}')
+                if not guid_re.search(identifier_value):
+                    log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-value provided for {0}; must be a GUID'.format(identifier_name))  
+
             default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
     else:
         # look for LA protected settings
