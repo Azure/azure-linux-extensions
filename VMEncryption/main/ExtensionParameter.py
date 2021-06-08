@@ -156,6 +156,17 @@ class ExtensionParameter(object):
     def _is_encrypt_command(self, command):
         return command in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]
 
+    def _is_kv_equivalent(self, a, b):
+        # ignore single trailing slash if present and ensure case insensitive string comparison for key vault and object name
+        # https://docs.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates#vault-name-and-object-name 
+        if a:
+            if a[-1] == '/': a = a[:-1]
+            a = a.lower()
+        if b:
+            b = b.lower()
+            if b[-1] == '/': b = b[:-1]
+        return a==b
+
     def config_changed(self):
         if (self.command or self.get_command()) and \
            (self.command != self.get_command() and \
@@ -165,12 +176,12 @@ class ExtensionParameter(object):
             return True
 
         if (self.KeyEncryptionKeyURL or self.get_kek_url()) and \
-           (self.KeyEncryptionKeyURL != self.get_kek_url()):
+           (not self._is_kv_equivalent(self.KeyEncryptionKeyURL, self.get_kek_url())):
             self.logger.log('Current config KeyEncryptionKeyURL {0} differs from effective config KeyEncryptionKeyURL {1}'.format(self.KeyEncryptionKeyURL, self.get_kek_url()))
             return True
 
         if (self.KeyVaultURL or self.get_keyvault_url()) and \
-           (self.KeyVaultURL != self.get_keyvault_url()):
+           (not self._is_kv_equivalent(self.KeyVaultURL, self.get_keyvault_url())):
             self.logger.log('Current config KeyVaultURL {0} differs from effective config KeyVaultURL {1}'.format(self.KeyVaultURL, self.get_keyvault_url()))
             return True
 
