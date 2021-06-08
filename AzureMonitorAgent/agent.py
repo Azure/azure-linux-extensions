@@ -310,8 +310,25 @@ def install():
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         hutil_log_info("Detecting Auto-Config mode.")
         return 0, ""
-    elif protected_settings is None or len(protected_settings) == 0:
+    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         default_configs["ENABLE_MCS"] = "true"
+        
+        # fetch proxy settings
+        if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
+            default_configs["MDSD_PROXY_MODE"] = "application"
+            
+            if "address" in public_settings.get("proxy"):
+                default_configs["MDSD_PROXY_ADDRESS"] = public_settings.get("proxy").get("address")
+            else:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
+
+            if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
+                if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
+                    default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
+                    default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
+                else:  
+                    log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+
     else:
         # look for LA protected settings
         for var in list(protected_settings.keys()):
