@@ -442,7 +442,7 @@ class HandlerUtility:
                 time.sleep(1)
                 process_wait_time -= 1
 
-            output = df.stdout.read()
+            output = df.stdout.read().decode()
             output = output.split("\n")
             total_used = 0
             total_used_network_shares = 0
@@ -540,8 +540,10 @@ class HandlerUtility:
             while(process_wait_time > 0 and p.poll() is None):
                 time.sleep(1)
                 process_wait_time -= 1
-            out = p.stdout.read()
+            out = p.stdout.read().decode()
             out = str(out)
+            if len(out) == 0:
+                raise Exception("/usr/sbin/waagent returns null")
             if "Goal state agent: " in out:
                  waagent_version = out.split("Goal state agent: ")[1].strip()
             else:
