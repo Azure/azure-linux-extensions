@@ -211,9 +211,10 @@ class FsFreezer:
             end_time = datetime.datetime.utcnow()
             self.logger.log("Wait time to aquire lock "+ str(end_time - start_time),True)
 
-            sig_handle = None
+            # sig_handle = None
             if (self.isAquireLockSucceeded == True):
-                sig_handle=self.freeze_handler.startproc(args)
+                self.logger.log("Aquired Lock Successful")
+            sig_handle=self.freeze_handler.startproc(args)
 
             self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
