@@ -44,12 +44,16 @@ class TestCheckUtil(unittest.TestCase):
         self.assertTrue(self.cutil.is_insufficient_memory())
 
     def test_is_kv_id(self):
-        self.cutil.check_kv_id("/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
-        self.cutil.check_kv_id("/subscriptions/759532d8-9991-4d04-878f-49f0f4804906/resourceGroups/adenszqtrrg/providers/Microsoft.KeyVault/vaults/adenszqtrkv", "")
+        # https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules
+        self.cutil.check_kv_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/adenszqtrrg/providers/Microsoft.KeyVault/vaults/adenszqtrkv", "")
+        self.cutil.check_kv_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/adenszqtrrg/providers/microsoft.keyvault/vaults/adenszqtrkv", "")
+
+        # invalid cases
         self.assertRaises(Exception, self.cutil.check_kv_id, "////", "")
         self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/", "")
         self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault////////", "")
         self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroupssss/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
+        self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
 
     def test_is_kv_url(self):
         dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
@@ -58,7 +62,7 @@ class TestCheckUtil(unittest.TestCase):
             self.cutil.check_kv_url("https://testkv." + dns_suffix + "/", "")
             self.cutil.check_kv_url("https://test-kv2." + dns_suffix + "/", "")
             self.cutil.check_kv_url("https://test-kv2." + dns_suffix + ":443/", "")
-            self.cutil.check_kv_url("https://test-kv2." + dns_suffix + ":443/keys/kekname/kekversion", "")
+            self.cutil.check_kek_url("https://test-kv2." + dns_suffix + ":443/keys/kekname/00000000000000000000000000000000", "")
             self.assertRaises(Exception, self.cutil.check_kv_url, "http://testkv." + dns_suffix + "/", "")
             # self.assertRaises(Exception, self.cutil.check_kv_url, "https://https://testkv." + dns_suffix + "/", "")
             # self.assertRaises(Exception, self.cutil.check_kv_url, "https://testkv.testkv." + dns_suffix + "/", "")
@@ -372,3 +376,111 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
             CommonVariables.VolumeTypeKey: "Data",
             CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll
             }, "All")   
+
+    def test_check_kv_url(self):
+        # Expected: https://{keyvault-name}.{vault-endpoint}[:443][/]
+        self.assertIsNone(self.cutil.check_kv_url("https://keyvault-name.vault-endpoint.net",""))
+        self.assertIsNone(self.cutil.check_kv_url("https://keyvault-name.vault-endpoint.net/",""))
+        self.assertIsNone(self.cutil.check_kv_url("https://keyvault-name.vault-endpoint.net:443",""))
+        self.assertIsNone(self.cutil.check_kv_url("https://keyvault-name.vault-endpoint.net:443/",""))
+
+        self.assertRaises(Exception, self.cutil.check_kv_url, { "https://keyvault.vault.endpoint.net////", "" })
+        self.assertRaises(Exception, self.cutil.check_kv_url, { "invalidurl", ""})
+        self.assertRaises(Exception, self.cutil.check_kv_url, { None, "" })
+        self.assertRaises(Exception, self.cutil.check_kv_url, { "https://localhost", "" })
+        self.assertRaises(Exception, self.cutil.check_kv_url, { "ftp://foo", "" })
+
+    def test_check_kek_url(self):
+        # Expected: https://{keyvault-name}.{vault-endpoint}/keys/{object-name}/{object-version}
+        self.assertIsNone(self.cutil.check_kek_url("https://keyvault-name.vault-endpoint.net/keys/kekname/00000000000000000000000000000000",""))
+        self.assertIsNone(self.cutil.check_kek_url("https://keyvault-name.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000",""))
+        self.assertIsNone(self.cutil.check_kek_url("https://keyvault-name.vault-endpoint.net/keys/kekname/00000000000000000000000000000000/",""))
+        self.assertIsNone(self.cutil.check_kek_url("https://keyvault-name.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000/",""))
+
+        self.assertRaises(Exception, self.cutil.check_kek_url, { "https://keyvault-name.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000////", ""})
+        self.assertRaises(Exception, self.cutil.check_kek_url, { "invalidurl", ""})
+        self.assertRaises(Exception, self.cutil.check_kek_url, { None, "" })
+
+    def test_check_kv_id(self):
+        # Expected: "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}"
+        self.assertIsNone(self.cutil.check_kv_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrgname/providers/Microsoft.KeyVault/vaults/testkvname",""))
+        self.assertIsNone(self.cutil.check_kv_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/testrgname/providers/microsoft.keyvault/vaults/testkvname",""))
+
+        self.assertRaises(Exception, self.cutil.check_kv_id, { "","" })
+        self.assertRaises(Exception, self.cutil.check_kv_id, { "https://not/a/resource/id","" })
+        self.assertRaises(Exception, self.cutil.check_kv_id, { "https://keyvault-name.vault-endpoint.net/keys/kekname/00000000000000000000000000000000","" })
+        self.assertRaises(Exception, self.cutil.check_kv_id, { "kekname","" })
+
+    def test_get_kv_id_name(self):
+        """extract key vault name from KV ID"""
+        self.assertEqual(self.cutil.get_kv_id_name("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrgname/providers/Microsoft.KeyVault/vaults/testkvname"),"testkvname")
+        self.assertEqual(self.cutil.get_kv_id_name("/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/testrgname/providers/microsoft.keyvault/vaults/testkvname"),"testkvname")
+
+        self.assertRaises(Exception, self.cutil.get_kv_id_name, { "" })
+        self.assertRaises(Exception, self.cutil.get_kv_id_name, { "https://not/a/resource/id","" })
+        self.assertRaises(Exception, self.cutil.get_kv_id_name, { "https://keyvault-name.vault-endpoint.net/keys/kekname/00000000000000000000000000000000","" })
+        self.assertRaises(Exception, self.cutil.get_kv_id_name, { "kekname","" })
+
+    def test_get_kv_url_name(self):
+        """extract key vault name from KV URL"""
+        self.assertEqual(self.cutil.get_kv_url_name("https://testkvname.vault.windows.net"),"testkvname")
+        self.assertEqual(self.cutil.get_kv_url_name("https://testkvname.vault.windows.net/"),"testkvname")
+        self.assertEqual(self.cutil.get_kv_url_name("https://testkvname.vault.windows.net:443"),"testkvname")
+        self.assertEqual(self.cutil.get_kv_url_name("https://testkvname.vault.windows.net:443/"),"testkvname")
+        self.assertEqual(self.cutil.get_kv_url_name("https://TESTKVNAME.vault.windows.net:443/").lower(),"testkvname")
+
+        self.assertIsNone(self.cutil.get_kv_url_name(None))
+        self.assertIsNone(self.cutil.get_kv_url_name(""))
+        self.assertIsNone(self.cutil.get_kv_url_name("https://"))
+
+    def test_get_kek_url_name(self):
+        """extract key vault name from KEK URL"""
+        self.assertEqual(self.cutil.get_kek_url_name("https://testkvname.vault-endpoint.net/keys/kekname/00000000000000000000000000000000"),"testkvname")
+        self.assertEqual(self.cutil.get_kek_url_name("https://tEsTkVnAmE.vault-endpoint.net/keys/kekname/00000000000000000000000000000000/").lower(),"testkvname")
+        self.assertEqual(self.cutil.get_kek_url_name("https://TESTKVNAME.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000").lower(),"testkvname")
+        self.assertEqual(self.cutil.get_kek_url_name("https://testKVNAME.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000/").lower(),"testkvname")
+
+        self.assertIsNone(self.cutil.get_kek_url_name(""))
+        self.assertIsNone(self.cutil.get_kek_url_name("invalid-url"))
+        self.assertIsNone(self.cutil.get_kek_url_name("https://foo"))
+        self.assertIsNone(self.cutil.get_kek_url_name(None))
+
+    def test_check_kek_name(self):
+        """ensure KEK KV ID vault name matches KEK URL vault name"""
+        kek_kv_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrgname/providers/Microsoft.KeyVault/vaults/testkvname"
+        kek_kv_url = "https://testkvname.vault-endpoint.net/keys/kekname/00000000000000000000000000000000"
+        kek_kv_url_2 = "https://testkvname2.vault-endpoint.net/keys/kekname/00000000000000000000000000000000"
+
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id.upper(), kek_kv_url, ""))
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id, "https://testkvname.vault-endpoint.net/keys/kekname/00000000000000000000000000000000", ""))
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id, "https://testkvname.vault-endpoint.net/keys/kekname/00000000000000000000000000000000/", ""))
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id, "https://testkvname.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000", ""))
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id, "https://testkvname.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000/", ""))
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id, "https://TESTKVNAME.vault-endpoint.net/keys/kekname/00000000000000000000000000000000", ""))
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id, "https://TeStKvNaMe.vault-endpoint.net/keys/kekname/00000000000000000000000000000000/", ""))
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id, "https://TESTKVNAME.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000", ""))
+        self.assertIsNone(self.cutil.check_kek_name(kek_kv_id, "https://testKVNAME.vault-endpoint.net:443/keys/kekname/00000000000000000000000000000000/", ""))
+
+        self.assertRaises(Exception, self.cutil.check_kek_name, { kek_kv_id, kek_kv_url_2, "" })
+        self.assertRaises(Exception, self.cutil.check_kek_name, { None, kek_kv_url, "" })
+        self.assertRaises(Exception, self.cutil.check_kek_name, { kek_kv_id, None, "" })
+
+    def test_check_kv_name(self):
+        """ensure KV ID vault name matches KV URL vault name"""
+        kv_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrgname/providers/Microsoft.KeyVault/vaults/testkvname"
+        kv_url = "https://testkvname.vault.windows.net"
+        kv_url_2 = "https://testkvname2.vault.windows.net"
+
+        self.assertIsNone(self.cutil.check_kv_name(kv_id.upper(), kv_url, ""))
+        self.assertIsNone(self.cutil.check_kv_name(kv_id, "https://testkvname.vault.windows.net", ""))
+        self.assertIsNone(self.cutil.check_kv_name(kv_id, "https://testkvname.vault.windows.net/", ""))
+        self.assertIsNone(self.cutil.check_kv_name(kv_id, "https://testkvname.vault.windows.net:443", ""))
+        self.assertIsNone(self.cutil.check_kv_name(kv_id, "https://testkvname.vault.windows.net:443/", ""))
+        self.assertIsNone(self.cutil.check_kv_name(kv_id, "https://TESTKVNAME.vault.windows.net", ""))
+        self.assertIsNone(self.cutil.check_kv_name(kv_id, "https://TESTKVNAME.vault.windows.net/", ""))
+        self.assertIsNone(self.cutil.check_kv_name(kv_id, "https://TESTKVNAME.vault.windows.net:443", ""))
+        self.assertIsNone(self.cutil.check_kv_name(kv_id, "https://TESTKVNAME.vault.windows.net:443/", ""))
+
+        self.assertRaises(Exception, self.cutil.check_kv_name, { kv_id, kv_url_2, "" })
+        self.assertRaises(Exception, self.cutil.check_kv_name, { None, kv_url, "" })
+        self.assertRaises(Exception, self.cutil.check_kv_name, { kv_id, None, "" })
