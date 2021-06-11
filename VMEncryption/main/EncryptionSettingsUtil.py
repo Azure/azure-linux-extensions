@@ -22,6 +22,7 @@ import re
 import time
 import base64
 
+from check_util import CheckUtil
 from shutil import copyfile
 import uuid
 from Common import CommonVariables
@@ -185,13 +186,14 @@ class EncryptionSettingsUtil(object):
         """ returns encryption settings object in format required by wire server """
 
         # validate key vault parameters prior to creating the encryption settings object
-        self.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
-        self.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
-        self.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
+        cutil = CheckUtil(self.logger)
+        cutil.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
+        cutil.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
+        cutil.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
         if kek_url:
-            self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
-            self.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
-            self.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
+            cutil.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
+            cutil.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
+            cutil.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
             if kek_algorithm not in CommonVariables.encryption_algorithms:
                 if kek_algorithm:
                     raise Exception("The KEK encryption algorithm requested was not recognized")
