@@ -87,10 +87,12 @@ class ResourceDiskUtil(object):
 
     def _resource_disk_exists(self):
         """ true if udev name for resource disk exists """
-        cmd = 'test -b ' + self._get_rd_base_dev_path()
-        if (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success:
-            self.logger.log("Resource disk exists.")
-            return True
+        rd_base_dev_path = self._get_rd_base_dev_path()
+        if rd_base_dev_path:
+            cmd = 'test -b' + rd_base_dev_path
+            if (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success:
+                self.logger.log("Resource disk exists.")
+                return True
         self.logger.log("Resource disk does not exist.")
         return False
 

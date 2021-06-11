@@ -604,8 +604,8 @@ def mark_encryption(command, volume_type, disk_format_query):
 
 
 def is_daemon_running():
-    handler_path = os.path.join(os.getcwd(), __file__)
-    daemon_arg = "-daemon"
+    handler_path = os.path.join(os.getcwd(), __file__).encode('utf-8')
+    daemon_arg = b'-daemon'
 
     psproc = subprocess.Popen(['ps', 'aux'], stdout=subprocess.PIPE)
     pslist, _ = psproc.communicate()
