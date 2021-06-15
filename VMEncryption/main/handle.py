@@ -360,7 +360,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             logger.log('Secret has already been updated')
             disk_util.log_lsblk_output()
 
-            if extension_parameter.passphrase and extension_parameter.passphrase != file(existing_passphrase_file).read():
+            if extension_parameter.passphrase and extension_parameter.passphrase != open(existing_passphrase_file,'r').read():
                 logger.log("The new passphrase has not been placed in BEK volume yet")
                 logger.log("Skipping removal of old passphrase")
                 exit_without_status_report()
