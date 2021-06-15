@@ -50,7 +50,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         self.context.logger.log("Entering patch_boot_system state")
 
-        self.command_executor.Execute('systemctl restart lvm2-lvmetad', True)
+        self.command_executor.Execute('systemctl restart lvm2-lvmetad', False)
         self.command_executor.Execute('pvscan', True)
         self.command_executor.Execute('vgcfgrestore -f /volumes.lvm rootvg', True)
         self.command_executor.Execute('cryptsetup luksClose osencrypt', True)
