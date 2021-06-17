@@ -365,10 +365,16 @@ def stop_telemetry_process():
     # kill existing telemetry watcher
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
-            for pids in f.readlines():
-                kill_cmd = "kill " + pids
-                run_command_and_log(kill_cmd)
-                run_command_and_log("rm "+pids_filepath)
+            for pid in f.readlines():
+                # Verify the pid actually belongs to omsagent.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if cmdline[0].find("omsagent.py") >= 0 and cmdline[0].find("-telemetry") >= 0:
+                            kill_cmd = "kill " + pid
+                            run_command_and_log(kill_cmd)
+        run_command_and_log("rm "+pids_filepath)
 
 def start_telemetry_process():
     """
