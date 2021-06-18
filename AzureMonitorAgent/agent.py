@@ -128,26 +128,6 @@ SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
 
-# Cloud Environments
-PublicCloudName     = "AzurePublicCloud"
-FairfaxCloudName    = "AzureUSGovernmentCloud"
-MooncakeCloudName   = "AzureChinaCloud"
-USNatCloudName      = "USNat" # EX
-USSecCloudName      = "USSec" # RX
-DefaultCloudName    = PublicCloudName # Fallback
-
-CloudDomainMap = {
-    PublicCloudName:   ".com",
-    FairfaxCloudName:  ".us",
-    MooncakeCloudName: ".cn",
-    USNatCloudName:    ".eaglex.ic.gov",
-    USSecCloudName:    ".microsoft.scloud"
-}
-
-# Endpoints, sans-region/domain(s)
-McsEndpointTemplate   = "https://{0}.handler.control.monitor.azure{1}"
-AzureEndpointTemplate = "https://monitor.azure{0}/"
-
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -310,16 +290,11 @@ def install():
         except:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )
 
-    mcs_regional_endpoint, mcs_global_endpoint, azure_endpoint = get_endpoints()
-
     default_configs = {
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
         "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
-        "MCS_REGIONAL_ENDPOINT" : mcs_regional_endpoint,
-        "MCS_GLOBAL_ENDPOINT" : mcs_global_endpoint,
-        "AZURE_ENDPOINT" : azure_endpoint,
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
         "MDSD_USE_LOCAL_PERSISTENCY" : "true",
@@ -1180,43 +1155,6 @@ def get_azure_environment_and_region():
         hutil_log_error('Unexpected error from Metadata service')
 
     return environment, region
-
-
-def get_endpoints():
-    """
-    Build and return the Regional MCS, Global MCS, and Azure endpoints based on the Azure region and environment
-    """
-    environment, region = get_azure_environment_and_region()
-
-    mcs_regional_endpoint = McsEndpointTemplate
-    mcs_global_endpoint = McsEndpointTemplate.format("global", "{0}")
-    azure_endpoint = AzureEndpointTemplate
-
-    if region:
-        hutil_log_info('Detected cloud region "{0}" via IMDS'.format(region))
-        mcs_regional_endpoint = mcs_regional_endpoint.format(region, "{0}")
-    else:
-        hutil_log_error('Unknown cloud region, falling back to _____')
-        mcs_regional_endpoint = mcs_regional_endpoint.format("", "{0}") # TODO what should this be?
-
-    try:
-        if environment:
-            for cloud, domain in CloudDomainMap.items():
-                if environment.lower() == cloud.lower():
-                    hutil_log_info('Detected cloud environment "{0}" via IMDS; the domain "{1}" will be used'.format(cloud, domain))
-                    return mcs_regional_endpoint.format(domain), \
-                           mcs_global_endpoint.format(domain), \
-                           azure_endpoint.format(domain)
-
-        hutil_log_info('Unknown cloud environment "{0}"'.format(environment))
-    except Exception as e:
-        hutil_log_error('Failed to detect cloud environment: {0}'.format(e))
-
-    default = CloudDomainMap[DefaultCloudName]
-    hutil_log_info('Falling back to default domain "{0}"'.format(default))
-    return mcs_regional_endpoint.format(default), \
-           mcs_global_endpoint.format(default), \
-           azure_endpoint.format(default)
 
 
 def run_command_and_log(cmd, check_error = True, log_cmd = True):

@@ -567,9 +567,9 @@ def setup_me(is_lad):
     # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
     # The armurl is only for Public Cloud. Needs verification in Sovereign clouds
     aad_auth_url = ""
-    amrurl = "https://management.azure.com/subscriptions/" + subscription_id + "?api-version=2014-04-01"
+    armurl = "https://management.azure.com/subscriptions/" + subscription_id + "?api-version=2014-04-01"
     try:
-        req = urllib.request.Request(amrurl, headers={'Content-Type':'application/json'})
+        req = urllib.request.Request(armurl, headers={'Content-Type':'application/json'})
 
         # urlopen alias in future backport is broken on py2.6, fails on urls with HTTPS - https://github.com/PythonCharmers/python-future/issues/167
         # Using this hack of switching between py2 and 3 to avoid this
@@ -579,7 +579,7 @@ def setup_me(is_lad):
         else:
             res = urllib.request.urlopen(req)
 
-    except Exception as e:
+    except urllib.error.HTTPError as e:
         err_res = e.headers["WWW-Authenticate"]
         for line in err_res.split(","):
                 if "Bearer authorization_uri" in line:
