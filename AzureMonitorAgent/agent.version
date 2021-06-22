@@ -1,4 +1,4 @@
 AGENT_VERSION="1.10.0"
 AGENT_VERSION_DATE=""
-MDSD_DEB_PACKAGE_NAME="azure-monitoringagent_1.10.0-build.master.89_x86_64.deb"
-MDSD_RPM_PACKAGE_NAME="azure-monitoringagent_1.10.0-build.master.89_x86_64.rpm"
+MDSD_DEB_PACKAGE_NAME="azuremonitoragent_1.10.0-build.master.89_x86_64.deb"
+MDSD_RPM_PACKAGE_NAME="azuremonitoragent_1.10.0-build.master.89_x86_64.rpm"

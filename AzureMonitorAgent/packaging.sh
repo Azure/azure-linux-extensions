@@ -37,7 +37,7 @@ rm -rf packages MetricsExtensionBin ext/future
 mkdir -p packages MetricsExtensionBin ext/future
 
 # copy shell bundle to packages/
-cp $input_path/azure-monitoringagent_$AGENT_VERSION* packages/
+cp $input_path/azuremonitoragent_$AGENT_VERSION* packages/
 cp $input_path/MetricsExtension MetricsExtensionBin/
 
 # copy just the source of python-future

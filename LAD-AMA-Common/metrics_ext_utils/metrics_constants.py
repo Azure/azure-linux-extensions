@@ -19,9 +19,9 @@
 # This File contains constants used for Platform Metrics feature in LAD and Azure Monitor Extension
 
 lad_metrics_extension_bin = "/usr/local/lad/bin/MetricsExtension"
-ama_metrics_extension_bin = "/opt/microsoft/azure-monitoringagent/bin/MetricsExtension"
+ama_metrics_extension_bin = "/opt/microsoft/azuremonitoragent/bin/MetricsExtension"
 lad_telegraf_bin = "/usr/local/lad/bin/telegraf"
-ama_telegraf_bin = "/opt/microsoft/azure-monitoringagent/bin/telegraf"
+ama_telegraf_bin = "/opt/microsoft/azuremonitoragent/bin/telegraf"
 metrics_extension_service_path = "/lib/systemd/system/metrics-extension.service"
 metrics_extension_service_path_usr_lib = "/usr/lib/systemd/system/metrics-extension.service"
 metrics_extension_service_path_etc = "/etc/systemd/system/metrics-extension.service"
