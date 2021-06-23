@@ -241,6 +241,11 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
     def test_no_vfat(self, mocked_exec):
         # simulate call to modprobe vfat that fails and raises exception from execute 
         self.assertRaises(Exception, self.cutil.validate_vfat) 
+    
+    @mock.patch("CommandExecutor.CommandExecutor.Execute", side_effect=[0, -1])
+    def test_vfat_not_loaded(self, mocked_exec):
+        # simulate call to modprobe vfat that succeeds and call to lsmod fails
+        self.cutil.validate_vfat()
       
     @mock.patch('os.popen')
     def test_minimum_memory(self, os_popen):
