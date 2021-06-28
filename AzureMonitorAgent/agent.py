@@ -632,12 +632,12 @@ def start_metrics_process():
 def metrics_watcher(hutil_error, hutil_log):
     """
     Watcher thread to monitor metric configuration changes and to take action on them
-    """    
-    
-    # check every 30 seconds
+    """
+
+    # Check every 30 seconds
     sleepTime =  30
 
-    # sleep before starting the monitoring.
+    # Sleep before starting the monitoring
     time.sleep(sleepTime)
     last_crc = None
     me_msi_token_expiry_epoch = None
@@ -647,21 +647,21 @@ def metrics_watcher(hutil_error, hutil_log):
             if os.path.isfile(MdsdCounterJsonPath):
                 f = open(MdsdCounterJsonPath, "r")
                 data = f.read()
-                    
+
                 if (data != ''):
-                    json_data = json.loads(data)  
+                    json_data = json.loads(data)
                     
                     if len(json_data) == 0:
-                        last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
+                        last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
                         if telhandler.is_running(is_lad=False):
-                            #Stop the telegraf and ME services
+                            # Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
                                 hutil_log(tel_msg)
                             else:
                                 hutil_error(tel_msg)
 
-                            #Delete the telegraf and ME services
+                            # Delete the telegraf and ME services
                             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
                             if tel_rm_out:
                                 hutil_log(tel_rm_msg)
@@ -681,7 +681,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(me_rm_msg)
                     else:
-                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
+                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
                         if(crc != last_crc):
                             # Resetting the me_msi_token_expiry_epoch variable if we set up ME again.
@@ -711,7 +711,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_error(log_messages)
 
                             last_crc = crc
-                        
+
                         generate_token = False
                         me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
 
@@ -726,7 +726,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 generate_token = True
 
-                        if me_msi_token_expiry_epoch:                
+                        if me_msi_token_expiry_epoch:
                             currentTime = datetime.datetime.now()
                             token_expiry_time = datetime.datetime.fromtimestamp(int(me_msi_token_expiry_epoch))
                             if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
@@ -774,7 +774,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 if me_out:
                                     hutil_log(me_msg)
                                 else:
-                                    hutil_error(me_msg)                  
+                                    hutil_error(me_msg)
                                 start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
 
                                 if start_metrics_out:
