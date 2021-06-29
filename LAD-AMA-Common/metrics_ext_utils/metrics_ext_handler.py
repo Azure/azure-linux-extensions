@@ -41,11 +41,11 @@ import metrics_ext_utils.metrics_common_utils as metrics_utils
 PublicCloudName     = "azurepubliccloud"
 FairfaxCloudName    = "azureusgovernmentcloud"
 MooncakeCloudName   = "azurechinacloud"
-UsNatCloudName      = "usnat" # EX
-UsSecCloudName      = "ussec" # RX
+USNatCloudName      = "usnat" # EX
+USSecCloudName      = "ussec" # RX
 DefaultCloudName    = PublicCloudName # Fallback
 
-ArmDomainMap = {
+ARMDomainMap = {
     PublicCloudName:    "management.azure.com",
     FairfaxCloudName:   "management.usgovcloudapi.net",
     MooncakeCloudName:  "management.chinacloudapi.cn",
@@ -562,7 +562,7 @@ def get_arm_domain(az_environment):
     """
 
     try:
-        domain = ArmDomainMap[az_environment.lower()]
+        domain = ARMDomainMap[az_environment.lower()]
     except KeyError:
         raise Exception("Unknown cloud environment \"{0}\". Failed to set up ME.".format(az_environment))
 
