@@ -593,7 +593,6 @@ def setup_me(is_lad):
 
     # get tenantID
     # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
-    # The armurl is only for Public Cloud. Needs verification in Sovereign clouds
     aad_auth_url = ""
     arm_url = "https://{0}/subscriptions/{1}?api-version=2014-04-01".format(arm_domain, subscription_id)
     try:
