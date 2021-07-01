@@ -72,7 +72,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     vmi_rate_counters_list = ["LogicalDisk\\BytesPerSecond", "LogicalDisk\\ReadBytesPerSecond", "LogicalDisk\\ReadsPerSecond",  "LogicalDisk\\WriteBytesPerSecond", "LogicalDisk\\WritesPerSecond", "LogicalDisk\\TransfersPerSecond", "Network\\ReadBytesPerSecond", "Network\\WriteBytesPerSecond"]
 
     MetricsExtensionNamepsace = metrics_constants.metrics_extension_namespace
-
+    has_mdsd_output = False
+    
     if len(data) == 0:
         raise Exception("Empty config data received.")
         return []
@@ -84,6 +85,9 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     telegraf_json = {}
 
     for item in data:
+        sink = item["sink"]
+        if "mdsd" in sink:
+            has_mdsd_output = True
         counter = item["displayName"]
         if counter in name_map:
             plugin = name_map[counter]["plugin"]
@@ -409,11 +413,12 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         agentconf += "  fielddrop = [" + excess_diskio_field_drop_list_str[:-2] + "]\n"
     agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
     agentconf += "  udp_payload = \"1024B\"\n\n"
-    agentconf += "\n# Configuration for sending metrics to MDSD\n"
-    agentconf += "[[outputs.socket_writer]]\n"
-    agentconf += "  namepass = [" + storage_namepass_str[:-2] + "]\n"
-    agentconf += "  data_format = \"influx\"\n"
-    agentconf += "  address = \"" + str(mdsd_url) + "\"\n\n"
+    if has_mdsd_output:
+        agentconf += "\n# Configuration for sending metrics to MDSD\n"
+        agentconf += "[[outputs.socket_writer]]\n"
+        agentconf += "  namepass = [" + storage_namepass_str[:-2] + "]\n"
+        agentconf += "  data_format = \"influx\"\n"
+        agentconf += "  address = \"" + str(mdsd_url) + "\"\n\n"
     agentconf += "\n# Configuration for outputing metrics to file. Uncomment to enable.\n"
     agentconf += "#[[outputs.file]]\n"
     agentconf += "#  files = [\"./metrics_to_file.out\"]\n\n"
