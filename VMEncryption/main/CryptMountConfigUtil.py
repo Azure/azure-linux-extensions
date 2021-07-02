@@ -614,17 +614,20 @@ class CryptMountConfigUtil(object):
         lines_to_keep_in_backup_fstab = []
         lines_to_put_back_to_fstab = []
 
-        with open('/etc/fstab.azure.backup', 'r') as f:
-            for line in f.readlines():
-                line = line.strip()
-                pattern = '\\s' + re.escape(mount_point_or_mapper_name) + '\\s'
+        try:
+            with open('/etc/fstab.azure.backup', 'r') as f:
+                for line in f.readlines():
+                    line = line.strip()
+                    pattern = '\\s' + re.escape(mount_point_or_mapper_name) + '\\s'
 
-                if re.search(pattern, line):
-                    self.logger.log("removing fstab.azure.backup line: {0}".format(line))
-                    lines_to_put_back_to_fstab.append(line)
-                    continue
+                    if re.search(pattern, line):
+                        self.logger.log("removing fstab.azure.backup line: {0}".format(line))
+                        lines_to_put_back_to_fstab.append(line)
+                        continue
 
-                lines_to_keep_in_backup_fstab.append(line)
+                    lines_to_keep_in_backup_fstab.append(line)
+        except:
+            self.logger.log("prior /etc/fstab.azure.backup file not found")
 
         with io.open('/etc/fstab.azure.backup', 'w') as f:
             contents = '\n'.join(lines_to_keep_in_backup_fstab)

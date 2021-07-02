@@ -142,7 +142,7 @@ def disable_encryption():
                                status_code=str(CommonVariables.success),
                                message='Encryption settings cleared')
 
-        bek_util.store_bek_passphrase(encryption_config, '')
+        bek_util.store_bek_passphrase(encryption_config, b'')
 
         bek_util.delete_bek_passphrase_file(encryption_config)
 
