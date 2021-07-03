@@ -83,7 +83,7 @@ class UbuntuPatching(AbstractPatching):
         # construct package installation list
         packages = ['at',
                     'cryptsetup-bin',
-                    'grub-pc-bin'
+                    'grub-pc-bin',
                     'lsscsi',
                     parted,
                     'python-six',
