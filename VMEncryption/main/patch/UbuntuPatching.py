@@ -47,33 +47,44 @@ class UbuntuPatching(AbstractPatching):
         self.umount_path = '/bin/umount'
         self.touch_path = '/usr/bin/touch'
 
+    def packages_installed(self, packages):
+        ''' return true if all packages in list are already installed '''
+        installed = True
+        for package in packages:
+            cmd = "dpkg-query -s {package} | grep -q 'install ok installed'"
+            if not self.command_executor.ExecuteInBash(cmd, False, None, None, True):
+                installed = False
+                self.logger.log("{1} package not yet installed".format(package))
+        return installed
+
     def install_cryptsetup(self):
         packages = ['cryptsetup-bin']
-        cmd = " ".join(['apt-get', 'install', '-y', '--no-upgrade'] + packages)
-        return_code = self.command_executor.Execute(cmd, timeout=30)
-        if return_code == -9:
-            msg = "Command: apt-get install timed out. Make sure apt-get is configured correctly and there are no network problems."
-            raise Exception(msg)
 
-        # If install fails, try running apt-get update and then try install again
-        if return_code != 0:
-            self.logger.log('cryptsetup installation failed. Retrying installation after running update')
-            return_code = self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update', timeout=30)
-            # Fail early if apt-get update times out.
-            if return_code == -9:
-                msg = "Command: apt-get -o Acquire::ForceIPv4=true -y update timed out. Make sure apt-get is configured correctly."
-                raise Exception(msg)
-            cmd = " ".join(['apt-get', 'install', '-y'] + packages)
+        if self.packages_installed(packages):
+            return
+        else:
+            cmd = " ".join(['apt-get', 'install', '-y', '--no-upgrade'] + packages)
             return_code = self.command_executor.Execute(cmd, timeout=30)
             if return_code == -9:
                 msg = "Command: apt-get install timed out. Make sure apt-get is configured correctly and there are no network problems."
                 raise Exception(msg)
-            return return_code
+
+            # If install fails, try running apt-get update and then try install again
+            if return_code != 0:
+                self.logger.log('cryptsetup installation failed. Retrying installation after running update')
+                return_code = self.command_executor.Execute('apt-get -o Acquire::ForceIPv4=true -y update', timeout=30)
+                # Fail early if apt-get update times out.
+                if return_code == -9:
+                    msg = "Command: apt-get -o Acquire::ForceIPv4=true -y update timed out. Make sure apt-get is configured correctly."
+                    raise Exception(msg)
+                cmd = " ".join(['apt-get', 'install', '-y'] + packages)
+                return_code = self.command_executor.Execute(cmd, timeout=30)
+                if return_code == -9:
+                    msg = "Command: apt-get install timed out. Make sure apt-get is configured correctly and there are no network problems."
+                    raise Exception(msg)
+                return return_code
 
     def install_extras(self):
-        cmd = " ".join(['apt-get', 'update'])
-        self.command_executor.Execute(cmd)
-
         # select the appropriate version specific parted package
         if (sys.version_info >= (3,)):
             parted = 'python3-parted'
@@ -90,8 +101,14 @@ class UbuntuPatching(AbstractPatching):
                     'procps',
                     'psmisc']
 
-        cmd = " ".join(['apt-get', 'install', '-y'] + packages)
-        self.command_executor.Execute(cmd)
+        if self.packages_installed(packages):
+            return
+        else:
+            cmd = " ".join(['apt-get', 'update'])
+            self.command_executor.Execute(cmd)
+
+            cmd = " ".join(['apt-get', 'install', '-y'] + packages)
+            self.command_executor.Execute(cmd)
 
     def update_prereq(self):
         self.logger.log("Trying to update Ubuntu osencrypt entry.")
