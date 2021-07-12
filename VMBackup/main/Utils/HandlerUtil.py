@@ -801,11 +801,11 @@ class HandlerUtility:
         self.pre_post_enabled = True
 
     def command_output_from_subprocess(self , args, process_wait_time):
-        p = subprocess.Popen(args, stdout=subprocess.PIPE)
-        while(process_wait_time > 0 and p.poll() is None):
+        process_out = subprocess.Popen(args, stdout=subprocess.PIPE)
+        while(process_wait_time > 0 and process_out.poll() is None):
             time.sleep(1)
             process_wait_time -= 1
-        out = p.stdout.read().decode()
+        out = process_out.stdout.read().decode()
         out = str(out)
         return out
         
