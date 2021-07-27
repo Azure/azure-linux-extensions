@@ -173,7 +173,7 @@ AgentGroup='omiusers'
 try:
     ext_log_path = '/var/log/azure/'
     if os.path.exists(ext_log_path):
-        os.chmod(ext_log_path, 700)
+        os.system('chmod {1} {0}'.format(ext_log_path, 700))
 except:
     pass
 
@@ -906,7 +906,8 @@ def is_vm_supported_for_extension():
                        'oracle' : ['6', '7', '8'], 'ol': ['6', '7', '8'], # Oracle
                        'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
-                       'suse' : ['12', '15'], 'sles' : ['12', '15'] # SLES
+                       'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
+                       'amzn' : ['2'] # AWS
     }
 
     vm_dist, vm_ver, vm_supported = '', '', False
