@@ -95,7 +95,7 @@ class SizeCalculation(object):
             self.logger.log("df command executed for process wait time value" + str(process_wait_time), True)
             if(df is not None and df.poll() is not None):
                 self.logger.log("df return code"+str(df.returncode), True)
-                output = df.stdout.read()
+                output = df.stdout.read().decode()
             if sys.version_info > (3,):
                 output = str(output, encoding='utf-8', errors="backslashreplace")
             else:

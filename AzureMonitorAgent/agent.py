@@ -64,7 +64,7 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
-# This code is taken from the omsagent's extension wrapper. 
+# This code is taken from the omsagent's extension wrapper.
 # This same monkey patch fix is relevant for AMA extension as well.
 # This monkey patch duplicates the one made in the waagent import above.
 # It is necessary because on 2.6, the waagent monkey patch appears to be overridden
@@ -267,14 +267,36 @@ def install():
                                          final_check = final_check_if_dpkg_locked)    
     
     default_configs = {   
+
+    # Set task limits to max of 65K in suse 12
+    # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
+    vm_dist, vm_ver = find_vm_distro('Install')
+    if vm_dist.lower().startswith('suse'):
+        try:
+            suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/mdsd.service.d")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+
+            suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/mdsd.service.d/override.conf")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+
+            suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/mdsd.service.d/override.conf")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+
+            suse_exit_code, suse_output = run_command_and_log("systemctl daemon-reload")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+        except:
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )
+
+    default_configs = {
         "MDSD_CONFIG_DIR" : "/etc/opt/microsoft/azuremonitoragent",
         "MDSD_LOG_DIR" : "/var/opt/microsoft/azuremonitoragent/log",
         "MDSD_ROLE_PREFIX" : "/run/azuremonitoragent/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/azuremonitoragent",
         "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh\"",
-        "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
-        "AZURE_ENDPOINT" : "https://monitor.azure.com/",
-        "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
         "MDSD_USE_LOCAL_PERSISTENCY" : "true",
@@ -286,8 +308,50 @@ def install():
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         hutil_log_info("Detecting Auto-Config mode.")
         return 0, ""
-    elif protected_settings is None or len(protected_settings) == 0:
+    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         default_configs["ENABLE_MCS"] = "true"
+
+        # fetch proxy settings
+        if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
+            default_configs["MDSD_PROXY_MODE"] = "application"
+            
+            if "address" in public_settings.get("proxy"):
+                default_configs["MDSD_PROXY_ADDRESS"] = public_settings.get("proxy").get("address")
+            else:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
+
+            if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
+                if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
+                    default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
+                    default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
+                else:  
+                    log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+
+        # Determine Managed Identity (MI) settings
+        # Nomenclature: Managed System Identity (MSI), System-Assigned Identity (SAI), User-Assigned Identity (UAI)
+        # Unspecified MI scenario: MSI returns SAI token if exists, otherwise returns UAI token if exactly one UAI exists, otherwise failure
+        # Specified MI scenario: MSI returns token for specified MI
+        if public_settings is not None and "authentication" in public_settings and "managedIdentity" in public_settings.get("authentication"):
+            managedIdentity = public_settings.get("authentication").get("managedIdentity")
+
+            if "identifier-name" not in managedIdentity or "identifier-value" not in managedIdentity:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameters "identifier-name" and "identifier-value" are both required in authentication.managedIdentity public setting')
+
+            identifier_name = managedIdentity.get("identifier-name")
+            identifier_value = managedIdentity.get("identifier-value")
+
+            if identifier_name not in ["object_id", "client_id", "mi_res_id"]:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-name provided; must be "object_id", "client_id", or "mi_res_id"')
+
+            if not identifier_value:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-value provided; cannot be empty')
+
+            if identifier_name in ["object_id", "client_id"]:
+                guid_re = re.compile(r'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}')
+                if not guid_re.search(identifier_value):
+                    log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-value provided for {0}; must be a GUID'.format(identifier_name))  
+
+            default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
     else:
         # look for LA protected settings
         for var in list(protected_settings.keys()):
@@ -336,7 +400,7 @@ def install():
             raise ParameterMissingException
         else:
             # set the values for GCS
-            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"        
+            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"
             default_configs["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
             default_configs["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
             default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
@@ -570,12 +634,12 @@ def start_metrics_process():
 def metrics_watcher(hutil_error, hutil_log):
     """
     Watcher thread to monitor metric configuration changes and to take action on them
-    """    
-    
-    # check every 30 seconds
+    """
+
+    # Check every 30 seconds
     sleepTime =  30
 
-    # sleep before starting the monitoring.
+    # Sleep before starting the monitoring
     time.sleep(sleepTime)
     last_crc = None
     me_msi_token_expiry_epoch = None
@@ -585,21 +649,21 @@ def metrics_watcher(hutil_error, hutil_log):
             if os.path.isfile(MdsdCounterJsonPath):
                 f = open(MdsdCounterJsonPath, "r")
                 data = f.read()
-                    
+
                 if (data != ''):
-                    json_data = json.loads(data)  
+                    json_data = json.loads(data)
                     
                     if len(json_data) == 0:
-                        last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
+                        last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
                         if telhandler.is_running(is_lad=False):
-                            #Stop the telegraf and ME services
+                            # Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
                                 hutil_log(tel_msg)
                             else:
                                 hutil_error(tel_msg)
 
-                            #Delete the telegraf and ME services
+                            # Delete the telegraf and ME services
                             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
                             if tel_rm_out:
                                 hutil_log(tel_rm_msg)
@@ -619,7 +683,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(me_rm_msg)
                     else:
-                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
+                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
                         if(crc != last_crc):
                             # Resetting the me_msi_token_expiry_epoch variable if we set up ME again.
@@ -649,7 +713,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_error(log_messages)
 
                             last_crc = crc
-                        
+
                         generate_token = False
                         me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
 
@@ -664,7 +728,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 generate_token = True
 
-                        if me_msi_token_expiry_epoch:                
+                        if me_msi_token_expiry_epoch:
                             currentTime = datetime.datetime.now()
                             token_expiry_time = datetime.datetime.fromtimestamp(int(me_msi_token_expiry_epoch))
                             if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
@@ -712,7 +776,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 if me_out:
                                     hutil_log(me_msg)
                                 else:
-                                    hutil_error(me_msg)                  
+                                    hutil_error(me_msg)
                                 start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
 
                                 if start_metrics_out:
@@ -722,13 +786,13 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
                         else:
-                            me_restart_retries = 0   
+                            me_restart_retries = 0
         
         except IOError as e:
-            hutil_error('I/O error in monitoring metrics. Exception={0}'.format(e))
+            hutil_error('I/O error in setting up or monitoring metrics. Exception={0}'.format(e))
 
         except Exception as e:
-            hutil_error('Error in monitoring metrics. Exception={0}'.format(e))
+            hutil_error('Error in setting up or monitoring metrics. Exception={0}'.format(e))
 
         finally:
             time.sleep(sleepTime)
@@ -1020,6 +1084,79 @@ def exit_if_vm_not_supported(operation):
         log_and_exit(operation, UnsupportedOperatingSystem, 'Unsupported operating system: ' \
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
+
+
+def is_arc_installed():
+    """
+    Check if this is an Arc machine
+    """
+    # Using systemctl to check this since Arc only supports VMs that have systemd
+    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
+    return check_arc == 0
+
+
+def get_arc_endpoint():
+    """
+    Find the endpoint for Arc IMDS
+    """
+    endpoint_filepath = '/lib/systemd/system.conf.d/azcmagent.conf'
+    endpoint = ''
+    try:
+        with open(endpoint_filepath, 'r') as f:
+            data = f.read()
+        endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+    except:
+        hutil_log_error('Unable to load Arc IMDS endpoint from {0}'.format(endpoint_filepath))
+    return endpoint
+
+
+def get_imds_endpoint():
+    """
+    Find the appropriate endpoint (Azure or Arc) for IMDS
+    """
+    azure_imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
+    if (is_arc_installed()):
+        hutil_log_info('Arc is installed, loading Arc-specific IMDS endpoint')
+        imds_endpoint = get_arc_endpoint()
+        if imds_endpoint:
+            imds_endpoint += '/metadata/instance?api-version=2019-08-15'
+        else:
+            # Fall back to the traditional IMDS endpoint; the cloud domain and VM
+            # resource id detection logic are resilient to failed queries to IMDS
+            imds_endpoint = azure_imds_endpoint
+            hutil_log_info('Falling back to default Azure IMDS endpoint')
+    else:
+        imds_endpoint = azure_imds_endpoint
+
+    hutil_log_info('Using IMDS endpoint "{0}"'.format(imds_endpoint))
+    return imds_endpoint
+
+
+def get_azure_environment_and_region():
+    """
+    Retreive the Azure environment and region from Azure or Arc IMDS
+    """
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
+    req.add_header('Metadata', 'True')
+
+    environment = region = None
+
+    try:
+        response = json.loads(urllib.request.urlopen(req).read())
+
+        if ('compute' in response):
+            if ('azEnvironment' in response['compute']):
+                environment = response['compute']['azEnvironment']
+            if ('location' in response['compute']):
+                region = response['compute']['location'].lower()
+    except urllib.error.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
+        hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+
+    return environment, region
 
 
 def run_command_and_log(cmd, check_error = True, log_cmd = True):

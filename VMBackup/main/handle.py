@@ -29,6 +29,7 @@ import time
 import shlex
 import traceback
 import datetime
+import random
 try:
     import ConfigParser as ConfigParsers
 except ImportError:
@@ -171,18 +172,7 @@ def exit_if_same_taskId(taskId):
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput)
         status_code=CommonVariables.SuccessAlreadyProcessedInput
         message='TaskId AlreadyProcessed nothing to do'
-        try:
-            if(para_parser is not None):
-                blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
-                        status_code=str(status_code),\
-                        message=message,\
-                        taskId=taskId,\
-                        commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                        snapshot_info=None)
-                status_report_to_file(file_report_msg)
-        except Exception as e:
-            err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(err_msg, True, 'Warning')
+        backup_logger.log(message, True)
         sys.exit(0)
 
 def convert_time(utcTicks):
@@ -351,12 +341,6 @@ def daemon():
                 temp_status= 'error'
                 exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
-        if(para_parser.taskId is not None and para_parser.taskId != ""):
-            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
-            exit_if_same_taskId(para_parser.taskId) 
-            taskIdentity = TaskIdentity()
-            taskIdentity.save_identity(para_parser.taskId)
-        
         hutil.save_seq()
 
         commandToExecute = para_parser.commandToExecute
@@ -608,9 +592,20 @@ def enable():
 
         hutil.exit_if_same_seq()
 
+        hutil.save_seq()
+
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
+
+        if(para_parser.taskId is not None and para_parser.taskId != ""):
+            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
+            randomSleepTime = random.randint(500, 5000)
+            backup_logger.log('Sleeping for milliseconds: ' + str(randomSleepTime), True)
+            time.sleep(randomSleepTime / 1000)
+            exit_if_same_taskId(para_parser.taskId)
+            taskIdentity = TaskIdentity()
+            taskIdentity.save_identity(para_parser.taskId)
 
         temp_status= 'success'
         temp_result=CommonVariables.ExtensionTempTerminalState
