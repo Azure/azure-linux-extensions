@@ -325,30 +325,13 @@ def install():
                 else:  
                     log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
 
-        # Determine Managed Identity (MI) settings
-        # Nomenclature: Managed System Identity (MSI), System-Assigned Identity (SAI), User-Assigned Identity (UAI)
-        # Unspecified MI scenario: MSI returns SAI token if exists, otherwise returns UAI token if exactly one UAI exists, otherwise failure
-        # Specified MI scenario: MSI returns token for specified MI
-        if public_settings is not None and "authentication" in public_settings and "managedIdentity" in public_settings.get("authentication"):
-            managedIdentity = public_settings.get("authentication").get("managedIdentity")
+        # add managed identity settings if they were provided
+        identifier_name, identifier_value, error_msg = get_managed_identity()
 
-            if "identifier-name" not in managedIdentity or "identifier-value" not in managedIdentity:
-                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameters "identifier-name" and "identifier-value" are both required in authentication.managedIdentity public setting')
+        if error_msg:
+            log_and_exit("Install", MissingorInvalidParameterErrorCode, 'Failed to determine managed identity settings. {0}.'.format(error_msg))
 
-            identifier_name = managedIdentity.get("identifier-name")
-            identifier_value = managedIdentity.get("identifier-value")
-
-            if identifier_name not in ["object_id", "client_id", "mi_res_id"]:
-                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-name provided; must be "object_id", "client_id", or "mi_res_id"')
-
-            if not identifier_value:
-                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-value provided; cannot be empty')
-
-            if identifier_name in ["object_id", "client_id"]:
-                guid_re = re.compile(r'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}')
-                if not guid_re.search(identifier_value):
-                    log_and_exit("install", MissingorInvalidParameterErrorCode, 'Invalid identifier-value provided for {0}; must be a GUID'.format(identifier_name))  
-
+        if identifier_name and identifier_value:
             default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
     else:
         # look for LA protected settings
@@ -491,7 +474,7 @@ def uninstall():
     elif PackageManager == "rpm":
         OneAgentUninstallCommand = "rpm -e azure-mdsd"
     else:
-        log_and_exit(operation, UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
+        log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(OneAgentUninstallCommand))
 
     # Retry, since uninstall can fail due to concurrent package operations
@@ -569,13 +552,46 @@ def update():
     """
     Update the current installation of AzureMonitorLinuxAgent
     No logic to install the agent as agent -> install() will be called 
-    with udpate because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
+    with update because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
     """
-    
+
     return 0, ""
 
+def get_managed_identity():
+    """
+    # Determine Managed Identity (MI) settings
+    # Nomenclature: Managed System Identity (MSI), System-Assigned Identity (SAI), User-Assigned Identity (UAI)
+    # Unspecified MI scenario: MSI returns SAI token if exists, otherwise returns UAI token if exactly one UAI exists, otherwise failure
+    # Specified MI scenario: MSI returns token for specified MI
+    # Returns identifier_name, identifier_value, and error message (if any)
+    """
+    identifier_name = identifier_value = ""
+    public_settings, protected_settings = get_settings()
+
+    if public_settings is not None and "authentication" in public_settings and "managedIdentity" in public_settings.get("authentication"):
+        managedIdentity = public_settings.get("authentication").get("managedIdentity")
+
+        if "identifier-name" not in managedIdentity or "identifier-value" not in managedIdentity:
+            return identifier_name, identifier_value, 'Parameters "identifier-name" and "identifier-value" are both required in authentication.managedIdentity public setting'
+
+        identifier_name = managedIdentity.get("identifier-name")
+        identifier_value = managedIdentity.get("identifier-value")
+
+        if identifier_name not in ["object_id", "client_id", "mi_res_id"]:
+            return identifier_name, identifier_value, 'Invalid identifier-name provided; must be "object_id", "client_id", or "mi_res_id"'
+
+        if not identifier_value:
+            return identifier_name, identifier_value, 'Invalid identifier-value provided; cannot be empty'
+
+        if identifier_name in ["object_id", "client_id"]:
+            guid_re = re.compile(r'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}')
+            if not guid_re.search(identifier_value):
+                return identifier_name, identifier_value, 'Invalid identifier-value provided for {0}; must be a GUID'.format(identifier_name)
+
+    return identifier_name, identifier_value, ""
+
 def stop_metrics_process():
-    
+
     if telhandler.is_running(is_lad=False):
         #Stop the telegraf and ME services
         tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
@@ -636,6 +652,11 @@ def metrics_watcher(hutil_error, hutil_log):
 
     # Check every 30 seconds
     sleepTime =  30
+
+    # Retrieve managed identity info that may be needed for token retrieval
+    identifier_name, identifier_value, error_msg = get_managed_identity()
+    if error_msg:
+        hutil_error('Failed to determine managed identity settings; MSI token retreival will rely on default identity, if any. {0}.'.format(error_msg))
 
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
@@ -735,7 +756,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                         if generate_token:
                             generate_token = False
-                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
+                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value)
                             if msi_token_generated:
                                 hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
                             else:
