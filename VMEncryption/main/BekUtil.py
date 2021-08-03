@@ -122,9 +122,9 @@ class BekUtil(object):
         if not bek_expected:
             bek_attached, error_reason = self.is_bek_disk_attached_and_partitioned()
             if bek_attached:
-                raise BekMissingException("BEK disk missing or not initialized." + fault_reason)
+                raise BekMissingException("BEK disk is missing or not initialized. " + fault_reason)
             else:
-                raise BekMissingException("BEK disk missing or not initialized." + error_reason)
+                raise BekMissingException("BEK disk is missing or not initialized. " + error_reason)
 
     def is_bek_volume_mounted_and_formatted(self):
         mount_items=self.disk_util.get_mount_items()
@@ -144,7 +144,7 @@ class BekUtil(object):
         ]
         for location in possible_bek_locations:
             if os.path.exists(location):
-                if os.path.exists(location+"-part1"):
+                if os.path.exists(os.path.join(location, "-part1")):
                     return True, ""
                 else:
                     return False, self.partition_missing_msg
