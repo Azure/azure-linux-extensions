@@ -171,7 +171,7 @@ def generate_Arc_MSI_token():
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
                 res = urllib.request.urlopen(req)
             except:
-                # The above request is expected to fail and add a key to the path - 
+                # The above request is expected to fail and add a key to the path
                 authkey_dir = "/var/opt/azcmagent/tokens/"
                 if not os.path.exists(authkey_dir):
                     log_messages += "Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir)
@@ -218,7 +218,7 @@ def generate_Arc_MSI_token():
     return True, expiry_epoch_time, log_messages
 
 
-def generate_MSI_token():
+def generate_MSI_token(identifier_name = '', identifier_value = ''):
     """
     This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
     This is called from the main extension code after config setup is complete
@@ -237,12 +237,16 @@ def generate_MSI_token():
         sleep_time = 5
 
         if not os.path.exists(me_config_dir):
-            log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token fo ME.\n".format(me_config_dir)
+            log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token for ME.\n".format(me_config_dir)
             return False, expiry_epoch_time, log_messages
         try:
             data = None
             while retries <= max_retries:
                 msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
+
+                if identifier_name and identifier_value:
+                    msiauthurl += '&{0}={1}'.format(identifier_name, identifier_value)
+
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
                 res = urllib.request.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
@@ -266,11 +270,12 @@ def generate_MSI_token():
             if "expires_on" in data:
                 expiry_epoch_time  = data["expires_on"]
             else:
-                log_messages += "Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
+                log_messages += "Error parsing the MSI token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
                 return False, expiry_epoch_time, log_messages
 
         except Exception as e:
-            log_messages += "Failed to get msi auth token. Please check if VM's system assigned Identity is enabled Failed with error {0}\n".format(e)
+            log_messages += "Failed to get MSI auth token. Please check if the VM's system assigned identity is enabled or the user assigned identity "
+            log_messages += "passed in the extension settings exists and is assigned to this VM. Failed with error {0}\n".format(e)
             return False, expiry_epoch_time, log_messages
 
         return True, expiry_epoch_time, log_messages
