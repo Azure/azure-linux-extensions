@@ -294,7 +294,7 @@ def install():
         "MDSD_LOG_DIR" : "/var/opt/microsoft/azuremonitoragent/log",
         "MDSD_ROLE_PREFIX" : "/run/azuremonitoragent/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/azuremonitoragent",
-        "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh\"",
+        "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
         "MDSD_USE_LOCAL_PERSISTENCY" : "true",
