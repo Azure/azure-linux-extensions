@@ -513,6 +513,7 @@ def start_mdsd(configurator):
     err_file_path = os.path.join(log_dir, 'mdsd.err')
     info_file_path = os.path.join(log_dir, 'mdsd.info')
     warn_file_path = os.path.join(log_dir, 'mdsd.warn')
+    qos_file_path = os.path.join(log_dir, 'mdsd.qos')
     # Need to provide EH events and Rsyslog spool path since the new mdsd master branch LAD doesnt create the directory needed
     eh_spool_path = os.path.join(log_dir, 'eh')
 
@@ -529,7 +530,7 @@ def start_mdsd(configurator):
         copy_env['MDSD_http_proxy'] = proxy_config
 
     # Now prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -S {7} -o {5}{6}'.format(
+    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -q {8} -S {7} -o {5}{6}'.format(
         g_mdsd_bin_path,
         xml_file,
         g_mdsd_role_name,
@@ -537,7 +538,8 @@ def start_mdsd(configurator):
         warn_file_path,
         info_file_path,
         g_ext_settings.get_mdsd_trace_option(),
-        eh_spool_path).split(" ")
+        eh_spool_path,
+        qos_file_path).split(" ")
 
     try:
         start_watcher_thread()
