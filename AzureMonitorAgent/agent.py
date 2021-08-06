@@ -421,7 +421,10 @@ def install():
             data = []
             new_data = ""
             vars_set = set()
-            dependent_vars = set(default_configs.keys()).intersection(["MDSD_OPTIONS"])
+            dependent_vars = ["MDSD_OPTIONS"]
+
+            # Scope to only dependent envvar being set by extension wrapper
+            dependent_vars = set(default_configs.keys()).intersection(dependent_vars)
 
             # Copy existing comments/envvar to the updated defaults file; replace existing envvar values if appropriate
             with open(config_file, "r") as f:
