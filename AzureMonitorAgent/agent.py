@@ -110,10 +110,11 @@ PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
 
 # Commands
-OneAgentInstallCommand = ''
-OneAgentUninstallCommand = ''
-RestartOneAgentServiceCommand = ''
-DisableOneAgentServiceCommand = ''
+AMAInstallCommand = ''
+AMAUninstallCommand = ''
+AMAServiceRestartCommand = ''
+AMAServiceEnableCommand = ''
+AMAServiceDisableCommand = ''
 
 # Error codes
 DPKGLockedErrorCode = 56
@@ -173,10 +174,13 @@ def main():
     exit_code = 0
     message = '{0} succeeded'.format(operation)
 
-    exit_code = check_disk_space_availability()
-    if exit_code != 0:
-        message = '{0} failed due to low disk space'.format(operation)
-        log_and_exit(operation, exit_code, message)
+    # Avoid entering broken state where manual purge actions are necessary in low disk space scenario
+    destructive_operations = ['Disable', 'Uninstall']
+    if operation not in destructive_operations:
+        exit_code = check_disk_space_availability()
+        if exit_code != 0:
+            message = '{0} failed due to low disk space'.format(operation)
+            log_and_exit(operation, exit_code, message)
 
     # Invoke operation
     try:
@@ -258,11 +262,11 @@ def install():
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
     print(PackageManager, " and ", BundleFileName)
-    OneAgentInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
-    hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
+    AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
+    hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
 
     # Retry, since install can fail due to concurrent package operations
-    exit_code, output = run_command_with_retries_output(OneAgentInstallCommand, retries = 15,
+    exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)
 
@@ -491,16 +495,16 @@ def uninstall():
     """
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
-        OneAgentUninstallCommand = "dpkg -P azuremonitoragent"
+        AMAUninstallCommand = "dpkg -P azuremonitoragent"
     elif PackageManager == "rpm":
-        OneAgentUninstallCommand = "rpm -e azuremonitoragent"
+        AMAUninstallCommand = "rpm -e azuremonitoragent"
     else:
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
-    hutil_log_info('Running command "{0}"'.format(OneAgentUninstallCommand))
+    hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
 
     # Retry, since uninstall can fail due to concurrent package operations
     try:
-        exit_code, output = run_command_with_retries_output(OneAgentUninstallCommand, retries = 4,
+        exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
                                             retry_check = retry_if_dpkg_locked,
                                             final_check = final_check_if_dpkg_locked)
     except Exception as ex:
@@ -524,21 +528,21 @@ def enable():
         start_arc_process()
 
     if is_systemd():
-        OneAgentEnableCommand = "systemctl start azuremonitoragent"
+        AMAServiceEnableCommand = "systemctl start azuremonitoragent"
     else:
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragent.")
-        OneAgentEnableCommand = "/etc/init.d/azuremonitoragent start"
+        AMAServiceEnableCommand = "/etc/init.d/azuremonitoragent start"
 
     public_settings, protected_settings = get_settings()
 
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        OneAgentEnableCommand = "systemctl start azuremonitoragentmgr"
+        AMAServiceEnableCommand = "systemctl start azuremonitoragentmgr"
         if not is_systemd():
             hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragentmgr.")
-            OneAgentEnableCommand = "/etc/init.d/azuremonitoragentmgr start"
+            AMAServiceEnableCommand = "/etc/init.d/azuremonitoragentmgr start"
 
     hutil_log_info('Handler initiating onboarding.')
-    exit_code, output = run_command_and_log(OneAgentEnableCommand)
+    exit_code, output = run_command_and_log(AMAServiceEnableCommand)
 
     if exit_code == 0:
         #start metrics process if enable is successful
@@ -560,13 +564,13 @@ def disable():
 
     #stop the Azure Monitor Linux Agent service
     if is_systemd():
-        DisableOneAgentServiceCommand = "systemctl stop azuremonitoragent"
+        AMAServiceDisableCommand = "systemctl stop azuremonitoragent"
 
     else:
-        DisableOneAgentServiceCommand = "/etc/init.d/azuremonitoragent stop"
+        AMAServiceDisableCommand = "/etc/init.d/azuremonitoragent stop"
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop azuremonitoragent.")
 
-    exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
+    exit_code, output = run_command_and_log(AMAServiceDisableCommand)
     return exit_code, output
 
 def update():
@@ -655,13 +659,12 @@ def start_metrics_process():
     """
     Start metrics process that performs periodic monitoring activities
     :return: None
-
     """
     stop_metrics_process()
 
-    #start metrics watcher
-    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-metrics']
+    # Start metrics watcher
+    ama_path = os.path.join(os.getcwd(), 'agent.py')
+    args = ['python{0}'.format(sys.version_info[0]), ama_path, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -864,8 +867,8 @@ def start_arc_process():
     hutil_log_info("starting arc process")
 
     #start arc watcher
-    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-arc']
+    ama_path = os.path.join(os.getcwd(), 'agent.py')
+    args = ['python{0}'.format(sys.version_info[0]), ama_path, '-arc']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
