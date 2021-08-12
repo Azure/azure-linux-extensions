@@ -113,9 +113,9 @@ MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
 # Commands
 AMAInstallCommand = ''
 AMAUninstallCommand = ''
-AMAServiceRestartCommand = ''
-AMAServiceEnableCommand = ''
-AMAServiceDisableCommand = ''
+AMAServiceStartCommand = ''
+AMAServiceStopCommand = ''
+AMAServiceStatusCommand = ''
 
 # Error codes
 DPKGLockedErrorCode = 56
@@ -254,6 +254,8 @@ def install():
     Note: install operation times out from WAAgent at 15 minutes, so do not
     wait longer.
     """
+    global AMAInstallCommand
+
     find_package_manager("Install")
     exit_if_vm_not_supported('Install')
 
@@ -493,6 +495,8 @@ def uninstall():
     This is a somewhat soft uninstall. It is not a purge.
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
+    global AMAUninstallCommand
+
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
         AMAUninstallCommand = "dpkg -P azure-mdsd"
@@ -520,6 +524,8 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
+    global AMAServiceStartCommand, AMAServiceStatusCommand
+
     exit_if_vm_not_supported('Enable')
 
     # Check if this is Arc VM and enable arc daemon if it is
@@ -528,25 +534,33 @@ def enable():
         start_arc_process()
 
     if is_systemd():
-        AMAServiceEnableCommand = "systemctl start mdsd"
+        AMAServiceStartCommand = "systemctl start mdsd"
+        AMAServiceStatusCommand = "systemctl status mdsd"
     else:
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
-        AMAServiceEnableCommand = "/etc/init.d/mdsd start"
+        AMAServiceStartCommand = "/etc/init.d/mdsd start"
+        AMAServiceStatusCommand = "/etc/init.d/mdsd status"
 
     public_settings, protected_settings = get_settings()
 
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        AMAServiceEnableCommand = "systemctl start mdsdmgr"
+        AMAServiceStartCommand = "systemctl start mdsdmgr"
+        AMAServiceStatusCommand = "systemctl status mdsdmgr"
         if not is_systemd():
             hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
-            AMAServiceEnableCommand = "/etc/init.d/mdsdmgr start"
+            AMAServiceStartCommand = "/etc/init.d/mdsdmgr start"
+            AMAServiceStatusCommand = "/etc/init.d/mdsdmgr status"
 
     hutil_log_info('Handler initiating onboarding.')
-    exit_code, output = run_command_and_log(AMAServiceEnableCommand)
+    exit_code, output = run_command_and_log(AMAServiceStartCommand)
 
     if exit_code == 0:
         #start metrics process if enable is successful
         start_metrics_process()
+    else:
+        status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
+        if status_exit_code != 0:
+            output += "Output of '{0}':\n{1}".format(AMAServiceStatusCommand, status_output)
 
     return exit_code, output
 
@@ -555,6 +569,7 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
+    global AMAServiceStopCommand
 
     # disable arc daemon if it is running
     stop_arc_watcher()
@@ -564,13 +579,13 @@ def disable():
 
     #stop the Azure Monitor Linux Agent service
     if is_systemd():
-        AMAServiceDisableCommand = "systemctl stop mdsd"
+        AMAServiceStopCommand = "systemctl stop mdsd"
 
     else:
-        AMAServiceDisableCommand = "/etc/init.d/mdsd stop"
+        AMAServiceStopCommand = "/etc/init.d/mdsd stop"
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop mdsd.")
 
-    exit_code, output = run_command_and_log(AMAServiceDisableCommand)
+    exit_code, output = run_command_and_log(AMAServiceStopCommand)
     return exit_code, output
 
 def update():
@@ -998,9 +1013,7 @@ def find_package_manager(operation):
     """
     Checks if the dist is debian based or centos based and assigns the package manager accordingly
     """
-    global PackageManager
-    global PackageManagerOptions
-    global BundleFileName
+    global PackageManager, PackageManagerOptions, BundleFileName
     dist, ver = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
