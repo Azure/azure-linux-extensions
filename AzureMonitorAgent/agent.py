@@ -524,7 +524,12 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
-    global AMAServiceStartCommand, AMAServiceStatusCommand
+    global AMAServiceStartCommand, AMAServiceStatusCommand, HUtilObject
+
+    if HUtilObject:
+        if(HUtilObject.is_seq_smaller()):
+            HUtilObject.log("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Exiting...")
+            sys.exit(0)
 
     exit_if_vm_not_supported('Enable')
 
@@ -557,6 +562,7 @@ def enable():
     if exit_code == 0:
         #start metrics process if enable is successful
         start_metrics_process()
+        HUtilObject.save_seq()
     else:
         status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
         if status_exit_code != 0:
