@@ -348,11 +348,27 @@ def install():
         # check if required GCS params are available
         MONITORING_GCS_CERT_CERTFILE = None
         if "certificate" in protected_settings:
-            MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
+            certificate = protected_settings.get("certificate")
+            # Try to handle a local path first if url style is provider,
+            # then fallback as base64 encoded certificate payload
+            if certificate.startsWith('file:'):
+                certificate = certificate[5:]
+                with open(certificate, 'r') as f:
+                    MONITORING_GCS_CERT_CERTFILE = f.read()
+            else:
+                MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(certificate)
 
         MONITORING_GCS_CERT_KEYFILE = None
         if "certificateKey" in protected_settings:
-            MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(protected_settings.get("certificateKey"))
+            certificateKey = protected_settings.get("certificateKey")
+            # Try to handle a local path first if url style is provider,
+            # then fallback as base64 encoded certificate payload
+            if certificateKey.startsWith('file:'):
+                certificateKey = certificateKey[5:]
+                with open(certificateKey, 'r') as f:
+                    MONITORING_GCS_CERT_KEYFILE = f.read()
+            else:
+                MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(certificateKey)
 
         MONITORING_GCS_ENVIRONMENT = ""
         if "monitoringGCSEnvironment" in protected_settings:
