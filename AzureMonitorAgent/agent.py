@@ -382,6 +382,19 @@ def install():
         if "monitoringGCSAuthId" in protected_settings:
             MONITORING_GCS_AUTH_ID = protected_settings.get("monitoringGCSAuthId")
 
+        MONITORING_TENANT = ""
+        if "monitoringTenant" in protected_settings:
+            MONITORING_TENANT = protected_settings.get("monitoringTenant")
+
+        MONITORING_ROLE = ""
+        if "monitoringRole" in protected_settings:
+            MONITORING_ROLE = protected_settings.get("monitoringRole")
+
+        MONITORING_ROLE_INSTANCE = ""
+        if "monitoringRoleInstance" in protected_settings:
+            MONITORING_ROLE_INSTANCE = protected_settings.get("monitoringRoleInstance")
+
+
         if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE == "")) or MONITORING_GCS_ENVIRONMENT == "" or MONITORING_GCS_NAMESPACE == "" or MONITORING_GCS_ACCOUNT == "" or MONITORING_GCS_REGION == "" or MONITORING_CONFIG_VERSION == "":
             waagent_log_error('Not all required GCS parameters are provided')
             raise ParameterMissingException
@@ -419,6 +432,15 @@ def install():
                 fh.close()
                 os.chown("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", uid, gid)
                 os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", 400))
+
+            if MONITORING_TENANT != "":
+                default_configs["MONITORING_TENANT"] = MONITORING_TENANT
+
+            if MONITORING_ROLE != "":
+                default_configs["MONITORING_ROLE"] = MONITORING_ROLE
+
+            if MONITORING_TENANT != "":
+                default_configs["MONITORING_ROLE_INSTANCE"] = MONITORING_ROLE_INSTANCE
 
     config_file = "/etc/default/azuremonitoragent"
     config_updated = False
