@@ -39,7 +39,7 @@ from BackupLogger import BackupLogger
 from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import EncryptionConfig
 from patch import GetDistroPatcher
-from BekUtil import BekUtil
+from BekUtil import BekUtil, BekMissingException
 from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
@@ -720,6 +720,13 @@ def enable():
                           status=CommonVariables.extension_error_status,
                           code=(CommonVariables.configuration_error),
                           message=msg)
+
+    except BekMissingException as e:
+        hutil.do_exit(exit_code=CommonVariables.missing_dependency,
+                      operation='Enable',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.missing_dependency),
+                      message=str(e))
 
     except Exception as e:
         msg = "Unexpected Error during enable: {0}".format(traceback.format_exc(e))
