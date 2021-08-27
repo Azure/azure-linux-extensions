@@ -277,15 +277,15 @@ def install():
     vm_dist, vm_ver = find_vm_distro('Install')
     if vm_dist.lower().startswith('suse'):
         try:
-            suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/mdsd.service.d")
+            suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
 
-            suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/mdsd.service.d/override.conf")
+            suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitoragent.service.d/override.conf")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
 
-            suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/mdsd.service.d/override.conf")
+            suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/azuremonitoragent.service.d/override.conf")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
 
@@ -293,7 +293,7 @@ def install():
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
         except:
-            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
 
     default_configs = {
         "MDSD_CONFIG_DIR" : "/etc/opt/microsoft/azuremonitoragent",
