@@ -528,8 +528,7 @@ def enable():
 
     if HUtilObject:
         if(HUtilObject.is_seq_smaller()):
-            HUtilObject.log("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Exiting...")
-            sys.exit(0)
+            return 0, "Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable"
 
     exit_if_vm_not_supported('Enable')
 
