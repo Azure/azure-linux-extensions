@@ -1,6 +1,12 @@
 {
   "redhat": [
         {
+          "Version" : "8.4"
+        },
+        {
+          "Version" : "8.3"
+        },
+        {
           "Version" : "8.2"
         },
         {
@@ -49,7 +55,19 @@
           "Kernel": "4.15"
         }
     ],
-    "centos" : [
+   "centos" : [
+        {
+          "Version" : "8.4"
+        },
+        {
+          "Version" : "8.3"
+        },
+        {
+          "Version" : "8.4"
+        },
+        {
+          "Version" : "8.3"
+        },
         {
           "Version" : "8.2"
         },
