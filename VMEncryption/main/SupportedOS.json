@@ -55,7 +55,7 @@
           "Kernel": "4.15"
         }
     ],
-   "centos" : [
+    "centos" : [
         {
           "Version" : "8.4"
         },
