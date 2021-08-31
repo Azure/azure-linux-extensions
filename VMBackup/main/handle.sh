@@ -9,6 +9,8 @@ postsubstr1=${postsubstr#*\"}
 resultstrlen=`expr ${#postsubstr} - 1 - ${#postsubstr1}`
 logfolder=$(echo $postsubstr | cut -b 1-$resultstrlen)
 logfile=$logfolder'/shell.log'
+crseq = './crseq'
+rm -f $crseq
 
 rc=3
 arc=0
@@ -65,14 +67,6 @@ then
 	echo "`date -u`- python path exists" >> $logfile
 	/usr/bin/env python main/handle.py -$1
 	rc=$?
-fi
-
-configSeqNo="$(echo `printenv ConfigSequenceNumber`)"
-if [ -n ${configSeqNo} ]
-then
-	echo "`date -u`- ConfigSequenceNumber from environment variable ${configSeqNo}" >> $logfile
-else
-	echo "`date -u`- ConfigSequenceNumber not found in environment variable"
 fi
 
 if [ $rc -ne 0 ] && [ -f "${pythonPath}" ]
