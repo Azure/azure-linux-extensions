@@ -9,8 +9,6 @@ postsubstr1=${postsubstr#*\"}
 resultstrlen=`expr ${#postsubstr} - 1 - ${#postsubstr1}`
 logfolder=$(echo $postsubstr | cut -b 1-$resultstrlen)
 logfile=$logfolder'/shell.log'
-crseq = './crseq'
-rm -f $crseq
 
 rc=3
 arc=0
