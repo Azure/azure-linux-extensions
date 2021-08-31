@@ -9,6 +9,8 @@ postsubstr1=${postsubstr#*\"}
 resultstrlen=`expr ${#postsubstr} - 1 - ${#postsubstr1}`
 logfolder=$(echo $postsubstr | cut -b 1-$resultstrlen)
 logfile=$logfolder'/shell.log'
+currentseq = './crseq'
+rm -f $currentseq
 
 rc=3
 arc=0
@@ -56,6 +58,16 @@ do
 		break
 	fi
 done
+
+configSeqNo="$(echo `printenv ConfigSequenceNumber`)"
+echo $configSeqNo >> $currentseq
+
+if [ -n ${configSeqNo} ]
+then
+	echo "`date -u`- ConfigSequenceNumber from environment variable ${configSeqNo}" >> $logfile
+else
+	echo "`date -u`- ConfigSequenceNumber not found in environment variable"
+fi
 
 pythonProcess=$(ps -ef | grep waagent | grep python)
 pythonPath=$(echo "${pythonProcess}" | head -n1 | awk '{print $8;}')

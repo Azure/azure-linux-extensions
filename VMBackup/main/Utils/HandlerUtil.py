@@ -113,6 +113,14 @@ class HandlerUtility:
         seq_no = -1
         cur_seq_no = -1
         freshest_time = None
+
+        try:
+            cur_seq_no = self.get_current_seq()
+            if(cur_seq_no != -1):
+                return cur_seq_no
+        except:
+            self.log("_get_current_seq_no: Could not get current sequence number from environment variable")
+
         for subdir, dirs, files in os.walk(config_folder):
             for file in files:
                 try:
@@ -133,6 +141,13 @@ class HandlerUtility:
     def get_last_seq(self):
         if(os.path.isfile('mrseq')):
             seq = waagent.GetFileContents('mrseq')
+            if(seq):
+                return int(seq)
+        return -1
+    
+    def get_current_seq(self):
+        if(os.path.isfile('crseq')):
+            seq = waagent.GetFileContents('crseq')
             if(seq):
                 return int(seq)
         return -1
