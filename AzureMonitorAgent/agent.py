@@ -64,7 +64,7 @@ except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
 
-# This code is taken from the omsagent's extension wrapper. 
+# This code is taken from the omsagent's extension wrapper.
 # This same monkey patch fix is relevant for AMA extension as well.
 # This monkey patch duplicates the one made in the waagent import above.
 # It is necessary because on 2.6, the waagent monkey patch appears to be overridden
@@ -99,8 +99,8 @@ if sys.version_info < (2,7):
 
 # Global Variables
 PackagesDirectory = 'packages'
-# TO BE CHANGED WITH EACH NEW RELEASE IF THE BUNDLE VERSION CHANGES
-# TODO: Installer should automatically figure this out from the folder instead of requiring this update
+# This changes during release if there are changes to mdsd. The release pipeline
+# uses apply_version.sh to replace the below with the appropriate package names.
 BundleFileNameDeb = 'azure-mdsd_1.5.133-build.master.157_x86_64.deb'
 BundleFileNameRpm = 'azure-mdsd_1.5.133-build.master.157_x86_64.rpm'
 BundleFileName = ''
@@ -111,10 +111,11 @@ PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
 
 # Commands
-OneAgentInstallCommand = ''
-OneAgentUninstallCommand = ''
-RestartOneAgentServiceCommand = ''
-DisableOneAgentServiceCommand = ''
+AMAInstallCommand = ''
+AMAUninstallCommand = ''
+AMAServiceStartCommand = ''
+AMAServiceStopCommand = ''
+AMAServiceStatusCommand = ''
 
 # Error codes
 DPKGLockedErrorCode = 56
@@ -174,10 +175,13 @@ def main():
     exit_code = 0
     message = '{0} succeeded'.format(operation)
 
-    exit_code = check_disk_space_availability()
-    if exit_code != 0:
-        message = '{0} failed due to low disk space'.format(operation)
-        log_and_exit(operation, exit_code, message)   
+    # Avoid entering broken state where manual purge actions are necessary in low disk space scenario
+    destructive_operations = ['Disable', 'Uninstall']
+    if operation not in destructive_operations:
+        exit_code = check_disk_space_availability()
+        if exit_code != 0:
+            message = '{0} failed due to low disk space'.format(operation)
+            log_and_exit(operation, exit_code, message)
 
     # Invoke operation
     try:
@@ -208,10 +212,10 @@ def main():
         message = '{0} failed with error: {1}\n' \
                   'Stacktrace: {2}'.format(operation, e,
                                            traceback.format_exc())
-     
+
     # Finish up and log messages
-    log_and_exit(operation, exit_code, message)   
-        
+    log_and_exit(operation, exit_code, message)
+
 def check_disk_space_availability():
     """
     Check if there is the required space on the machine.
@@ -226,7 +230,7 @@ def check_disk_space_availability():
     except:
         print('Failed to check disk usage.')
         return 0
-        
+
 
 def get_free_space_mb(dirname):
     """
@@ -250,6 +254,8 @@ def install():
     Note: install operation times out from WAAgent at 15 minutes, so do not
     wait longer.
     """
+    global AMAInstallCommand
+
     find_package_manager("Install")
     exit_if_vm_not_supported('Install')
 
@@ -259,41 +265,86 @@ def install():
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
     print(PackageManager, " and ", BundleFileName)
-    OneAgentInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
-    hutil_log_info('Running command "{0}"'.format(OneAgentInstallCommand))
+    AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
+    hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
 
     # Retry, since install can fail due to concurrent package operations
-    exit_code, output = run_command_with_retries_output(OneAgentInstallCommand, retries = 15,
+    exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
-                                         final_check = final_check_if_dpkg_locked)    
-    
-    default_configs = {   
+                                         final_check = final_check_if_dpkg_locked)
+
+    # Set task limits to max of 65K in suse 12
+    # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
+    vm_dist, vm_ver = find_vm_distro('Install')
+    if vm_dist.lower().startswith('suse'):
+        try:
+            suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/mdsd.service.d")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+
+            suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/mdsd.service.d/override.conf")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+
+            suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/mdsd.service.d/override.conf")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+
+            suse_exit_code, suse_output = run_command_and_log("systemctl daemon-reload")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+        except:
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )
+
+    default_configs = {
         "MDSD_LOG" : "/var/log",
         "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
         "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
         "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
-        "MCS_ENDPOINT" : "handler.control.monitor.azure.com",
-        "AZURE_ENDPOINT" : "https://monitor.azure.com/",
-        "ADD_REGION_TO_MCS_ENDPOINT" : "true",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
         "MDSD_USE_LOCAL_PERSISTENCY" : "true",
         #"OMS_TLD" : "int2.microsoftatlanta-int.com",
-        #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",        
+        #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",
     }
 
     # Decide the mode
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         hutil_log_info("Detecting Auto-Config mode.")
         return 0, ""
-    elif protected_settings is None or len(protected_settings) == 0:
+    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         default_configs["ENABLE_MCS"] = "true"
+
+        # fetch proxy settings
+        if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
+            default_configs["MDSD_PROXY_MODE"] = "application"
+
+            if "address" in public_settings.get("proxy"):
+                default_configs["MDSD_PROXY_ADDRESS"] = public_settings.get("proxy").get("address")
+            else:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
+
+            if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
+                if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
+                    default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
+                    default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
+                else:
+                    log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+
+        # add managed identity settings if they were provided
+        identifier_name, identifier_value, error_msg = get_managed_identity()
+
+        if error_msg:
+            log_and_exit("Install", MissingorInvalidParameterErrorCode, 'Failed to determine managed identity settings. {0}.'.format(error_msg))
+
+        if identifier_name and identifier_value:
+            default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
     else:
         # look for LA protected settings
         for var in list(protected_settings.keys()):
             if "_key" in var or "_id" in var:
                 default_configs[var] = protected_settings.get(var)
-        
+
         # check if required GCS params are available
         MONITORING_GCS_CERT_CERTFILE = None
         if "certificate" in protected_settings:
@@ -331,12 +382,25 @@ def install():
         if "monitoringGCSAuthId" in protected_settings:
             MONITORING_GCS_AUTH_ID = protected_settings.get("monitoringGCSAuthId")
 
+        MONITORING_TENANT = ""
+        if "monitoringTenant" in protected_settings:
+            MONITORING_TENANT = protected_settings.get("monitoringTenant")
+
+        MONITORING_ROLE = ""
+        if "monitoringRole" in protected_settings:
+            MONITORING_ROLE = protected_settings.get("monitoringRole")
+
+        MONITORING_ROLE_INSTANCE = ""
+        if "monitoringRoleInstance" in protected_settings:
+            MONITORING_ROLE_INSTANCE = protected_settings.get("monitoringRoleInstance")
+
+
         if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE == "")) or MONITORING_GCS_ENVIRONMENT == "" or MONITORING_GCS_NAMESPACE == "" or MONITORING_GCS_ACCOUNT == "" or MONITORING_GCS_REGION == "" or MONITORING_CONFIG_VERSION == "":
             waagent_log_error('Not all required GCS parameters are provided')
             raise ParameterMissingException
         else:
             # set the values for GCS
-            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"        
+            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"
             default_configs["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
             default_configs["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
             default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
@@ -346,7 +410,7 @@ def install():
             # write the certificate and key to disk
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
-            
+
             if MONITORING_GCS_AUTH_ID_TYPE != "":
                 default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
 
@@ -359,7 +423,7 @@ def install():
                 fh.write(MONITORING_GCS_CERT_CERTFILE)
                 fh.close()
                 os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))  
+                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))
 
             if MONITORING_GCS_CERT_KEYFILE is not None:
                 default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/mdsd.d/gcskey.pem"
@@ -367,7 +431,16 @@ def install():
                 fh.write(MONITORING_GCS_CERT_KEYFILE)
                 fh.close()
                 os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))  
+                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))
+
+            if MONITORING_TENANT != "":
+                default_configs["MONITORING_TENANT"] = MONITORING_TENANT
+
+            if MONITORING_ROLE != "":
+                default_configs["MONITORING_ROLE"] = MONITORING_ROLE
+
+            if MONITORING_TENANT != "":
+                default_configs["MONITORING_ROLE_INSTANCE"] = MONITORING_ROLE_INSTANCE
 
     config_file = "/etc/default/mdsd"
     config_updated = False
@@ -376,23 +449,44 @@ def install():
             data = []
             new_data = ""
             vars_set = set()
+            dependent_vars = ["MDSD_OPTIONS"]
+
+            # Scope to only dependent envvar being set by extension wrapper
+            dependent_vars = set(default_configs.keys()).intersection(dependent_vars)
+
+            # Copy existing comments/envvar to the updated defaults file; replace existing envvar values if appropriate
             with open(config_file, "r") as f:
                 data = f.readlines()
                 for line in data:
+                    # Skip definitions of dependent envvar until very end
+                    skip_line = False
+                    for var in dependent_vars:
+                        if "export {0}".format(var) in line:
+                            skip_line = True
+                            break
+                    if skip_line:
+                        continue
+
                     for var in list(default_configs.keys()):
-                        if var in line:
+                        if "export {0}".format(var) in line and var not in dependent_vars:
                             line = "export " + var + "=" + default_configs[var] + "\n"
                             vars_set.add(var)
                             break
                     new_data += line
-            
+
+            # Set remaining non-dependent envvar that weren't present in the old defaults file
             for var in list(default_configs.keys()):
-                if var not in vars_set:
+                if var not in vars_set and var not in dependent_vars:
                     new_data += "export " + var + "=" + default_configs[var] + "\n"
+
+            # Finally, set envvar with dependencies (e.g. MDSD_OPTIONS depends on MDSD_LOG)
+            for var in dependent_vars:
+                new_data += "export " + var + "=" + default_configs[var] + "\n"
+                vars_set.add(var)
 
             with open("/etc/default/mdsd_temp", "w") as f:
                 f.write(new_data)
-                config_updated = True if len(new_data) > 0 else False 
+                config_updated = True if len(new_data) > 0 else False
 
             if not config_updated or not os.path.isfile("/etc/default/mdsd_temp"):
                 log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/mdsd")
@@ -403,12 +497,12 @@ def install():
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
             os.chown(config_file, uid, gid)
-            os.system('chmod {1} {0}'.format(config_file, 400))  
+            os.system('chmod {1} {0}'.format(config_file, 400))
 
         else:
-            log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )        
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )
     except:
-        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/mdsd" )        
+        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/mdsd" )
     return exit_code, output
 
 def check_kill_process(pstring):
@@ -423,18 +517,20 @@ def uninstall():
     This is a somewhat soft uninstall. It is not a purge.
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
+    global AMAUninstallCommand
+
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
-        OneAgentUninstallCommand = "dpkg -P azure-mdsd"
+        AMAUninstallCommand = "dpkg -P azure-mdsd"
     elif PackageManager == "rpm":
-        OneAgentUninstallCommand = "rpm -e azure-mdsd"
+        AMAUninstallCommand = "rpm -e azure-mdsd"
     else:
-        log_and_exit(operation, UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
-    hutil_log_info('Running command "{0}"'.format(OneAgentUninstallCommand))
+        log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
+    hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
 
     # Retry, since uninstall can fail due to concurrent package operations
     try:
-        exit_code, output = run_command_with_retries_output(OneAgentUninstallCommand, retries = 4,
+        exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
                                             retry_check = retry_if_dpkg_locked,
                                             final_check = final_check_if_dpkg_locked)
     except Exception as ex:
@@ -450,6 +546,8 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
+    global AMAServiceStartCommand, AMAServiceStatusCommand
+
     exit_if_vm_not_supported('Enable')
 
     # Check if this is Arc VM and enable arc daemon if it is
@@ -458,26 +556,34 @@ def enable():
         start_arc_process()
 
     if is_systemd():
-        OneAgentEnableCommand = "systemctl start mdsd"
+        AMAServiceStartCommand = "systemctl start mdsd"
+        AMAServiceStatusCommand = "systemctl status mdsd"
     else:
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
-        OneAgentEnableCommand = "/etc/init.d/mdsd start"
-    
+        AMAServiceStartCommand = "/etc/init.d/mdsd start"
+        AMAServiceStatusCommand = "/etc/init.d/mdsd status"
+
     public_settings, protected_settings = get_settings()
 
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        OneAgentEnableCommand = "systemctl start mdsdmgr"
+        AMAServiceStartCommand = "systemctl start mdsdmgr"
+        AMAServiceStatusCommand = "systemctl status mdsdmgr"
         if not is_systemd():
             hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
-            OneAgentEnableCommand = "/etc/init.d/mdsdmgr start"
+            AMAServiceStartCommand = "/etc/init.d/mdsdmgr start"
+            AMAServiceStatusCommand = "/etc/init.d/mdsdmgr status"
 
     hutil_log_info('Handler initiating onboarding.')
-    exit_code, output = run_command_and_log(OneAgentEnableCommand)
+    exit_code, output = run_command_and_log(AMAServiceStartCommand)
 
     if exit_code == 0:
         #start metrics process if enable is successful
         start_metrics_process()
-        
+    else:
+        status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
+        if status_exit_code != 0:
+            output += "Output of '{0}':\n{1}".format(AMAServiceStatusCommand, status_output)
+
     return exit_code, output
 
 def disable():
@@ -485,6 +591,7 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
+    global AMAServiceStopCommand
 
     # disable arc daemon if it is running
     stop_arc_watcher()
@@ -494,26 +601,59 @@ def disable():
 
     #stop the Azure Monitor Linux Agent service
     if is_systemd():
-        DisableOneAgentServiceCommand = "systemctl stop mdsd"
-        
+        AMAServiceStopCommand = "systemctl stop mdsd"
+
     else:
-        DisableOneAgentServiceCommand = "/etc/init.d/mdsd stop"
+        AMAServiceStopCommand = "/etc/init.d/mdsd stop"
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop mdsd.")
-    
-    exit_code, output = run_command_and_log(DisableOneAgentServiceCommand)
+
+    exit_code, output = run_command_and_log(AMAServiceStopCommand)
     return exit_code, output
 
 def update():
     """
     Update the current installation of AzureMonitorLinuxAgent
-    No logic to install the agent as agent -> install() will be called 
-    with udpate because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
+    No logic to install the agent as agent -> install() will be called
+    with update because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
     """
-    
+
     return 0, ""
 
+def get_managed_identity():
+    """
+    # Determine Managed Identity (MI) settings
+    # Nomenclature: Managed System Identity (MSI), System-Assigned Identity (SAI), User-Assigned Identity (UAI)
+    # Unspecified MI scenario: MSI returns SAI token if exists, otherwise returns UAI token if exactly one UAI exists, otherwise failure
+    # Specified MI scenario: MSI returns token for specified MI
+    # Returns identifier_name, identifier_value, and error message (if any)
+    """
+    identifier_name = identifier_value = ""
+    public_settings, protected_settings = get_settings()
+
+    if public_settings is not None and "authentication" in public_settings and "managedIdentity" in public_settings.get("authentication"):
+        managedIdentity = public_settings.get("authentication").get("managedIdentity")
+
+        if "identifier-name" not in managedIdentity or "identifier-value" not in managedIdentity:
+            return identifier_name, identifier_value, 'Parameters "identifier-name" and "identifier-value" are both required in authentication.managedIdentity public setting'
+
+        identifier_name = managedIdentity.get("identifier-name")
+        identifier_value = managedIdentity.get("identifier-value")
+
+        if identifier_name not in ["object_id", "client_id", "mi_res_id"]:
+            return identifier_name, identifier_value, 'Invalid identifier-name provided; must be "object_id", "client_id", or "mi_res_id"'
+
+        if not identifier_value:
+            return identifier_name, identifier_value, 'Invalid identifier-value provided; cannot be empty'
+
+        if identifier_name in ["object_id", "client_id"]:
+            guid_re = re.compile(r'[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}')
+            if not guid_re.search(identifier_value):
+                return identifier_name, identifier_value, 'Invalid identifier-value provided for {0}; must be a GUID'.format(identifier_name)
+
+    return identifier_name, identifier_value, ""
+
 def stop_metrics_process():
-    
+
     if telhandler.is_running(is_lad=False):
         #Stop the telegraf and ME services
         tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
@@ -521,14 +661,14 @@ def stop_metrics_process():
             hutil_log_info(tel_msg)
         else:
             hutil_log_error(tel_msg)
-        
+
         #Delete the telegraf and ME services
         tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
         if tel_rm_out:
             hutil_log_info(tel_rm_msg)
         else:
             hutil_log_error(tel_rm_msg)
-    
+
     if me_handler.is_running(is_lad=False):
         me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
         if me_out:
@@ -556,13 +696,12 @@ def start_metrics_process():
     """
     Start metrics process that performs periodic monitoring activities
     :return: None
-
     """
     stop_metrics_process()
-    
-    #start metrics watcher
-    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-metrics']
+
+    # Start metrics watcher
+    ama_path = os.path.join(os.getcwd(), 'agent.py')
+    args = ['python{0}'.format(sys.version_info[0]), ama_path, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -570,12 +709,17 @@ def start_metrics_process():
 def metrics_watcher(hutil_error, hutil_log):
     """
     Watcher thread to monitor metric configuration changes and to take action on them
-    """    
-    
-    # check every 30 seconds
+    """
+
+    # Check every 30 seconds
     sleepTime =  30
 
-    # sleep before starting the monitoring.
+    # Retrieve managed identity info that may be needed for token retrieval
+    identifier_name, identifier_value, error_msg = get_managed_identity()
+    if error_msg:
+        hutil_error('Failed to determine managed identity settings; MSI token retreival will rely on default identity, if any. {0}.'.format(error_msg))
+
+    # Sleep before starting the monitoring
     time.sleep(sleepTime)
     last_crc = None
     me_msi_token_expiry_epoch = None
@@ -585,21 +729,21 @@ def metrics_watcher(hutil_error, hutil_log):
             if os.path.isfile(MdsdCounterJsonPath):
                 f = open(MdsdCounterJsonPath, "r")
                 data = f.read()
-                    
+
                 if (data != ''):
-                    json_data = json.loads(data)  
-                    
+                    json_data = json.loads(data)
+
                     if len(json_data) == 0:
-                        last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
+                        last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
                         if telhandler.is_running(is_lad=False):
-                            #Stop the telegraf and ME services
+                            # Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
                                 hutil_log(tel_msg)
                             else:
                                 hutil_error(tel_msg)
 
-                            #Delete the telegraf and ME services
+                            # Delete the telegraf and ME services
                             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
                             if tel_rm_out:
                                 hutil_log(tel_rm_msg)
@@ -619,7 +763,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(me_rm_msg)
                     else:
-                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()                    
+                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
                         if(crc != last_crc):
                             # Resetting the me_msi_token_expiry_epoch variable if we set up ME again.
@@ -628,8 +772,8 @@ def metrics_watcher(hutil_error, hutil_log):
                             hutil_log(data)
 
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
-                                json_data, 
-                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port, 
+                                json_data,
+                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port,
                                 "unix:///var/run/mdsd/default_influx.socket",
                                 is_lad=False)
 
@@ -649,7 +793,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_error(log_messages)
 
                             last_crc = crc
-                        
+
                         generate_token = False
                         me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
 
@@ -664,7 +808,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 generate_token = True
 
-                        if me_msi_token_expiry_epoch:                
+                        if me_msi_token_expiry_epoch:
                             currentTime = datetime.datetime.now()
                             token_expiry_time = datetime.datetime.fromtimestamp(int(me_msi_token_expiry_epoch))
                             if token_expiry_time - currentTime < datetime.timedelta(minutes=30):
@@ -673,7 +817,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                         if generate_token:
                             generate_token = False
-                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
+                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value)
                             if msi_token_generated:
                                 hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
                             else:
@@ -712,7 +856,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 if me_out:
                                     hutil_log(me_msg)
                                 else:
-                                    hutil_error(me_msg)                  
+                                    hutil_error(me_msg)
                                 start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
 
                                 if start_metrics_out:
@@ -722,13 +866,13 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
                         else:
-                            me_restart_retries = 0   
-        
+                            me_restart_retries = 0
+
         except IOError as e:
-            hutil_error('I/O error in monitoring metrics. Exception={0}'.format(e))
+            hutil_error('I/O error in setting up or monitoring metrics. Exception={0}'.format(e))
 
         except Exception as e:
-            hutil_error('Error in monitoring metrics. Exception={0}'.format(e))
+            hutil_error('Error in setting up or monitoring metrics. Exception={0}'.format(e))
 
         finally:
             time.sleep(sleepTime)
@@ -736,7 +880,7 @@ def metrics_watcher(hutil_error, hutil_log):
 def metrics():
     """
     Take care of setting up telegraf and ME for metrics if configuration is present
-    """    
+    """
     pids_filepath = os.path.join(os.getcwd(), 'amametrics.pid')
     py_pid = os.getpid()
     with open(pids_filepath, 'w') as f:
@@ -758,10 +902,10 @@ def start_arc_process():
     hutil_log_info("stopping previously running arc process")
     stop_arc_watcher()
     hutil_log_info("starting arc process")
-    
+
     #start arc watcher
-    oneagent_filepath = os.path.join(os.getcwd(),'agent.py')
-    args = ['python{0}'.format(sys.version_info[0]), oneagent_filepath, '-arc']
+    ama_path = os.path.join(os.getcwd(), 'agent.py')
+    args = ['python{0}'.format(sys.version_info[0]), ama_path, '-arc']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -769,7 +913,7 @@ def start_arc_process():
 def start_arc_watcher():
     """
     Take care of starting arc_watcher daemon if the VM has arc running
-    """    
+    """
     hutil_log_info("Starting the watcher")
     print("Starting the watcher")
     pids_filepath = os.path.join(os.getcwd(), 'amaarc.pid')
@@ -799,25 +943,26 @@ operations = {'Disable' : disable,
 def stop_arc_watcher():
     """
     Take care of stopping arc_watcher daemon if the VM has arc running
-    """    
+    """
     pids_filepath = os.path.join(os.getcwd(),'amaarc.pid')
 
     # kill existing arc watcher
+
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
             for pids in f.readlines():
                 proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
                 output = proc.communicate()[0]
-                if "arc" in output:
-                    kill_cmd = "kill " + pids 
+                if output and "arc" in output:
+                    kill_cmd = "kill " + pids
                     run_command_and_log(kill_cmd)
-        
+
         # Delete the file after to avoid clutter
         os.remove(pids_filepath)
 
 def arc_watcher(hutil_error, hutil_log):
     """
-    This is needed to override mdsd's syslog permissions restriction which prevents mdsd 
+    This is needed to override mdsd's syslog permissions restriction which prevents mdsd
     from reading temporary key files that are needed to make https calls to get an MSI token for arc during onboarding to download amcs config
     This method spins up a process that will continuously keep refreshing that particular file path with valid keys
     So that whenever mdsd needs to refresh it's MSI token, it is able to find correct keys there to make the https calls
@@ -845,7 +990,7 @@ def arc_watcher(hutil_error, hutil_log):
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
                 res = urllib.request.urlopen(req)
             except:
-                # The above request is expected to fail and add a key to the path - 
+                # The above request is expected to fail and add a key to the path
                 authkey_dir = "/var/opt/azcmagent/tokens/"
                 if not os.path.exists(authkey_dir):
                     raise Exception("Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir))
@@ -854,7 +999,7 @@ def arc_watcher(hutil_error, hutil_log):
                     filepath = authkey_dir + filename
                     print(filepath)
                     shutil.copy(filepath, arc_token_mdsd_dir)
-                
+
                 # Change the ownership of the mdsd arc token dir to be accessible by syslog (since mdsd runs as syslog user)
                 os.system("chown -R syslog:syslog {0}".format(arc_token_mdsd_dir))
 
@@ -873,7 +1018,7 @@ def parse_context(operation):
     if ('Utils.WAAgentUtil' in sys.modules
             and 'Utils.HandlerUtil' in sys.modules):
         try:
-            
+
             logFileName = 'extension.log'
             hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, logFileName=logFileName)
             hutil.do_parse_context(operation)
@@ -890,9 +1035,7 @@ def find_package_manager(operation):
     """
     Checks if the dist is debian based or centos based and assigns the package manager accordingly
     """
-    global PackageManager
-    global PackageManagerOptions
-    global BundleFileName
+    global PackageManager, PackageManagerOptions, BundleFileName
     dist, ver = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
@@ -916,11 +1059,11 @@ def find_package_manager(operation):
 
     if PackageManager == "":
         log_and_exit(operation, UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
-    
-    
+
+
 def find_vm_distro(operation):
     """
-    Finds the Linux Distribution this vm is running on. 
+    Finds the Linux Distribution this vm is running on.
     """
     vm_dist = vm_id = vm_ver =  None
     parse_manually = False
@@ -932,7 +1075,7 @@ def find_vm_distro(operation):
         except AttributeError:
             hutil_log_info("Falling back to /etc/os-release distribution parsing")
     # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
-    # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case 
+    # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
     try:
         temp_vm_ver = int(vm_ver.split('.')[0])
     except:
@@ -1021,6 +1164,79 @@ def exit_if_vm_not_supported(operation):
     return 0
 
 
+def is_arc_installed():
+    """
+    Check if this is an Arc machine
+    """
+    # Using systemctl to check this since Arc only supports VMs that have systemd
+    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
+    return check_arc == 0
+
+
+def get_arc_endpoint():
+    """
+    Find the endpoint for Arc IMDS
+    """
+    endpoint_filepath = '/lib/systemd/system.conf.d/azcmagent.conf'
+    endpoint = ''
+    try:
+        with open(endpoint_filepath, 'r') as f:
+            data = f.read()
+        endpoint = data.split("\"IMDS_ENDPOINT=")[1].split("\"\n")[0]
+    except:
+        hutil_log_error('Unable to load Arc IMDS endpoint from {0}'.format(endpoint_filepath))
+    return endpoint
+
+
+def get_imds_endpoint():
+    """
+    Find the appropriate endpoint (Azure or Arc) for IMDS
+    """
+    azure_imds_endpoint = 'http://169.254.169.254/metadata/instance?api-version=2018-10-01'
+    if (is_arc_installed()):
+        hutil_log_info('Arc is installed, loading Arc-specific IMDS endpoint')
+        imds_endpoint = get_arc_endpoint()
+        if imds_endpoint:
+            imds_endpoint += '/metadata/instance?api-version=2019-08-15'
+        else:
+            # Fall back to the traditional IMDS endpoint; the cloud domain and VM
+            # resource id detection logic are resilient to failed queries to IMDS
+            imds_endpoint = azure_imds_endpoint
+            hutil_log_info('Falling back to default Azure IMDS endpoint')
+    else:
+        imds_endpoint = azure_imds_endpoint
+
+    hutil_log_info('Using IMDS endpoint "{0}"'.format(imds_endpoint))
+    return imds_endpoint
+
+
+def get_azure_environment_and_region():
+    """
+    Retreive the Azure environment and region from Azure or Arc IMDS
+    """
+    imds_endpoint = get_imds_endpoint()
+    req = urllib.request.Request(imds_endpoint)
+    req.add_header('Metadata', 'True')
+
+    environment = region = None
+
+    try:
+        response = json.loads(urllib.request.urlopen(req).read())
+
+        if ('compute' in response):
+            if ('azEnvironment' in response['compute']):
+                environment = response['compute']['azEnvironment']
+            if ('location' in response['compute']):
+                region = response['compute']['location'].lower()
+    except urllib.error.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
+        hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
+    except:
+        hutil_log_error('Unexpected error from Metadata service')
+
+    return environment, region
+
+
 def run_command_and_log(cmd, check_error = True, log_cmd = True):
     """
     Run the provided shell command and log its output, including stdout and
@@ -1033,21 +1249,21 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         hutil_log_info('Output of command "{0}": \n{1}'.format(cmd.rstrip(), output))
     else:
         hutil_log_info('Output: \n{0}'.format(output))
-        
-    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB	
-    # take only the last 100 characters as extension cuts off after that	
-    try:	
-        if exit_code != 0:	
-            sys.stderr.write(output[-500:])        
+
+    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB
+    # take only the last 100 characters as extension cuts off after that
+    try:
+        if exit_code != 0:
+            sys.stderr.write(output[-500:])
 
         if "Permission denied" in output:
             # Enable failures
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-            exit_code = 52        
- 
-    except:	
-        hutil_log_info('Failed to write output to STDERR')	
-  
+            exit_code = 52
+
+    except:
+        hutil_log_info('Failed to write output to STDERR')
+
     return exit_code, output
 
 def run_command_with_retries_output(cmd, retries, retry_check, final_check = None,
@@ -1334,7 +1550,7 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
             output = e.output
-    
+
     output = output.encode('utf-8')
 
     # On python 3, encode returns a byte object, so we must decode back to a string

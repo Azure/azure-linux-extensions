@@ -37,6 +37,23 @@ import signal
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
 
+# Cloud Environments
+PublicCloudName     = "azurepubliccloud"
+FairfaxCloudName    = "azureusgovernmentcloud"
+MooncakeCloudName   = "azurechinacloud"
+USNatCloudName      = "usnat" # EX
+USSecCloudName      = "ussec" # RX
+DefaultCloudName    = PublicCloudName # Fallback
+
+ARMDomainMap = {
+    PublicCloudName:    "management.azure.com",
+    FairfaxCloudName:   "management.usgovcloudapi.net",
+    MooncakeCloudName:  "management.chinacloudapi.cn",
+    USNatCloudName:     "management.azure.eaglex.ic.gov",
+    USSecCloudName:     "management.azure.microsoft.scloud"
+}
+
+
 def is_running(is_lad):
     """
     This method is used to check if metrics binary is currently running on the system or not.
@@ -154,7 +171,7 @@ def generate_Arc_MSI_token():
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
                 res = urllib.request.urlopen(req)
             except:
-                # The above request is expected to fail and add a key to the path - 
+                # The above request is expected to fail and add a key to the path
                 authkey_dir = "/var/opt/azcmagent/tokens/"
                 if not os.path.exists(authkey_dir):
                     log_messages += "Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir)
@@ -201,7 +218,7 @@ def generate_Arc_MSI_token():
     return True, expiry_epoch_time, log_messages
 
 
-def generate_MSI_token():
+def generate_MSI_token(identifier_name = '', identifier_value = ''):
     """
     This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
     This is called from the main extension code after config setup is complete
@@ -220,12 +237,16 @@ def generate_MSI_token():
         sleep_time = 5
 
         if not os.path.exists(me_config_dir):
-            log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token fo ME.\n".format(me_config_dir)
+            log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token for ME.\n".format(me_config_dir)
             return False, expiry_epoch_time, log_messages
         try:
             data = None
             while retries <= max_retries:
                 msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
+
+                if identifier_name and identifier_value:
+                    msiauthurl += '&{0}={1}'.format(identifier_name, identifier_value)
+
                 req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
                 res = urllib.request.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
@@ -249,11 +270,12 @@ def generate_MSI_token():
             if "expires_on" in data:
                 expiry_epoch_time  = data["expires_on"]
             else:
-                log_messages += "Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
+                log_messages += "Error parsing the MSI token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
                 return False, expiry_epoch_time, log_messages
 
         except Exception as e:
-            log_messages += "Failed to get msi auth token. Please check if VM's system assigned Identity is enabled Failed with error {0}\n".format(e)
+            log_messages += "Failed to get MSI auth token. Please check if the VM's system assigned identity is enabled or the user assigned identity "
+            log_messages += "passed in the extension settings exists and is assigned to this VM. Failed with error {0}\n".format(e)
             return False, expiry_epoch_time, log_messages
 
         return True, expiry_epoch_time, log_messages
@@ -273,7 +295,7 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
     daemon_reload_status = 1
 
     if not os.path.exists(configFolder):
-        raise Exception("Metrics extension config directory does not exist. Failed to setup ME service.")
+        raise Exception("Metrics extension config directory does not exist. Failed to set up ME service.")
         return False
 
     if os.path.isfile(me_service_template_path):
@@ -286,13 +308,13 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
             daemon_reload_status = os.system("sudo systemctl daemon-reload")
             if daemon_reload_status != 0:
-                raise Exception("Unable to reload systemd after ME service file change. Failed to setup ME service.")
+                raise Exception("Unable to reload systemd after ME service file change. Failed to set up ME service.")
                 return False
         else:
-            raise Exception("Unable to copy Metrics extension service file to {0}. Failed to setup ME service.".format(me_service_path))
+            raise Exception("Unable to copy Metrics extension service file to {0}. Failed to set up ME service.".format(me_service_path))
             return False
     else:
-        raise Exception("Metrics extension service template file does not exist at {0}. Failed to setup ME service.".format(me_service_template_path))
+        raise Exception("Metrics extension service template file does not exist at {0}. Failed to set up ME service.".format(me_service_template_path))
         return False
     return True
 
@@ -335,7 +357,7 @@ def start_metrics(is_lad):
         _, configFolder = get_handler_vars()
         me_config_dir = configFolder + "/metrics_configs/"
         #query imds to get the subscription id
-        az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
+        az_resource_id, subscription_id, location, az_environment, data = get_imds_values(is_lad)
 
         if is_lad:
             monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
@@ -485,25 +507,24 @@ def get_imds_values(is_lad):
     retries = 1
     max_retries = 3
     sleep_time = 5
-    imdsurl = ""
+    imds_url = ""
     is_arc = False
 
     if is_lad:
-        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+        imds_url = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
     else:
         if metrics_utils.is_arc_installed():
-            imdsurl = metrics_utils.get_arc_endpoint()
-            imdsurl += "/metadata/instance?api-version=2019-11-01"
+            imds_url = metrics_utils.get_arc_endpoint()
+            imds_url += "/metadata/instance?api-version=2019-11-01"
             is_arc = True
         else:
-            imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
-
+            imds_url = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
 
     data = None
     while retries <= max_retries:
 
-        #query imds to get the required information
-        req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
+        # Query imds to get the required information
+        req = urllib.request.Request(imds_url, headers={'Metadata':'true'})
         res = urllib.request.urlopen(req)
         data = json.loads(res.read().decode('utf-8', 'ignore'))
 
@@ -515,29 +536,42 @@ def get_imds_values(is_lad):
         time.sleep(sleep_time)
 
     if retries > max_retries:
-        raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup ME.".format(max_retries))
-        return False
-
+        raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to set up ME.".format(max_retries))
 
     if "resourceId" not in data["compute"]:
-        raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup ME.")
-        return False
+        raise Exception("Unable to find 'resourceId' key in imds query response. Failed to set up ME.")
 
     az_resource_id = data["compute"]["resourceId"]
 
     if "subscriptionId" not in data["compute"]:
-        raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup ME.")
-        return False
+        raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to set up ME.")
 
     subscription_id = data["compute"]["subscriptionId"]
 
     if "location" not in data["compute"]:
-        raise Exception("Unable to find 'location' key in imds query response. Failed to setup ME.")
-        return False
+        raise Exception("Unable to find 'location' key in imds query response. Failed to set up ME.")
 
-    location= data["compute"]["location"]
+    location = data["compute"]["location"]
 
-    return az_resource_id, subscription_id, location, data
+    if "azEnvironment" not in data["compute"]:
+        raise Exception("Unable to find 'azEnvironment' key in imds query response. Failed to set up ME.")
+
+    az_environment = data["compute"]["azEnvironment"]
+
+    return az_resource_id, subscription_id, location, az_environment, data
+
+
+def get_arm_domain(az_environment):
+    """
+    Return the ARM domain to use based on the Azure environment
+    """
+
+    try:
+        domain = ARMDomainMap[az_environment.lower()]
+    except KeyError:
+        raise Exception("Unknown cloud environment \"{0}\". Failed to set up ME.".format(az_environment))
+
+    return domain
 
 
 def get_metrics_extension_service_path():
@@ -549,9 +583,7 @@ def get_metrics_extension_service_path():
     elif os.path.exists("/usr/lib/systemd/system/"):
         return metrics_constants.metrics_extension_service_path_usr_lib
     else:
-        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
-
-
+        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to set up Metrics Extension service.")
 
 
 def setup_me(is_lad):
@@ -561,15 +593,15 @@ def setup_me(is_lad):
     """
 
     # query imds to get the required information
-    az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
+    az_resource_id, subscription_id, location, az_environment, data = get_imds_values(is_lad)
+    arm_domain = get_arm_domain(az_environment)
 
     # get tenantID
     # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
-    # The armurl is only for Public Cloud. Needs verification in Sovereign clouds
     aad_auth_url = ""
-    amrurl = "https://management.azure.com/subscriptions/" + subscription_id + "?api-version=2014-04-01"
+    arm_url = "https://{0}/subscriptions/{1}?api-version=2014-04-01".format(arm_domain, subscription_id)
     try:
-        req = urllib.request.Request(amrurl, headers={'Content-Type':'application/json'})
+        req = urllib.request.Request(arm_url, headers={'Content-Type':'application/json'})
 
         # urlopen alias in future backport is broken on py2.6, fails on urls with HTTPS - https://github.com/PythonCharmers/python-future/issues/167
         # Using this hack of switching between py2 and 3 to avoid this
@@ -579,16 +611,16 @@ def setup_me(is_lad):
         else:
             res = urllib.request.urlopen(req)
 
-    except Exception as e:
+    except urllib.error.HTTPError as e:
         err_res = e.headers["WWW-Authenticate"]
         for line in err_res.split(","):
                 if "Bearer authorization_uri" in line:
                         data = line.split("=")
-                        aad_auth_url = data[1][1:-1] #Removing the quotes from the front and back
+                        aad_auth_url = data[1][1:-1] # Removing the quotes from the front and back
                         break
 
     if aad_auth_url == "":
-        raise Exception("Unable to find AAD Authentication URL in the request error response. Failed to setup ME.")
+        raise Exception("Unable to find AAD Authentication URL in the request error response. Failed to set up ME.")
         return False
 
     #create metrics conf
@@ -601,9 +633,9 @@ def setup_me(is_lad):
     logFolder, configFolder = get_handler_vars()
     me_config_dir = configFolder + "/metrics_configs/"
 
-    # Clear older config directory if exists. 
+    # Clear older config directory if exists.
     if os.path.exists(me_config_dir):
-        rmtree(me_config_dir)    
+        rmtree(me_config_dir)
     os.mkdir(me_config_dir)
 
 
@@ -650,7 +682,7 @@ def setup_me(is_lad):
             copyfile(me_bin_local_path, metrics_ext_bin)
             os.chmod(metrics_ext_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
     else:
-        raise Exception("Unable to copy MetricsExtension Binary, could not find file at the location {0} . Failed to setup ME.".format(me_bin_local_path))
+        raise Exception("Unable to copy MetricsExtension Binary, could not find file at the location {0} . Failed to set up ME.".format(me_bin_local_path))
         return False
 
     if is_lad:

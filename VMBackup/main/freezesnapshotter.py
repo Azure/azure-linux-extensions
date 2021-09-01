@@ -290,7 +290,15 @@ class FreezeSnapshotter(object):
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
 
-            if(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
+            if(self.para_parser is not None and self.is_command_timedout(self.para_parser) == True):
+                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
+                run_result = CommonVariables.FailedGuestAgentInvokedCommandTooLate
+                run_status = 'error'
+                all_failed = True
+                all_snapshots_failed = True
+                self.logger.log('T:S takeSnapshotFromGuest : Thawing as failing due to CRP timeout', True, 'Error')
+                self.freezer.thaw_safe()
+            elif(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
@@ -370,7 +378,15 @@ class FreezeSnapshotter(object):
 
         if self.g_fsfreeze_on :
             run_result, run_status = self.freeze()
-        if(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
+
+        if(self.para_parser is not None and self.is_command_timedout(self.para_parser) == True):
+            self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
+            run_result = CommonVariables.FailedGuestAgentInvokedCommandTooLate
+            run_status = 'error'
+            all_failed = True
+            self.logger.log('T:S takeSnapshotFromOnlyHost : Thawing as failing due to CRP timeout', True, 'Error')
+            self.freezer.thaw_safe()
+        elif(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
             snap_shotter = HostSnapshotter(self.logger, self.hostIp)
             self.logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()
@@ -382,3 +398,36 @@ class FreezeSnapshotter(object):
             self.logger.log('T:S snapshotall ends...', True)
 
         return run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent
+
+    def is_command_timedout(self, para_parser):
+        result = False
+
+        try:
+            if(para_parser is not None and para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
+                utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
+                self.logger.log('utcTicks in long format' + str(utcTicksLong))
+                commandStartTime = self.convert_time(utcTicksLong)
+                utcNow = datetime.datetime.utcnow()
+                self.logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
+                timespan = utcNow - commandStartTime
+                MAX_TIMESPAN = 140 * 60 # in seconds
+                total_span_in_seconds = self.timedelta_total_seconds(timespan)
+                self.logger.log('timespan: ' + str(timespan) + ', total_span_in_seconds: ' + str(total_span_in_seconds) + ', MAX_TIMESPAN: ' + str(MAX_TIMESPAN))
+
+                if total_span_in_seconds > MAX_TIMESPAN :
+                    self.logger.log('CRP timeout limit has reached, should abort.')
+                    result = True
+        except Exception as e:
+            self.logger.log('T:S is_command_timedout : Exception %s, stack trace: %s' % (str(e), traceback.format_exc()))
+
+        return result
+
+    def convert_time(self, utcTicks):
+        return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
+
+    def timedelta_total_seconds(self, delta):
+        if not hasattr(datetime.timedelta, 'total_seconds'):
+            return delta.days * 86400 + delta.seconds
+        else:
+            return delta.total_seconds()
+

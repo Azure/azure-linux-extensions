@@ -417,7 +417,6 @@ class HandlerUtility:
 
     def get_total_used_size(self):
         try:
-            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
@@ -437,12 +436,7 @@ class HandlerUtility:
             //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
-            process_wait_time = 30
-            while(process_wait_time >0 and df.poll() is None):
-                time.sleep(1)
-                process_wait_time -= 1
-
-            output = df.stdout.read()
+            output = self.command_output_from_subprocess(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], 30)
             output = output.split("\n")
             total_used = 0
             total_used_network_shares = 0
@@ -535,13 +529,7 @@ class HandlerUtility:
         try:
             cur_dir = os.getcwd()
             os.chdir("..")
-            p = subprocess.Popen(['/usr/sbin/waagent', '-version'], stdout=subprocess.PIPE)
-            process_wait_time = 30
-            while(process_wait_time > 0 and p.poll() is None):
-                time.sleep(1)
-                process_wait_time -= 1
-            out = p.stdout.read()
-            out = str(out)
+            out = self.command_output_from_subprocess(['/usr/sbin/waagent', '-version'],30)
             if "Goal state agent: " in out:
                  waagent_version = out.split("Goal state agent: ")[1].strip()
             else:
@@ -811,6 +799,15 @@ class HandlerUtility:
         
     def set_pre_post_enabled(self):
         self.pre_post_enabled = True
+
+    def command_output_from_subprocess(self , args, process_wait_time):
+        process_out = subprocess.Popen(args, stdout=subprocess.PIPE)
+        while(process_wait_time > 0 and process_out.poll() is None):
+            time.sleep(1)
+            process_wait_time -= 1
+        out = process_out.stdout.read().decode()
+        out = str(out)
+        return out
         
     @staticmethod
     def convert_to_string(txt):

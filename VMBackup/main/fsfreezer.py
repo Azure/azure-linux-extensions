@@ -182,21 +182,26 @@ class FsFreezer:
 
             while self.getLockRetry < self.maxGetLockRetry:
                 try:
+                    if not os.path.isdir('/etc/azure'):
+                        os.mkdir('/etc/azure')
                     if not os.path.isdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock'):
                         os.mkdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock')
                     self.safeFreezelockFile = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
                     self.logger.log("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file opened Sucessfully",True)
                     try:
+                        #isAquiredLockSucceeded lock will only be false if there is a issue in taking lock.
+                        #For all other issue like faliure in creating file, not enough space in disk it will be true. so that we can proceed with the backup
+                        self.isAquireLockSucceeded = False  
                         fcntl.lockf(self.safeFreezelockFile, fcntl.LOCK_EX | fcntl.LOCK_NB)
                         self.logger.log("Aquiring lock succeeded",True)
                         self.isAquireLockSucceeded = True
                         break
                     except Exception as ex:
                         self.safeFreezelockFile.close()
+                        self.logger.log("Failed to aquire lock: %s, stack trace: %s" % (str(ex), traceback.format_exc()),True)
                         raise ex
                 except Exception as e:
                     self.logger.log("Failed to open file or aquire lock: %s, stack trace: %s" % (str(e), traceback.format_exc()),True)
-                    self.isAquireLockSucceeded = False
                     self.getLockRetry= self.getLockRetry + 1
                     time.sleep(1)
                     if(self.getLockRetry == self.maxGetLockRetry - 1):
@@ -206,9 +211,10 @@ class FsFreezer:
             end_time = datetime.datetime.utcnow()
             self.logger.log("Wait time to aquire lock "+ str(end_time - start_time),True)
 
-            sig_handle = None
+            # sig_handle = None
             if (self.isAquireLockSucceeded == True):
-                sig_handle=self.freeze_handler.startproc(args)
+                self.logger.log("Aquired Lock Successful")
+            sig_handle=self.freeze_handler.startproc(args)
 
             self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
