@@ -439,7 +439,7 @@ def install():
             if MONITORING_ROLE != "":
                 default_configs["MONITORING_ROLE"] = MONITORING_ROLE
 
-            if MONITORING_TENANT != "":
+            if MONITORING_ROLE_INSTANCE != "":
                 default_configs["MONITORING_ROLE_INSTANCE"] = MONITORING_ROLE_INSTANCE
 
     config_file = "/etc/default/mdsd"
