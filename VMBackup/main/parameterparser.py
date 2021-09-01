@@ -35,7 +35,6 @@ class ParameterParser(object):
         self.snapshotTaskToken = ''
         self.includedDisks = None
         self.includeLunList = []    #To be shared with HP
-        self.isVmgsBlobIncluded = None
 
         """
         get the public configuration
