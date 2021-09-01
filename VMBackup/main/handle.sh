@@ -9,7 +9,7 @@ postsubstr1=${postsubstr#*\"}
 resultstrlen=`expr ${#postsubstr} - 1 - ${#postsubstr1}`
 logfolder=$(echo $postsubstr | cut -b 1-$resultstrlen)
 logfile=$logfolder'/shell.log'
-currentseq = './crseq'
+currentseq='./crseq'
 rm -f $currentseq
 
 rc=3
@@ -61,7 +61,7 @@ done
 
 configSeqNo="$(echo `printenv ConfigSequenceNumber`)"
 
-{echo $configSeqNo >> $currentseq} || {echo "`date -u`- Could not create current sequence file" >> $logfile}
+echo $configSeqNo >> $currentseq || echo "`date -u`- Could not create current sequence file" >> $logfile
 
 if [ -n ${configSeqNo} ]
 then

@@ -117,7 +117,10 @@ class HandlerUtility:
         try:
             cur_seq_no = self.get_current_seq()
             if(cur_seq_no != -1):
+                self.log("_get_current_seq_no: Current Sequence No. form environment varaible: " + str(cur_seq_no))
                 return cur_seq_no
+            else:
+                self.log("_get_current_seq_no: Could not get current sequence number from environment variable")
         except:
             self.log("_get_current_seq_no: Could not get current sequence number from environment variable")
 
@@ -146,10 +149,17 @@ class HandlerUtility:
         return -1
     
     def get_current_seq(self):
-        if(os.path.isfile('crseq')):
-            seq = waagent.GetFileContents('crseq')
-            if(seq):
-                return int(seq)
+        filepath = 'crseq'
+        if(os.path.isfile(filepath)):
+            c = None
+            try:
+                with open(filepath, 'r') as f:
+                    f.seek(f.tell()-1,2) # reads the last char of the file
+                    c = f.read()
+                    return int(c)
+            except IOError as e:
+                self.log('Reading from file ' + str(filepath) + ' Exception is ' + str(e))
+                return -1
         return -1
 
     def exit_if_same_seq(self):
