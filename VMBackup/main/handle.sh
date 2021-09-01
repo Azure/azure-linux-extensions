@@ -60,7 +60,8 @@ do
 done
 
 configSeqNo="$(echo `printenv ConfigSequenceNumber`)"
-echo $configSeqNo >> $currentseq
+
+{echo $configSeqNo >> $currentseq} || {echo "`date -u`- Could not create current sequence file" >> $logfile}
 
 if [ -n ${configSeqNo} ]
 then
