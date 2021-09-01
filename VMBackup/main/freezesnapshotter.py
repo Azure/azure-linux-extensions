@@ -110,10 +110,11 @@ class FreezeSnapshotter(object):
                             self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
                             self.takeSnapshotFrom = CommonVariables.onlyHost
                             break
-                
-                if(para_parser.isVmgsBlobIncluded == True):
-                    self.logger.log('Vmgs Blob is Included. Setting the snapshot mode to onlyHost.')
-                    self.takeSnapshotFrom = CommonVariables.onlyHost
+
+                if(para_parser.includedDisks != None and CommonVariables.isVmgsBlobIncluded in para_parser.includedDisks.keys()):
+                    if (para_parser.includedDisks[CommonVariables.isVmgsBlobIncluded] == True):
+                        self.logger.log('Vmgs Blob is included. Setting the snapshot mode to onlyHost.')
+                        self.takeSnapshotFrom = CommonVariables.onlyHost
 
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
