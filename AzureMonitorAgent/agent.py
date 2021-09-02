@@ -524,7 +524,7 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
-    global AMAServiceStartCommand, AMAServiceStatusCommand, HUtilObject
+    global AMAServiceStartCommand, AMAServiceStatusCommand
 
     if HUtilObject:
         if(HUtilObject.is_seq_smaller()):
