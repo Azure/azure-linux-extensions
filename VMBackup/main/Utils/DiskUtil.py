@@ -67,7 +67,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = item_value_str.split()
+                disk_info_item_array = shlex.split(item_value_str)
                 if(dev_name == disk_info_item_array[0]):
                     if(len(disk_info_item_array) > 1):
                         return disk_info_item_array[1]
@@ -89,7 +89,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = item_value_str.split()
+                disk_info_item_array = shlex.split(item_value_str)
                 device_item = DeviceItem()
                 device_item.name = disk_info_item_array[0]
                 device_items.append(device_item)
@@ -135,7 +135,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = item_value_str.split()
+                disk_info_item_array = shlex.split(item_value_str)
                 device_item = DeviceItem()
                 device_item.name = disk_info_item_array[0]
                 device_items_temp.append(device_item)
@@ -263,7 +263,7 @@ class DiskUtil(object):
                 for i in range(0,len(lines)):
                     item_value_str = lines[i].strip()
                     if(item_value_str != ""):
-                        disk_info_item_array = item_value_str.split()
+                        disk_info_item_array = shlex.split(item_value_str)
                         device_item = DeviceItem()
                         disk_info_item_array_length = len(disk_info_item_array)
                         for j in range(0, disk_info_item_array_length):
@@ -333,7 +333,7 @@ class DiskUtil(object):
             for line in lines:
                 line = line.strip()
                 if(line != ""):
-                    deviceName = line.split()[0]
+                    deviceName = shlex.split(line)[0]
                     mountPrefixStr = " on /"
                     prefixIndex = line.find(mountPrefixStr)
                     if(prefixIndex >= 0):
@@ -377,7 +377,7 @@ class DiskUtil(object):
                 self.logger.log("print line by line :" + line , True)
                 line = line.strip()
                 if(line != ""):
-                    file_system = line.split()[0]
+                    file_system = shlex.split(line)[0]
                     mountPrefixStr = " on /"
                     prefixIndex = line.find(mountPrefixStr)
                     if(prefixIndex >= 0):

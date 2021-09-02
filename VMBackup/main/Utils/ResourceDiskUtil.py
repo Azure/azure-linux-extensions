@@ -2,9 +2,11 @@ import os
 import sys
 import re
 import subprocess
+import shlex
 from subprocess import *
 import traceback
 from Utils.DiskUtil import DiskUtil
+
 
 STORAGE_DEVICE_PATH = '/sys/bus/vmbus/devices/'
 GEN2_DEVICE_ID = 'f8b3781a-1e82-4818-a1c3-63d806ec15bb'
@@ -116,7 +118,7 @@ class ResourceDiskUtil(object):
 		if (mountlist and device):
 			for entry in mountlist.split('\n'):
 				if(re.search(device, entry)):
-					tokens = entry.split()
+					tokens = shlex.split(entry)
 					#Return the 3rd column of this line
 					return tokens[2] if len(tokens) > 2 else None
 		return None
