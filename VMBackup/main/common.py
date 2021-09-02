@@ -40,6 +40,7 @@ class CommonVariables:
     VmTypeV2 = 'microsoft.compute/virtualmachines'
     customSettings = 'customSettings'
     statusBlobUploadError = 'statusBlobUploadError'
+    TempStatusFileName = 'tempStatusFile.status'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
