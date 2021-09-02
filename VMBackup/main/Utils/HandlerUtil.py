@@ -186,13 +186,13 @@ class HandlerUtility:
                     pass
             else:
                 self._log(self._get_log_prefix() + message)
-            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.utcnow()) , level , message)
         self.log_message = self.log_message + message
 
     def log_py3(self, msg):
         if type(msg) is not str:
             msg = str(msg, errors="backslashreplace")
-        msg = str(datetime.datetime.now()) + " " + str(self._get_log_prefix()) + msg + "\n"
+        msg = str(datetime.datetime.utcnow()) + " " + str(self._get_log_prefix()) + msg + "\n"
         try:
             with open(self.logging_file, "a+") as C :
                 C.write(msg)
@@ -690,9 +690,11 @@ class HandlerUtility:
 
     def write_to_status_file(self, stat_rept_file):
         try:
+            tempStatusFile =  os.path.join(self._context._status_dir, CommonVariables.TempStatusFileName)
             if self._context._status_file:
-                with open(self._context._status_file,'w+') as f:
+                with open(tempStatusFile,'w+') as f:
                     f.write(stat_rept_file)
+                os.rename(tempStatusFile, self._context._status_file)
         except Exception as e:
             errMsg = 'Status file creation failed with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)

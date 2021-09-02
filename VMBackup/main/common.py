@@ -40,6 +40,7 @@ class CommonVariables:
     VmTypeV2 = 'microsoft.compute/virtualmachines'
     customSettings = 'customSettings'
     statusBlobUploadError = 'statusBlobUploadError'
+    TempStatusFileName = 'tempStatusFile.status'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
@@ -51,6 +52,7 @@ class CommonVariables:
     isAnyDiskExcluded = 'isAnyDiskExcluded'
     dataDiskLunList = 'dataDiskLunList'
     isOSDiskIncluded = 'isOSDiskIncluded'
+    isVmgsBlobIncluded = 'isVmgsBlobIncluded'
 
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'

@@ -23,22 +23,22 @@ then
 		if [ "$WorkloadConfEdited" != "" ]
 			then
 				#Workload.conf is edited
-				echo "`date`- The command is $1, exiting without conf file copy" >> $logfile
+				echo "`date -u`- The command is $1, exiting without conf file copy" >> $logfile
 			else
 				#workload.conf is not edited
 				cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
-				echo "`date`- The command is $1, exiting with conf file copy" >> $logfile	
+				echo "`date -u`- The command is $1, exiting with conf file copy" >> $logfile	
 		fi
         exit $arc
     else
         mkdir -p /etc/azure
         cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
-        echo "`date`- The command is $1, exiting with conf file copy" >> $logfile
+        echo "`date -u`- The command is $1, exiting with conf file copy" >> $logfile
         exit $arc
     fi
 elif [ "$1" != "enable"  ] && [ "$1" != "daemon" ]
 then
-    echo "`date`- The command is $1, exiting" >> $logfile
+    echo "`date -u`- The command is $1, exiting" >> $logfile
     exit $arc
 fi
 
@@ -49,7 +49,7 @@ do
 	cmnd="/usr/bin/${pythonVersion}"
 	if [ -f "${cmnd}" ]
     then
-		echo "`date`- ${pythonVersion} path exists" >> $logfile
+		echo "`date -u`- ${pythonVersion} path exists" >> $logfile
 		$cmnd main/handle.py -$1
 		rc=$?
 	fi
@@ -75,23 +75,23 @@ pythonPath=$(echo "${pythonProcess}" | head -n1 | awk '{print $8;}')
 
 if [ $rc -ne 0 ] && [ -f "`which python`" ]
 then
-	echo "`date`- python path exists" >> $logfile
+	echo "`date -u`- python path exists" >> $logfile
 	/usr/bin/env python main/handle.py -$1
 	rc=$?
 fi
 
 if [ $rc -ne 0 ] && [ -f "${pythonPath}" ]
 then
-	echo "`date`- python path exists" >> $logfile
+	echo "`date -u`- python path exists" >> $logfile
 	$pythonPath main/handle.py -$1
 	rc=$?
 fi
 	
 if [ $rc -eq 3 ]
 then
-	echo "`date`- python version unknown" >> $logfile
+	echo "`date -u`- python version unknown" >> $logfile
 fi
 
-echo "`date`- $rc returned from handle.py" >> $logfile
+echo "`date -u`- $rc returned from handle.py" >> $logfile
 
 exit $rc

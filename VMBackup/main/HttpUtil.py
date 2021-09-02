@@ -143,7 +143,7 @@ class HttpUtil(object):
                 connection.close()
             result = CommonVariables.success
         except Exception as e:
-            errorMsg = str(datetime.datetime.now()) +  " Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            errorMsg = str(datetime.datetime.utcnow()) +  " Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
             if sys.version[0] == 2 and sys.version[1] == 6:
                 self.CallUsingCurl(method,sasuri_obj,data,headers)
