@@ -149,17 +149,11 @@ class HandlerUtility:
         return -1
     
     def get_current_seq(self):
-        filepath = 'crseq'
-        if(os.path.isfile(filepath)):
-            c = None
-            try:
-                with open(filepath, 'r') as f:
-                    f.seek(f.tell()-1,2) # reads the last char of the file
-                    c = f.read()
-                    return int(c)
-            except IOError as e:
-                self.log('Reading from file ' + str(filepath) + ' Exception is ' + str(e))
-                return -1
+        if(os.path.isfile('crseq')):
+            seq = waagent.GetFileContents('crseq')
+            os.remove('crseq')
+            if(seq):
+                return int(seq)
         return -1
 
     def exit_if_same_seq(self):
