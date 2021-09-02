@@ -3,3 +3,7 @@ keys/keyring.gpg
 keys/keyring.gpg~
 keys/.gnupg/
 .vscode/
+ext/future
+Utils/
+waagent
+waagentc

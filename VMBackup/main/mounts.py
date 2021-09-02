@@ -24,7 +24,7 @@ import subprocess
 import types
 from Utils.DiskUtil import DiskUtil
 
-class Error(Exception):
+class Error(Exception): 
     pass
 
 class Mount:
@@ -39,18 +39,18 @@ class Mounts:
     def __init__(self,patching,logger):
         self.mounts = []
         added_mount_point_names = [] 
-        disk_util = DiskUtil(patching,logger)
+        disk_util = DiskUtil.get_instance(patching,logger)
         # Get mount points 
         mount_points, mount_points_info = disk_util.get_mount_points() 
         # Get lsblk devices 
-        device_items = disk_util.get_device_items(None)
+        self.device_items = disk_util.get_device_items(None)
         lsblk_mounts = [] 
         lsblk_mount_points = []
         lsblk_unique_names = []
         lsblk_fs_types = []
         # List to hold mount-points returned from lsblk command but not reurned from mount command 
         lsblk_mounts_not_in_mount = [] 
-        for device_item in device_items:
+        for device_item in self.device_items:
             mount = Mount(device_item.name, device_item.type, device_item.file_system, device_item.mount_point)
             lsblk_mounts.append(mount)
             logger.log("lsblk mount point "+str(mount.mount_point)+" added with device-name "+str(mount.name)+" and fs type "+str(mount.fstype)+", unique-name "+str(mount.unique_name), True)

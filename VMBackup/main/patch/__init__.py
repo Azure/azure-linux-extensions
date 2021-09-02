@@ -58,6 +58,23 @@ def DistInfo():
                 osfile.close()
             distinfo[0] = distinfo[0].strip()
             return distinfo
+        if 'Linux' in platform.system():
+            distinfo = ["Default"]
+            if "ubuntu" in platform.version().lower():
+                distinfo[0] = "Ubuntu"
+            elif 'suse' in platform.version().lower():
+                distinfo[0] = "SuSE"
+            elif 'centos' in platform.version().lower():
+                distinfo[0] = "centos"
+            elif 'debian' in platform.version().lower():
+                distinfo[0] = "debian"
+            elif 'oracle' in platform.version().lower():
+                distinfo[0] = "oracle"
+            elif 'redhat' in platform.version().lower() or 'rhel' in platform.version().lower():
+                distinfo[0] = "redhat"
+            elif 'kali' in platform.version().lower():
+                distinfo[0] = "Kali"
+            return distinfo
         else:
             return platform.dist()
     except Exception as e:

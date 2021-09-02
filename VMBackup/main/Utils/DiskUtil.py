@@ -28,11 +28,34 @@ import glob
 from common import DeviceItem
 import Utils.HandlerUtil
 import traceback
+try:
+        import ConfigParser as ConfigParsers
+except ImportError:
+        import configparser as ConfigParsers
 
 class DiskUtil(object):
+    __instance__ = None
+    patching = None
+    logger = None
+    mount_output = None
+
+
     def __init__(self, patching, logger):
-        self.patching = patching
-        self.logger = logger
+
+        if DiskUtil.__instance__ is None:
+            self.patching = patching
+            self.logger = logger
+            self.mount_output = None
+            DiskUtil.__instance__ = self
+        else:
+            return DiskUtil.__instance__
+
+    @staticmethod
+    def get_instance(patching, logger):
+        if not DiskUtil.__instance__:
+            DiskUtil(patching, logger)
+
+        return DiskUtil.__instance__
 
     def get_device_items_property(self, lsblk_path, dev_name, property_name):
         get_property_cmd = lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
@@ -131,11 +154,40 @@ class DiskUtil(object):
 
     def get_lsblk_pairs_output(self, lsblk_path, dev_path):
         self.logger.log("get_lsblk_pairs_output : getting the blk info from " + str(dev_path) + " using lsblk_path " + str(lsblk_path), True)
+        
+        # If an alternate user is specified  in vmbackup.conf, run lsblk command through that user, not with root access. 
+        # Fixes issues found in some SUSE-related distros where lsblk command gets stuck with root access
+        # Sample vmbackup.conf file with such alternate user setting:
+        # [lsblkUser]
+        # username: vmadmin
+
+        configfile = '/etc/azure/vmbackup.conf'
+        command_user = ''
+        alternate_user = False
+
+        try :
+            if os.path.exists(configfile):
+                config = ConfigParsers.ConfigParser()
+                config.read(configfile)
+                if config.has_option('lsblkUser','username'):
+                    lsblk_user = config.get('lsblkUser','username')
+                    command_user = "su - " + lsblk_user + " -c"
+                    if (dev_path is None):
+                        command_user = command_user + ' \'' + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE' + '\''
+                    else:
+                        command_user = command_user + ' \'' + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE' + ' ' + dev_path + '\''
+                    alternate_user = True
+        except Exception as e:
+            pass
+
         out_lsblk_output = None
         error_msg = None
         is_lsblk_path_wrong = False
         try:
-            if(dev_path is None):
+            if (alternate_user):
+                self.logger.log("Switching to alternate user to run this lsblk command: " + str(command_user), True)
+                p = Popen(command_user, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            elif(dev_path is None):
                 p = Popen([str(lsblk_path), '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
                 p = Popen([str(lsblk_path), '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -349,25 +401,29 @@ class DiskUtil(object):
         return file_systems_info
 
     def get_mount_output(self):
-        # Get the output on the mount command
-        self.logger.log("getting the mount-points info using mount command ", True)
-        mount_path = self.patching.mount_path
-        is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-        if (is_mount_path_wrong == True):
-            if self.patching.usr_flag == 1:
-                self.logger.log("mount path is wrong.removing /usr prefix", True, 'Warning')
-                mount_path = "/bin/mount"
-            else:
-                self.logger.log("mount path is wrong.Adding /usr prefix", True, 'Warning')
-                mount_path = "/usr/bin/mount"
+        if self.mount_output is not None:
+            return self.mount_output
+        else :
+            # Get the output on the mount command
+            self.logger.log("getting the mount-points info using mount command ", True)
+            mount_path = self.patching.mount_path
             is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-        # if mount_path was still wrong, mount_path using "which" command
-        if (is_mount_path_wrong == True):
-            self.logger.log("mount path is wrong. finding path using which command", True, 'Warning')
-            out_which_output, which_error_msg = self.get_which_command_result('mount')
-            # get mount command output
-            if (out_which_output is not None):
-                 mount_path = str(out_which_output)
-                 is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
-        return out_mount_output
+            if (is_mount_path_wrong == True):
+                if self.patching.usr_flag == 1:
+                    self.logger.log("mount path is wrong.removing /usr prefix", True, 'Warning')
+                    mount_path = "/bin/mount"
+                else:
+                    self.logger.log("mount path is wrong.Adding /usr prefix", True, 'Warning')
+                    mount_path = "/usr/bin/mount"
+                is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
+            # if mount_path was still wrong, mount_path using "which" command
+            if (is_mount_path_wrong == True):
+                self.logger.log("mount path is wrong. finding path using which command", True, 'Warning')
+                out_which_output, which_error_msg = self.get_which_command_result('mount')
+                # get mount command output
+                if (out_which_output is not None):
+                     mount_path = str(out_which_output)
+                     is_mount_path_wrong, out_mount_output, error_msg = self.get_mount_command_output(mount_path)
+            self.mount_output = out_mount_output
+            return out_mount_output
 

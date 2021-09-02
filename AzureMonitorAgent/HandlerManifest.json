@@ -1,16 +1,17 @@
 [
   {
     "name":  "AzureMonitorLinuxAgent",
-    "version": "0.9.2",
+    "version": "1.5.124",
     "handlerManifest": {
-      "installCommand": "agent.py -install",
-      "uninstallCommand": "agent.py -uninstall",
-      "updateCommand": "agent.py -update",
-      "enableCommand": "agent.py -enable",
-      "disableCommand": "agent.py -disable",
+      "installCommand": "./shim.sh -install",
+      "uninstallCommand": "./shim.sh -uninstall",
+      "updateCommand": "./shim.sh -update",
+      "enableCommand": "./shim.sh -enable",
+      "disableCommand": "./shim.sh -disable",
       "rebootAfterInstall": false,
       "reportHeartbeat": false,
-      "updateMode": "UpdateWithInstall"
+      "updateMode": "UpdateWithInstall",
+      "continueOnUpdateFailure": "true"
     }
   }
 ]

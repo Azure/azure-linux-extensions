@@ -1,7 +1,7 @@
 [
   {
     "name":  "OmsAgentForLinux",
-    "version": "1.13.5",
+    "version": "1.13.19",
     "handlerManifest": {
       "installCommand": "omsagent_shim.sh -install",
       "uninstallCommand": "omsagent_shim.sh -uninstall",
@@ -11,7 +11,6 @@
       "rebootAfterInstall": false,
       "reportHeartbeat": false,
       "updateMode": "UpdateWithInstall",
-      "stopOnMultipleConnections": "true",
       "continueOnUpdateFailure": "true"
     }
   }
