@@ -1,3 +1,10 @@
+1.2.0.89
+- avoid apt-get timeouts on isolated networks
+- add grub-pc-bin package if missing on Ubuntu
+- prevent unintended key rotation on case or trailing slash differences
+- fix resource disk logic on D8S_v4_vm size
+- fix status cannot be read issue on Ubuntu 20.04 Gen2
+
 1.2.0.84
 - add support for RHEL 8 SAP image
 - fix RD encryption in Gen2 VMs
