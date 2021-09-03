@@ -1906,6 +1906,8 @@ def daemon_encrypt():
         elif ((distro_name == 'redhat' and distro_version.startswith('8.1')) or
               (distro_name == 'redhat' and distro_version.startswith('8.2')) or
               (distro_name == 'redhat' and distro_version.startswith('8.3')) or
+              (distro_name == 'redhat' and distro_version.startswith('8.4')) or
+              (distro_name == 'centos' and distro_version.startswith('8.4')) or
               (distro_name == 'centos' and distro_version.startswith('8.3')) or
               (distro_name == 'centos' and distro_version.startswith('8.2')) or
               (distro_name == 'centos' and distro_version.startswith('8.1'))):
