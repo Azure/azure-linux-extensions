@@ -1,3 +1,8 @@
+1.2.0.90
+- Support for RHEL 8.3, 8.4
+- Support for CentOS 8.3, 8.4
+- Add BEK disk validations
+
 1.2.0.89
 - avoid apt-get timeouts on isolated networks
 - add grub-pc-bin package if missing on Ubuntu
@@ -26,7 +31,7 @@
 - Add support for VM sizes without Resource Disks
 
 1.2.0.70
--	Add support for Python3
+- Add support for Python3
 - Add support for RHEL 8
 - Enable Online encryption for RHEL 8 OS disk encryption
 
