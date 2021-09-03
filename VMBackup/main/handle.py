@@ -60,7 +60,7 @@ from workloadPatch import WorkloadPatch
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro, configSeqNo
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -74,6 +74,7 @@ def main():
         backup_logger = Backuplogger(hutil)
         MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
         hutil.patching = MyPatching
+        configSeqNo = -1
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
                 disable()
@@ -87,12 +88,14 @@ def main():
                 update()
             elif re.match("^([-/]*)(daemon)", a):
                 daemon()
+            elif re.match("^([-/]*)(seqNo)", a):
+                configSeqNo = int(a.split(':')[1])
     except Exception as e:
         sys.exit(0)
 
 def install():
-    global hutil
-    hutil.do_parse_context('Install')
+    global hutil,configSeqNo
+    hutil.do_parse_context('Install', configSeqNo)
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
 def timedelta_total_seconds(delta):
@@ -234,9 +237,9 @@ def can_take_crash_consistent_snapshot(para_parser):
     return takeCrashConsistentSnapshot
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch, configSeqNo
     #this is using the most recent file timestamp.
-    hutil.do_parse_context('Executing')
+    hutil.do_parse_context('Executing', configSeqNo)
 
     try:
         backup_logger.log('starting daemon', True)
@@ -571,21 +574,24 @@ def daemon():
     sys.exit(0)
 
 def uninstall():
-    hutil.do_parse_context('Uninstall')
+    global configSeqNo
+    hutil.do_parse_context('Uninstall', configSeqNo)
     hutil.do_exit(0,'Uninstall','success','0', 'Uninstall succeeded')
 
 def disable():
-    hutil.do_parse_context('Disable')
+    global configSeqNo
+    hutil.do_parse_context('Disable', configSeqNo)
     hutil.do_exit(0,'Disable','success','0', 'Disable Succeeded')
 
 def update():
-    hutil.do_parse_context('Upadate')
+    global configSeqNo
+    hutil.do_parse_context('Upadate', configSeqNo)
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
-    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro
+    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo
     try:
-        hutil.do_parse_context('Enable')
+        hutil.do_parse_context('Enable', configSeqNo)
 
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)

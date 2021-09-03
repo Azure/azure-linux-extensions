@@ -113,17 +113,6 @@ class HandlerUtility:
         seq_no = -1
         cur_seq_no = -1
         freshest_time = None
-
-        try:
-            cur_seq_no = self.get_current_seq()
-            if(cur_seq_no != -1):
-                self.log("_get_current_seq_no: Current Sequence No. form environment varaible: " + str(cur_seq_no))
-                return cur_seq_no
-            else:
-                self.log("_get_current_seq_no: Could not get current sequence number from environment variable")
-        except:
-            self.log("_get_current_seq_no: Could not get current sequence number from environment variable")
-
         for subdir, dirs, files in os.walk(config_folder):
             for file in files:
                 try:
@@ -144,14 +133,6 @@ class HandlerUtility:
     def get_last_seq(self):
         if(os.path.isfile('mrseq')):
             seq = waagent.GetFileContents('mrseq')
-            if(seq):
-                return int(seq)
-        return -1
-    
-    def get_current_seq(self):
-        if(os.path.isfile('crseq')):
-            seq = waagent.GetFileContents('crseq')
-            os.remove('crseq')
             if(seq):
                 return int(seq)
         return -1
@@ -241,9 +222,9 @@ class HandlerUtility:
                 self.log('Config decoded correctly.')
         return config
 
-    def do_parse_context(self, operation):
+    def do_parse_context(self, operation, seqNo):
         self.operation = operation
-        _context = self.try_parse_context()
+        _context = self.try_parse_context(seqNo)
         getWaagentPathUsed = Utils.WAAgentUtil.GetPathUsed()
         if(getWaagentPathUsed == 0):
             self.log("waagent old path is used")
@@ -254,7 +235,7 @@ class HandlerUtility:
             sys.exit(0)
         return _context
 
-    def try_parse_context(self):
+    def try_parse_context(self, seqNo):
         self._context = HandlerContext(self._short_name)
         handler_env = None
         config = None
@@ -290,12 +271,18 @@ class HandlerUtility:
             self._change_log_file()
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
-            self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
+            if seqNo != -1:
+                self._context._seq_no = seqNo
+            else:
+                self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
             if self._context._seq_no < 0:
                 self.error("Unable to locate a .settings file!")
                 return None
             self._context._seq_no = str(self._context._seq_no)
-            self.log('sequence number is ' + self._context._seq_no)
+            if seqNo != -1:
+                self.log('sequence number from environment varaible is ' + self._context._seq_no)
+            else:
+                self.log('sequence number is ' + self._context._seq_no)
             self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
             self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
             self.log("setting file path is" + self._context._settings_file)
