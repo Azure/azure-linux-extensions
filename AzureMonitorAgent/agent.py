@@ -347,7 +347,7 @@ def install():
 
         # check if required GCS params are available
         MONITORING_GCS_CERT_CERTFILE = None
-        if "certificate" in protected_settings:           
+        if "certificate" in protected_settings:
             MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
 
         if "certificatePath" in protected_settings:
