@@ -47,7 +47,7 @@ then
 	echo "`date -u`- ConfigSequenceNumber not found in environment variable ${configSeqNo}" >> $logfile
 else
 	configSeqNo='seqNo:'$configSeqNo
-	echo "`date -u`- ConfigSequenceNumber from environment variableb ${configSeqNo}" >> $logfile
+	echo "`date -u`- ConfigSequenceNumber from environment variable ${configSeqNo}" >> $logfile
 fi
 
 pythonVersionList="python3.8 python3.7 python3.6 python3.5 python3.4 python3.3 python3 python2.7 python2.6 python2 python"

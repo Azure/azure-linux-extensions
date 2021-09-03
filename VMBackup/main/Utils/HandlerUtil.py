@@ -282,7 +282,7 @@ class HandlerUtility:
             if seqNo != -1:
                 self.log('sequence number from environment varaible is ' + self._context._seq_no)
             else:
-                self.log('sequence number is ' + self._context._seq_no)
+                self.log('sequence number based on config file-names is ' + self._context._seq_no)
             self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
             self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
             self.log("setting file path is" + self._context._settings_file)
