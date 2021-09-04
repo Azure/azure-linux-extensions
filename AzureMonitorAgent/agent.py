@@ -364,10 +364,9 @@ def install():
         if "certificateKeyPath" in protected_settings:
             try:
                 with open(protected_settings.get("certificateKeyPath"), 'r') as f:
-                    MONITORING_GCS_CERT_CERTFILE = f.read()
+                    MONITORING_GCS_CERT_KEYFILE = f.read()
             except Exception as ex:
                 log_and_exit('Install', MissingorInvalidParameterErrorCode, 'Failed to read certificate key {0}: {1}'.format(protected_settings.get("certificateKeyPath"), ex))
-
 
         MONITORING_GCS_ENVIRONMENT = ""
         if "monitoringGCSEnvironment" in protected_settings:
