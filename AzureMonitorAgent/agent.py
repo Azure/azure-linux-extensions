@@ -350,9 +350,23 @@ def install():
         if "certificate" in protected_settings:
             MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
 
+        if "certificatePath" in protected_settings:
+            try:
+                with open(protected_settings.get("certificatePath"), 'r') as f:
+                    MONITORING_GCS_CERT_CERTFILE = f.read()
+            except Exception as ex:
+                log_and_exit('Install', MissingorInvalidParameterErrorCode, 'Failed to read certificate {0}: {1}'.format(protected_settings.get("certificatePath"), ex))
+
         MONITORING_GCS_CERT_KEYFILE = None
         if "certificateKey" in protected_settings:
             MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(protected_settings.get("certificateKey"))
+
+        if "certificateKeyPath" in protected_settings:
+            try:
+                with open(protected_settings.get("certificateKeyPath"), 'r') as f:
+                    MONITORING_GCS_CERT_KEYFILE = f.read()
+            except Exception as ex:
+                log_and_exit('Install', MissingorInvalidParameterErrorCode, 'Failed to read certificate key {0}: {1}'.format(protected_settings.get("certificateKeyPath"), ex))
 
         MONITORING_GCS_ENVIRONMENT = ""
         if "monitoringGCSEnvironment" in protected_settings:
