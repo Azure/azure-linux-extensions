@@ -53,6 +53,7 @@ Example Status Report:
 
 import os
 import os.path
+import shlex
 import sys
 import re
 try:
@@ -450,7 +451,7 @@ class HandlerUtility:
             total_used_gluster = 0
             network_fs_types = []
             for i in range(1,len(output)-1):
-                device, fstype, size, used, available, percent, mountpoint = output[i].split()
+                device, fstype, size, used, available, percent, mountpoint = shlex.split(output[i])
                 self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
                 if "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
                     if fstype not in network_fs_types :
