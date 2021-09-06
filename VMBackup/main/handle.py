@@ -89,7 +89,10 @@ def main():
             elif re.match("^([-/]*)(daemon)", a):
                 daemon()
             elif re.match("^([-/]*)(seqNo:)", a):
-                configSeqNo = int(a.split(':')[1])
+                try:
+                    configSeqNo = int(a.split(':')[1])
+                except:
+                    configSeqNo = -1
     except Exception as e:
         sys.exit(0)
 
