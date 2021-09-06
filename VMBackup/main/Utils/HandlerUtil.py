@@ -223,9 +223,9 @@ class HandlerUtility:
                 self.log('Config decoded correctly.')
         return config
 
-    def do_parse_context(self, operation):
+    def do_parse_context(self, operation, seqNo):
         self.operation = operation
-        _context = self.try_parse_context()
+        _context = self.try_parse_context(seqNo)
         getWaagentPathUsed = Utils.WAAgentUtil.GetPathUsed()
         if(getWaagentPathUsed == 0):
             self.log("waagent old path is used")
@@ -236,13 +236,14 @@ class HandlerUtility:
             sys.exit(0)
         return _context
 
-    def try_parse_context(self):
+    def try_parse_context(self, seqNo):
         self._context = HandlerContext(self._short_name)
         handler_env = None
         config = None
         ctxt = None
         code = 0
         try:
+            self.log('try_parse_context : Sequence Number received ' + seqNo)
             # get the HandlerEnvironment.json.  According to the extension handler
             # spec, it is always in the ./ directory
             self.log('cwd is ' + os.path.realpath(os.path.curdir))
@@ -272,12 +273,18 @@ class HandlerUtility:
             self._change_log_file()
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
-            self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
+            if seqNo != -1:
+                self._context._seq_no = seqNo
+            else:
+                self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
             if self._context._seq_no < 0:
                 self.error("Unable to locate a .settings file!")
                 return None
             self._context._seq_no = str(self._context._seq_no)
-            self.log('sequence number is ' + self._context._seq_no)
+            if seqNo != -1:
+                self.log('sequence number from environment varaible is ' + self._context._seq_no)
+            else:
+                self.log('sequence number based on config file-names is ' + self._context._seq_no)
             self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
             self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
             self.log("setting file path is" + self._context._settings_file)

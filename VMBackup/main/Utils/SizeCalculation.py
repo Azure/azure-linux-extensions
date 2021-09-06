@@ -98,7 +98,10 @@ class SizeCalculation(object):
                 self.logger.log("df return code"+str(df.returncode), True)
                 output = df.stdout.read().decode()
             if sys.version_info > (3,):
-                output = str(output, encoding='utf-8', errors="backslashreplace")
+                try:
+                    output = str(output, encoding='utf-8', errors="backslashreplace")
+                except:
+                    output = str(output)
             else:
                 output = str(output)
             output = output.strip().split("\n")

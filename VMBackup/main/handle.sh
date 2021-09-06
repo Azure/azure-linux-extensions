@@ -40,6 +40,16 @@ then
     exit $arc
 fi
 
+configSeqNo="$(echo `printenv ConfigSequenceNumber`)"
+if [ -z ${configSeqNo} ]
+then
+	configSeqNo='seqNo:-1'
+	echo "`date -u`- ConfigSequenceNumber not found in environment variable ${configSeqNo}" >> $logfile
+else
+	configSeqNo='seqNo:'$configSeqNo
+	echo "`date -u`- ConfigSequenceNumber from environment variable ${configSeqNo}" >> $logfile
+fi
+
 pythonVersionList="python3.8 python3.7 python3.6 python3.5 python3.4 python3.3 python3 python2.7 python2.6 python2 python"
 
 for pythonVersion in ${pythonVersionList};
@@ -48,7 +58,7 @@ do
 	if [ -f "${cmnd}" ]
     then
 		echo "`date -u`- ${pythonVersion} path exists" >> $logfile
-		$cmnd main/handle.py -$1
+		$cmnd main/handle.py -$configSeqNo -$1
 		rc=$?
 	fi
 	if [ $rc -eq 0 ]
@@ -63,14 +73,14 @@ pythonPath=$(echo "${pythonProcess}" | head -n1 | awk '{print $8;}')
 if [ $rc -ne 0 ] && [ -f "`which python`" ]
 then
 	echo "`date -u`- python path exists" >> $logfile
-	/usr/bin/env python main/handle.py -$1
+	/usr/bin/env python main/handle.py -$configSeqNo -$1
 	rc=$?
 fi
 
 if [ $rc -ne 0 ] && [ -f "${pythonPath}" ]
 then
 	echo "`date -u`- python path exists" >> $logfile
-	$pythonPath main/handle.py -$1
+	$pythonPath main/handle.py -$configSeqNo -$1
 	rc=$?
 fi
 	
