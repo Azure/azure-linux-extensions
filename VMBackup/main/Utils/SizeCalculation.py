@@ -14,6 +14,7 @@ from Utils.ResourceDiskUtil import ResourceDiskUtil
 import Utils.HandlerUtil
 import traceback
 import subprocess
+import shlex
 
 class SizeCalculation(object):
 
@@ -126,16 +127,16 @@ class SizeCalculation(object):
             device_list=self.device_list_for_billing() #new logic: calculate the disk size for billing
 
             while index < output_length:
-                if(len(output[index].split()) < 6 ): #when a row is divided in 2 lines
+                if(len(shlex.split(output[index])) < 6 ): #when a row is divided in 2 lines
                     index = index+1
-                    if(index < output_length and len(output[index-1].split()) + len(output[index].split()) == 6):
+                    if(index < output_length and len(shlex.split(output[index-1])) + len(shlex.split(output[index])) == 6):
                         output[index] = output[index-1] + output[index]
                     else:
                         self.logger.log("Output of df command is not in desired format",True)
                         total_used = 0
                         size_calc_failed = True
                         break
-                device, size, used, available, percent, mountpoint = output[index].split()
+                device, size, used, available, percent, mountpoint = shlex.split(output[index])
                 fstype = ''
                 isNetworkFs = False
                 isKnownFs = False
