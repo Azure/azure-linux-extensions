@@ -243,7 +243,7 @@ class HandlerUtility:
         ctxt = None
         code = 0
         try:
-            self.log('try_parse_context : Sequence Number received ' + seqNo)
+            self.log('try_parse_context : Sequence Number received ' + str(seqNo))
             # get the HandlerEnvironment.json.  According to the extension handler
             # spec, it is always in the ./ directory
             self.log('cwd is ' + os.path.realpath(os.path.curdir))
