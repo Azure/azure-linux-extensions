@@ -562,6 +562,10 @@ def enable():
     """
     global AMAServiceStartCommand, AMAServiceStatusCommand
 
+    if HUtilObject:
+        if(HUtilObject.is_seq_smaller()):
+            return 0, "Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable"
+
     exit_if_vm_not_supported('Enable')
 
     # Check if this is Arc VM and enable arc daemon if it is
@@ -593,6 +597,7 @@ def enable():
     if exit_code == 0:
         #start metrics process if enable is successful
         start_metrics_process()
+        HUtilObject.save_seq()
     else:
         status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
         if status_exit_code != 0:
