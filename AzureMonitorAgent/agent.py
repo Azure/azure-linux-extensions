@@ -1058,7 +1058,7 @@ def find_package_manager(operation):
     dist, ver = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner"])
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1131,7 +1131,8 @@ def is_vm_supported_for_extension(operation):
                        'oracle' : ['6', '7', '8'], # Oracle
                        'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'] # SLES
+                       'suse' : ['12'], 'sles' : ['15'], # SLES
+                       'cbl-mariner' : ['1'] # Mariner
     }
 
     vm_supported = False
