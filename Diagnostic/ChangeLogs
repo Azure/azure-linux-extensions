@@ -1,6 +1,8 @@
-2020-11-04: LAD-3.0.131
-    - Fix a crash that could occur when using fileLogs with a JSON Blob
-    sink
+2021-09-16: LAD-3.0.133
+    - Install latest OMI after OMS agent to address security vulnerability
+
+2020-11-06: LAD-3.0.131
+    - Fix issue #1262: Crashing bug caused by task synchronization issue in XJsonBlobRequest
 
 2020-07-01: LAD-3.0.129
     - Fix issue #499 : Need a better error message if LAD protectedSettings is missing

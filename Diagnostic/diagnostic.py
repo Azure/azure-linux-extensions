@@ -177,6 +177,23 @@ def setup_dependencies_and_mdsd(configurator):
     if omsagent_setup_exit_code is not 0:
         return 3, omsagent_setup_output
 
+    # Patch OMI if LAD contains a newer version
+    openssl_ver = ''
+    cmd_exit_code, cmd_output = g_dist_config.log_run_get_output('openssl version')
+    if cmd_exit_code != 0:
+        return 5, 'Could not determine openssl version. Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+    openssl_version = cmd_output.split()[1]
+    if re.match('^1.0.*', openssl_version):
+        openssl_ver = '100'
+    elif re.match('^1.1.*', openssl_version):
+        openssl_ver = '110'
+    else:
+        return 6, 'Unsupported openssl version. OpenSSL 1.0 or 1.1 must be installed. Detected version={0}'.format(openssl_version)
+
+    cmd_exit_code, cmd_output = g_dist_config.patch_lad_omi(openssl_ver)
+    if cmd_exit_code != 0:
+        return 7, 'omi pkg install failed. Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
+
     # Install lad-mdsd pkg (/usr/local/lad/bin/mdsd). Must be done after omsagent install because of dependencies
     cmd_exit_code, cmd_output = g_dist_config.install_lad_mdsd()
     if cmd_exit_code != 0:
