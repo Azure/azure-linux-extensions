@@ -43,7 +43,7 @@ ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.6.8-1ssl_'
+omi_package_prefix = 'packages/omi-1.6.8-1.ssl_'
 dsc_package_prefix = 'packages/dsc-1.1.1-294.ssl_'
 omi_major_version = 1
 omi_minor_version = 6
