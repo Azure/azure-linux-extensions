@@ -1,4 +1,4 @@
-2021-09-16: LAD-3.0.133
+2021-09-17: LAD-3.0.135
     - This release incorporates security updates for the OMI agent subcomponent, addressing CVE-2021-38645, CVE-2021-38649, CVE-2021-38648, and CVE-2021-38647
 
 2020-11-06: LAD-3.0.131

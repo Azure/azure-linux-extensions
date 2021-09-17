@@ -192,12 +192,12 @@ def setup_dependencies_and_mdsd(configurator):
         if cmd_exit_code == 0:  # Successfully set up
             is_omi_setup_correctly = True
             break
-        logger_error("omi setup failed (trial #" + str(trialNum) + ").")
+        hutil.error("omi setup failed (trial #" + str(trialNum) + ").")
         if trialNum < maxTries:
-            logger_error("Retrying in 30 seconds...")
+            hutil.error("Retrying in 30 seconds...")
             time.sleep(30)
     if not is_omi_setup_correctly:
-        logger_error("omi setup failed " + str(maxTries) + " times. Giving up...")
+        hutil.error("omi setup failed " + str(maxTries) + " times. Giving up...")
         return 7, "omi setup failed {0} times. " \
                   "Last exit code={1}, Output={2}".format(maxTries, cmd_exit_code, cmd_output)
 

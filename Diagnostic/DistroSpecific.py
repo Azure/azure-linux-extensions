@@ -267,7 +267,13 @@ class RedhatActions(CommonActions):
 
     def patch_lad_omi(self, openssl_ver):
         # openssl_ver must be 100 or 110
-        cmd = "rpm -i omi-*.ssl_OPENSSLVER.ulinux.x64.rpm".replace("OPENSSLVER", openssl_ver)
+        omi_install_check_result = self.log_run_ignore_output("rpm -q omi")
+        if omi_install_check_result == 0:
+            # omi is present; run a 'freshen' install. This will possibly upgrade (but not downgrade OMI)
+            cmd = "rpm -Fhv omi-*.ssl_OPENSSLVER.ulinux.x64.rpm".replace("OPENSSLVER", openssl_ver)
+        else:
+            # omi is not present; run a normal install.
+            cmd = "rpm -Uhv omi-*.ssl_OPENSSLVER.ulinux.x64.rpm".replace("OPENSSLVER", openssl_ver)
         return self.log_run_get_output(cmd)
 
 
