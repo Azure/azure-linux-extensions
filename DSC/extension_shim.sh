@@ -91,6 +91,27 @@ function stop_omiservice(){
     fi
 }
 
+function compare_versions(){
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i v1=($1) v2=($2)
+    for ((i=0; i<${#v1[@]}; i++)) 
+    do
+        if ((${v1[i]} > ${v2[i]}))
+        then
+            return 1
+        fi
+        if ((${v1[i]} < ${v2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
+
 function ensure_required_omi_version_exists(){
     # Populate SSL Version
     get_openssl_version
@@ -107,11 +128,10 @@ function ensure_required_omi_version_exists(){
             RESULT=`service omid status >/dev/null 2>&1`
             OMI_SERVICE_STATE=$?
             echo "OMI is already installed. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE};" # Add current running status
-            if [ ${INSTALLED_OMI_VERSION} = ${REQUIRED_OMI_VERSION} ]; then
-                echo "Installed OMI version is same as Required OMI version. No action needed."
-            else
+            compare_versions ${INSTALLED_OMI_VERSION} ${REQUIRED_OMI_VERSION}
+            if [ $? -eq 2 ]; then
                 OMI_PACKAGE_PATH="${OMI_PACKAGE_PREFIX}${OPENSSL_VERSION}.x64.rpm"
-                echo "Installed OMI version is not same as Required OMI version. Trying to upgrade."
+                echo "Installed OMI version is lower than the Required OMI version. Trying to upgrade."
                 if [ -f ${OMI_PACKAGE_PATH} ]; then
                     echo "The OMI package exists at ${OMI_PACKAGE_PATH}. Using this to upgrade."
                     stop_omiservice
@@ -128,7 +148,9 @@ function ensure_required_omi_version_exists(){
                     fi
                 else          
                     echo "The OMI package does not exists at ${OMI_PACKAGE_PATH}. Skipping upgrade."
-                fi  
+                fi
+            else
+                echo "Installed OMI version is equal to or greater than the Required OMI version. No action needed."
             fi
         fi
         INSTALLED_OMI_VERSION=`rpm -q --queryformat "%{VERSION}.%{RELEASE}" omi 2>&1`
@@ -146,11 +168,10 @@ function ensure_required_omi_version_exists(){
                 RESULT=`service omid status >/dev/null 2>&1`
                 OMI_SERVICE_STATE=$?
                 echo "OMI is already installed. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE};"
-                if [ ${INSTALLED_OMI_VERSION} = ${REQUIRED_OMI_VERSION} ]; then
-                    echo "Installed OMI version is same as Required OMI version. No action needed..."
-                else
+                compare_versions ${INSTALLED_OMI_VERSION} ${REQUIRED_OMI_VERSION}
+                if [ $? -eq 2 ]; then
                     OMI_PACKAGE_PATH="${OMI_PACKAGE_PREFIX}${OPENSSL_VERSION}.x64.deb"
-                    echo "Installed OMI version is not same as Required OMI version. Trying to upgrade."
+                    echo "Installed OMI version is lower than the Required OMI version. Trying to upgrade."
                     if [ -f ${OMI_PACKAGE_PATH} ]; then
                         echo "The OMI package exists at ${OMI_PACKAGE_PATH}. Using this to upgrade."
                         stop_omiservice
@@ -168,6 +189,8 @@ function ensure_required_omi_version_exists(){
                     else          
                         echo "The OMI package does not exists at ${OMI_PACKAGE_PATH}. Skipping upgrade."                    
                     fi 
+                else
+                    echo "Installed OMI version is equal to or greater than the Required OMI version. No action needed."
                 fi
             fi
             INSTALLED_OMI_VERSION=`dpkg -s omi 2>&1 | grep Version: | awk '{print $2}'`
