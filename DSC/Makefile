@@ -10,6 +10,7 @@ SOURCES = \
         dsc.py \
 	test \
 	HandlerManifest.json \
+	extension_shim.sh \
 	manifest.xml \
 	azure \
 	packages \
