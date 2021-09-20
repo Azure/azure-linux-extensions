@@ -95,7 +95,7 @@ function ensure_required_omi_version_exists(){
     # Populate SSL Version
     get_openssl_version
 
-    echo "Checking if OMI is installed. Required OMI version: ${REQUIRED_OMI_VERSION}"
+    echo "Checking if OMI is installed. Required OMI version: ${REQUIRED_OMI_VERSION};"
 
     # Check if RPM exists
     if command -v rpm >/dev/null 2>&1 ; then
@@ -106,7 +106,7 @@ function ensure_required_omi_version_exists(){
         else
             RESULT=`service omid status >/dev/null 2>&1`
             OMI_SERVICE_STATE=$?
-            echo "OMI is already installed. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE}" # Add current running status
+            echo "OMI is already installed. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE};" # Add current running status
             if [ ${INSTALLED_OMI_VERSION} = ${REQUIRED_OMI_VERSION} ]; then
                 echo "Installed OMI version is same as Required OMI version. No action needed."
             else
@@ -118,9 +118,9 @@ function ensure_required_omi_version_exists(){
                     RESULT=`rpm -Uvh ${OMI_PACKAGE_PATH} >/dev/null 2>&1`
                     if [ $? -eq 0 ]; then
                         UPGRADED_OMI_VERSION=`rpm -q --queryformat "%{VERSION}.%{RELEASE}" omi 2>&1`
-                        echo "Succesfully upgraded the OMI. Installed: ${INSTALLED_OMI_VERSION} Required: ${REQUIRED_OMI_VERSION} Upgraded: ${UPGRADED_OMI_VERSION}"
+                        echo "Succesfully upgraded the OMI. Installed: ${INSTALLED_OMI_VERSION}; Required: ${REQUIRED_OMI_VERSION}; Upgraded: ${UPGRADED_OMI_VERSION};"
                     else
-                        echo "Failed to upgrade the OMI. Installed: ${INSTALLED_OMI_VERSION} Required: ${REQUIRED_OMI_VERSION}"
+                        echo "Failed to upgrade the OMI. Installed: ${INSTALLED_OMI_VERSION}; Required: ${REQUIRED_OMI_VERSION};"
                     fi
                     # Start OMI only if previous state was running
                     if [ $OMI_SERVICE_STATE -eq 0 ]; then
@@ -134,7 +134,7 @@ function ensure_required_omi_version_exists(){
         INSTALLED_OMI_VERSION=`rpm -q --queryformat "%{VERSION}.%{RELEASE}" omi 2>&1`
         RESULT=`service omid status >/dev/null 2>&1`
         OMI_SERVICE_STATE=$?
-        echo "OMI upgrade is complete. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE}"
+        echo "OMI upgrade is complete. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE};"
     else 
         # Check if DPKG exists
         if command -v dpkg >/dev/null 2>&1 ; then
@@ -145,7 +145,7 @@ function ensure_required_omi_version_exists(){
             else
                 RESULT=`service omid status >/dev/null 2>&1`
                 OMI_SERVICE_STATE=$?
-                echo "OMI is already installed. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE}"
+                echo "OMI is already installed. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE};"
                 if [ ${INSTALLED_OMI_VERSION} = ${REQUIRED_OMI_VERSION} ]; then
                     echo "Installed OMI version is same as Required OMI version. No action needed..."
                 else
@@ -157,9 +157,9 @@ function ensure_required_omi_version_exists(){
                         RESULT=`dpkg -i --force-confold --force-confdef --refuse-downgrade ${OMI_PACKAGE_PATH} >/dev/null 2>&1`
                         if [ $? -eq 0 ]; then
                             UPGRADED_OMI_VERSION=`dpkg -s omi 2>&1 | grep Version: | awk '{print $2}'`
-                            echo "Succesfully upgraded the OMI. Installed: ${INSTALLED_OMI_VERSION} Required: ${REQUIRED_OMI_VERSION} Upgraded: ${UPGRADED_OMI_VERSION}"
+                            echo "Succesfully upgraded the OMI. Installed: ${INSTALLED_OMI_VERSION}; Required: ${REQUIRED_OMI_VERSION}; Upgraded: ${UPGRADED_OMI_VERSION};"
                         else
-                            echo "Failed to upgrade the OMI. Installed: ${INSTALLED_OMI_VERSION} Required: ${REQUIRED_OMI_VERSION}"
+                            echo "Failed to upgrade the OMI. Installed: ${INSTALLED_OMI_VERSION}; Required: ${REQUIRED_OMI_VERSION};"
                         fi
                         # Start OMI only if previous state was running
                         if [ $OMI_SERVICE_STATE -eq 0 ]; then
@@ -173,7 +173,7 @@ function ensure_required_omi_version_exists(){
             INSTALLED_OMI_VERSION=`dpkg -s omi 2>&1 | grep Version: | awk '{print $2}'`
             RESULT=`service omid status >/dev/null 2>&1`
             OMI_SERVICE_STATE=$?
-            echo "OMI upgrade is complete. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE}"
+            echo "OMI upgrade is complete. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE};"
         fi
     fi
 }
