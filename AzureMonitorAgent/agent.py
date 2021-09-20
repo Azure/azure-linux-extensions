@@ -687,10 +687,17 @@ def stop_metrics_process():
     # kill existing metrics watcher
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
-            for pids in f.readlines():
-                kill_cmd = "kill " + pids
-                run_command_and_log(kill_cmd)
-                run_command_and_log("rm "+pids_filepath)
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA metrics watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
+                            kill_cmd = "kill " + pid
+                            run_command_and_log(kill_cmd)
+
+             run_command_and_log("rm "+pids_filepath)
 
 def start_metrics_process():
     """
@@ -950,10 +957,16 @@ def stop_arc_watcher():
 
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
-            for pids in f.readlines():                
-                kill_cmd = "kill " + pids
-                run_command_and_log(kill_cmd)
-
+            for pid in f.readlines():                
+                # Verify the pid actually belongs to AMA arc watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-arc") >= 0:
+                            kill_cmd = "kill " + pid
+                            run_command_and_log(kill_cmd)
+                            
         # Delete the file after to avoid clutter
         os.remove(pids_filepath)
 
