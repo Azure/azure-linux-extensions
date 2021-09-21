@@ -697,7 +697,7 @@ def stop_metrics_process():
                             kill_cmd = "kill " + pid
                             run_command_and_log(kill_cmd)
 
-             run_command_and_log("rm "+pids_filepath)
+            run_command_and_log("rm "+pids_filepath)
 
 def start_metrics_process():
     """
