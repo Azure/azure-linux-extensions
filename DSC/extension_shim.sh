@@ -6,7 +6,6 @@ PYTHON=""
 
 # We are writing logs to error stream in extension_shim.sh as the logs written to output stream are being overriden by HandlerUtil.py. This has been done as part of OMIGOD hotfix
 # Default variables for OMI Package Upgrade
-REGEX_FOR_VERSION="^(\d+).(\d+).(\d+).(\d+)$"
 REQUIRED_OMI_VERSION="1.6.8.1"
 INSTALLED_OMI_VERSION=""
 UPGRADED_OMI_VERSION=""
@@ -124,7 +123,7 @@ function ensure_required_omi_version_exists(){
     if command -v rpm >/dev/null 2>&1 ; then
         echo "Package Manager Type: RPM" >&2
         INSTALLED_OMI_VERSION=`rpm -q --queryformat "%{VERSION}.%{RELEASE}" omi 2>&1` 
-        if [[ ${INSTALLED_OMI_VERSION} =~ ${REGEX_FOR_VERSION} ]]; then
+        if [ -z "$INSTALLED_OMI_VERSION" -o "$INSTALLED_OMI_VERSION" = "package omi is not installed" ]; then
             echo "OMI is not installed on the machine." >&2
         else
             RESULT=`service omid status >/dev/null 2>&1`
@@ -164,7 +163,7 @@ function ensure_required_omi_version_exists(){
         if command -v dpkg >/dev/null 2>&1 ; then
             echo "Package Manager Type: DPKG" >&2
             INSTALLED_OMI_VERSION=`dpkg -s omi 2>&1 | grep Version: | awk '{print $2}'`
-            if [[ ${INSTALLED_OMI_VERSION} =~ ${REGEX_FOR_VERSION} ]]; then
+            if [ -z "$INSTALLED_OMI_VERSION" -o "$INSTALLED_OMI_VERSION" = "package omi is not installed" ]; then
                 echo "OMI is not installed on the machine." >&2
             else
                 RESULT=`service omid status >/dev/null 2>&1`
