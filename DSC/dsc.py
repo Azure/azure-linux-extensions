@@ -56,7 +56,7 @@ dsc_release = 926
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.71.1.25"
+extension_handler_version = "2.71.1.28"
 
 # Error codes
 UnsupportedDistro = 51 #excludes from SLA
