@@ -562,6 +562,10 @@ def enable():
     """
     global AMAServiceStartCommand, AMAServiceStatusCommand
 
+    if HUtilObject:
+        if(HUtilObject.is_seq_smaller()):
+            return 0, "Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable"
+
     exit_if_vm_not_supported('Enable')
 
     # Check if this is Arc VM and enable arc daemon if it is
@@ -593,6 +597,7 @@ def enable():
     if exit_code == 0:
         #start metrics process if enable is successful
         start_metrics_process()
+        HUtilObject.save_seq()
     else:
         status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
         if status_exit_code != 0:
@@ -701,10 +706,17 @@ def stop_metrics_process():
     # kill existing metrics watcher
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
-            for pids in f.readlines():
-                kill_cmd = "kill " + pids
-                run_command_and_log(kill_cmd)
-                run_command_and_log("rm "+pids_filepath)
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA metrics watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
+                            kill_cmd = "kill " + pid
+                            run_command_and_log(kill_cmd)
+
+        run_command_and_log("rm "+pids_filepath)
 
 def start_metrics_process():
     """
@@ -964,13 +976,16 @@ def stop_arc_watcher():
 
     if os.path.exists(pids_filepath):
         with open(pids_filepath, "r") as f:
-            for pids in f.readlines():
-                proc = subprocess.Popen(["ps -o cmd= {0}".format(pids)], stdout=subprocess.PIPE, shell=True)
-                output = proc.communicate()[0]
-                if output and "arc" in output:
-                    kill_cmd = "kill " + pids
-                    run_command_and_log(kill_cmd)
-
+            for pid in f.readlines():                
+                # Verify the pid actually belongs to AMA arc watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-arc") >= 0:
+                            kill_cmd = "kill " + pid
+                            run_command_and_log(kill_cmd)
+                            
         # Delete the file after to avoid clutter
         os.remove(pids_filepath)
 
@@ -1053,7 +1068,7 @@ def find_package_manager(operation):
     dist, ver = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner"])
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1126,7 +1141,8 @@ def is_vm_supported_for_extension(operation):
                        'oracle' : ['6', '7', '8'], # Oracle
                        'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'] # SLES
+                       'suse' : ['12'], 'sles' : ['15'], # SLES
+                       'cbl-mariner' : ['1'] # Mariner
     }
 
     vm_supported = False
