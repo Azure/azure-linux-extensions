@@ -139,7 +139,7 @@ class SizeCalculation(object):
                         total_used = 0
                         size_calc_failed = True
                         break
-                device, size, used, available, percent, mountpoint =Utils.HandlerUtil.HandlerUtility.HandlerUtility.split(output[index])
+                device, size, used, available, percent, mountpoint =Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])
                 fstype = ''
                 isNetworkFs = False
                 isKnownFs = False
