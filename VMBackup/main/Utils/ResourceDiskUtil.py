@@ -119,7 +119,7 @@ class ResourceDiskUtil(object):
 		if (mountlist and device):
 			for entry in mountlist.split('\n'):
 				if(re.search(device, entry)):
-					tokens =Utils.HandlerUtil.HandlerUtility.split(entry)
+					tokens =Utils.HandlerUtil.HandlerUtility.split(self.logger, entry)
 					#Return the 3rd column of this line
 					return tokens[2] if len(tokens) > 2 else None
 		return None

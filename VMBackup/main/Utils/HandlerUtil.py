@@ -451,7 +451,7 @@ class HandlerUtility:
             total_used_gluster = 0
             network_fs_types = []
             for i in range(1,len(output)-1):
-                device, fstype, size, used, available, percent, mountpoint = Utils.HandlerUtil.HandlerUtility.split(output[i])
+                device, fstype, size, used, available, percent, mountpoint = output[i].split()
                 self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
                 if "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
                     if fstype not in network_fs_types :
@@ -820,12 +820,12 @@ class HandlerUtility:
         return out
 
     @staticmethod
-    def split(txt):
+    def split(logger,txt):
         result = None
         try:
             result = shlex.split(txt)
         except Exception as e:
-            Utils.HandlerUtil.HandlerUtility.log("Shlex.split threw exception:" + str(e))
+            logger.log('Shlex.Split threw exception error: %s, stack trace: %s' % (str(e), traceback.format_exc()))
             result = txt.split()
         return result
 

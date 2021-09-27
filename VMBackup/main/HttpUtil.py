@@ -73,7 +73,7 @@ class HttpUtil(object):
         else:
             commandToExecute = 'curl --request PUT --connect-timeout 10 --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
                 + '--proxy ' + self.proxyHost + ':' + self.proxyPort + ' -v'
-        args =Utils.HandlerUtil.HandlerUtility.split(commandToExecute.encode('ascii'))
+        args =Utils.HandlerUtil.HandlerUtility.split(self.logger, commandToExecute.encode('ascii'))
         proc = Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         proc.stdin.write(data)
         curlResult,err = proc.communicate()

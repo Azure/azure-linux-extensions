@@ -130,16 +130,16 @@ class SizeCalculation(object):
             device_list=self.device_list_for_billing() #new logic: calculate the disk size for billing
 
             while index < output_length:
-                if(len(Utils.HandlerUtil.split(output[index])) < 6 ): #when a row is divided in 2 lines
+                if(len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) < 6 ): #when a row is divided in 2 lines
                     index = index+1
-                    if(index < output_length and len(Utils.HandlerUtil.split(output[index-1])) + len(Utils.HandlerUtil.split(output[index])) == 6):
+                    if(index < output_length and len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index-1])) + len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) == 6):
                         output[index] = output[index-1] + output[index]
                     else:
                         self.logger.log("Output of df command is not in desired format",True)
                         total_used = 0
                         size_calc_failed = True
                         break
-                device, size, used, available, percent, mountpoint =Utils.HandlerUtil.HandlerUtility.split(output[index])
+                device, size, used, available, percent, mountpoint =Utils.HandlerUtil.HandlerUtility.HandlerUtility.split(output[index])
                 fstype = ''
                 isNetworkFs = False
                 isKnownFs = False
