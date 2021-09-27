@@ -821,10 +821,11 @@ class HandlerUtility:
 
     @staticmethod
     def split(txt):
+        result = None
         try:
             result = shlex.split(txt)
         except Exception as e:
-            self.log("Shlex.split threw exception:" + str(e))
+            Utils.HandlerUtil.HandlerUtility.log("Shlex.split threw exception:" + str(e))
             result = txt.split()
         return result
 
