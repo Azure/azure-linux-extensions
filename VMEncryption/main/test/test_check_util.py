@@ -405,6 +405,7 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         # Expected: "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}"
         self.assertIsNone(self.cutil.check_kv_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrgname/providers/Microsoft.KeyVault/vaults/testkvname",""))
         self.assertIsNone(self.cutil.check_kv_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/testrgname/providers/microsoft.keyvault/vaults/testkvname",""))
+        self.assertIsNone(self.cutil.check_kv_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/test.rgname/providers/microsoft.keyvault/vaults/testkvname",""))
 
         self.assertRaises(Exception, self.cutil.check_kv_id, { "","" })
         self.assertRaises(Exception, self.cutil.check_kv_id, { "https://not/a/resource/id","" })
@@ -415,6 +416,7 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         """extract key vault name from KV ID"""
         self.assertEqual(self.cutil.get_kv_id_name("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testrgname/providers/Microsoft.KeyVault/vaults/testkvname"),"testkvname")
         self.assertEqual(self.cutil.get_kv_id_name("/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/testrgname/providers/microsoft.keyvault/vaults/testkvname"),"testkvname")
+        self.assertEqual(self.cutil.get_kv_id_name("/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/test.rgname/providers/microsoft.keyvault/vaults/testkvname"),"testkvname")
 
         self.assertRaises(Exception, self.cutil.get_kv_id_name, { "" })
         self.assertRaises(Exception, self.cutil.get_kv_id_name, { "https://not/a/resource/id","" })

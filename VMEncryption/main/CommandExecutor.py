@@ -61,7 +61,7 @@ class CommandExecutor(object):
             else:
                 if not suppress_logging:
                     # traceback format_exc converts exception to string 
-                    self.logger.log("Process creation failed: " + traceback.format_exc(e))
+                    self.logger.log("Process creation failed: " + traceback.format_exc())
                 return -1
 
         def timeout_process():
