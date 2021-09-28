@@ -677,11 +677,11 @@ def enable():
                 cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
-            logger.log(traceback.format_exc(e))
+            logger.log(traceback.format_exc())
             # Reject settings if fatal exception occurs while a daemon is running
             if is_daemon_running():
                 hutil.reject_settings()
-            msg = str(traceback.format_exc(e))
+            msg = str(traceback.format_exc())
             hutil.do_exit(exit_code=CommonVariables.configuration_error,
                           operation='Enable',
                           status=CommonVariables.extension_error_status,
@@ -698,7 +698,7 @@ def enable():
                 logger.log("PRECHECK: Prechecks successful")
         except Exception as e:
             logger.log("PRECHECK: Exception thrown during precheck")
-            logger.log(traceback.format_exc(e))
+            logger.log(traceback.format_exc())
 
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
             if is_migrate_operation:
@@ -729,7 +729,7 @@ def enable():
                       message=str(e))
 
     except Exception as e:
-        msg = "Unexpected Error during enable: {0}".format(traceback.format_exc(e))
+        msg = "Unexpected Error during enable: {0}".format(traceback.format_exc())
         logger.log(msg)
         hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='Enable',
