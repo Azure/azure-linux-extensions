@@ -100,7 +100,7 @@ class CheckUtil(object):
     def check_kv_id(self, test_kv_id, message):
         """basic sanity check of the key vault id"""
         expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}"
-        pattern = re.compile(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([a-zA-Z0-9\-\_]+)/providers/Microsoft.KeyVault/vaults/([a-zA-Z0-9\-\_]+)(/)?$',re.IGNORECASE)
+        pattern = re.compile(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/vaults/([a-zA-Z0-9\-\_]+)(/)?$',re.IGNORECASE)
         if not (test_kv_id and pattern.match(test_kv_id)):
             raise Exception('\n' + message + '\nActual: ' + test_kv_id + '\nExpected: ' + expected + "\n")
         return
@@ -108,7 +108,7 @@ class CheckUtil(object):
     def get_kv_id_name(self, kv_id):
         """extract key vault name from KV ID"""
         if kv_id:
-            match = re.search(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([a-zA-Z0-9\-\_]+)/providers/Microsoft.KeyVault/vaults/([a-zA-Z0-9\-\_]+)(/)?$', kv_id, re.IGNORECASE)
+            match = re.search(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/vaults/([a-zA-Z0-9\-\_]+)(/)?$', kv_id, re.IGNORECASE)
             if match:
                 return match.group(3)
         return
