@@ -59,7 +59,7 @@ class DiskUtil(object):
 
     def get_device_items_property(self, lsblk_path, dev_name, property_name):
         get_property_cmd = lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
-        get_property_cmd_args = shlex.split(get_property_cmd)
+        get_property_cmd_args =Utils.HandlerUtil.HandlerUtility.split(self.logger, get_property_cmd)
         get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         output,err = get_property_cmd_p.communicate()
         output= str(output)
@@ -67,7 +67,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = shlex.split(item_value_str)
+                disk_info_item_array =Utils.HandlerUtil.HandlerUtility.split(self.logger, item_value_str)
                 if(dev_name == disk_info_item_array[0]):
                     if(len(disk_info_item_array) > 1):
                         return disk_info_item_array[1]
@@ -81,7 +81,7 @@ class DiskUtil(object):
             get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME"
         else:
             get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME " + dev_path
-        get_device_cmd_args = shlex.split(get_device_cmd)
+        get_device_cmd_args =Utils.HandlerUtil.HandlerUtility.split(self.logger, get_device_cmd)
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
         out_lsblk_output = str(out_lsblk_output)
@@ -89,7 +89,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = shlex.split(item_value_str)
+                disk_info_item_array =Utils.HandlerUtil.HandlerUtility.split(self.logger, item_value_str)
                 device_item = DeviceItem()
                 device_item.name = disk_info_item_array[0]
                 device_items.append(device_item)
@@ -123,7 +123,7 @@ class DiskUtil(object):
             get_device_cmd = lsblk_path + " -b -nl -o NAME"
         else:
             get_device_cmd = lsblk_path + " -b -nl -o NAME " + dev_path
-        get_device_cmd_args = shlex.split(get_device_cmd)
+        get_device_cmd_args =Utils.HandlerUtil.HandlerUtility.split(self.logger, get_device_cmd)
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
         if sys.version_info > (3,):
@@ -135,7 +135,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = shlex.split(item_value_str)
+                disk_info_item_array =Utils.HandlerUtil.HandlerUtility.split(self.logger, item_value_str)
                 device_item = DeviceItem()
                 device_item.name = disk_info_item_array[0]
                 device_items_temp.append(device_item)
@@ -263,7 +263,7 @@ class DiskUtil(object):
                 for i in range(0,len(lines)):
                     item_value_str = lines[i].strip()
                     if(item_value_str != ""):
-                        disk_info_item_array = shlex.split(item_value_str)
+                        disk_info_item_array =Utils.HandlerUtil.HandlerUtility.split(self.logger, item_value_str)
                         device_item = DeviceItem()
                         disk_info_item_array_length = len(disk_info_item_array)
                         for j in range(0, disk_info_item_array_length):
@@ -333,7 +333,7 @@ class DiskUtil(object):
             for line in lines:
                 line = line.strip()
                 if(line != ""):
-                    deviceName = shlex.split(line)[0]
+                    deviceName =Utils.HandlerUtil.HandlerUtility.split(self.logger, line)[0]
                     mountPrefixStr = " on /"
                     prefixIndex = line.find(mountPrefixStr)
                     if(prefixIndex >= 0):
@@ -377,7 +377,7 @@ class DiskUtil(object):
                 self.logger.log("print line by line :" + line , True)
                 line = line.strip()
                 if(line != ""):
-                    file_system = shlex.split(line)[0]
+                    file_system =Utils.HandlerUtil.HandlerUtility.split(self.logger, line)[0]
                     mountPrefixStr = " on /"
                     prefixIndex = line.find(mountPrefixStr)
                     if(prefixIndex >= 0):

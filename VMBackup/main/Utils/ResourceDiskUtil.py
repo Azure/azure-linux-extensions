@@ -6,6 +6,7 @@ import shlex
 from subprocess import *
 import traceback
 from Utils.DiskUtil import DiskUtil
+import Utils.HandlerUtil
 
 
 STORAGE_DEVICE_PATH = '/sys/bus/vmbus/devices/'
@@ -118,7 +119,7 @@ class ResourceDiskUtil(object):
 		if (mountlist and device):
 			for entry in mountlist.split('\n'):
 				if(re.search(device, entry)):
-					tokens = shlex.split(entry)
+					tokens =Utils.HandlerUtil.HandlerUtility.split(self.logger, entry)
 					#Return the 3rd column of this line
 					return tokens[2] if len(tokens) > 2 else None
 		return None
