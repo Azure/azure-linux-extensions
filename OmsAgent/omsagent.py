@@ -532,6 +532,11 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
+    
+    if HUtilObject is not None:
+        if HUtilObject.is_seq_smaller():
+            return 0, "Current sequence number " + HUtilObject._context._seq_no + " is not greater than the sequence number of the most recent executed configuration, skipping enable."
+    
     exit_if_vm_not_supported('Enable')
 
     public_settings, protected_settings = get_settings()
@@ -672,6 +677,9 @@ def enable():
 
         #start telemetry process if enable is successful
         start_telemetry_process()
+        
+        #save sequence number
+        HUtilObject.save_seq()
 
     return exit_code, output
 
