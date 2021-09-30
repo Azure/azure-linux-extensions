@@ -56,7 +56,7 @@ fi
 
 echo "Packaging extension $PACKAGE_NAME to $output_path"
 excluded_files="agent.version packaging.sh apply_version.sh update_version.sh"
-zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./ext/python-future/*"
+zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./ext/python-future/*" "./ext/future/future/backports/test/*"
 
 # cleanup newly added dir or files
 rm -rf Utils/ waagent
