@@ -77,7 +77,7 @@ class BekUtil(object):
                         f.write(passphrase)
 
         except Exception as e:
-            message = "Failed to store BEK in BEK VOLUME with error: {0}".format(traceback.format_exc(e))
+            message = "Failed to store BEK in BEK VOLUME with error: {0}".format(traceback.format_exc())
             self.logger.log(message)
             raise e
         else:
@@ -105,7 +105,7 @@ class BekUtil(object):
 
         except Exception as e:
             # use traceback to convert exception to string on both python2 and python3+
-            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(traceback.format_exc(e))
+            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(traceback.format_exc())
             self.logger.log(message)
 
         return None
