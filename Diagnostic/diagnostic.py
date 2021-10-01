@@ -361,27 +361,6 @@ def main(command):
                 hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
                 return
 
-            #Start the Telegraf and ME services on Enable after installation is complete
-            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
-            if start_telegraf_out:
-                hutil.log("Successfully started metrics-sourcer.")
-            else:
-                hutil.error(log_messages)
-
-            if enable_metrics_ext:
-                # Generate/regenerate MSI Token required by ME
-                msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
-                if msi_token_generated:
-                    hutil.log("Successfully generated metrics-extension MSI Auth token.")
-                else:
-                    hutil.error(log_messages)
-
-                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=True)
-                if start_metrics_out:
-                    hutil.log("Successfully started metrics-extension.")
-                else:
-                    hutil.error(log_messages)
-
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
             hutil.do_status_report(g_ext_op_type, "success", '0', "Install succeeded")
@@ -395,7 +374,7 @@ def main(command):
                     hutil.do_status_report(g_ext_op_type, "error", '-1', "Enabled failed")
                     return
 
-                #Start the Telegraf and ME services on Enable after installation is complete
+                # Start the Telegraf and ME services on enable after installation is complete
                 start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
                 if start_telegraf_out:
                     hutil.log("Successfully started metrics-sourcer.")
