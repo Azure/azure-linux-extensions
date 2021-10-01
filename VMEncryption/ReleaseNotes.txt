@@ -2,6 +2,7 @@
 - Support for RHEL 8.3, 8.4
 - Support for CentOS 8.3, 8.4
 - Add BEK disk validations
+- Fix Key Vault resouce ID check
 
 1.2.0.89
 - avoid apt-get timeouts on isolated networks
