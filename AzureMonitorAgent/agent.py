@@ -805,8 +805,8 @@ def metrics_watcher(hutil_error, hutil_log):
 
                             me_handler.setup_me(is_lad=False)
 
-                            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
-                            if start_telegraf_out:
+                            start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
+                            if start_telegraf_res:
                                 hutil_log("Successfully started metrics-sourcer.")
                             else:
                                 hutil_error(log_messages)
@@ -863,8 +863,8 @@ def metrics_watcher(hutil_error, hutil_log):
                                     hutil_log(tel_msg)
                                 else:
                                     hutil_error(tel_msg)
-                                start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
-                                if start_telegraf_out:
+                                start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
+                                if start_telegraf_res:
                                     hutil_log("Successfully started metrics-sourcer.")
                                 else:
                                     hutil_error(log_messages)

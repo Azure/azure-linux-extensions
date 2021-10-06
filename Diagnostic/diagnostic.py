@@ -375,8 +375,8 @@ def main(command):
                     return
 
                 # Start the Telegraf and ME services on enable after installation is complete
-                start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
-                if start_telegraf_out:
+                start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=True)
+                if start_telegraf_res:
                     hutil.log("Successfully started metrics-sourcer.")
                 else:
                     hutil.error(log_messages)
@@ -612,8 +612,8 @@ def start_mdsd(configurator):
                             hutil.log(tel_msg)
                         else:
                             hutil.error(tel_msg)
-                        start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
-                        if start_telegraf_out:
+                        start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=True)
+                        if start_telegraf_res:
                             hutil.log("Successfully started metrics-sourcer.")
                         else:
                             hutil.error(log_messages)

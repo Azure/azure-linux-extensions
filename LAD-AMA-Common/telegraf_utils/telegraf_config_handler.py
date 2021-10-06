@@ -645,8 +645,11 @@ def start_telegraf(is_lad):
             telegraf_pid = proc.pid
 
             # Write this pid to a file for future use
-            with open(telegraf_pid_path, "w") as f:
-                f.write(str(telegraf_pid) + '\n')
+            try:
+                with open(telegraf_pid_path, "a") as f:
+                    f.write(str(telegraf_pid) + '\n')
+            except Exception as e:
+                log_messages += "Successfully started telegraf binary, but could not save telegraf pidfile."
         else:
             out, err = proc.communicate()
             log_messages += "Unable to run telegraf binary as a process due to error - {0}. Failed to start telegraf.".format(err)
