@@ -324,19 +324,6 @@ def main(command):
                             'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output))
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
 
-            #Stop the telegraf and ME services
-            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
-            if tel_out:
-                hutil.log(tel_msg)
-            else:
-                hutil.error(tel_msg)
-
-            me_out, me_msg = me_handler.stop_metrics_service(is_lad=True)
-            if me_out:
-                hutil.log(me_msg)
-            else:
-                hutil.error(me_msg)
-
             #Delete the telegraf and ME services
             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
             if tel_rm_out:
