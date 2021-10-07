@@ -569,7 +569,37 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 HUtilObject.error(me_rm_msg)
                     else:
-                        crc = hashlib.sha256(data).hexdigest()                    
+                        crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
+
+                        if(crc != last_crc):
+                            # Resetting the me_msi_token_expiry_epoch variable if we set up ME again.
+                            me_msi_token_expiry_epoch = None
+                            hutil_log("Start processing metric configuration")
+                            hutil_log(data)
+
+                            telegraf_config, telegraf_namespaces = telhandler.handle_config(
+                                json_data,
+                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port,
+                                "unix:///run/azuremonitoragent/default_influx.socket",
+                                is_lad=False)
+
+                            me_handler.setup_me(is_lad=False)
+
+                            start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
+                            if start_telegraf_res:
+                                hutil_log("Successfully started metrics-sourcer.")
+                            else:
+                                hutil_error(log_messages)
+
+
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                            if start_metrics_out:
+                                hutil_log("Successfully started metrics-extension.")
+                            else:
+                                hutil_error(log_messages)
+
+                            last_crc = crc
+
                         generate_token = False
                         me_token_path = os.path.join(os.getcwd(), "/config/metrics_configs/AuthToken-MSI.json")
 
@@ -640,8 +670,8 @@ def metrics_watcher(hutil_error, hutil_log):
                                     hutil_log(tel_msg)
                                 else:
                                     hutil_error(tel_msg)
-                                start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
-                                if start_telegraf_out:
+                                start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
+                                if start_telegraf_res:
                                     hutil_log("Successfully started metrics-sourcer.")
                                 else:
                                     hutil_error(log_messages)
