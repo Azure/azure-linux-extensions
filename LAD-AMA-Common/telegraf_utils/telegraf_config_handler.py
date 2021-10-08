@@ -486,7 +486,7 @@ def stop_telegraf_service(is_lad):
                         if cmdline[0].find(telegraf_bin) >= 0:
                             os.kill(int(pid), signal.SIGKILL)
         os.remove(pids_filepath)
-    else if not metrics_utils.is_systemd():
+    elif not metrics_utils.is_systemd():
         return False, "Could not find telegraf service nor process to stop."
 
     return True, "Successfully stopped metrics-sourcer service"
