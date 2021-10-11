@@ -246,7 +246,7 @@ def is_systemd():
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     return check_systemd == 0
 
-def get_service_name()
+def get_service_name():
     public_settings, protected_settings = get_settings()
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
         return "azuremonitoragentmgr"
