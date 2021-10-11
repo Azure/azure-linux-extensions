@@ -246,6 +246,13 @@ def is_systemd():
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     return check_systemd == 0
 
+def get_service_name()
+    public_settings, protected_settings = get_settings()
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+        return "azuremonitoragentmgr"
+    else:
+        return "azuremonitoragent"
+
 def install():
     """
     Ensure that this VM distro and version are supported.
@@ -573,24 +580,15 @@ def enable():
         hutil_log_info("This VM is an Arc VM, Running the arc watcher daemon.")
         start_arc_process()
 
-    public_settings, protected_settings = get_settings()
+    service_name = get_service_name()
 
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        # The systemd service azuremonitoragentmgr is disabled by default.
-        # Enable it here so the service starts after reboot.
-        AMAServiceStartCommand = "systemctl start azuremonitoragentmgr && systemctl enable azuremonitoragentmgr"
-        AMAServiceStatusCommand = "systemctl status azuremonitoragentmgr"
-        if not is_systemd():
-            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragentmgr.")
-            AMAServiceStartCommand = "/etc/init.d/azuremonitoragentmgr start"
-            AMAServiceStatusCommand = "/etc/init.d/azuremonitoragentmgr status"
-    else:
-        AMAServiceStartCommand = "systemctl start azuremonitoragent && systemctl enable azuremonitoragent"
-        AMAServiceStatusCommand = "systemctl status azuremonitoragent"
-        if not is_systemd():
-            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragent.")
-            AMAServiceStartCommand = "/etc/init.d/azuremonitoragent start"
-            AMAServiceStatusCommand = "/etc/init.d/azuremonitoragent status"
+    # Start and enable systemd services so they are started after system reboot.
+    AMAServiceStartCommand = 'systemctl start {0} && systemctl enable {0}'.format(service_name)
+    AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
+    if not is_systemd():
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service_name))
+        AMAServiceStartCommand = '/etc/init.d/{0} start'.format(service_name)
+        AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(AMAServiceStartCommand)
@@ -619,23 +617,15 @@ def disable():
     #stop the metrics process
     stop_metrics_process()
 
-    public_settings, protected_settings = get_settings()
+    service_name = get_service_name()
 
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        AMAServiceStopCommand = "systemctl stop azuremonitoragentmgr && systemctl disable azuremonitoragentmgr"
-        AMAServiceStatusCommand = "systemctl status azuremonitoragentmgr"
-        if not is_systemd():
-            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop azuremonitoragentmgr.")
-            AMAServiceStopCommand = "/etc/init.d/azuremonitoragentmgr stop"
-            AMAServiceStatusCommand = "/etc/init.d/azuremonitoragentmgr status"
-    else:
-        #stop the Azure Monitor Linux Agent service
-        AMAServiceStopCommand = "systemctl stop azuremonitoragent && systemctl disable azuremonitoragent"
-        AMAServiceStatusCommand = "systemctl status azuremonitoragent"
-        if not is_systemd():
-            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop azuremonitoragent.")
-            AMAServiceStopCommand = "/etc/init.d/azuremonitoragent stop"
-            AMAServiceStatusCommand = "/etc/init.d/azuremonitoragent status"
+    # Stop and disable systemd services so they are not started after system reboot.
+    AMAServiceStopCommand = 'systemctl stop {0} && systemctl disable {0}'.format(service_name)
+    AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
+    if not is_systemd():
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop {0}.".format(service_name))
+        AMAServiceStopCommand = '/etc/init.d/{0} stop'.format(service_name)
+        AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     exit_code, output = run_command_and_log(AMAServiceStopCommand)
     if exit_code != 0:
