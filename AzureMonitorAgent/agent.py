@@ -246,6 +246,13 @@ def is_systemd():
     check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
     return check_systemd == 0
 
+def get_service_name():
+    public_settings, protected_settings = get_settings()
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+        return "azuremonitoragentmgr"
+    else:
+        return "azuremonitoragent"
+
 def install():
     """
     Ensure that this VM distro and version are supported.
@@ -573,23 +580,15 @@ def enable():
         hutil_log_info("This VM is an Arc VM, Running the arc watcher daemon.")
         start_arc_process()
 
-    if is_systemd():
-        AMAServiceStartCommand = "systemctl start azuremonitoragent"
-        AMAServiceStatusCommand = "systemctl status azuremonitoragent"
-    else:
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragent.")
-        AMAServiceStartCommand = "/etc/init.d/azuremonitoragent start"
-        AMAServiceStatusCommand = "/etc/init.d/azuremonitoragent status"
+    service_name = get_service_name()
 
-    public_settings, protected_settings = get_settings()
-
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        AMAServiceStartCommand = "systemctl start azuremonitoragentmgr"
-        AMAServiceStatusCommand = "systemctl status azuremonitoragentmgr"
-        if not is_systemd():
-            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragentmgr.")
-            AMAServiceStartCommand = "/etc/init.d/azuremonitoragentmgr start"
-            AMAServiceStatusCommand = "/etc/init.d/azuremonitoragentmgr status"
+    # Start and enable systemd services so they are started after system reboot.
+    AMAServiceStartCommand = 'systemctl start {0} && systemctl enable {0}'.format(service_name)
+    AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
+    if not is_systemd():
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service_name))
+        AMAServiceStartCommand = '/etc/init.d/{0} start'.format(service_name)
+        AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(AMAServiceStartCommand)
@@ -610,7 +609,7 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
-    global AMAServiceStopCommand
+    global AMAServiceStopCommand, AMAServiceStatusCommand
 
     # disable arc daemon if it is running
     stop_arc_watcher()
@@ -618,15 +617,22 @@ def disable():
     #stop the metrics process
     stop_metrics_process()
 
-    #stop the Azure Monitor Linux Agent service
-    if is_systemd():
-        AMAServiceStopCommand = "systemctl stop azuremonitoragent"
+    service_name = get_service_name()
 
-    else:
-        AMAServiceStopCommand = "/etc/init.d/azuremonitoragent stop"
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop azuremonitoragent.")
+    # Stop and disable systemd services so they are not started after system reboot.
+    AMAServiceStopCommand = 'systemctl stop {0} && systemctl disable {0}'.format(service_name)
+    AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
+    if not is_systemd():
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop {0}.".format(service_name))
+        AMAServiceStopCommand = '/etc/init.d/{0} stop'.format(service_name)
+        AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     exit_code, output = run_command_and_log(AMAServiceStopCommand)
+    if exit_code != 0:
+        status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
+        if status_exit_code != 0:
+            output += "Output of '{0}':\n{1}".format(AMAServiceStatusCommand, status_output)
+
     return exit_code, output
 
 def update():
