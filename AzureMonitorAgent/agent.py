@@ -573,23 +573,24 @@ def enable():
         hutil_log_info("This VM is an Arc VM, Running the arc watcher daemon.")
         start_arc_process()
 
-    if is_systemd():
-        AMAServiceStartCommand = "systemctl start azuremonitoragent"
-        AMAServiceStatusCommand = "systemctl status azuremonitoragent"
-    else:
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragent.")
-        AMAServiceStartCommand = "/etc/init.d/azuremonitoragent start"
-        AMAServiceStatusCommand = "/etc/init.d/azuremonitoragent status"
-
     public_settings, protected_settings = get_settings()
 
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        AMAServiceStartCommand = "systemctl start azuremonitoragentmgr"
+        # The systemd service azuremonitoragentmgr is disabled by default.
+        # Enable it here so the service starts after reboot.
+        AMAServiceStartCommand = "systemctl start azuremonitoragentmgr && systemctl enable azuremonitoragentmgr"
         AMAServiceStatusCommand = "systemctl status azuremonitoragentmgr"
         if not is_systemd():
             hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragentmgr.")
             AMAServiceStartCommand = "/etc/init.d/azuremonitoragentmgr start"
             AMAServiceStatusCommand = "/etc/init.d/azuremonitoragentmgr status"
+    else:
+        AMAServiceStartCommand = "systemctl start azuremonitoragent && systemctl enable azuremonitoragent"
+        AMAServiceStatusCommand = "systemctl status azuremonitoragent"
+        if not is_systemd():
+            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start azuremonitoragent.")
+            AMAServiceStartCommand = "/etc/init.d/azuremonitoragent start"
+            AMAServiceStatusCommand = "/etc/init.d/azuremonitoragent status"
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(AMAServiceStartCommand)
@@ -610,7 +611,7 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
-    global AMAServiceStopCommand
+    global AMAServiceStopCommand, AMAServiceStatusCommand
 
     # disable arc daemon if it is running
     stop_arc_watcher()
@@ -618,15 +619,30 @@ def disable():
     #stop the metrics process
     stop_metrics_process()
 
-    #stop the Azure Monitor Linux Agent service
-    if is_systemd():
-        AMAServiceStopCommand = "systemctl stop azuremonitoragent"
+    public_settings, protected_settings = get_settings()
 
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+        AMAServiceStopCommand = "systemctl stop azuremonitoragentmgr && systemctl disable azuremonitoragentmgr"
+        AMAServiceStatusCommand = "systemctl status azuremonitoragentmgr"
+        if not is_systemd():
+            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop azuremonitoragentmgr.")
+            AMAServiceStopCommand = "/etc/init.d/azuremonitoragentmgr stop"
+            AMAServiceStatusCommand = "/etc/init.d/azuremonitoragentmgr status"
     else:
-        AMAServiceStopCommand = "/etc/init.d/azuremonitoragent stop"
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop azuremonitoragent.")
+        #stop the Azure Monitor Linux Agent service
+        AMAServiceStopCommand = "systemctl stop azuremonitoragent && systemctl disable azuremonitoragent"
+        AMAServiceStatusCommand = "systemctl status azuremonitoragent"
+        if not is_systemd():
+            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop azuremonitoragent.")
+            AMAServiceStopCommand = "/etc/init.d/azuremonitoragent stop"
+            AMAServiceStatusCommand = "/etc/init.d/azuremonitoragent status"
 
     exit_code, output = run_command_and_log(AMAServiceStopCommand)
+    if exit_code != 0:
+        status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
+        if status_exit_code != 0:
+            output += "Output of '{0}':\n{1}".format(AMAServiceStatusCommand, status_output)
+
     return exit_code, output
 
 def update():
