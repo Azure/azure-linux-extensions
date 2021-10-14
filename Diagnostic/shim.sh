@@ -4,7 +4,7 @@
 # and if yes then uses that Python (if both are available then, default is set to python3) to run extension operations in agent.py
 # Control arguments passed to the shim are redirected to agent.py without validation.
 
-COMMAND="./agent.py"
+COMMAND="./diagnostic.py"
 PYTHON=""
 FUTURE_PATH=""
 ARG="$@"
