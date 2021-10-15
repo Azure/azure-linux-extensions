@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This is the main driver file for AMA extension. This file first checks if Python 3 or 2 is available on the VM 
+# This is the main driver file for LAD 4 extension. This file first checks if Python 3 or 2 is available on the VM 
 # and if yes then uses that Python (if both are available then, default is set to python3) to run extension operations in agent.py
 # Control arguments passed to the shim are redirected to agent.py without validation.
 
@@ -26,7 +26,7 @@ find_python PYTHON FUTURE_PATH
 
 if [ -z "$PYTHON" ] # If python is not installed, we will fail the install with the following error, requiring cx to have python pre-installed
 then
-    echo "No Python interpreter found, which is an AMA extension dependency. Please install Python 3, or Python 2 if the former is unavailable." >&2
+    echo "No Python interpreter found, which is a LAD 4 extension dependency. Please install Python 3, or Python 2 if the former is unavailable." >&2
     exit 52 # Missing Dependency
 else
     ${PYTHON} --version 2>&1
