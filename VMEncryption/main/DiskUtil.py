@@ -337,7 +337,13 @@ class DiskUtil(object):
             return keyslots
 
     def luks_check_reencryption(self, dev_path, header_file):
-        luks_dump_out = self._luks_get_header_dump(header_file or dev_path)
+        device_header = None
+        if header_file is None:
+            device_header = dev_path
+        else:
+            device_header = header_file
+
+        luks_dump_out = self._luks_get_header_dump(device_header)
 
         luks_version = self._extract_luks_version_from_dump(luks_dump_out)
 
