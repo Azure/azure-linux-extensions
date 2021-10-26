@@ -230,14 +230,12 @@ def check_disk_space_availability():
         print('Failed to check disk usage.')
         return 0
 
-
 def get_free_space_mb(dirname):
     """
     Get the free space in MB in the directory path.
     """
     st = os.statvfs(dirname)
     return (st.f_bavail * st.f_frsize) // (1024 * 1024)
-
 
 def is_systemd():
     """
@@ -251,6 +249,12 @@ def get_service_name():
         return "azuremonitoragentmgr"
     else:
         return "azuremonitoragent"
+
+def check_kill_process(pstring):
+    for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
+        fields = line.split()
+        pid = fields[0]
+        os.kill(int(pid), signal.SIGKILL)
 
 def install():
     """
@@ -274,8 +278,6 @@ def install():
             if insserv_exit_code != 0:
                 return insserv_exit_code, insserv_output
 
-    public_settings, protected_settings = get_settings()
-
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
@@ -290,25 +292,74 @@ def install():
 
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
-    if vm_dist.lower().startswith('suse'):
-        try:
-            suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
-            if suse_exit_code != 0:
-                return suse_exit_code, suse_output
+    if exit_code == 0:
+        vm_dist, _ = find_vm_distro('Install')
+        if vm_dist.lower().startswith('suse'):
+            try:
+                suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
+                if suse_exit_code != 0:
+                    return suse_exit_code, suse_output
 
-            suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitoragent.service.d/override.conf")
-            if suse_exit_code != 0:
-                return suse_exit_code, suse_output
+                suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitoragent.service.d/override.conf")
+                if suse_exit_code != 0:
+                    return suse_exit_code, suse_output
 
-            suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/azuremonitoragent.service.d/override.conf")
-            if suse_exit_code != 0:
-                return suse_exit_code, suse_output
+                suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/azuremonitoragent.service.d/override.conf")
+                if suse_exit_code != 0:
+                    return suse_exit_code, suse_output
 
-            suse_exit_code, suse_output = run_command_and_log("systemctl daemon-reload")
-            if suse_exit_code != 0:
-                return suse_exit_code, suse_output
-        except:
-            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
+                suse_exit_code, suse_output = run_command_and_log("systemctl daemon-reload")
+                if suse_exit_code != 0:
+                    return suse_exit_code, suse_output
+            except:
+                log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
+
+    return exit_code, output
+
+def uninstall():
+    """
+    Uninstall the Azure Monitor Linux Agent.
+    This is a somewhat soft uninstall. It is not a purge.
+    Note: uninstall operation times out from WAAgent at 5 minutes
+    """
+    global AMAUninstallCommand
+
+    find_package_manager("Uninstall")
+    if PackageManager == "dpkg":
+        AMAUninstallCommand = "dpkg -P azuremonitoragent"
+    elif PackageManager == "rpm":
+        AMAUninstallCommand = "rpm -e azuremonitoragent"
+    else:
+        log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
+    hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
+
+    # Retry, since uninstall can fail due to concurrent package operations
+    try:
+        exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
+                                            retry_check = retry_if_dpkg_locked,
+                                            final_check = final_check_if_dpkg_locked)
+    except Exception as ex:
+        exit_code = 1
+        output = 'Uninstall failed with error: {0}\n' \
+                'Stacktrace: {1}'.format(ex, traceback.format_exc())
+    return exit_code, output
+
+def enable():
+    """
+    Start the Azure Monitor Linux Agent Service
+    This call will return non-zero or throw an exception if
+    the settings provided are incomplete or incorrect.
+    Note: enable operation times out from WAAgent at 5 minutes
+    """
+    global AMAServiceStartCommand, AMAServiceStatusCommand
+
+    if HUtilObject:
+        if(HUtilObject.is_seq_smaller()):
+            return 0, "Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable"
+
+    exit_if_vm_not_supported('Enable')
+
+    public_settings, protected_settings = get_settings()
 
     default_configs = {
         "MDSD_CONFIG_DIR" : "/etc/opt/microsoft/azuremonitoragent",
@@ -318,9 +369,7 @@ def install():
         "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
-        "MDSD_USE_LOCAL_PERSISTENCY" : "true",
-        #"OMS_TLD" : "int2.microsoftatlanta-int.com",
-        #"customResourceId" : "/subscriptions/42e7aed6-f510-46a2-8597-a5fe2e15478b/resourcegroups/amcs-test/providers/Microsoft.OperationalInsights/workspaces/amcs-pretend-linuxVM",
+        "MDSD_USE_LOCAL_PERSISTENCY" : "true"
     }
 
     # Decide the mode
@@ -337,20 +386,20 @@ def install():
             if "address" in public_settings.get("proxy"):
                 default_configs["MDSD_PROXY_ADDRESS"] = public_settings.get("proxy").get("address")
             else:
-                log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
+                log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
 
             if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
                 if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
                     default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                     default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
                 else:
-                    log_and_exit("install", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+                    log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
 
         # add managed identity settings if they were provided
         identifier_name, identifier_value, error_msg = get_managed_identity()
 
         if error_msg:
-            log_and_exit("Install", MissingorInvalidParameterErrorCode, 'Failed to determine managed identity settings. {0}.'.format(error_msg))
+            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Failed to determine managed identity settings. {0}.'.format(error_msg))
 
         if identifier_name and identifier_value:
             default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
@@ -370,7 +419,7 @@ def install():
                 with open(protected_settings.get("certificatePath"), 'r') as f:
                     MONITORING_GCS_CERT_CERTFILE = f.read()
             except Exception as ex:
-                log_and_exit('Install', MissingorInvalidParameterErrorCode, 'Failed to read certificate {0}: {1}'.format(protected_settings.get("certificatePath"), ex))
+                log_and_exit('Enable', MissingorInvalidParameterErrorCode, 'Failed to read certificate {0}: {1}'.format(protected_settings.get("certificatePath"), ex))
 
         MONITORING_GCS_CERT_KEYFILE = None
         if "certificateKey" in protected_settings:
@@ -381,7 +430,7 @@ def install():
                 with open(protected_settings.get("certificateKeyPath"), 'r') as f:
                     MONITORING_GCS_CERT_KEYFILE = f.read()
             except Exception as ex:
-                log_and_exit('Install', MissingorInvalidParameterErrorCode, 'Failed to read certificate key {0}: {1}'.format(protected_settings.get("certificateKeyPath"), ex))
+                log_and_exit('Enable', MissingorInvalidParameterErrorCode, 'Failed to read certificate key {0}: {1}'.format(protected_settings.get("certificateKeyPath"), ex))
 
         MONITORING_GCS_ENVIRONMENT = ""
         if "monitoringGCSEnvironment" in protected_settings:
@@ -472,6 +521,7 @@ def install():
                 default_configs["MONITORING_ROLE_INSTANCE"] = MONITORING_ROLE_INSTANCE
 
     config_file = "/etc/default/azuremonitoragent"
+    temp_config_file = "/etc/default/azuremonitoragent_temp"
     config_updated = False
     try:
         if os.path.isfile(config_file):
@@ -513,15 +563,15 @@ def install():
                 new_data += "export " + var + "=" + default_configs[var] + "\n"
                 vars_set.add(var)
 
-            with open("/etc/default/azuremonitoragent_temp", "w") as f:
-                f.write(new_data)
-                config_updated = True if len(new_data) > 0 else False
+            with open(temp_config_file, "w") as f:
+                wrote_len = f.write(new_data)
+                config_updated = True if wrote_len is not None and len(wrote_len) > 0 else False
 
-            if not config_updated or not os.path.isfile("/etc/default/azuremonitoragent_temp"):
-                log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/azuremonitoragent")
+            if not config_updated or not os.path.isfile(temp_config_file):
+                log_and_exit("Enable", MissingorInvalidParameterErrorCode, "Error while updating environment variables in {0}".format(config_file))
 
             os.remove(config_file)
-            os.rename("/etc/default/azuremonitoragent_temp", config_file)
+            os.rename(temp_config_file, config_file)
 
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
@@ -529,61 +579,9 @@ def install():
             os.system('chmod {1} {0}'.format(config_file, 400))
 
         else:
-            log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/azuremonitoragent" )
-    except:
-        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/azuremonitoragent" )
-    return exit_code, output
-
-def check_kill_process(pstring):
-    for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
-        fields = line.split()
-        pid = fields[0]
-        os.kill(int(pid), signal.SIGKILL)
-
-def uninstall():
-    """
-    Uninstall the Azure Monitor Linux Agent.
-    This is a somewhat soft uninstall. It is not a purge.
-    Note: uninstall operation times out from WAAgent at 5 minutes
-    """
-    global AMAUninstallCommand
-
-    find_package_manager("Uninstall")
-    if PackageManager == "dpkg":
-        AMAUninstallCommand = "dpkg -P azuremonitoragent"
-    elif PackageManager == "rpm":
-        AMAUninstallCommand = "rpm -e azuremonitoragent"
-    else:
-        log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
-    hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
-
-    # Retry, since uninstall can fail due to concurrent package operations
-    try:
-        exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
-                                            retry_check = retry_if_dpkg_locked,
-                                            final_check = final_check_if_dpkg_locked)
-    except Exception as ex:
-        exit_code = 1
-        output = 'Uninstall failed with error: {0}\n' \
-                'Stacktrace: {1}'.format(ex, traceback.format_exc())
-    return exit_code, output
-
-def enable():
-    """
-    Start the Azure Monitor Linux Agent Service
-    This call will return non-zero or throw an exception if
-    the settings provided are incomplete or incorrect.
-    Note: enable operation times out from WAAgent at 5 minutes
-    """
-    global AMAServiceStartCommand, AMAServiceStatusCommand
-
-    if HUtilObject:
-        if(HUtilObject.is_seq_smaller()):
-            log_output = "Current sequence number {0} is not greater than the sequence number of the most recent executed configuration, skipping enable.".format(HUtilObject._context._seq_no)
-            hutil_log_info(log_output)
-            return 0, log_output
-
-    exit_if_vm_not_supported('Enable')
+            log_and_exit("Enable", MissingorInvalidParameterErrorCode, "Could not find the file {0}".format(config_file))
+    except Exception as e:
+        log_and_exit("Enable", MissingorInvalidParameterErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
     service_name = get_service_name()
 
@@ -599,7 +597,7 @@ def enable():
     exit_code, output = run_command_and_log(AMAServiceStartCommand)
 
     if exit_code == 0:
-        #start metrics process if enable is successful
+        # start metrics process if enable is successful
         start_metrics_process()
         HUtilObject.save_seq()
     else:

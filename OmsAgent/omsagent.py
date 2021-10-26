@@ -1061,6 +1061,8 @@ def detect_multiple_connections(workspace_id):
         # default encoding in python is ascii in python < 3
         if sys.version_info < (3,):
             output = utfoutput.decode('utf8').encode('utf8')
+        else:
+            output = utfoutput
 
         if output.strip().lower() != 'no workspace':
             for line in output.split('\n'):
