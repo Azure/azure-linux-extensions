@@ -248,7 +248,7 @@ def is_systemd():
 
 def get_service_name():
     public_settings, protected_settings = get_settings()
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         return "azuremonitoragentmgr"
     else:
         return "azuremonitoragent"
@@ -316,7 +316,7 @@ def install():
     }
 
     # Decide the mode
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detecting Auto-Config mode.")
         return 0, ""
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
