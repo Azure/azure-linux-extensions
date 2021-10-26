@@ -47,6 +47,7 @@ import crypt
 import xml.dom.minidom
 import re
 import hashlib
+from collections import OrderedDict
 from distutils.version import LooseVersion
 from hashlib import sha256
 from shutil import copyfile
@@ -117,10 +118,11 @@ AMAServiceStopCommand = ''
 AMAServiceStatusCommand = ''
 
 # Error codes
-DPKGLockedErrorCode = 56
-MissingorInvalidParameterErrorCode = 53
+GenericErrorCode = 1
 UnsupportedOperatingSystem = 51
 IndeterminateOperatingSystem = 51
+MissingorInvalidParameterErrorCode = 53
+DPKGLockedErrorCode = 56
 
 # Configuration
 HUtilObject = None
@@ -168,7 +170,7 @@ def main():
         waagent_log_error(str(e))
 
     if operation is None:
-        log_and_exit('Unknown', 1, 'No valid operation provided')
+        log_and_exit('Unknown', GenericErrorCode, 'No valid operation provided')
 
     # Set up for exit code and any error messages
     exit_code = 0
@@ -207,7 +209,7 @@ def main():
         exit_code = e.error_code
         message = e.get_error_message(operation)
     except Exception as e:
-        exit_code = 1
+        exit_code = GenericErrorCode
         message = '{0} failed with error: {1}\n' \
                   'Stacktrace: {2}'.format(operation, e,
                                            traceback.format_exc())
@@ -294,7 +296,7 @@ def install():
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
     if exit_code == 0:
         vm_dist, _ = find_vm_distro('Install')
-        if vm_dist.lower().startswith('suse'):
+        if vm_dist.startswith('suse'):
             try:
                 suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
                 if suse_exit_code != 0:
@@ -339,7 +341,7 @@ def uninstall():
                                             retry_check = retry_if_dpkg_locked,
                                             final_check = final_check_if_dpkg_locked)
     except Exception as ex:
-        exit_code = 1
+        exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
                 'Stacktrace: {1}'.format(ex, traceback.format_exc())
     return exit_code, output
@@ -361,16 +363,21 @@ def enable():
 
     public_settings, protected_settings = get_settings()
 
-    default_configs = {
-        "MDSD_CONFIG_DIR" : "/etc/opt/microsoft/azuremonitoragent",
-        "MDSD_LOG_DIR" : "/var/opt/microsoft/azuremonitoragent/log",
-        "MDSD_ROLE_PREFIX" : "/run/azuremonitoragent/default",
-        "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/azuremonitoragent",
-        "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"",
-        "ENABLE_MCS" : "false",
-        "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
-        "MDSD_USE_LOCAL_PERSISTENCY" : "true"
-    }
+    # Use an Ordered Dictionary to ensure MDSD_OPTIONS (and other dependent variables) are written after their dependencies
+    default_configs = OrderedDict([
+        ("MDSD_CONFIG_DIR", "/etc/opt/microsoft/azuremonitoragent"),
+        ("MDSD_LOG_DIR", "/var/opt/microsoft/azuremonitoragent/log"),
+        ("MDSD_ROLE_PREFIX", "/run/azuremonitoragent/default"),
+        ("MDSD_SPOOL_DIRECTORY", "/var/opt/microsoft/azuremonitoragent"),
+        ("MDSD_OPTIONS", "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\""),
+        ("MDSD_USE_LOCAL_PERSISTENCY", "true"),
+        ("MDSD_TCMALLOC_RELEASE_FREQ_SEC", "1")
+        ("MONITORING_USE_GENEVA_CONFIG_SERVICE", "false"),
+        ("ENABLE_MCS", "false")
+    ])
+
+    ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
+    default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
     # Decide the mode
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
@@ -497,17 +504,15 @@ def enable():
 
             if MONITORING_GCS_CERT_CERTFILE is not None:
                 default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/opt/microsoft/azuremonitoragent/gcscert.pem"
-                fh = open("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", "wb")
-                fh.write(MONITORING_GCS_CERT_CERTFILE)
-                fh.close()
+                with open("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", "wb") as f:
+                    f.write(MONITORING_GCS_CERT_CERTFILE)
                 os.chown("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", uid, gid)
                 os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", 400))
 
             if MONITORING_GCS_CERT_KEYFILE is not None:
                 default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/opt/microsoft/azuremonitoragent/gcskey.pem"
-                fh = open("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", "wb")
-                fh.write(MONITORING_GCS_CERT_KEYFILE)
-                fh.close()
+                with open("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", "wb") as f:
+                    f.write(MONITORING_GCS_CERT_KEYFILE)
                 os.chown("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", uid, gid)
                 os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", 400))
 
@@ -523,52 +528,17 @@ def enable():
     config_file = "/etc/default/azuremonitoragent"
     temp_config_file = "/etc/default/azuremonitoragent_temp"
     config_updated = False
+
     try:
         if os.path.isfile(config_file):
-            data = []
-            new_data = ""
-            vars_set = set()
-            dependent_vars = ["MDSD_OPTIONS"]
-
-            # Scope to only dependent envvar being set by extension wrapper
-            dependent_vars = set(default_configs.keys()).intersection(dependent_vars)
-
-            # Copy existing comments/envvar to the updated defaults file; replace existing envvar values if appropriate
-            with open(config_file, "r") as f:
-                data = f.readlines()
-                for line in data:
-                    # Skip definitions of dependent envvar until very end
-                    skip_line = False
-                    for var in dependent_vars:
-                        if "export {0}".format(var) in line:
-                            skip_line = True
-                            break
-                    if skip_line:
-                        continue
-
-                    for var in list(default_configs.keys()):
-                        if "export {0}".format(var) in line and var not in dependent_vars:
-                            line = "export " + var + "=" + default_configs[var] + "\n"
-                            vars_set.add(var)
-                            break
-                    new_data += line
-
-            # Set remaining non-dependent envvar that weren't present in the old defaults file
-            for var in list(default_configs.keys()):
-                if var not in vars_set and var not in dependent_vars:
-                    new_data += "export " + var + "=" + default_configs[var] + "\n"
-
-            # Finally, set envvar with dependencies (e.g. MDSD_OPTIONS depends on MDSD_LOG)
-            for var in dependent_vars:
-                new_data += "export " + var + "=" + default_configs[var] + "\n"
-                vars_set.add(var)
+            new_config = "\n".join(["export {0}={1}".format(key, value) for key, value in default_configs.items()])
 
             with open(temp_config_file, "w") as f:
-                wrote_len = f.write(new_data)
+                wrote_len = f.write(new_config)
                 config_updated = True if wrote_len is not None and len(wrote_len) > 0 else False
 
             if not config_updated or not os.path.isfile(temp_config_file):
-                log_and_exit("Enable", MissingorInvalidParameterErrorCode, "Error while updating environment variables in {0}".format(config_file))
+                log_and_exit("Enable", GenericErrorCode, "Error while updating environment variables in {0}".format(config_file))
 
             os.remove(config_file)
             os.rename(temp_config_file, config_file)
@@ -577,11 +547,10 @@ def enable():
             gid = grp.getgrnam("syslog").gr_gid
             os.chown(config_file, uid, gid)
             os.system('chmod {1} {0}'.format(config_file, 400))
-
         else:
-            log_and_exit("Enable", MissingorInvalidParameterErrorCode, "Could not find the file {0}".format(config_file))
+            log_and_exit("Enable", GenericErrorCode, "Could not find the file {0}".format(config_file))
     except Exception as e:
-        log_and_exit("Enable", MissingorInvalidParameterErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
+        log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
     service_name = get_service_name()
 
@@ -653,7 +622,7 @@ def get_managed_identity():
     # Returns identifier_name, identifier_value, and error message (if any)
     """
     identifier_name = identifier_value = ""
-    public_settings, protected_settings = get_settings()
+    public_settings, _ = get_settings()
 
     if public_settings is not None and "authentication" in public_settings and "managedIdentity" in public_settings.get("authentication"):
         managedIdentity = public_settings.get("authentication").get("managedIdentity")
@@ -962,12 +931,12 @@ def find_package_manager(operation):
     Checks if the dist is debian based or centos based and assigns the package manager accordingly
     """
     global PackageManager, PackageManagerOptions, BundleFileName
-    dist, ver = find_vm_distro(operation)
+    dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
     rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner"])
     for dpkg_dist in dpkg_set:
-        if dist.lower().startswith(dpkg_dist):
+        if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
             # OK to replace the /etc/default/azuremonitoragent, since the placeholders gets replaced again.
             # Otherwise, the package manager prompts for action (Y/I/N/O/D/Z) [default=N]
@@ -976,7 +945,7 @@ def find_package_manager(operation):
             break
 
     for rpm_dist in rpm_set:
-        if dist.lower().startswith(rpm_dist):
+        if dist.startswith(rpm_dist):
             PackageManager = "rpm"
             # Same as above.
             PackageManagerOptions = "--force"
@@ -1020,7 +989,7 @@ def find_vm_distro(operation):
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
-    return vm_dist, vm_ver
+    return vm_dist.lower(), vm_ver.lower()
 
 
 def is_vm_supported_for_extension(operation):
@@ -1046,7 +1015,7 @@ def is_vm_supported_for_extension(operation):
     vm_dist, vm_ver = find_vm_distro(operation)
     # Find this VM distribution in the supported list
     for supported_dist in list(supported_dists.keys()):
-        if not vm_dist.lower().startswith(supported_dist):
+        if not vm_dist.startswith(supported_dist):
             continue
 
         # Check if this VM distribution version is supported
@@ -1089,6 +1058,32 @@ def exit_if_vm_not_supported(operation):
         log_and_exit(operation, UnsupportedOperatingSystem, 'Unsupported operating system: ' \
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
+
+
+def get_ssl_cert_info(operation):
+    """
+    Get the appropriate SSL_CERT_DIR / SSL_CERT_FILE based on the Linux distro
+    """
+    name = value = None
+
+    distro, version = find_vm_distro(operation)
+
+    for name in ['ubuntu', 'debian']:
+        if distro.startswith(name):
+            return 'SSL_CERT_DIR', '/etc/ssl/certs'
+
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner']:
+        if distro.startswith(name):
+            return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
+
+    for name in ['suse', 'sles']:
+        if distro.startswith(name):
+            if version.startswith('12'):
+                return 'SSL_CERT_DIR', '/var/lib/ca-certificates/openssl'
+            elif version.startswith('15'):
+                return 'SSL_CERT_DIR', '/etc/ssl/certs'
+
+    log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
 
 
 def is_arc_installed():
@@ -1336,8 +1331,7 @@ def get_settings():
             protected_settings_str = output[0]
 
             if protected_settings_str is None:
-                log_and_exit('Enable', 1, 'Failed decrypting ' \
-                                          'protectedSettings')
+                log_and_exit('Enable', GenericErrorCode, 'Failed decrypting protectedSettings')
             protected_settings = ''
             try:
                 protected_settings = json.loads(protected_settings_str)
@@ -1543,7 +1537,7 @@ def hutil_log_error(message):
         print('Error: {0}'.format(message))
 
 
-def log_and_exit(operation, exit_code = 1, message = ''):
+def log_and_exit(operation, exit_code = GenericErrorCode, message = ''):
     """
     Log the exit message and perform the exit
     """
@@ -1573,7 +1567,7 @@ class AzureMonitorAgentForLinuxException(Exception):
     Base exception class for all exceptions; as such, its error code is the
     basic error code traditionally returned in Linux: 1
     """
-    error_code = 1
+    error_code = GenericErrorCode
     def get_error_message(self, operation):
         """
         Return a descriptive error message based on this type of exception
