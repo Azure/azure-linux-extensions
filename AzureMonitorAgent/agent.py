@@ -264,6 +264,16 @@ def install():
 
     find_package_manager("Install")
     exit_if_vm_not_supported('Install')
+    vm_dist, vm_ver = find_vm_distro('Install')
+
+    # Check if SUSE 15 VMs have /sbin/insserv package (required for AMA 1.14.4+)
+    if (vm_dist.lower().startswith('suse') or vm_dist.lower().startswith('sles')) and vm_ver.startswith('15'):
+        check_insserv, _ = run_command_and_log("which insserv")
+        if check_insserv != 0:
+            hutil_log_info("'insserv-compat' package missing from SUSE 15 machine, installing to allow AMA to run.")
+            insserv_exit_code, insserv_output = run_command_and_log("zypper --non-interactive install insserv-compat")
+            if insserv_exit_code != 0:
+                return insserv_exit_code, insserv_output
 
     public_settings, protected_settings = get_settings()
 
@@ -281,7 +291,6 @@ def install():
 
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
-    vm_dist, vm_ver = find_vm_distro('Install')
     if vm_dist.lower().startswith('suse'):
         try:
             suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
