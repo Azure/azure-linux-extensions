@@ -568,12 +568,7 @@ def setup_me(is_lad):
                         break
 
     if aad_auth_url == "":
-<<<<<<< HEAD
-        raise Exception("Unable to find AAD Authentication URL in the request error response. Failed to setup ME.")
-        return False
-=======
         raise Exception("Unable to find AAD Authentication URL in the request error response. Failed to set up ME.")
->>>>>>> 62903327 (Prevent telegraf duplicates (#1441))
 
     #create metrics conf
     me_conf = create_metrics_extension_conf(az_resource_id, aad_auth_url)
