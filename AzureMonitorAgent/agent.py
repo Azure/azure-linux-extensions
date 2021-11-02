@@ -265,15 +265,6 @@ def install():
     exit_if_vm_not_supported('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
-    # Check if SUSE 15 VMs have /sbin/insserv package (required for AMA 1.14.4+)
-    if (vm_dist.lower().startswith('suse') or vm_dist.lower().startswith('sles')) and vm_ver.startswith('15'):
-        check_insserv, _ = run_command_and_log("which insserv")
-        if check_insserv != 0:
-            hutil_log_info("'insserv-compat' package missing from SUSE 15 machine, installing to allow AMA to run.")
-            insserv_exit_code, insserv_output = run_command_and_log("zypper --non-interactive install insserv-compat")
-            if insserv_exit_code != 0:
-                return insserv_exit_code, insserv_output
-
     public_settings, protected_settings = get_settings()
 
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
