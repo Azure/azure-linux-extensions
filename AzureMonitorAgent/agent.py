@@ -2,7 +2,7 @@
 #
 # AzureMonitoringLinuxAgent Extension
 #
-# Copyright 2019 Microsoft Corporation
+# Copyright 2021 Microsoft Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,16 +99,15 @@ if sys.version_info < (2,7):
 
 # Global Variables
 PackagesDirectory = 'packages'
-# This changes during release if there are changes to mdsd. The release pipeline
-# uses apply_version.sh to replace the below with the appropriate package names.
-BundleFileNameDeb = 'azure-mdsd_1.5.133-build.master.157_x86_64.deb'
-BundleFileNameRpm = 'azure-mdsd_1.5.133-build.master.157_x86_64.rpm'
+# The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
+BundleFileNameDeb = 'azuremonitoragent.deb'
+BundleFileNameRpm = 'azuremonitoragent.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
 PackageManager = ''
 PackageManagerOptions = ''
-MdsdCounterJsonPath = '/etc/mdsd.d/config-cache/metricCounters.json'
+MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
 
 # Commands
 AMAInstallCommand = ''
@@ -221,7 +220,7 @@ def check_disk_space_availability():
     Check if there is the required space on the machine.
     """
     try:
-        if get_free_space_mb("/var") < 500 or get_free_space_mb("/etc") < 500 :
+        if get_free_space_mb("/var") < 500 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500 :
             # 52 is the exit code for missing dependency i.e. disk space
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             return 52
@@ -244,8 +243,14 @@ def is_systemd():
     """
     Check if the system is using systemd
     """
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    return check_systemd == 0
+    return os.path.isdir("/run/systemd/system")
+
+def get_service_name():
+    public_settings, protected_settings = get_settings()
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
+        return "azuremonitoragentmgr"
+    else:
+        return "azuremonitoragent"
 
 def install():
     """
@@ -258,6 +263,16 @@ def install():
 
     find_package_manager("Install")
     exit_if_vm_not_supported('Install')
+    vm_dist, vm_ver = find_vm_distro('Install')
+
+    # Check if SUSE 15 VMs have /sbin/insserv package (required for AMA 1.14.4+)
+    if (vm_dist.lower().startswith('suse') or vm_dist.lower().startswith('sles')) and vm_ver.startswith('15'):
+        check_insserv, _ = run_command_and_log("which insserv")
+        if check_insserv != 0:
+            hutil_log_info("'insserv-compat' package missing from SUSE 15 machine, installing to allow AMA to run.")
+            insserv_exit_code, insserv_output = run_command_and_log("zypper --non-interactive install insserv-compat")
+            if insserv_exit_code != 0:
+                return insserv_exit_code, insserv_output
 
     public_settings, protected_settings = get_settings()
 
@@ -275,18 +290,17 @@ def install():
 
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
-    vm_dist, vm_ver = find_vm_distro('Install')
     if vm_dist.lower().startswith('suse'):
         try:
-            suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/mdsd.service.d")
+            suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
 
-            suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/mdsd.service.d/override.conf")
+            suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitoragent.service.d/override.conf")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
 
-            suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/mdsd.service.d/override.conf")
+            suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/azuremonitoragent.service.d/override.conf")
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
 
@@ -294,13 +308,14 @@ def install():
             if suse_exit_code != 0:
                 return suse_exit_code, suse_output
         except:
-            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/mdsd.service.d for suse 12,15" )
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
 
     default_configs = {
-        "MDSD_LOG" : "/var/log",
-        "MDSD_ROLE_PREFIX" : "/var/run/mdsd/default",
-        "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/linuxmonagent",
-        "MDSD_OPTIONS" : "\"-A -c /etc/mdsd.d/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -e $MDSD_LOG/mdsd.err -w $MDSD_LOG/mdsd.warn -o $MDSD_LOG/mdsd.info\"",
+        "MDSD_CONFIG_DIR" : "/etc/opt/microsoft/azuremonitoragent",
+        "MDSD_LOG_DIR" : "/var/opt/microsoft/azuremonitoragent/log",
+        "MDSD_ROLE_PREFIX" : "/run/azuremonitoragent/default",
+        "MDSD_SPOOL_DIRECTORY" : "/var/opt/microsoft/azuremonitoragent",
+        "MDSD_OPTIONS" : "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"",
         "ENABLE_MCS" : "false",
         "MONITORING_USE_GENEVA_CONFIG_SERVICE" : "false",
         "MDSD_USE_LOCAL_PERSISTENCY" : "true",
@@ -309,7 +324,7 @@ def install():
     }
 
     # Decide the mode
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
+    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detecting Auto-Config mode.")
         return 0, ""
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
@@ -432,20 +447,20 @@ def install():
                 default_configs["MONITORING_GCS_AUTH_ID"] = MONITORING_GCS_AUTH_ID
 
             if MONITORING_GCS_CERT_CERTFILE is not None:
-                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/mdsd.d/gcscert.pem"
-                fh = open("/etc/mdsd.d/gcscert.pem", "wb")
+                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/opt/microsoft/azuremonitoragent/gcscert.pem"
+                fh = open("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", "wb")
                 fh.write(MONITORING_GCS_CERT_CERTFILE)
                 fh.close()
-                os.chown("/etc/mdsd.d/gcscert.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcscert.pem", 400))
+                os.chown("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", 400))
 
             if MONITORING_GCS_CERT_KEYFILE is not None:
-                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/mdsd.d/gcskey.pem"
-                fh = open("/etc/mdsd.d/gcskey.pem", "wb")
+                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/opt/microsoft/azuremonitoragent/gcskey.pem"
+                fh = open("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", "wb")
                 fh.write(MONITORING_GCS_CERT_KEYFILE)
                 fh.close()
-                os.chown("/etc/mdsd.d/gcskey.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/mdsd.d/gcskey.pem", 400))
+                os.chown("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", uid, gid)
+                os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", 400))
 
             if MONITORING_TENANT != "":
                 default_configs["MONITORING_TENANT"] = MONITORING_TENANT
@@ -456,7 +471,7 @@ def install():
             if MONITORING_TENANT != "":
                 default_configs["MONITORING_ROLE_INSTANCE"] = MONITORING_ROLE_INSTANCE
 
-    config_file = "/etc/default/mdsd"
+    config_file = "/etc/default/azuremonitoragent"
     config_updated = False
     try:
         if os.path.isfile(config_file):
@@ -498,15 +513,15 @@ def install():
                 new_data += "export " + var + "=" + default_configs[var] + "\n"
                 vars_set.add(var)
 
-            with open("/etc/default/mdsd_temp", "w") as f:
+            with open("/etc/default/azuremonitoragent_temp", "w") as f:
                 f.write(new_data)
                 config_updated = True if len(new_data) > 0 else False
 
-            if not config_updated or not os.path.isfile("/etc/default/mdsd_temp"):
-                log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/mdsd")
+            if not config_updated or not os.path.isfile("/etc/default/azuremonitoragent_temp"):
+                log_and_exit("install",MissingorInvalidParameterErrorCode, "Error while updating MCS Environment Variables in /etc/default/azuremonitoragent")
 
             os.remove(config_file)
-            os.rename("/etc/default/mdsd_temp", config_file)
+            os.rename("/etc/default/azuremonitoragent_temp", config_file)
 
             uid = pwd.getpwnam("syslog").pw_uid
             gid = grp.getgrnam("syslog").gr_gid
@@ -514,9 +529,9 @@ def install():
             os.system('chmod {1} {0}'.format(config_file, 400))
 
         else:
-            log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/mdsd" )
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Could not find the file - /etc/default/azuremonitoragent" )
     except:
-        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/mdsd" )
+        log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to add MCS Environment Variables in /etc/default/azuremonitoragent" )
     return exit_code, output
 
 def check_kill_process(pstring):
@@ -535,9 +550,9 @@ def uninstall():
 
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
-        AMAUninstallCommand = "dpkg -P azure-mdsd"
+        AMAUninstallCommand = "dpkg -P azuremonitoragent"
     elif PackageManager == "rpm":
-        AMAUninstallCommand = "rpm -e azure-mdsd"
+        AMAUninstallCommand = "rpm -e azuremonitoragent"
     else:
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
@@ -573,23 +588,15 @@ def enable():
         hutil_log_info("This VM is an Arc VM, Running the arc watcher daemon.")
         start_arc_process()
 
-    if is_systemd():
-        AMAServiceStartCommand = "systemctl start mdsd"
-        AMAServiceStatusCommand = "systemctl status mdsd"
-    else:
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsd.")
-        AMAServiceStartCommand = "/etc/init.d/mdsd start"
-        AMAServiceStatusCommand = "/etc/init.d/mdsd status"
+    service_name = get_service_name()
 
-    public_settings, protected_settings = get_settings()
-
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == "true":
-        AMAServiceStartCommand = "systemctl start mdsdmgr"
-        AMAServiceStatusCommand = "systemctl status mdsdmgr"
-        if not is_systemd():
-            hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start mdsdmgr.")
-            AMAServiceStartCommand = "/etc/init.d/mdsdmgr start"
-            AMAServiceStatusCommand = "/etc/init.d/mdsdmgr status"
+    # Start and enable systemd services so they are started after system reboot.
+    AMAServiceStartCommand = 'systemctl start {0} && systemctl enable {0}'.format(service_name)
+    AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
+    if not is_systemd():
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service_name))
+        AMAServiceStartCommand = '/etc/init.d/{0} start'.format(service_name)
+        AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(AMAServiceStartCommand)
@@ -610,7 +617,7 @@ def disable():
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
-    global AMAServiceStopCommand
+    global AMAServiceStopCommand, AMAServiceStatusCommand
 
     # disable arc daemon if it is running
     stop_arc_watcher()
@@ -618,15 +625,22 @@ def disable():
     #stop the metrics process
     stop_metrics_process()
 
-    #stop the Azure Monitor Linux Agent service
-    if is_systemd():
-        AMAServiceStopCommand = "systemctl stop mdsd"
+    service_name = get_service_name()
 
-    else:
-        AMAServiceStopCommand = "/etc/init.d/mdsd stop"
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop mdsd.")
+    # Stop and disable systemd services so they are not started after system reboot.
+    AMAServiceStopCommand = 'systemctl stop {0} && systemctl disable {0}'.format(service_name)
+    AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
+    if not is_systemd():
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop {0}.".format(service_name))
+        AMAServiceStopCommand = '/etc/init.d/{0} stop'.format(service_name)
+        AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     exit_code, output = run_command_and_log(AMAServiceStopCommand)
+    if exit_code != 0:
+        status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
+        if status_exit_code != 0:
+            output += "Output of '{0}':\n{1}".format(AMAServiceStatusCommand, status_output)
+
     return exit_code, output
 
 def update():
@@ -800,13 +814,13 @@ def metrics_watcher(hutil_error, hutil_log):
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data,
                                 "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port,
-                                "unix:///var/run/mdsd/default_influx.socket",
+                                "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
                             me_handler.setup_me(is_lad=False)
 
-                            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
-                            if start_telegraf_out:
+                            start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
+                            if start_telegraf_res:
                                 hutil_log("Successfully started metrics-sourcer.")
                             else:
                                 hutil_error(log_messages)
@@ -863,8 +877,8 @@ def metrics_watcher(hutil_error, hutil_log):
                                     hutil_log(tel_msg)
                                 else:
                                     hutil_error(tel_msg)
-                                start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=False)
-                                if start_telegraf_out:
+                                start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
+                                if start_telegraf_res:
                                     hutil_log("Successfully started metrics-sourcer.")
                                 else:
                                     hutil_error(log_messages)
@@ -1004,7 +1018,7 @@ def arc_watcher(hutil_error, hutil_log):
 
     while True:
         try:
-            arc_token_mdsd_dir = "/etc/mdsd.d/arc_tokens/"
+            arc_token_mdsd_dir = "/etc/opt/microsoft/azuremonitoragent/arc_tokens/"
             if not os.path.exists(arc_token_mdsd_dir):
                 os.makedirs(arc_token_mdsd_dir)
             else:
@@ -1072,7 +1086,7 @@ def find_package_manager(operation):
     for dpkg_dist in dpkg_set:
         if dist.lower().startswith(dpkg_dist):
             PackageManager = "dpkg"
-            # OK to replace the /etc/default/mdsd, since the placeholders gets replaced again.
+            # OK to replace the /etc/default/azuremonitoragent, since the placeholders gets replaced again.
             # Otherwise, the package manager prompts for action (Y/I/N/O/D/Z) [default=N]
             PackageManagerOptions = "--force-overwrite --force-confnew"
             BundleFileName = BundleFileNameDeb
