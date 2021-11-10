@@ -58,9 +58,9 @@ try:
 
 
 except Exception as e:
-    print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
-          'Stacktrace: {1}'.format(e, traceback.format_exc())
-    print "Can't proceed. Exiting with a special exit code 119."
+    print('A local import (e.g., waagent) failed. Exception: {0}\n' \
+          'Stacktrace: {1}'.format(e, traceback.format_exc()))
+    print("Can't proceed. Exiting with a special exit code 119.")
     sys.exit(119)  # This is the only thing we can do, as all logging depends on waagent/hutil.
 
 
