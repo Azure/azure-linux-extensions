@@ -15,7 +15,7 @@ sed -i "s/\"version\".*$/\"version\": \"$OMS_EXTENSION_VERSION\",/g" HandlerMani
 sed -i "s/^OMSExtensionVersion = .*$/OMSExtensionVersion = '$OMS_EXTENSION_VERSION'/"  watcherutil.py
 
 # updating omsagent.py
-# check BundleFileName = 'omsagent-1.12.7-0.universal.x64.sh'
+# check BundleFileName = 'omsagent-0.0.0-0.universal.x64.sh'
 sed -i "s/^BundleFileName = .*$/BundleFileName = 'omsagent-$OMS_SHELL_BUNDLE_VERSION.universal.x64.sh'/" omsagent.py
 
 # updating manifest.xml

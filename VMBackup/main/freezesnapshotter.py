@@ -54,7 +54,7 @@ class FreezeSnapshotter(object):
         if(para_parser.snapshotTaskToken == None):
             para_parser.snapshotTaskToken = '' #making snaoshot string empty when snapshotTaskToken is null
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
-        self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
+        self.takeSnapshotFrom = CommonVariables.firstHostThenGuest
         self.isManaged = False
         self.taskId = self.para_parser.taskId
         self.hostIp = '168.63.129.16'
@@ -89,14 +89,13 @@ class FreezeSnapshotter(object):
                     self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
                 
                 if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
-                    if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True):
-                        self.logger.log('Some disks are excluded from backup. Setting the snapshot mode to onlyGuest.')
+                    if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True and (para_parser.includeLunList == None or para_parser.includeLunList.count == 0)):
+                        self.logger.log('Some disks are excluded from backup and LUN list is not present. Setting the snapshot mode to onlyGuest.')
                         self.takeSnapshotFrom = CommonVariables.onlyGuest
 
-                #Not hitting host when snapshot uri has special characters
+                #Check if snapshot uri has special characters
                 if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
-                    self.logger.log('Some disk blob Uris have special characters. Setting the snapshot mode to onlyGuest.')
-                    self.takeSnapshotFrom = CommonVariables.onlyGuest
+                    self.logger.log('Some disk blob Uris have special characters.')
                 
                 waDiskLunList= []
 
@@ -110,6 +109,16 @@ class FreezeSnapshotter(object):
                             self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
                             self.takeSnapshotFrom = CommonVariables.onlyHost
                             break
+
+                if(para_parser.includedDisks != None and CommonVariables.isAnyWADiskIncluded in para_parser.includedDisks.keys()):
+                    if (para_parser.includedDisks[CommonVariables.isAnyWADiskIncluded] == True):
+                        self.logger.log('WA disk is included. Setting the snapshot mode to onlyHost.')
+                        self.takeSnapshotFrom = CommonVariables.onlyHost
+
+                if(para_parser.includedDisks != None and CommonVariables.isVmgsBlobIncluded in para_parser.includedDisks.keys()):
+                    if (para_parser.includedDisks[CommonVariables.isVmgsBlobIncluded] == True):
+                        self.logger.log('Vmgs Blob is included. Setting the snapshot mode to onlyHost.')
+                        self.takeSnapshotFrom = CommonVariables.onlyHost
 
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):

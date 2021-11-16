@@ -296,7 +296,6 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
 
     if not os.path.exists(configFolder):
         raise Exception("Metrics extension config directory does not exist. Failed to set up ME service.")
-        return False
 
     if os.path.isfile(me_service_template_path):
         copyfile(me_service_template_path, me_service_path)
@@ -309,13 +308,10 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
             daemon_reload_status = os.system("sudo systemctl daemon-reload")
             if daemon_reload_status != 0:
                 raise Exception("Unable to reload systemd after ME service file change. Failed to set up ME service.")
-                return False
         else:
             raise Exception("Unable to copy Metrics extension service file to {0}. Failed to set up ME service.".format(me_service_path))
-            return False
     else:
         raise Exception("Metrics extension service template file does not exist at {0}. Failed to set up ME service.".format(me_service_template_path))
-        return False
     return True
 
 
@@ -576,14 +572,16 @@ def get_arm_domain(az_environment):
 
 def get_metrics_extension_service_path():
     """
-    Utility method to get the service path in case /lib/systemd/system doesnt exist on the OS
+    Utility method to get the service path
     """
+    if os.path.exists("/etc/systemd/system"):
+        return metrics_constants.metrics_extension_service_path_etc
     if os.path.exists("/lib/systemd/system/"):
         return metrics_constants.metrics_extension_service_path
     elif os.path.exists("/usr/lib/systemd/system/"):
         return metrics_constants.metrics_extension_service_path_usr_lib
     else:
-        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to set up Metrics Extension service.")
+        raise Exception("Systemd unit files do not exist at /etc/systemd/system, /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
 
 
 def setup_me(is_lad):
@@ -621,7 +619,6 @@ def setup_me(is_lad):
 
     if aad_auth_url == "":
         raise Exception("Unable to find AAD Authentication URL in the request error response. Failed to set up ME.")
-        return False
 
     #create metrics conf
     me_conf = create_metrics_extension_conf(az_resource_id, aad_auth_url)
@@ -683,7 +680,6 @@ def setup_me(is_lad):
             os.chmod(metrics_ext_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
     else:
         raise Exception("Unable to copy MetricsExtension Binary, could not find file at the location {0} . Failed to set up ME.".format(me_bin_local_path))
-        return False
 
     if is_lad:
         me_influx_port = metrics_constants.lad_metrics_extension_udp_port

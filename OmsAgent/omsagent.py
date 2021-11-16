@@ -87,7 +87,8 @@ if sys.version_info < (2,7):
 ProceedOnSigningVerificationFailure = True
 PackagesDirectory = 'packages'
 keysDirectory = 'keys'
-BundleFileName = 'omsagent-1.13.11-0.universal.x64.sh'
+# Below file version will be replaced during OMS-Build time.
+BundleFileName = 'omsagent-0.0.0-0.universal.x64.sh'
 GUIDRegex = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 GUIDOnlyRegex = r'^' + GUIDRegex + '$'
 SCOMCertIssuerRegex = r'^[\s]*Issuer:[\s]*CN=SCX-Certificate/title=SCX' + GUIDRegex + ', DC=.*$'
@@ -531,6 +532,13 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
+
+    if HUtilObject is not None:
+        if HUtilObject.is_seq_smaller():
+            log_output = "Current sequence number {0} is not greater than the sequence number of the most recent executed configuration, skipping enable.".format(HUtilObject._context._seq_no)
+            hutil_log_info(log_output)
+            return 0, log_output
+
     exit_if_vm_not_supported('Enable')
 
     public_settings, protected_settings = get_settings()
@@ -671,6 +679,9 @@ def enable():
 
         #start telemetry process if enable is successful
         start_telemetry_process()
+
+        #save sequence number
+        HUtilObject.save_seq()
 
     return exit_code, output
 

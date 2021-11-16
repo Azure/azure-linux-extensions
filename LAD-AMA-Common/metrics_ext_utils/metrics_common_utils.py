@@ -22,9 +22,7 @@ def is_systemd():
     """
     Check if the system is using systemd
     """
-
-    check_systemd = os.system("pidof systemd 1>/dev/null 2>&1")
-    return check_systemd == 0
+    return os.path.isdir("/run/systemd/system")
 
 
 def is_arc_installed():

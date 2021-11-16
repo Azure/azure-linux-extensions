@@ -29,6 +29,7 @@ import sys
 from common import CommonVariables
 from subprocess import *
 from Utils.WAAgentUtil import waagent
+import Utils.HandlerUtil
 import sys
 
 class HttpUtil(object):
@@ -72,7 +73,7 @@ class HttpUtil(object):
         else:
             commandToExecute = 'curl --request PUT --connect-timeout 10 --data-binary @-' + ' ' + header_str + ' "' + sasuri_obj.scheme + '://' + sasuri_obj.hostname + sasuri_obj.path + '?' + sasuri_obj.query + '"'\
                 + '--proxy ' + self.proxyHost + ':' + self.proxyPort + ' -v'
-        args = shlex.split(commandToExecute.encode('ascii'))
+        args =Utils.HandlerUtil.HandlerUtility.split(self.logger, commandToExecute.encode('ascii'))
         proc = Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         proc.stdin.write(data)
         curlResult,err = proc.communicate()
@@ -143,7 +144,7 @@ class HttpUtil(object):
                 connection.close()
             result = CommonVariables.success
         except Exception as e:
-            errorMsg = str(datetime.datetime.now()) +  " Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            errorMsg = str(datetime.datetime.utcnow()) +  " Failed to call http with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg)
             if sys.version[0] == 2 and sys.version[1] == 6:
                 self.CallUsingCurl(method,sasuri_obj,data,headers)
