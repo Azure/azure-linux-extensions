@@ -55,12 +55,9 @@ try:
     import metrics_ext_utils.metrics_ext_handler as me_handler
     import metrics_ext_utils.metrics_constants as metrics_constants
 
-
-
 except Exception as e:
-    print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
-          'Stacktrace: {1}'.format(e, traceback.format_exc())
-    print "Can't proceed. Exiting with a special exit code 119."
+    print('A local import (e.g., waagent) failed. Exception: {0}\nStacktrace: {1}'.format(e, traceback.format_exc()))
+    print("Can't proceed. Exiting with a special exit code 119.")
     sys.exit(119)  # This is the only thing we can do, as all logging depends on waagent/hutil.
 
 
@@ -883,7 +880,7 @@ if __name__ == '__main__':
                 # Trick to print backtrace in case we execute './diagnostic.py -xxx yyy' from a terminal for testing.
                 # By just adding one more cmdline arg with any content, the above if condition becomes false,\
                 # thus allowing us to run code here, printing the exception message with the stack trace.
-                print msg
+                print(msg)
             # Need to exit with an error code, so that this situation can be detected by waagent and also
             # reported to customer through agent/extension status blob.
             hutil.do_exit(42, wala_event_type, 'Error', '42', msg)  # What's 42? Ask Abhi.
