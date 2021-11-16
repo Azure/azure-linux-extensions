@@ -164,8 +164,6 @@ def main():
             operation = 'Update'
         elif re.match('^([-/]*)(metrics)', option):
             operation = 'Metrics'
-        elif re.match('^([-/]*)(arc)', option):
-            operation = 'Arc'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -356,7 +354,7 @@ def enable():
     global AMAServiceStartCommand, AMAServiceStatusCommand
 
     if HUtilObject:
-        if(HUtilObject.is_seq_smaller()):
+        if HUtilObject.is_seq_smaller():
             return 0, "Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable"
 
     exit_if_vm_not_supported('Enable')
@@ -371,7 +369,7 @@ def enable():
         ("MDSD_SPOOL_DIRECTORY", "/var/opt/microsoft/azuremonitoragent"),
         ("MDSD_OPTIONS", "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\""),
         ("MDSD_USE_LOCAL_PERSISTENCY", "true"),
-        ("MDSD_TCMALLOC_RELEASE_FREQ_SEC", "1")
+        ("MDSD_TCMALLOC_RELEASE_FREQ_SEC", "1"),
         ("MONITORING_USE_GENEVA_CONFIG_SERVICE", "false"),
         ("ENABLE_MCS", "false")
     ])
