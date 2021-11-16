@@ -531,7 +531,7 @@ def stop_telegraf_service(is_lad):
                         cmdline = cmd_f.readlines()
                         if cmdline[0].find(telegraf_bin) >= 0:
                             os.kill(int(pid), signal.SIGKILL)
-        os.remove(pids_filepath)
+        os.remove(telegraf_pid_path)
     elif not metrics_utils.is_systemd():
         return False, "Could not find telegraf service nor process to stop."
 
