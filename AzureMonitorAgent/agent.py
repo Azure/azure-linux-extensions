@@ -733,7 +733,7 @@ def start_metrics_process():
 
     # Start metrics watcher
     ama_path = os.path.join(os.getcwd(), 'agent.py')
-    args = ['python{0}'.format(sys.version_info[0]), ama_path, '-metrics']
+    args = [sys.executable, ama_path, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
