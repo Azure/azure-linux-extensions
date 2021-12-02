@@ -101,12 +101,6 @@ def install():
     hutil.do_parse_context('Install', configSeqNo)
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
 
-def timedelta_total_seconds(delta):
-    if not hasattr(datetime.timedelta, 'total_seconds'):
-        return delta.days * 86400 + delta.seconds
-    else:
-        return delta.total_seconds()
-
 def status_report_to_file(file_report_msg):
     global backup_logger,hutil
     hutil.write_to_status_file(file_report_msg)
@@ -180,9 +174,6 @@ def exit_if_same_taskId(taskId):
         message='TaskId AlreadyProcessed nothing to do'
         backup_logger.log(message, True)
         sys.exit(0)
-
-def convert_time(utcTicks):
-    return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
 def freeze_snapshot(timeout):
     try:
@@ -328,18 +319,11 @@ def daemon():
             exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
-            utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
-            backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
-            commandStartTime = convert_time(utcTicksLong)
-            utcNow = datetime.datetime.utcnow()
-            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow), True)
-            timespan = utcNow - commandStartTime
-            MAX_TIMESPAN = 140 * 60 # in seconds
-            # handle the machine identity for the restoration scenario.
-            total_span_in_seconds = timedelta_total_seconds(timespan)
-            backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
+            canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
+            temp_g_fsfreeze_on = True
+            freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, temp_g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
 
-            if total_span_in_seconds > MAX_TIMESPAN :
+            if freeze_snap_shotter.is_command_timedout(para_parser) :
                 error_msg = "CRP timeout limit has reached, will not take snapshot."
                 errMsg = error_msg
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)

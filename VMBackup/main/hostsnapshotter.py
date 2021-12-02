@@ -152,7 +152,7 @@ class HostSnapshotter(object):
             self.logger.log(errorMsg, False, 'Error')
             statusCode = 558
         HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodePreSnapshot, str(statusCode))
-        return statusCode
+        return statusCode, responseBody
 
     def get_snapshot_info(self, responseBody):
         blobsnapshotinfo_array = []
