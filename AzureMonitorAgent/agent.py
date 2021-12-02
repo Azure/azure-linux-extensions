@@ -583,11 +583,6 @@ def enable():
 
     exit_if_vm_not_supported('Enable')
 
-    # Check if this is Arc VM and enable arc daemon if it is
-    if metrics_utils.is_arc_installed():
-        hutil_log_info("This VM is an Arc VM, Running the arc watcher daemon.")
-        start_arc_process()
-
     service_name = get_service_name()
 
     # Start and enable systemd services so they are started after system reboot.
@@ -618,9 +613,6 @@ def disable():
     Note: disable operation times out from WAAgent at 15 minutes
     """
     global AMAServiceStopCommand, AMAServiceStatusCommand
-
-    # disable arc daemon if it is running
-    stop_arc_watcher()
 
     #stop the metrics process
     stop_metrics_process()
@@ -741,7 +733,7 @@ def start_metrics_process():
 
     # Start metrics watcher
     ama_path = os.path.join(os.getcwd(), 'agent.py')
-    args = ['python{0}'.format(sys.version_info[0]), ama_path, '-metrics']
+    args = [sys.executable, ama_path, '-metrics']
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil_log_info('start watcher process '+str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -933,124 +925,15 @@ def metrics():
     return 0, ""
 
 
-def start_arc_process():
-    """
-    Start arc process that performs periodic monitoring activities
-    :return: None
-
-    """
-    hutil_log_info("stopping previously running arc process")
-    stop_arc_watcher()
-    hutil_log_info("starting arc process")
-
-    #start arc watcher
-    ama_path = os.path.join(os.getcwd(), 'agent.py')
-    args = ['python{0}'.format(sys.version_info[0]), ama_path, '-arc']
-    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    hutil_log_info('start watcher process '+str(args))
-    subprocess.Popen(args, stdout=log, stderr=log)
-
-def start_arc_watcher():
-    """
-    Take care of starting arc_watcher daemon if the VM has arc running
-    """
-    hutil_log_info("Starting the watcher")
-    print("Starting the watcher")
-    pids_filepath = os.path.join(os.getcwd(), 'amaarc.pid')
-    py_pid = os.getpid()
-    print("pid ", py_pid)
-    with open(pids_filepath, 'w') as f:
-        f.write(str(py_pid) + '\n')
-    hutil_log_info("Written all the pids")
-    print("Written all the pids")
-    watcher_thread = Thread(target = arc_watcher, args = [hutil_log_error, hutil_log_info])
-    watcher_thread.start()
-    watcher_thread.join()
-
-    return 0, ""
-
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
               'Uninstall' : uninstall,
               'Install' : install,
               'Enable' : enable,
               'Update' : update,
-              'Metrics' : metrics,
-              'Arc' : start_arc_watcher,
+              'Metrics' : metrics
 }
 
-
-def stop_arc_watcher():
-    """
-    Take care of stopping arc_watcher daemon if the VM has arc running
-    """
-    pids_filepath = os.path.join(os.getcwd(),'amaarc.pid')
-
-    # kill existing arc watcher
-
-    if os.path.exists(pids_filepath):
-        with open(pids_filepath, "r") as f:
-            for pid in f.readlines():                
-                # Verify the pid actually belongs to AMA arc watcher.
-                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
-                if os.path.exists(cmd_file):
-                    with open(cmd_file, "r") as pidf:
-                        cmdline = pidf.readlines()
-                        if cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-arc") >= 0:
-                            kill_cmd = "kill " + pid
-                            run_command_and_log(kill_cmd)
-                            
-        # Delete the file after to avoid clutter
-        os.remove(pids_filepath)
-
-def arc_watcher(hutil_error, hutil_log):
-    """
-    This is needed to override mdsd's syslog permissions restriction which prevents mdsd
-    from reading temporary key files that are needed to make https calls to get an MSI token for arc during onboarding to download amcs config
-    This method spins up a process that will continuously keep refreshing that particular file path with valid keys
-    So that whenever mdsd needs to refresh it's MSI token, it is able to find correct keys there to make the https calls
-    """
-    # check every 25 seconds
-    sleepTime =  25
-
-    # sleep before starting the monitoring.
-    time.sleep(sleepTime)
-
-    while True:
-        try:
-            arc_token_mdsd_dir = "/etc/opt/microsoft/azuremonitoragent/arc_tokens/"
-            if not os.path.exists(arc_token_mdsd_dir):
-                os.makedirs(arc_token_mdsd_dir)
-            else:
-                # delete the existing keys as they might not be valid anymore
-                for filename in os.listdir(arc_token_mdsd_dir):
-                    filepath = arc_token_mdsd_dir + filename
-                    os.remove(filepath)
-
-            arc_endpoint = metrics_utils.get_arc_endpoint()
-            try:
-                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://monitor.azure.com/"
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
-                res = urllib.request.urlopen(req)
-            except:
-                # The above request is expected to fail and add a key to the path
-                authkey_dir = "/var/opt/azcmagent/tokens/"
-                if not os.path.exists(authkey_dir):
-                    raise Exception("Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir))
-                # Copy the tokens to mdsd accessible dir
-                for filename in os.listdir(authkey_dir):
-                    filepath = authkey_dir + filename
-                    print(filepath)
-                    shutil.copy(filepath, arc_token_mdsd_dir)
-
-                # Change the ownership of the mdsd arc token dir to be accessible by syslog (since mdsd runs as syslog user)
-                os.system("chown -R syslog:syslog {0}".format(arc_token_mdsd_dir))
-
-        except Exception as e:
-            hutil_error('Error in arc watcher process while copying token for arc MSI auth queries. Exception={0}'.format(e))
-
-        finally:
-            time.sleep(sleepTime)
 
 def parse_context(operation):
     """
