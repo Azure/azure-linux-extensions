@@ -406,7 +406,7 @@ class FreezeSnapshotter(object):
 
     def is_command_timedout(self, para_parser):
         result = False
-        dateTimeNow = None
+        dateTimeNow = datetime.datetime.utcnow()
         try:
             try:
                 snap_shotter = HostSnapshotter(self.logger, self.hostIp)
@@ -415,10 +415,9 @@ class FreezeSnapshotter(object):
                 if(int(pre_snapshot_statuscode) == 200 or int(pre_snapshot_statuscode) == 201) and (responseBody != None and responseBody != "") :
                     resonse = json.loads(responseBody)
                     dateTimeNow = datetime.datetime(resonse['responseTime']['year'], resonse['responseTime']['month'], resonse['responseTime']['day'], resonse['responseTime']['hour'], resonse['responseTime']['minute'], resonse['responseTime']['second'])
-                self.logger.log('Date and time extracted form pre-snapshot request: '+ str(dateTimeNow))
+                    self.logger.log('Date and time extracted from pre-snapshot request: '+ str(dateTimeNow))
             except Exception as e:
-                self.logger.log('Erorr in getting Host time falling back to using system time. Exception %s, stack trace: %s' % (str(e), traceback.format_exc()))
-                dateTimeNow = datetime.datetime.utcnow()
+                self.logger.log('Error in getting Host time falling back to using system time. Exception %s, stack trace: %s' % (str(e), traceback.format_exc()))
 
             if(para_parser is not None and para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
                 utcTicksLong = int(para_parser.commandStartTimeUTCTicks)

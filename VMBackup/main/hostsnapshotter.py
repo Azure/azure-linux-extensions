@@ -137,6 +137,7 @@ class HostSnapshotter(object):
                 self.logger.log("presnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     statusCode = httpResp.status
+                    self.logger.log("PreSnapshot: Status Code: " + str(statusCode))
                     if(int(statusCode) == 200 or int(statusCode) == 201) and (responseBody == None or responseBody == "") :
                         self.logger.log("PreSnapshot:responseBody is empty but http status code is success")
                         statusCode = 557
