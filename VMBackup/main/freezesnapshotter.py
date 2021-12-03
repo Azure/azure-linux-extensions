@@ -357,7 +357,7 @@ class FreezeSnapshotter(object):
         unable_to_sleep = False
         blob_snapshot_info_array = None
         snap_shotter = HostSnapshotter(self.logger, self.hostIp)
-        pre_snapshot_statuscode = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
+        pre_snapshot_statuscode, responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
 
         if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
@@ -406,15 +406,25 @@ class FreezeSnapshotter(object):
 
     def is_command_timedout(self, para_parser):
         result = False
-
+        dateTimeNow = datetime.datetime.utcnow()
         try:
+            try:
+                snap_shotter = HostSnapshotter(self.logger, self.hostIp)
+                pre_snapshot_statuscode,responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
+                
+                if(int(pre_snapshot_statuscode) == 200 or int(pre_snapshot_statuscode) == 201) and (responseBody != None and responseBody != "") :
+                    resonse = json.loads(responseBody)
+                    dateTimeNow = datetime.datetime(resonse['responseTime']['year'], resonse['responseTime']['month'], resonse['responseTime']['day'], resonse['responseTime']['hour'], resonse['responseTime']['minute'], resonse['responseTime']['second'])
+                    self.logger.log('Date and time extracted from pre-snapshot request: '+ str(dateTimeNow))
+            except Exception as e:
+                self.logger.log('Error in getting Host time falling back to using system time. Exception %s, stack trace: %s' % (str(e), traceback.format_exc()))
+
             if(para_parser is not None and para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
                 utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
                 self.logger.log('utcTicks in long format' + str(utcTicksLong))
                 commandStartTime = self.convert_time(utcTicksLong)
-                utcNow = datetime.datetime.utcnow()
-                self.logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow))
-                timespan = utcNow - commandStartTime
+                self.logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(dateTimeNow))
+                timespan = dateTimeNow - commandStartTime
                 MAX_TIMESPAN = 140 * 60 # in seconds
                 total_span_in_seconds = self.timedelta_total_seconds(timespan)
                 self.logger.log('timespan: ' + str(timespan) + ', total_span_in_seconds: ' + str(total_span_in_seconds) + ', MAX_TIMESPAN: ' + str(MAX_TIMESPAN))

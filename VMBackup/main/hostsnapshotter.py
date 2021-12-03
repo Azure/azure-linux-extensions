@@ -137,6 +137,7 @@ class HostSnapshotter(object):
                 self.logger.log("presnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     statusCode = httpResp.status
+                    self.logger.log("PreSnapshot: Status Code: " + str(statusCode))
                     if(int(statusCode) == 200 or int(statusCode) == 201) and (responseBody == None or responseBody == "") :
                         self.logger.log("PreSnapshot:responseBody is empty but http status code is success")
                         statusCode = 557
@@ -152,7 +153,7 @@ class HostSnapshotter(object):
             self.logger.log(errorMsg, False, 'Error')
             statusCode = 558
         HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodePreSnapshot, str(statusCode))
-        return statusCode
+        return statusCode, responseBody
 
     def get_snapshot_info(self, responseBody):
         blobsnapshotinfo_array = []
