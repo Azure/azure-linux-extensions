@@ -361,7 +361,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             logger.log('Secret has already been updated')
             disk_util.log_lsblk_output()
 
-            if extension_parameter.passphrase and extension_parameter.passphrase != open(existing_passphrase_file,'r').read():
+            if extension_parameter.passphrase and extension_parameter.passphrase.decode("utf-8") != open(existing_passphrase_file,'r').read():
                 logger.log("The new passphrase has not been placed in BEK volume yet")
                 logger.log("Skipping removal of old passphrase")
                 exit_without_status_report()
@@ -369,7 +369,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             logger.log('Removing old passphrase')
 
             temp_oldkeyfile = tempfile.NamedTemporaryFile(delete=False)
-            temp_oldkeyfile.write(old_passphrase)
+            temp_oldkeyfile.write(old_passphrase.encode("utf-8"))
             temp_oldkeyfile.close()
 
             for crypt_item in crypt_mount_config_util.get_crypt_items():
