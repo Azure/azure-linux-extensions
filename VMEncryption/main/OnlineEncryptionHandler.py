@@ -31,7 +31,7 @@ class OnlineEncryptionHandler:
                     msg = "Encrypting {0} file system is not supported for data-preserving encryption. Consider using the encrypt-format-all option.".format(device_fs)
                 else:
                     msg = "AzureDiskEncryption does not support the {0} file system".format(device_fs)
-                logger.log(msg=msg, level=CommonVariables.ErrorLevel)
+                self.logger.log(msg=msg, level=CommonVariables.ErrorLevel)
                 return device_item
 
             umount_status_code = CommonVariables.success
