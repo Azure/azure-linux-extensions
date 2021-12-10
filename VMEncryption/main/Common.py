@@ -75,6 +75,7 @@ class CommonVariables:
     sector_size = 512
     luks_header_size = 4096 * 512
     luks_header_size_v2 = 32768 * 512
+    luks_header_sector_v2 = "32768S"
     default_block_size = 52428800
     min_filesystem_size_support = 52428800 * 3
     default_file_system = 'ext4'
@@ -130,6 +131,7 @@ class CommonVariables:
     EncryptionDecryptionOperationKey = 'DecryptionOperation'
     EncryptionVolumeTypeKey = 'VolumeType'
     EncryptionDiskFormatQueryKey = 'DiskFormatQuery'
+    EncryptionModeKey = 'EncryptionMode'
 
     """
     crypt ongoing item config keys

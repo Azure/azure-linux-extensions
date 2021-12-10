@@ -47,6 +47,7 @@ from EncryptionEnvironment import EncryptionEnvironment
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
+from OnlineEncryptionHandler import OnlineEncryptionHandler
 from io import open
 
 
@@ -360,7 +361,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             logger.log('Secret has already been updated')
             disk_util.log_lsblk_output()
 
-            if extension_parameter.passphrase and extension_parameter.passphrase != open(existing_passphrase_file,'r').read():
+            if extension_parameter.passphrase and extension_parameter.passphrase.decode("utf-8") != open(existing_passphrase_file,'r').read():
                 logger.log("The new passphrase has not been placed in BEK volume yet")
                 logger.log("Skipping removal of old passphrase")
                 exit_without_status_report()
@@ -368,7 +369,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             logger.log('Removing old passphrase')
 
             temp_oldkeyfile = tempfile.NamedTemporaryFile(delete=False)
-            temp_oldkeyfile.write(old_passphrase)
+            temp_oldkeyfile.write(old_passphrase.encode("utf-8"))
             temp_oldkeyfile.close()
 
             for crypt_item in crypt_mount_config_util.get_crypt_items():
@@ -594,11 +595,14 @@ def main():
             daemon()
 
 
-def mark_encryption(command, volume_type, disk_format_query):
+def mark_encryption(command, volume_type, disk_format_query, encryption_mode=None):
     encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
     encryption_marker.command = command
     encryption_marker.volume_type = volume_type
     encryption_marker.diskFormatQuery = disk_format_query
+    if encryption_mode is not None:
+        logger.log("Data disks will be encrypted with online mode")
+        encryption_marker.encryption_mode = encryption_mode
     encryption_marker.commit()
     return encryption_marker
 
@@ -886,7 +890,8 @@ def enable_encryption():
                 logger.log(msg="config file exists and passphrase file exists.", level=CommonVariables.WarningLevel)
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
-                                                    disk_format_query=extension_parameter.DiskFormatQuery)
+                                                    disk_format_query=extension_parameter.DiskFormatQuery,
+                                                    encryption_mode='Online' if ((disk_util.get_luks_header_size() == CommonVariables.luks_header_size_v2) and (DistroPatcher.distro_info[0].lower() == "redhat")) else None)
                 start_daemon('EnableEncryption')
             else:
                 # prepare to create secret, place on key volume, and request key vault update via wire protocol
@@ -937,7 +942,8 @@ def enable_encryption():
                             logger.log("Resource Disk is either absent or encrypted successfully.")
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
-                                                    disk_format_query=extension_parameter.DiskFormatQuery)
+                                                    disk_format_query=extension_parameter.DiskFormatQuery,
+                                                    encryption_mode='Online' if ((disk_util.get_luks_header_size() == CommonVariables.luks_header_size_v2) and (DistroPatcher.distro_info[0].lower() == "redhat")) else None)
                 start_daemon('EnableEncryption')
 
     except Exception as e:
@@ -1676,6 +1682,14 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
                            status=CommonVariables.extension_success_status,
                            status_code=str(CommonVariables.success),
                            message=msg)
+    if encryption_marker.get_encryption_mode() == 'Online':
+        logger.log("Starting Online Encryption for data disks.")
+        online_enc_handle = OnlineEncryptionHandler(logger)
+        failed_item = online_enc_handle.handle(device_items_to_encrypt, passphrase_file, disk_util, crypt_mount_config_util, bek_util)
+        if failed_item is not None:
+            return failed_item
+        online_enc_handle.handle_resume_encryption(disk_util)
+        return
 
     for device_num, device_item in enumerate(device_items_to_encrypt):
         umount_status_code = CommonVariables.success
