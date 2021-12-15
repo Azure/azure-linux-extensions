@@ -355,7 +355,8 @@ def enable():
 
     if HUtilObject:
         if HUtilObject.is_seq_smaller():
-            return 0, "Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable"
+            hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable")
+            return 0, ""
 
     exit_if_vm_not_supported('Enable')
 
@@ -529,11 +530,11 @@ def enable():
 
     try:
         if os.path.isfile(config_file):
-            new_config = "\n".join(["export {0}={1}".format(key, value) for key, value in default_configs.items()])
+            new_config = "\n".join(["export {0}={1}".format(key, value) for key, value in default_configs.items()]) + "\n"
 
             with open(temp_config_file, "w") as f:
                 wrote_len = f.write(new_config)
-                config_updated = True if wrote_len is not None and len(wrote_len) > 0 else False
+                config_updated = True if wrote_len is not None and wrote_len > 0 else False
 
             if not config_updated or not os.path.isfile(temp_config_file):
                 log_and_exit("Enable", GenericErrorCode, "Error while updating environment variables in {0}".format(config_file))
@@ -553,11 +554,11 @@ def enable():
     service_name = get_service_name()
 
     # Start and enable systemd services so they are started after system reboot.
-    AMAServiceStartCommand = 'systemctl start {0} && systemctl enable {0}'.format(service_name)
+    AMAServiceStartCommand = 'systemctl restart {0} && systemctl enable {0}'.format(service_name)
     AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
     if not is_systemd():
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service_name))
-        AMAServiceStartCommand = '/etc/init.d/{0} start'.format(service_name)
+        AMAServiceStartCommand = '/etc/init.d/{0} restart'.format(service_name)
         AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     hutil_log_info('Handler initiating onboarding.')
@@ -1581,7 +1582,7 @@ class ParameterMissingException(AzureMonitorAgentForLinuxException):
     error_code = MissingorInvalidParameterErrorCode
     def get_error_message(self, operation):
         return '{0} failed due to a missing parameter: {1}'.format(operation,
-                                                                   self)
+                                                                   self.error_code)
 
 if __name__ == '__main__' :
     main()
