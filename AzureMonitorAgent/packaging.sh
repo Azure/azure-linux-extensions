@@ -33,8 +33,8 @@ cp -r  ../LAD-AMA-Common/telegraf_utils .
 cp -r  ../Diagnostic/services .
 
 # cleanup packages, ext
-rm -rf packages MetricsExtensionBin ext/future pipelineagent agentlauncher
-mkdir -p packages MetricsExtensionBin ext/future pipelineagent agentlauncher
+rm -rf packages MetricsExtensionBin ext/future pipelineAgentBin agentLauncherBin
+mkdir -p packages MetricsExtensionBin ext/future pipelineAgentBin agentLauncherBin
 
 # copy shell bundle to packages/
 cp $input_path/azuremonitoragent_$AGENT_VERSION* packages/
