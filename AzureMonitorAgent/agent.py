@@ -257,47 +257,35 @@ def check_kill_process(pstring):
         pid = fields[0]
         os.kill(int(pid), signal.SIGKILL)
 
+def compare_and_copy_bin(src, dest):
+    # Check if previous file exist at the location, compare the two binaries,
+    # If the files are not same, remove the older file, and copy the new one
+    # If they are the same, then we ignore it and don't copy
+    if os.path.isfile(src ):
+        if os.path.isfile(dest):
+            if not filecmp.cmp(src, dest):
+                # Removing the file in case it is already being run in a process,
+                # in which case we can get an error "text file busy" while copying
+                os.remove(dest)
+                copyfile(src, dest)
+
+        else:
+            # No previous binary exist, simply copy it and make it executable
+            copyfile(src, dest)
+        
+        os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
+
 def copy_pa_binaries():
     pa_bin_local_path = os.getcwd() + "/pipelineAgentBin/pipelineagent"
     pa_bin = "/opt/microsoft/azuremonitoragent/bin/pipelineagent" 
 
-    # Check if previous file exist at the location, compare the two binaries,
-    # If the files are not same, remove the older file, and copy the new one
-    # If they are the same, then we ignore it and don't copy
-    if os.path.isfile(pa_bin_local_path ):
-        if os.path.isfile(pa_bin):
-            if not filecmp.cmp(pa_bin_local_path, pa_bin):
-                # Removing the file in case it is already being run in a process,
-                # in which case we can get an error "text file busy" while copying
-                os.remove(pa_bin)
-                copyfile(pa_bin_local_path, pa_bin)
-                os.chmod(pa_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
-
-        else:
-            # No previous binary exist, simply copy it and make it executable
-            copyfile(pa_bin_local_path, pa_bin)
-            os.chmod(pa_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
+    compare_and_copy_bin(pa_bin_local_path, pa_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
 
-    # Check if previous file exist at the location, compare the two binaries,
-    # If the files are not same, remove the older file, and copy the new one
-    # If they are the same, then we ignore it and don't copy
-    if os.path.isfile(agentlauncher_bin_local_path ):
-        if os.path.isfile(agentlauncher_bin):
-            if not filecmp.cmp(agentlauncher_bin_local_path, agentlauncher_bin):
-                # Removing the file in case it is already being run in a process,
-                # in which case we can get an error "text file busy" while copying
-                os.remove(agentlauncher_bin)
-                copyfile(agentlauncher_bin_local_path, agentlauncher_bin)
-                os.chmod(agentlauncher_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
-
-        else:
-            # No previous binary exist, simply copy it and make it executable
-            copyfile(agentlauncher_bin_local_path, agentlauncher_bin)
-            os.chmod(agentlauncher_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
-
+    compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
+    
 def install():
     """
     Ensure that this VM distro and version are supported.
