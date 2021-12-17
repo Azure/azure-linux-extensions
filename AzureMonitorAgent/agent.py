@@ -800,8 +800,9 @@ def metrics_watcher(hutil_error, hutil_log):
                         restart_pa()
                         last_crc_fluent = crc_fluent
             else:
-                restart_pa()
-                last_crc_fluent = None
+                if last_crc_fluent != None:
+                    restart_pa()
+                    last_crc_fluent = None
 
             if os.path.isfile(MdsdCounterJsonPath):
                 f = open(MdsdCounterJsonPath, "r")
