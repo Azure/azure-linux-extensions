@@ -109,6 +109,7 @@ InitialRetrySleepSeconds = 30
 PackageManager = ''
 PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
+FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 
 # Commands
 AMAInstallCommand = ''
@@ -599,15 +600,8 @@ def enable():
 
     service_name = get_service_name()
 
-    # start PA and agent launcher
-    hutil_log_info('Handler initiating PA and agent launcher')
-    if not is_systemd():
-        exit_code, output = run_command_and_log('/etc/init.d/azuremonitor-pipelineagent restart')
-        exit_code, output = run_command_and_log('/etc/init.d/azuremonitor-agentlauncher restart')
-    else:
-        exit_code, output = run_command_and_log('systemctl restart azuremonitor-pipelineagent && systemctl enable azuremonitor-pipelineagent')
-        exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
-
+    restart_pa()
+    
     # Start and enable systemd services so they are started after system reboot.
     AMAServiceStartCommand = 'systemctl restart {0} && systemctl enable {0}'.format(service_name)
     AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
@@ -644,13 +638,9 @@ def disable():
 
     # stop PA and agent launcher
     hutil_log_info('Handler initiating PA and agent launcher')
-    if not is_systemd():
-        exit_code, output = run_command_and_log('/etc/init.d/azuremonitor-pipelineagent stop')
-        exit_code, output = run_command_and_log('/etc/init.d/azuremonitor-agentlauncher stop')
-    else:
+    if is_systemd():
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-pipelineagent && systemctl disable azuremonitor-pipelineagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
-
 
     # Stop and disable systemd services so they are not started after system reboot.
     AMAServiceStopCommand = 'systemctl stop {0} && systemctl disable {0}'.format(service_name)
@@ -676,6 +666,13 @@ def update():
     """
 
     return 0, ""
+
+def restart_pa():
+    # start PA and agent launcher
+    hutil_log_info('Handler initiating PA and agent launcher')
+    if is_systemd():       
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-pipelineagent && systemctl enable azuremonitor-pipelineagent')
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
 def get_managed_identity():
     """
@@ -787,10 +784,25 @@ def metrics_watcher(hutil_error, hutil_log):
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
     last_crc = None
+    last_crc_fluent = None
     me_msi_token_expiry_epoch = None
 
     while True:
         try:
+            if os.path.isfile(FluentCfgPath):
+                f = open(FluentCfgPath, "r")
+                data = f.read()
+
+                if (data != ''):
+                    crc_fluent = hashlib.sha256(data.encode('utf-8')).hexdigest()
+
+                    if (crc_fluent != last_crc_fluent):
+                        restart_pa()
+                        last_crc_fluent = crc_fluent
+            else:
+                restart_pa()
+                last_crc_fluent = None
+
             if os.path.isfile(MdsdCounterJsonPath):
                 f = open(MdsdCounterJsonPath, "r")
                 data = f.read()
