@@ -601,6 +601,7 @@ def enable():
     service_name = get_service_name()
 
     restart_pa()
+    restart_launcher()
     
     # Start and enable systemd services so they are started after system reboot.
     AMAServiceStartCommand = 'systemctl restart {0} && systemctl enable {0}'.format(service_name)
@@ -669,9 +670,14 @@ def update():
 
 def restart_pa():
     # start PA and agent launcher
-    hutil_log_info('Handler initiating PA and agent launcher')
+    hutil_log_info('Handler initiating PA')
     if is_systemd():       
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-pipelineagent && systemctl enable azuremonitor-pipelineagent')
+
+def restart_launcher():
+    # start PA and agent launcher
+    hutil_log_info('Handler initiating agent launcher')
+    if is_systemd():       
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
 def get_managed_identity():
@@ -797,11 +803,11 @@ def metrics_watcher(hutil_error, hutil_log):
                     crc_fluent = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
                     if (crc_fluent != last_crc_fluent):
-                        restart_pa()
+                        restart_launcher()
                         last_crc_fluent = crc_fluent
             else:
                 if last_crc_fluent != None:
-                    restart_pa()
+                    restart_launcher()
                     last_crc_fluent = None
 
             if os.path.isfile(MdsdCounterJsonPath):
