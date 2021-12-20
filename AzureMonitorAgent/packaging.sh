@@ -33,12 +33,14 @@ cp -r  ../LAD-AMA-Common/telegraf_utils .
 cp -r  ../Diagnostic/services .
 
 # cleanup packages, ext
-rm -rf packages MetricsExtensionBin ext/future
-mkdir -p packages MetricsExtensionBin ext/future
+rm -rf packages MetricsExtensionBin ext/future pipelineAgentBin agentLauncherBin
+mkdir -p packages MetricsExtensionBin ext/future pipelineAgentBin agentLauncherBin
 
 # copy shell bundle to packages/
 cp $input_path/azuremonitoragent_$AGENT_VERSION* packages/
 cp $input_path/MetricsExtension MetricsExtensionBin/
+cp $input_path/pipelineagent pipelineAgentBin/
+cp $input_path/agentlauncher agentLauncherBin/
 
 # copy just the source of python-future
 cp -r ext/python-future/src/* ext/future

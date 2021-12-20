@@ -109,6 +109,7 @@ InitialRetrySleepSeconds = 30
 PackageManager = ''
 PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
+FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 
 # Commands
 AMAInstallCommand = ''
@@ -256,6 +257,35 @@ def check_kill_process(pstring):
         pid = fields[0]
         os.kill(int(pid), signal.SIGKILL)
 
+def compare_and_copy_bin(src, dest):
+    # Check if previous file exist at the location, compare the two binaries,
+    # If the files are not same, remove the older file, and copy the new one
+    # If they are the same, then we ignore it and don't copy
+    if os.path.isfile(src ):
+        if os.path.isfile(dest):
+            if not filecmp.cmp(src, dest):
+                # Removing the file in case it is already being run in a process,
+                # in which case we can get an error "text file busy" while copying
+                os.remove(dest)
+                copyfile(src, dest)
+
+        else:
+            # No previous binary exist, simply copy it and make it executable
+            copyfile(src, dest)
+        
+        os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
+
+def copy_pa_binaries():
+    pa_bin_local_path = os.getcwd() + "/pipelineAgentBin/pipelineagent"
+    pa_bin = "/opt/microsoft/azuremonitoragent/bin/pipelineagent" 
+
+    compare_and_copy_bin(pa_bin_local_path, pa_bin)
+                  
+    agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
+    agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
+
+    compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
+    
 def install():
     """
     Ensure that this VM distro and version are supported.
@@ -289,6 +319,9 @@ def install():
     exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_locked,
                                          final_check = final_check_if_dpkg_locked)
+
+    # Copy the PA and agentlauncher binaries
+    copy_pa_binaries()
 
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
@@ -384,6 +417,9 @@ def enable():
         return 0, ""
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         default_configs["ENABLE_MCS"] = "true"
+        default_configs["PA_GIG_BRIDGE_MODE"] = "true"
+        # this port will be dynamic in future
+        default_configs["PA_FLUENT_SOCKET_PORT"] = "13000"
 
         # fetch proxy settings
         if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
@@ -553,6 +589,9 @@ def enable():
 
     service_name = get_service_name()
 
+    restart_pa()
+    restart_launcher()
+    
     # Start and enable systemd services so they are started after system reboot.
     AMAServiceStartCommand = 'systemctl restart {0} && systemctl enable {0}'.format(service_name)
     AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
@@ -587,6 +626,12 @@ def disable():
 
     service_name = get_service_name()
 
+    # stop PA and agent launcher
+    hutil_log_info('Handler initiating PA and agent launcher')
+    if is_systemd():
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-pipelineagent && systemctl disable azuremonitor-pipelineagent')
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+
     # Stop and disable systemd services so they are not started after system reboot.
     AMAServiceStopCommand = 'systemctl stop {0} && systemctl disable {0}'.format(service_name)
     AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
@@ -611,6 +656,18 @@ def update():
     """
 
     return 0, ""
+
+def restart_pa():
+    # start PA and agent launcher
+    hutil_log_info('Handler initiating PA')
+    if is_systemd():       
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-pipelineagent && systemctl enable azuremonitor-pipelineagent')
+
+def restart_launcher():
+    # start PA and agent launcher
+    hutil_log_info('Handler initiating agent launcher')
+    if is_systemd():       
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
 def get_managed_identity():
     """
@@ -722,10 +779,22 @@ def metrics_watcher(hutil_error, hutil_log):
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
     last_crc = None
+    last_crc_fluent = None
     me_msi_token_expiry_epoch = None
 
     while True:
         try:
+            if os.path.isfile(FluentCfgPath):
+                f = open(FluentCfgPath, "r")
+                data = f.read()
+
+                if (data != ''):
+                    crc_fluent = hashlib.sha256(data.encode('utf-8')).hexdigest()
+
+                    if (crc_fluent != last_crc_fluent):
+                        restart_launcher()
+                        last_crc_fluent = crc_fluent
+           
             if os.path.isfile(MdsdCounterJsonPath):
                 f = open(MdsdCounterJsonPath, "r")
                 data = f.read()
