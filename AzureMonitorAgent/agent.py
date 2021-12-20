@@ -418,6 +418,7 @@ def enable():
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         default_configs["ENABLE_MCS"] = "true"
         default_configs["PA_GIG_BRIDGE_MODE"] = "true"
+        # this port will be dynamic in future
         default_configs["PA_FLUENT_SOCKET_PORT"] = "13000"
 
         # fetch proxy settings
