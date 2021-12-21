@@ -631,6 +631,8 @@ def disable():
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-pipelineagent && systemctl disable azuremonitor-pipelineagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+        # in case AL is not cleaning up properly
+        check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
 
     # Stop and disable systemd services so they are not started after system reboot.
     AMAServiceStopCommand = 'systemctl stop {0} && systemctl disable {0}'.format(service_name)
@@ -667,6 +669,9 @@ def restart_launcher():
     # start PA and agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():       
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+        # in case AL is not cleaning up properly
+        check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')    
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
 def get_managed_identity():
