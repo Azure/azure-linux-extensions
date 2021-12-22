@@ -109,6 +109,9 @@ InitialRetrySleepSeconds = 30
 PackageManager = ''
 PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
+VarDirectory = '/var/opt/microsoft/azuremonitoragent'
+EtcDirectory = '/etc/opt/microsoft/azuremonitoragent'
+CacheDirectory = os.path.join(os.getcwd(), 'upgrade_cache')
 
 # Commands
 AMAInstallCommand = ''
@@ -227,7 +230,7 @@ def check_disk_space_availability():
         else:
             return 0
     except:
-        print('Failed to check disk usage.')
+        hutil_log_error('Failed to check disk usage.')
         return 0
 
 def get_free_space_mb(dirname):
@@ -277,6 +280,17 @@ def install():
             insserv_exit_code, insserv_output = run_command_and_log("zypper --non-interactive install insserv-compat")
             if insserv_exit_code != 0:
                 return insserv_exit_code, insserv_output
+
+    # Copy any AMA /var and /etc contents cached prior to update
+    try:
+        shutil.move(EtcDirectory, os.path.join(CacheDirectory, EtcDirectory))
+        shutil.move(VarDirectory, os.path.join(CacheDirectory, VarDirectory))
+        shutil.rmtree(CacheDirectory)
+    except FileNotFoundError as e:
+        # This may be a clean install; safe to ignore
+        pass
+    except Exception as e:
+        log_and_exit('Update', GenericErrorCode, 'Failed to back up AMA content under /etc and /var. Exception={0}'.format(e))
 
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
@@ -381,7 +395,6 @@ def enable():
     # Decide the mode
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detecting Auto-Config mode.")
-        return 0, ""
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         default_configs["ENABLE_MCS"] = "true"
 
@@ -564,7 +577,7 @@ def enable():
     hutil_log_info('Handler initiating onboarding.')
     exit_code, output = run_command_and_log(AMAServiceStartCommand)
 
-    if exit_code == 0:
+    if exit_code == 0 and "ENABLE_MCS" in default_configs:
         # start metrics process if enable is successful
         start_metrics_process()
         HUtilObject.save_seq()
@@ -606,9 +619,18 @@ def disable():
 def update():
     """
     Update the current installation of AzureMonitorLinuxAgent
-    No logic to install the agent as agent -> install() will be called
-    with update because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
+    No install logic to here since in HandlerManifest, upgradeMode = "UpgradeWithInstall"
+    Rather, use this function to cache any AMA content from /etc or /var (such as persisted events)
     """
+    try:
+        shutil.rmtree(CacheDirectory)
+        os.mkdir(CacheDirectory)
+        shutil.move(EtcDirectory, os.path.join(CacheDirectory, EtcDirectory))
+        shutil.move(VarDirectory, os.path.join(CacheDirectory, VarDirectory))
+    except Exception as e:
+        # Don't report a failure, 
+        hutil_log_error('Failed to back up AMA content under /etc and /var. Exception={0}'.format(e))
+        # return GenericErrorCode, 'Failed to back up AMA content under /etc and /var. Exception={0}'.format(e)
 
     return 0, ""
 
