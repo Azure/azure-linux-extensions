@@ -414,7 +414,6 @@ def enable():
     # Decide the mode
     if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detecting Auto-Config mode.")
-        return 0, ""
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         default_configs["ENABLE_MCS"] = "true"
         default_configs["PA_GIG_BRIDGE_MODE"] = "true"
@@ -589,9 +588,10 @@ def enable():
 
     service_name = get_service_name()
 
-    restart_pa()
-    restart_launcher()
-    
+    if "ENABLE_MCS" in default_configs:
+        restart_pa()
+        restart_launcher()
+
     # Start and enable systemd services so they are started after system reboot.
     AMAServiceStartCommand = 'systemctl restart {0} && systemctl enable {0}'.format(service_name)
     AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
@@ -604,9 +604,11 @@ def enable():
     exit_code, output = run_command_and_log(AMAServiceStartCommand)
 
     if exit_code == 0:
-        # start metrics process if enable is successful
-        start_metrics_process()
         HUtilObject.save_seq()
+
+        if "ENABLE_MCS" in default_configs:
+            # start metrics process if enable is successful
+            start_metrics_process()
     else:
         status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
         if status_exit_code != 0:
