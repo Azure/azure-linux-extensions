@@ -568,10 +568,9 @@ def enable():
             new_config = "\n".join(["export {0}={1}".format(key, value) for key, value in default_configs.items()]) + "\n"
 
             with open(temp_config_file, "w") as f:
-                wrote_len = f.write(new_config)
-                config_updated = True if wrote_len is not None and wrote_len > 0 else False
+                f.write(new_config)
 
-            if not config_updated or not os.path.isfile(temp_config_file):
+            if not os.path.isfile(temp_config_file):
                 log_and_exit("Enable", GenericErrorCode, "Error while updating environment variables in {0}".format(config_file))
 
             os.remove(config_file)
