@@ -262,6 +262,7 @@ def install():
     global AMAInstallCommand
 
     find_package_manager("Install")
+    set_os_arch()
     exit_if_vm_not_supported('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
@@ -955,6 +956,15 @@ def parse_context(operation):
                               '{0}'.format(e))
             raise ParameterMissingException
     return hutil
+
+def set_os_arch():
+    """
+    Checks if the system is x86 or aarch64 based and replaces package name 
+    from *x86_64 to *aarch64 accordingly
+    """
+    if platform.machine() == 'aarch64':
+        BundleFileName = BundleFileName.replace('x86_64','aarch64')
+
 
 
 def find_package_manager(operation):
