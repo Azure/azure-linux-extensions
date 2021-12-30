@@ -962,6 +962,8 @@ def set_os_arch():
     Checks if the system is x86 or aarch64 based and replaces package name 
     from *x86_64 to *aarch64 accordingly
     """
+    global BundleFileName
+    
     if platform.machine() == 'aarch64':
         BundleFileName = BundleFileName.replace('x86_64','aarch64')
 
