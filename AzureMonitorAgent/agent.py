@@ -963,11 +963,9 @@ def set_os_arch():
     from *x86_64 to *aarch64 accordingly
     """
     global BundleFileName
-    
+
     if platform.machine() == 'aarch64':
         BundleFileName = BundleFileName.replace('x86_64','aarch64')
-
-
 
 def find_package_manager(operation):
     """
