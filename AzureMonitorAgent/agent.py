@@ -109,6 +109,8 @@ PackageManager = ''
 PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
 
+SupportedArch = set(['x86_64', 'aarch64'])
+
 # Commands
 AMAInstallCommand = ''
 AMAUninstallCommand = ''
@@ -959,13 +961,14 @@ def parse_context(operation):
 
 def set_os_arch():
     """
-    Checks if the system is x86 or aarch64 based and replaces package name 
-    from *x86_64 to *aarch64 accordingly
+    Checks if the current system architecture is present in the SupportedArch set and replaces 
+    the package name accordingly
     """
-    global BundleFileName
+    global BundleFileName, SupportedArch
+    current_arch = platform.machine()
 
-    if platform.machine() == 'aarch64':
-        BundleFileName = BundleFileName.replace('x86_64','aarch64')
+    if current_arch in SupportedArch:
+        BundleFileName = BundleFileName.replace('x86_64', current_arch)
 
 def find_package_manager(operation):
     """
