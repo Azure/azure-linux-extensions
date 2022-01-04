@@ -99,8 +99,8 @@ class PatchBootSystemState(OSEncryptionState):
             super(PatchBootSystemState, self).should_exit()
 
             self.context.hutil.do_status_report(operation='EnableEncryptionOSVolume',
-                                                status=CommonVariables.extension_error_status,
-                                                status_code=CommonVariables.encryption_failed,
+                                                status=CommonVariables.extension_transitioning_status,
+                                                status_code=CommonVariables.success,
                                                 message="Restarting vm after patching")
 
             # the restarted vm shall see the marker and advance the state machine

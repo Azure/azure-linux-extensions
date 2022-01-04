@@ -82,24 +82,34 @@ class OnlineEncryptionHandler:
         
         device_mapper_path = os.path.join(CommonVariables.dev_mapper_root, mapper_name)
 
-        if crypt_item_to_update.mount_point != "None":
-            disk_util.mount_filesystem(device_mapper_path, crypt_item_to_update.mount_point)
-            backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
-            update_crypt_item_result = crypt_mount_config_util.add_crypt_item(crypt_item_to_update, backup_folder)
-        else:
-            logger.log("the crypt_item_to_update.mount_point is None, so we do not mount it.")
-            update_crypt_item_result = crypt_mount_config_util.add_crypt_item(crypt_item_to_update)
-
-        if not update_crypt_item_result:
-            self.logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
-
         if mount_point:
             self.logger.log(msg="removing entry for unencrypted drive from fstab", level=CommonVariables.InfoLevel)
             crypt_mount_config_util.modify_fstab_entry_encrypt(mount_point, device_mapper_path)
         else:
             self.logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update", level=CommonVariables.InfoLevel)
 
+        if crypt_item_to_update.mount_point != "None":
+            disk_util.mount_filesystem(device_mapper_path, crypt_item_to_update.mount_point)
+            backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
+            update_crypt_item_result = crypt_mount_config_util.add_crypt_item(crypt_item_to_update, backup_folder)
+        else:
+            self.logger.log("the crypt_item_to_update.mount_point is None, so we do not mount it.")
+            update_crypt_item_result = crypt_mount_config_util.add_crypt_item(crypt_item_to_update)
+
+        if not update_crypt_item_result:
+            self.logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
+
         return crypt_item_to_update
+
+    def get_device_items_for_resume(self, crypt_mount_config_util, disk_util):
+        crypt_items = crypt_mount_config_util.get_crypt_items()
+        for crypt_item in crypt_items:
+            self.logger.log("Checking if device {0} needs resume encryption.".format(crypt_item.dev_path))
+            if disk_util.luks_check_reencryption(crypt_item.dev_path, crypt_item.luks_header_path):
+                self.logger.log("Device {0} needs resume encryption.".format(crypt_item.dev_path))
+                self.devices.put(OnlineEncryptionItem(crypt_item, crypt_item.keyfile_path))
+        return self.devices.qsize()
+
 
     def get_online_encryption_item(self, queue_lock, log_lock):
         online_encryption_item = None

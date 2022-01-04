@@ -132,6 +132,9 @@ class CommonVariables:
     EncryptionVolumeTypeKey = 'VolumeType'
     EncryptionDiskFormatQueryKey = 'DiskFormatQuery'
     EncryptionModeKey = 'EncryptionMode'
+    EncryptionPhaseKey = 'EncryptionPhase'
+    EncryptionModeOnline = 'Online'
+    EncryptionPhaseResume = 'Resume'
 
     """
     crypt ongoing item config keys
@@ -270,6 +273,7 @@ class CryptItem(object):
         self.luks_header_path = None
         self.uses_cleartext_key = None
         self.current_luks_slot = None
+        self.keyfile_path = None
 
     def __str__(self):
         return ("name: " + str(self.mapper_name) + " dev_path:" + str(self.dev_path) +

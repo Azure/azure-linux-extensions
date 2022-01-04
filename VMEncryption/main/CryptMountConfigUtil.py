@@ -70,6 +70,7 @@ class CryptMountConfigUtil(object):
         keyfile_path = crypttab_parts[2]
         if CommonVariables.encryption_key_file_name not in keyfile_path and self.encryption_environment.cleartext_key_base_path not in keyfile_path:
             return None  # if the key_file path doesn't have the encryption key file name, its probably not for us to mess with
+        crypt_item.keyfile_path = keyfile_path
         if self.encryption_environment.cleartext_key_base_path in keyfile_path:
             crypt_item.uses_cleartext_key = True
         crypttab_option_string = crypttab_parts[3]
