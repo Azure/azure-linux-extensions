@@ -111,6 +111,8 @@ PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 
+SupportedArch = set(['x86_64', 'aarch64'])
+
 # Commands
 AMAInstallCommand = ''
 AMAUninstallCommand = ''
@@ -296,6 +298,7 @@ def install():
     global AMAInstallCommand
 
     find_package_manager("Install")
+    set_os_arch()
     exit_if_vm_not_supported('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
@@ -999,6 +1002,16 @@ def parse_context(operation):
             raise ParameterMissingException
     return hutil
 
+def set_os_arch():
+    """
+    Checks if the current system architecture is present in the SupportedArch set and replaces 
+    the package name accordingly
+    """
+    global BundleFileName, SupportedArch
+    current_arch = platform.machine()
+
+    if current_arch in SupportedArch:
+        BundleFileName = BundleFileName.replace('x86_64', current_arch)
 
 def find_package_manager(operation):
     """
