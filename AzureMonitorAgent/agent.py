@@ -389,6 +389,10 @@ def enable():
     """
     global AMAServiceStartCommand, AMAServiceStatusCommand
 
+    # start the metrics process if its not already running
+    if (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+        start_metrics_process()        
+
     if HUtilObject:
         if HUtilObject.is_seq_smaller():
             hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable")
@@ -607,10 +611,6 @@ def enable():
 
     if exit_code == 0:
         HUtilObject.save_seq()
-
-        if "ENABLE_MCS" in default_configs:
-            # start metrics process if enable is successful
-            start_metrics_process()
     else:
         status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
         if status_exit_code != 0:
@@ -758,19 +758,38 @@ def stop_metrics_process():
 
         run_command_and_log("rm "+pids_filepath)
 
+def is_metrics_process_running():
+    pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA metrics watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
+                            return True
+
+    return False
+
 def start_metrics_process():
     """
     Start metrics process that performs periodic monitoring activities
     :return: None
     """
-    stop_metrics_process()
 
-    # Start metrics watcher
-    ama_path = os.path.join(os.getcwd(), 'agent.py')
-    args = [sys.executable, ama_path, '-metrics']
-    log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-    hutil_log_info('start watcher process '+str(args))
-    subprocess.Popen(args, stdout=log, stderr=log)
+    # if metrics process is already running, it should manage lifecycle of telegraf, ME, 
+    # process to refresh ME MSI token and look for new config changes if counters change, etc, so this is no-op
+    if not is_metrics_process_running():
+        stop_metrics_process()
+
+        # Start metrics watcher
+        ama_path = os.path.join(os.getcwd(), 'agent.py')
+        args = [sys.executable, ama_path, '-metrics']
+        log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+        hutil_log_info('start watcher process '+str(args))
+        subprocess.Popen(args, stdout=log, stderr=log)
 
 def metrics_watcher(hutil_error, hutil_log):
     """
