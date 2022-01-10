@@ -390,6 +390,8 @@ def enable():
     global AMAServiceStartCommand, AMAServiceStatusCommand
 
     # start the metrics process if its not already running
+    public_settings, protected_settings = get_settings()
+
     if (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         start_metrics_process()        
 
@@ -399,8 +401,6 @@ def enable():
             return 0, ""
 
     exit_if_vm_not_supported('Enable')
-
-    public_settings, protected_settings = get_settings()
 
     # Use an Ordered Dictionary to ensure MDSD_OPTIONS (and other dependent variables) are written after their dependencies
     default_configs = OrderedDict([
