@@ -1,7 +1,10 @@
-from queue import Queue
 import uuid
 import os
 import threading
+try:
+    from queue import Queue # Python 3
+except ImportError:
+    from Queue import Queue # Python 2
 
 from DiskUtil import DiskUtil
 from CryptMountConfigUtil import CryptMountConfigUtil
