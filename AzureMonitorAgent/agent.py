@@ -278,8 +278,8 @@ def compare_and_copy_bin(src, dest):
         os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
 
 def copy_pa_binaries():
-    pa_bin_local_path = os.getcwd() + "/pipelineAgentBin/pipelineagent"
-    pa_bin = "/opt/microsoft/azuremonitoragent/bin/pipelineagent" 
+    pa_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
+    pa_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent" 
 
     compare_and_copy_bin(pa_bin_local_path, pa_bin)
                   
@@ -633,7 +633,7 @@ def disable():
     # stop PA and agent launcher
     hutil_log_info('Handler initiating PA and agent launcher')
     if is_systemd():
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-pipelineagent && systemctl disable azuremonitor-pipelineagent')
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
         # in case AL is not cleaning up properly
         check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
@@ -667,7 +667,7 @@ def restart_pa():
     # start PA and agent launcher
     hutil_log_info('Handler initiating PA')
     if is_systemd():       
-        exit_code, output = run_command_and_log('systemctl restart azuremonitor-pipelineagent && systemctl enable azuremonitor-pipelineagent')
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
 
 def restart_launcher():
     # start PA and agent launcher
