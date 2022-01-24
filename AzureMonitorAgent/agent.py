@@ -125,7 +125,7 @@ GenericErrorCode = 1
 UnsupportedOperatingSystem = 51
 IndeterminateOperatingSystem = 51
 MissingorInvalidParameterErrorCode = 53
-DPKGLockedErrorCode = 56
+DPKGOrRPMLockedErrorCode = 56
 
 # Configuration
 HUtilObject = None
@@ -198,10 +198,10 @@ def main():
                       'dependencies are installed. For details, check logs ' \
                       'in /var/log/azure/Microsoft.Azure.Monitor' \
                       '.AzureMonitorLinuxAgent'
-        elif exit_code is DPKGLockedErrorCode and operation == 'Install':
+        elif exit_code is DPKGOrRPMLockedErrorCode and operation == 'Install':
             message = 'Install failed with exit code {0} because the ' \
                       'package manager on the VM is currently locked: ' \
-                      'please wait and try again'.format(DPKGLockedErrorCode)
+                      'please wait and try again'.format(DPKGOrRPMLockedErrorCode)
         elif exit_code != 0:
             message = '{0} failed with exit code {1} {2}'.format(operation,
                                                              exit_code, output)
@@ -320,8 +320,8 @@ def install():
 
     # Retry, since install can fail due to concurrent package operations
     exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
-                                         retry_check = retry_if_dpkg_locked,
-                                         final_check = final_check_if_dpkg_locked)
+                                         retry_check = retry_if_dpkg_or_rpm_locked,
+                                         final_check = final_check_if_dpkg_or_rpm_locked)
 
     # Copy the PA and agentlauncher binaries
     copy_pa_binaries()
@@ -372,8 +372,8 @@ def uninstall():
     # Retry, since uninstall can fail due to concurrent package operations
     try:
         exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
-                                            retry_check = retry_if_dpkg_locked,
-                                            final_check = final_check_if_dpkg_locked)
+                                            retry_check = retry_if_dpkg_or_rpm_locked,
+                                            final_check = final_check_if_dpkg_or_rpm_locked)
     except Exception as ex:
         exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
@@ -1333,7 +1333,7 @@ def run_command_with_retries_output(cmd, retries, retry_check, final_check = Non
     return exit_code, output
 
 
-def is_dpkg_locked(exit_code, output):
+def is_dpkg_or_rpm_locked(exit_code, output):
     """
     If dpkg is locked, the output will contain a message similar to 'dpkg
     status database is locked by another process'
@@ -1343,34 +1343,39 @@ def is_dpkg_locked(exit_code, output):
         dpkg_locked_re = re.compile(dpkg_locked_search, re.M)
         if dpkg_locked_re.search(output):
             return True
+
+        rpm_locked_search = r'^.*rpm.+lock.*$'
+        rpm_locked_re = re.compile(rpm_locked_search, re.M)
+        if rpm_locked_re.search(output):
+            return True
     return False
 
 
-def retry_if_dpkg_locked(exit_code, output):
+def retry_if_dpkg_or_rpm_locked(exit_code, output):
     """
     Some commands fail because the package manager is locked (apt-get/dpkg
     only); this will allow retries on failing commands.
     """
     retry_verbosely = False
-    dpkg_locked = is_dpkg_locked(exit_code, output)
+    dpkg_or_rpm_locked = is_dpkg_or_rpm_locked(exit_code, output)
     apt_get_exit_code, apt_get_output = run_get_output('which apt-get',
                                                        chk_err = False,
                                                        log_cmd = False)
-    if dpkg_locked:
+    if dpkg_or_rpm_locked:
         return True, 'Retrying command because package manager is locked.', \
                retry_verbosely
     else:
         return False, '', False
 
 
-def final_check_if_dpkg_locked(exit_code, output):
+def final_check_if_dpkg_or_rpm_locked(exit_code, output):
     """
-    If dpkg is still locked after the retries, we want to return a specific
+    If dpkg or rpm is still locked after the retries, we want to return a specific
     error code
     """
-    dpkg_locked = is_dpkg_locked(exit_code, output)
-    if dpkg_locked:
-        exit_code = DPKGLockedErrorCode
+    dpkg_or_rpm_locked = is_dpkg_or_rpm_locked(exit_code, output)
+    if dpkg_or_rpm_locked:
+        exit_code = DPKGOrRPMLockedErrorCode
     return exit_code
 
 
