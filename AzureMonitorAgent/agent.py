@@ -393,12 +393,7 @@ def enable():
     public_settings, protected_settings = get_settings()
 
     if (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
-        start_metrics_process()        
-
-    if HUtilObject:
-        if HUtilObject.is_seq_smaller():
-            hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable")
-            return 0, ""
+        start_metrics_process()
 
     exit_if_vm_not_supported('Enable')
 
@@ -591,6 +586,13 @@ def enable():
             log_and_exit("Enable", GenericErrorCode, "Could not find the file {0}".format(config_file))
     except Exception as e:
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
+
+    # Only restart AMA if we got new settings. But don't skip the above defaults content generation; otherwise, upon upgrading,
+    # the defaults content will be wiped but not regenerated (since sequence number does not increment with upgrade).
+    if HUtilObject:
+        if HUtilObject.is_seq_smaller():
+            hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable")
+            return 0, ""
 
     service_name = get_service_name()
 
