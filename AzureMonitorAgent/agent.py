@@ -117,6 +117,7 @@ SupportedArch = set(['x86_64', 'aarch64'])
 AMAInstallCommand = ''
 AMAUninstallCommand = ''
 AMAServiceStartCommand = ''
+AMAServiceRestartCommand = ''
 AMAServiceStopCommand = ''
 AMAServiceStatusCommand = ''
 
@@ -387,18 +388,13 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
-    global AMAServiceStartCommand, AMAServiceStatusCommand
+    global AMAServiceStartCommand, AMAServiceRestartCommand, AMAServiceStatusCommand
 
     # start the metrics process if its not already running
     public_settings, protected_settings = get_settings()
 
     if (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
-        start_metrics_process()        
-
-    if HUtilObject:
-        if HUtilObject.is_seq_smaller():
-            hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the sequence number of the most recent executed configuration. Skipping enable")
-            return 0, ""
+        start_metrics_process()
 
     exit_if_vm_not_supported('Enable')
 
@@ -599,15 +595,25 @@ def enable():
         restart_launcher()
 
     # Start and enable systemd services so they are started after system reboot.
-    AMAServiceStartCommand = 'systemctl restart {0} && systemctl enable {0}'.format(service_name)
+    AMAServiceStartCommand = 'systemctl start {0} && systemctl enable {0}'.format(service_name)
+    AMAServiceRestartCommand = 'systemctl restart {0} && systemctl enable {0}'.format(service_name)
     AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
     if not is_systemd():
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service_name))
-        AMAServiceStartCommand = '/etc/init.d/{0} restart'.format(service_name)
+        AMAServiceStartCommand = '/etc/init.d/{0} start'.format(service_name)
+        AMAServiceRestartCommand = '/etc/init.d/{0} restart'.format(service_name)
         AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     hutil_log_info('Handler initiating onboarding.')
-    exit_code, output = run_command_and_log(AMAServiceStartCommand)
+
+    if HUtilObject and HUtilObject.is_seq_smaller():
+        # Either upgrade has just happened (in which case we need to start), or enable was called with no change to extension config
+        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the LKG sequence number. Starting agent only if it is not yet running.")
+        exit_code, output = run_command_and_log(AMAServiceStartCommand)
+    else:
+        # Either this is a clean install (in which case restart is effectively start), or extension config has changed
+        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is greater than the LKG sequence number. Restarting agent to pick up the new config.")
+        exit_code, output = run_command_and_log(AMAServiceRestartCommand)
 
     if exit_code == 0:
         HUtilObject.save_seq()
@@ -666,16 +672,16 @@ def update():
 def restart_pa():
     # start PA and agent launcher
     hutil_log_info('Handler initiating PA')
-    if is_systemd():       
-        exit_code, output = run_command_and_log('systemctl restart azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
+    if is_systemd():
+        exit_code, output = run_command_and_log('systemctl start azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
 
 def restart_launcher():
     # start PA and agent launcher
     hutil_log_info('Handler initiating agent launcher')
-    if is_systemd():       
+    if is_systemd():
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
         # in case AL is not cleaning up properly
-        check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')    
+        check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
 def get_managed_identity():
