@@ -115,6 +115,7 @@ def init_distro_specific_actions():
             except:
                 raise
 
+        hutil.log("os version: {0}:{1}".format(name.lower(), version))
         g_dist_config = DistroSpecific.get_distro_actions(name.lower(), version, hutil.log)
         RunGetOutput = g_dist_config.log_run_get_output
     except exceptions.LookupError as ex:
