@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-# This is the main driver file for AMA extension. This file first checks if Python 3 or 2 is available on the VM 
+# This is the main driver file for LAD 4 extension. This file first checks if Python 3 or 2 is available on the VM 
 # and if yes then uses that Python (if both are available then, default is set to python3) to run extension operations in agent.py
 # Control arguments passed to the shim are redirected to agent.py without validation.
 
-COMMAND="./agent.py"
+COMMAND="./diagnostic.py"
 PYTHON=""
 FUTURE_PATH=""
 ARG="$@"
@@ -19,11 +19,6 @@ function find_python() {
     elif command -v python2 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python2"
         eval ${future_path}="${PWD}/ext/future:"
-    elif command -v /usr/libexec/platform-python >/dev/null 2>&1 ; then
-        # If a user-installed python isn't available, check for a platform-python. This is typically only used in RHEL 8.0.
-        echo "User-installed python not found. Using /usr/libexec/platform-python as the python interpreter."
-        eval ${python_exec_command}="/usr/libexec/platform-python"
-        # do not set future_path; future seems to cause interference with preexisting packages in python 3 environment
     fi
 }
 
@@ -31,7 +26,7 @@ find_python PYTHON FUTURE_PATH
 
 if [ -z "$PYTHON" ] # If python is not installed, we will fail the install with the following error, requiring cx to have python pre-installed
 then
-    echo "No Python interpreter found, which is an AMA extension dependency. Please install Python 3, or Python 2 if the former is unavailable." >&2
+    echo "No Python interpreter found, which is a LAD 4 extension dependency. Please install Python 3, or Python 2 if the former is unavailable." >&2
     exit 52 # Missing Dependency
 else
     ${PYTHON} --version 2>&1

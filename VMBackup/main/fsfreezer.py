@@ -145,6 +145,7 @@ class FsFreezer:
         self.isAquireLockSucceeded = True
         self.getLockRetry = 0
         self.maxGetLockRetry = 5
+        self.safeFreezelockFile = None
 
     def should_skip(self, mount):
         if(self.resource_disk_mount_point is not None and mount.mount_point == self.resource_disk_mount_point):
@@ -201,21 +202,26 @@ class FsFreezer:
 
             while self.getLockRetry < self.maxGetLockRetry:
                 try:
+                    if not os.path.isdir('/etc/azure'):
+                        os.mkdir('/etc/azure')
                     if not os.path.isdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock'):
                         os.mkdir('/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock')
-                    file = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
+                    self.safeFreezelockFile = open("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile","w")
                     self.logger.log("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file opened Sucessfully",True)
                     try:
-                        fcntl.lockf(file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        #isAquiredLockSucceeded lock will only be false if there is a issue in taking lock.
+                        #For all other issue like faliure in creating file, not enough space in disk it will be true. so that we can proceed with the backup
+                        self.isAquireLockSucceeded = False  
+                        fcntl.lockf(self.safeFreezelockFile, fcntl.LOCK_EX | fcntl.LOCK_NB)
                         self.logger.log("Aquiring lock succeeded",True)
                         self.isAquireLockSucceeded = True
                         break
                     except Exception as ex:
-                        file.close()
+                        self.safeFreezelockFile.close()
+                        self.logger.log("Failed to aquire lock: %s, stack trace: %s" % (str(ex), traceback.format_exc()),True)
                         raise ex
                 except Exception as e:
-                    self.logger.log("Failed to open file or aquire lock:  "+ str(e),True)
-                    self.isAquireLockSucceeded = False
+                    self.logger.log("Failed to open file or aquire lock: %s, stack trace: %s" % (str(e), traceback.format_exc()),True)
                     self.getLockRetry= self.getLockRetry + 1
                     time.sleep(1)
                     if(self.getLockRetry == self.maxGetLockRetry - 1):
@@ -225,20 +231,10 @@ class FsFreezer:
             end_time = datetime.datetime.utcnow()
             self.logger.log("Wait time to aquire lock "+ str(end_time - start_time),True)
 
-            
-            sig_handle = None
+            # sig_handle = None
             if (self.isAquireLockSucceeded == True):
-                sig_handle=self.freeze_handler.startproc(args)
-                self.thaw_safe()
-                try:
-                    fcntl.lockf(file, fcntl.LOCK_UN)
-                    file.close()
-                except:
-                    pass
-            try:
-                os.remove("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile")
-            except:
-                pass
+                self.logger.log("Aquired Lock Successful")
+            sig_handle=self.freeze_handler.startproc(args)
 
             self.logger.log("freeze_safe after returning from startproc : sig_handle="+str(sig_handle))
             if(sig_handle != 1):
@@ -268,46 +264,63 @@ class FsFreezer:
             self.logger.log(error_msg, True, 'Error')
         return freeze_result,timedout
 
+    def releaseFileLock(self):
+        if (self.isAquireLockSucceeded == True):
+            try:
+                fcntl.lockf(self.safeFreezelockFile, fcntl.LOCK_UN)
+                self.safeFreezelockFile.close()
+            except Exception as e:
+                self.logger.log("Failed to unlock: %s, stack trace: %s" % (str(e), traceback.format_exc()),True)
+        try:
+            os.remove("/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile")
+        except Exception as e:
+            self.logger.log("Failed to delete /etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile file: %s, stack trace: %s" % (str(e), traceback.format_exc()),True)
+
     def thaw_safe(self):
-        thaw_result = FreezeResult()
+        thaw_result = None
         unable_to_sleep = False
-        if(self.skip_freeze == True):
-            return thaw_result, unable_to_sleep
-        if(self.freeze_handler.child is None):
-            self.logger.log("child already completed", True)
-            self.logger.log("****** 7. Error - Binary Process Already Completed", True)
-            error_msg = 'snapshot result inconsistent'
-            thaw_result.errors.append(error_msg)
-        elif(self.freeze_handler.child.poll() is None):
-            self.logger.log("child process still running")
-            self.logger.log("****** 7. Sending Thaw Signal to Binary")
-            self.freeze_handler.child.send_signal(signal.SIGUSR1)
-            for i in range(0,30):
-                if(self.freeze_handler.child.poll() is None):
-                    self.logger.log("child still running sigusr1 sent")
-                    time.sleep(1)
-                else:
-                    break
-            self.logger.enforce_local_flag(True)
-            self.log_binary_output()
-            if(self.freeze_handler.child.returncode!=0):
-                error_msg = 'snapshot result inconsistent as child returns with failure'
-                thaw_result.errors.append(error_msg)
-                self.logger.log(error_msg, True, 'Error')
-        else:
-            self.logger.log("Binary output after process end when no thaw sent: ", True)
-            if(self.freeze_handler.child.returncode==2):
-                error_msg = 'Unable to execute sleep'
-                thaw_result.errors.append(error_msg)
-                unable_to_sleep = True
-            else:
+        try:
+            thaw_result = FreezeResult()
+            if(self.skip_freeze == True):
+                return thaw_result, unable_to_sleep
+            if(self.freeze_handler.child is None):
+                self.logger.log("child already completed", True)
+                self.logger.log("****** 7. Error - Binary Process Already Completed", True)
                 error_msg = 'snapshot result inconsistent'
                 thaw_result.errors.append(error_msg)
-            self.logger.enforce_local_flag(True)
-            self.log_binary_output()
-            self.logger.log(error_msg, True, 'Error')
-        self.logger.enforce_local_flag(True)
+            elif(self.freeze_handler.child.poll() is None):
+                self.logger.log("child process still running")
+                self.logger.log("****** 7. Sending Thaw Signal to Binary")
+                self.freeze_handler.child.send_signal(signal.SIGUSR1)
+                for i in range(0,30):
+                    if(self.freeze_handler.child.poll() is None):
+                        self.logger.log("child still running sigusr1 sent")
+                        time.sleep(1)
+                    else:
+                        break
+                self.logger.enforce_local_flag(True)
+                self.log_binary_output()
+                if(self.freeze_handler.child.returncode!=0):
+                    error_msg = 'snapshot result inconsistent as child returns with failure'
+                    thaw_result.errors.append(error_msg)
+                    self.logger.log(error_msg, True, 'Error')
+            else:
+                self.logger.log("Binary output after process end when no thaw sent: ", True)
+                if(self.freeze_handler.child.returncode==2):
+                    error_msg = 'Unable to execute sleep'
+                    thaw_result.errors.append(error_msg)
+                    unable_to_sleep = True
+                else:
+                    error_msg = 'snapshot result inconsistent'
+                    thaw_result.errors.append(error_msg)
+                self.logger.enforce_local_flag(True)
+                self.log_binary_output()
+                self.logger.log(error_msg, True, 'Error')
+            self.logger.enforce_local_flag(True) 
+        finally:
+            self.releaseFileLock()
         return thaw_result, unable_to_sleep
+
 
     def log_binary_output(self):
         self.logger.log("============== Binary output traces start ================= ", True)

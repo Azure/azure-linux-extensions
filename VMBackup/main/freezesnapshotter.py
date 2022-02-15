@@ -54,7 +54,7 @@ class FreezeSnapshotter(object):
         if(para_parser.snapshotTaskToken == None):
             para_parser.snapshotTaskToken = '' #making snaoshot string empty when snapshotTaskToken is null
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
-        self.takeSnapshotFrom = CommonVariables.firstGuestThenHost
+        self.takeSnapshotFrom = CommonVariables.firstHostThenGuest
         self.isManaged = False
         self.taskId = self.para_parser.taskId
         self.hostIp = '168.63.129.16'
@@ -89,14 +89,13 @@ class FreezeSnapshotter(object):
                     self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
                 
                 if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
-                    if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True):
-                        self.logger.log('Some disks are excluded from backup. Setting the snapshot mode to onlyGuest.')
+                    if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True and (para_parser.includeLunList == None or para_parser.includeLunList.count == 0)):
+                        self.logger.log('Some disks are excluded from backup and LUN list is not present. Setting the snapshot mode to onlyGuest.')
                         self.takeSnapshotFrom = CommonVariables.onlyGuest
 
-                #Not hitting host when snapshot uri has special characters
+                #Check if snapshot uri has special characters
                 if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
-                    self.logger.log('Some disk blob Uris have special characters. Setting the snapshot mode to onlyGuest.')
-                    self.takeSnapshotFrom = CommonVariables.onlyGuest
+                    self.logger.log('Some disk blob Uris have special characters.')
                 
                 waDiskLunList= []
 
@@ -110,6 +109,16 @@ class FreezeSnapshotter(object):
                             self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
                             self.takeSnapshotFrom = CommonVariables.onlyHost
                             break
+
+                if(para_parser.includedDisks != None and CommonVariables.isAnyWADiskIncluded in para_parser.includedDisks.keys()):
+                    if (para_parser.includedDisks[CommonVariables.isAnyWADiskIncluded] == True):
+                        self.logger.log('WA disk is included. Setting the snapshot mode to onlyHost.')
+                        self.takeSnapshotFrom = CommonVariables.onlyHost
+
+                if(para_parser.includedDisks != None and CommonVariables.isVmgsBlobIncluded in para_parser.includedDisks.keys()):
+                    if (para_parser.includedDisks[CommonVariables.isVmgsBlobIncluded] == True):
+                        self.logger.log('Vmgs Blob is included. Setting the snapshot mode to onlyHost.')
+                        self.takeSnapshotFrom = CommonVariables.onlyHost
 
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
@@ -286,7 +295,15 @@ class FreezeSnapshotter(object):
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
 
-            if(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
+            if(self.para_parser is not None and self.is_command_timedout(self.para_parser) == True):
+                self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
+                run_result = CommonVariables.FailedGuestAgentInvokedCommandTooLate
+                run_status = 'error'
+                all_failed = True
+                all_snapshots_failed = True
+                self.logger.log('T:S takeSnapshotFromGuest : Thawing as failing due to CRP timeout', True, 'Error')
+                self.freezer.thaw_safe()
+            elif(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
                 HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.snapshotCreator, CommonVariables.guestExtension)
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
@@ -340,7 +357,7 @@ class FreezeSnapshotter(object):
         unable_to_sleep = False
         blob_snapshot_info_array = None
         snap_shotter = HostSnapshotter(self.logger, self.hostIp)
-        pre_snapshot_statuscode = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
+        pre_snapshot_statuscode, responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
 
         if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
@@ -366,7 +383,15 @@ class FreezeSnapshotter(object):
 
         if self.g_fsfreeze_on :
             run_result, run_status = self.freeze()
-        if(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
+
+        if(self.para_parser is not None and self.is_command_timedout(self.para_parser) == True):
+            self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
+            run_result = CommonVariables.FailedGuestAgentInvokedCommandTooLate
+            run_status = 'error'
+            all_failed = True
+            self.logger.log('T:S takeSnapshotFromOnlyHost : Thawing as failing due to CRP timeout', True, 'Error')
+            self.freezer.thaw_safe()
+        elif(run_result == CommonVariables.success or self.takeCrashConsistentSnapshot == True):
             snap_shotter = HostSnapshotter(self.logger, self.hostIp)
             self.logger.log('T:S doing snapshot now...')
             time_before_snapshot = datetime.datetime.now()
@@ -378,3 +403,46 @@ class FreezeSnapshotter(object):
             self.logger.log('T:S snapshotall ends...', True)
 
         return run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent
+
+    def is_command_timedout(self, para_parser):
+        result = False
+        dateTimeNow = datetime.datetime.utcnow()
+        try:
+            try:
+                snap_shotter = HostSnapshotter(self.logger, self.hostIp)
+                pre_snapshot_statuscode,responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
+                
+                if(int(pre_snapshot_statuscode) == 200 or int(pre_snapshot_statuscode) == 201) and (responseBody != None and responseBody != "") :
+                    resonse = json.loads(responseBody)
+                    dateTimeNow = datetime.datetime(resonse['responseTime']['year'], resonse['responseTime']['month'], resonse['responseTime']['day'], resonse['responseTime']['hour'], resonse['responseTime']['minute'], resonse['responseTime']['second'])
+                    self.logger.log('Date and time extracted from pre-snapshot request: '+ str(dateTimeNow))
+            except Exception as e:
+                self.logger.log('Error in getting Host time falling back to using system time. Exception %s, stack trace: %s' % (str(e), traceback.format_exc()))
+
+            if(para_parser is not None and para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
+                utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
+                self.logger.log('utcTicks in long format' + str(utcTicksLong))
+                commandStartTime = self.convert_time(utcTicksLong)
+                self.logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(dateTimeNow))
+                timespan = dateTimeNow - commandStartTime
+                MAX_TIMESPAN = 140 * 60 # in seconds
+                total_span_in_seconds = self.timedelta_total_seconds(timespan)
+                self.logger.log('timespan: ' + str(timespan) + ', total_span_in_seconds: ' + str(total_span_in_seconds) + ', MAX_TIMESPAN: ' + str(MAX_TIMESPAN))
+
+                if total_span_in_seconds > MAX_TIMESPAN :
+                    self.logger.log('CRP timeout limit has reached, should abort.')
+                    result = True
+        except Exception as e:
+            self.logger.log('T:S is_command_timedout : Exception %s, stack trace: %s' % (str(e), traceback.format_exc()))
+
+        return result
+
+    def convert_time(self, utcTicks):
+        return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
+
+    def timedelta_total_seconds(self, delta):
+        if not hasattr(datetime.timedelta, 'total_seconds'):
+            return delta.days * 86400 + delta.seconds
+        else:
+            return delta.total_seconds()
+

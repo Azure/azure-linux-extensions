@@ -260,6 +260,12 @@ class RedhatActions(CommonActions):
     def remove_lad_mdsd(self):
         return self.log_run_get_output('rpm -e lad-mdsd')
 
+class Redhat8Actions(RedhatActions):
+    def __init__(self, logger):
+        RedhatActions.__init__(self, logger)
+
+    def install_required_packages(self):
+        return self.install_extra_packages(('policycoreutils-python-utils', 'tar'), True)
 
 class Suse11Actions(RedhatActions):
     def __init__(self, logger):
@@ -323,6 +329,7 @@ DistroMap = {
     'ubuntu:16.04': Ubuntu1510OrHigherActions,
     'ubuntu:18.04': Ubuntu1510OrHigherActions,
     'redhat': RedhatActions,
+    'redhat:8': Redhat8Actions,
     'centos': CentosActions,
     'oracle': RedhatActions,
     'suse:12': Suse12Actions,
@@ -336,6 +343,11 @@ def get_distro_actions(name, version, logger):
     name_and_version = name + ":" + version
     if name_and_version in DistroMap:
         return DistroMap[name_and_version](logger)
-    elif name in DistroMap:
-        return DistroMap[name](logger)
+    else:
+        major_version = version.split(".")[0]
+        name_and_major_version = name + ":" + major_version
+        if name_and_major_version in DistroMap:
+            return DistroMap[name_and_major_version](logger)
+        if name in DistroMap:
+            return DistroMap[name](logger)
     raise exceptions.LookupError('{0} is not a supported distro'.format(name_and_version))

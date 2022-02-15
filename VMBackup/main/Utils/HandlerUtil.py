@@ -53,6 +53,7 @@ Example Status Report:
 
 import os
 import os.path
+import shlex
 import sys
 import re
 try:
@@ -167,13 +168,13 @@ class HandlerUtility:
                     pass
             else:
                 self._log(self._get_log_prefix() + message)
-            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.utcnow()) , level , message)
         self.log_message = self.log_message + message
 
     def log_py3(self, msg):
         if type(msg) is not str:
             msg = str(msg, errors="backslashreplace")
-        msg = str(datetime.datetime.now()) + " " + str(self._get_log_prefix()) + msg + "\n"
+        msg = str(datetime.datetime.utcnow()) + " " + str(self._get_log_prefix()) + msg + "\n"
         try:
             with open(self.logging_file, "a+") as C :
                 C.write(msg)
@@ -222,9 +223,9 @@ class HandlerUtility:
                 self.log('Config decoded correctly.')
         return config
 
-    def do_parse_context(self, operation):
+    def do_parse_context(self, operation, seqNo):
         self.operation = operation
-        _context = self.try_parse_context()
+        _context = self.try_parse_context(seqNo)
         getWaagentPathUsed = Utils.WAAgentUtil.GetPathUsed()
         if(getWaagentPathUsed == 0):
             self.log("waagent old path is used")
@@ -235,13 +236,14 @@ class HandlerUtility:
             sys.exit(0)
         return _context
 
-    def try_parse_context(self):
+    def try_parse_context(self, seqNo):
         self._context = HandlerContext(self._short_name)
         handler_env = None
         config = None
         ctxt = None
         code = 0
         try:
+            self.log('try_parse_context : Sequence Number received ' + str(seqNo))
             # get the HandlerEnvironment.json.  According to the extension handler
             # spec, it is always in the ./ directory
             self.log('cwd is ' + os.path.realpath(os.path.curdir))
@@ -271,12 +273,18 @@ class HandlerUtility:
             self._change_log_file()
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
-            self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
+            if seqNo != -1:
+                self._context._seq_no = seqNo
+            else:
+                self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
             if self._context._seq_no < 0:
                 self.error("Unable to locate a .settings file!")
                 return None
             self._context._seq_no = str(self._context._seq_no)
-            self.log('sequence number is ' + self._context._seq_no)
+            if seqNo != -1:
+                self.log('sequence number from environment varaible is ' + self._context._seq_no)
+            else:
+                self.log('sequence number based on config file-names is ' + self._context._seq_no)
             self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
             self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
             self.log("setting file path is" + self._context._settings_file)
@@ -417,7 +425,6 @@ class HandlerUtility:
 
     def get_total_used_size(self):
         try:
-            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
             '''
             Sample output of the df command
 
@@ -437,12 +444,7 @@ class HandlerUtility:
             //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
-            process_wait_time = 30
-            while(process_wait_time >0 and df.poll() is None):
-                time.sleep(1)
-                process_wait_time -= 1
-
-            output = df.stdout.read()
+            output = self.command_output_from_subprocess(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], 30)
             output = output.split("\n")
             total_used = 0
             total_used_network_shares = 0
@@ -535,13 +537,7 @@ class HandlerUtility:
         try:
             cur_dir = os.getcwd()
             os.chdir("..")
-            p = subprocess.Popen(['/usr/sbin/waagent', '-version'], stdout=subprocess.PIPE)
-            process_wait_time = 30
-            while(process_wait_time > 0 and p.poll() is None):
-                time.sleep(1)
-                process_wait_time -= 1
-            out = p.stdout.read()
-            out = str(out)
+            out = self.command_output_from_subprocess(['/usr/sbin/waagent', '-version'],30)
             if "Goal state agent: " in out:
                  waagent_version = out.split("Goal state agent: ")[1].strip()
             else:
@@ -683,9 +679,11 @@ class HandlerUtility:
 
     def write_to_status_file(self, stat_rept_file):
         try:
+            tempStatusFile =  os.path.join(self._context._status_dir, CommonVariables.TempStatusFileName)
             if self._context._status_file:
-                with open(self._context._status_file,'w+') as f:
+                with open(tempStatusFile,'w+') as f:
                     f.write(stat_rept_file)
+                os.rename(tempStatusFile, self._context._status_file)
         except Exception as e:
             errMsg = 'Status file creation failed with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
@@ -811,6 +809,26 @@ class HandlerUtility:
         
     def set_pre_post_enabled(self):
         self.pre_post_enabled = True
+
+    def command_output_from_subprocess(self , args, process_wait_time):
+        process_out = subprocess.Popen(args, stdout=subprocess.PIPE)
+        while(process_wait_time > 0 and process_out.poll() is None):
+            time.sleep(1)
+            process_wait_time -= 1
+        out = process_out.stdout.read().decode()
+        out = str(out)
+        return out
+
+    @staticmethod
+    def split(logger,txt):
+        result = None
+        try:
+            result = shlex.split(txt)
+        except Exception as e:
+            logger.log('Shlex.Split threw exception error: %s, stack trace: %s' % (str(e), traceback.format_exc()))
+            result = txt.split()
+        return result
+
         
     @staticmethod
     def convert_to_string(txt):

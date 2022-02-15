@@ -55,12 +55,9 @@ try:
     import metrics_ext_utils.metrics_ext_handler as me_handler
     import metrics_ext_utils.metrics_constants as metrics_constants
 
-
-
 except Exception as e:
-    print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
-          'Stacktrace: {1}'.format(e, traceback.format_exc())
-    print "Can't proceed. Exiting with a special exit code 119."
+    print('A local import (e.g., waagent) failed. Exception: {0}\nStacktrace: {1}'.format(e, traceback.format_exc()))
+    print("Can't proceed. Exiting with a special exit code 119.")
     sys.exit(119)  # This is the only thing we can do, as all logging depends on waagent/hutil.
 
 
@@ -115,6 +112,7 @@ def init_distro_specific_actions():
             except:
                 raise
 
+        hutil.log("os version: {0}:{1}".format(name.lower(), version))
         g_dist_config = DistroSpecific.get_distro_actions(name.lower(), version, hutil.log)
         RunGetOutput = g_dist_config.log_run_get_output
     except exceptions.LookupError as ex:
@@ -324,19 +322,6 @@ def main(command):
                             'Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output))
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
 
-            #Stop the telegraf and ME services
-            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
-            if tel_out:
-                hutil.log(tel_msg)
-            else:
-                hutil.error(tel_msg)
-
-            me_out, me_msg = me_handler.stop_metrics_service(is_lad=True)
-            if me_out:
-                hutil.log(me_msg)
-            else:
-                hutil.error(me_msg)
-
             #Delete the telegraf and ME services
             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
             if tel_rm_out:
@@ -361,27 +346,6 @@ def main(command):
                 hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
                 return
 
-            #Start the Telegraf and ME services on Enable after installation is complete
-            start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
-            if start_telegraf_out:
-                hutil.log("Successfully started metrics-sourcer.")
-            else:
-                hutil.error(log_messages)
-
-            if enable_metrics_ext:
-                # Generate/regenerate MSI Token required by ME
-                msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token()
-                if msi_token_generated:
-                    hutil.log("Successfully generated metrics-extension MSI Auth token.")
-                else:
-                    hutil.error(log_messages)
-
-                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=True)
-                if start_metrics_out:
-                    hutil.log("Successfully started metrics-extension.")
-                else:
-                    hutil.error(log_messages)
-
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
             hutil.do_status_report(g_ext_op_type, "success", '0', "Install succeeded")
@@ -395,9 +359,9 @@ def main(command):
                     hutil.do_status_report(g_ext_op_type, "error", '-1', "Enabled failed")
                     return
 
-                #Start the Telegraf and ME services on Enable after installation is complete
-                start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
-                if start_telegraf_out:
+                # Start the Telegraf and ME services on enable after installation is complete
+                start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=True)
+                if start_telegraf_res:
                     hutil.log("Successfully started metrics-sourcer.")
                 else:
                     hutil.error(log_messages)
@@ -514,8 +478,14 @@ def start_mdsd(configurator):
     # Need 'HeartBeat' instead of 'Daemon'
     waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
 
-    copy_env = os.environ
-    # Add MDSD_CONFIG_DIR  as an env variable since new mdsd master branch LAD doesnt create this dir
+    # mdsd http proxy setting
+    proxy_config = get_mdsd_proxy_config(waagent.HttpProxyConfigString, g_ext_settings, hutil.log)
+    if proxy_config:
+        # Add MDSD_http_proxy to current environment. Child processes will inherit its value.
+        os.environ['MDSD_http_proxy'] = proxy_config
+
+    copy_env = os.environ.copy()
+    # Add MDSD_CONFIG_DIR as an env variable since new mdsd master branch LAD doesnt create this dir
     mdsd_config_cache_dir = os.path.join(g_ext_dir, "config")
     copy_env["MDSD_CONFIG_DIR"] = mdsd_config_cache_dir
 
@@ -546,6 +516,7 @@ def start_mdsd(configurator):
     err_file_path = os.path.join(log_dir, 'mdsd.err')
     info_file_path = os.path.join(log_dir, 'mdsd.info')
     warn_file_path = os.path.join(log_dir, 'mdsd.warn')
+    qos_file_path = os.path.join(log_dir, 'mdsd.qos')
     # Need to provide EH events and Rsyslog spool path since the new mdsd master branch LAD doesnt create the directory needed
     eh_spool_path = os.path.join(log_dir, 'eh')
 
@@ -556,13 +527,8 @@ def start_mdsd(configurator):
 
     g_dist_config.extend_environment(copy_env)
 
-    # mdsd http proxy setting
-    proxy_config = get_mdsd_proxy_config(waagent.HttpProxyConfigString, g_ext_settings, hutil.log)
-    if proxy_config:
-        copy_env['MDSD_http_proxy'] = proxy_config
-
     # Now prepare actual mdsd cmdline.
-    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -S {7} -o {5}{6}'.format(
+    command = '{0} -A -C -c {1} -R -r {2} -e {3} -w {4} -q {8} -S {7} -o {5}{6}'.format(
         g_mdsd_bin_path,
         xml_file,
         g_mdsd_role_name,
@@ -570,7 +536,8 @@ def start_mdsd(configurator):
         warn_file_path,
         info_file_path,
         g_ext_settings.get_mdsd_trace_option(),
-        eh_spool_path).split(" ")
+        eh_spool_path,
+        qos_file_path).split(" ")
 
     try:
         start_watcher_thread()
@@ -630,8 +597,8 @@ def start_mdsd(configurator):
                             hutil.log(tel_msg)
                         else:
                             hutil.error(tel_msg)
-                        start_telegraf_out, log_messages = telhandler.start_telegraf(is_lad=True)
-                        if start_telegraf_out:
+                        start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=True)
+                        if start_telegraf_res:
                             hutil.log("Successfully started metrics-sourcer.")
                         else:
                             hutil.error(log_messages)
@@ -914,7 +881,7 @@ if __name__ == '__main__':
                 # Trick to print backtrace in case we execute './diagnostic.py -xxx yyy' from a terminal for testing.
                 # By just adding one more cmdline arg with any content, the above if condition becomes false,\
                 # thus allowing us to run code here, printing the exception message with the stack trace.
-                print msg
+                print(msg)
             # Need to exit with an error code, so that this situation can be detected by waagent and also
             # reported to customer through agent/extension status blob.
             hutil.do_exit(42, wala_event_type, 'Error', '42', msg)  # What's 42? Ask Abhi.

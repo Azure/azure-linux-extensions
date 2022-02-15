@@ -29,6 +29,7 @@ import time
 import shlex
 import traceback
 import datetime
+import random
 try:
     import ConfigParser as ConfigParsers
 except ImportError:
@@ -59,7 +60,7 @@ from workloadPatch import WorkloadPatch
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro, configSeqNo
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -73,6 +74,7 @@ def main():
         backup_logger = Backuplogger(hutil)
         MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
         hutil.patching = MyPatching
+        configSeqNo = -1
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
                 disable()
@@ -86,19 +88,18 @@ def main():
                 update()
             elif re.match("^([-/]*)(daemon)", a):
                 daemon()
+            elif re.match("^([-/]*)(seqNo:)", a):
+                try:
+                    configSeqNo = int(a.split(':')[1])
+                except:
+                    configSeqNo = -1
     except Exception as e:
         sys.exit(0)
 
 def install():
-    global hutil
-    hutil.do_parse_context('Install')
+    global hutil,configSeqNo
+    hutil.do_parse_context('Install', configSeqNo)
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
-
-def timedelta_total_seconds(delta):
-    if not hasattr(datetime.timedelta, 'total_seconds'):
-        return delta.days * 86400 + delta.seconds
-    else:
-        return delta.total_seconds()
 
 def status_report_to_file(file_report_msg):
     global backup_logger,hutil
@@ -171,22 +172,8 @@ def exit_if_same_taskId(taskId):
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput)
         status_code=CommonVariables.SuccessAlreadyProcessedInput
         message='TaskId AlreadyProcessed nothing to do'
-        try:
-            if(para_parser is not None):
-                blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
-                        status_code=str(status_code),\
-                        message=message,\
-                        taskId=taskId,\
-                        commandStartTimeUTCTicks=para_parser.commandStartTimeUTCTicks,\
-                        snapshot_info=None)
-                status_report_to_file(file_report_msg)
-        except Exception as e:
-            err_msg='cannot write status to the status file, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
-            backup_logger.log(err_msg, True, 'Warning')
+        backup_logger.log(message, True)
         sys.exit(0)
-
-def convert_time(utcTicks):
-    return datetime.datetime(1, 1, 1) + datetime.timedelta(microseconds = utcTicks / 10)
 
 def freeze_snapshot(timeout):
     try:
@@ -244,9 +231,9 @@ def can_take_crash_consistent_snapshot(para_parser):
     return takeCrashConsistentSnapshot
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch, configSeqNo
     #this is using the most recent file timestamp.
-    hutil.do_parse_context('Executing')
+    hutil.do_parse_context('Executing', configSeqNo)
 
     try:
         backup_logger.log('starting daemon', True)
@@ -332,18 +319,11 @@ def daemon():
             exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
         if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
-            utcTicksLong = int(para_parser.commandStartTimeUTCTicks)
-            backup_logger.log('utcTicks in long format' + str(utcTicksLong), True)
-            commandStartTime = convert_time(utcTicksLong)
-            utcNow = datetime.datetime.utcnow()
-            backup_logger.log('command start time is ' + str(commandStartTime) + " and utcNow is " + str(utcNow), True)
-            timespan = utcNow - commandStartTime
-            MAX_TIMESPAN = 140 * 60 # in seconds
-            # handle the machine identity for the restoration scenario.
-            total_span_in_seconds = timedelta_total_seconds(timespan)
-            backup_logger.log('timespan is ' + str(timespan) + ' ' + str(total_span_in_seconds))
+            canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
+            temp_g_fsfreeze_on = True
+            freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, temp_g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
 
-            if total_span_in_seconds > MAX_TIMESPAN :
+            if freeze_snap_shotter.is_command_timedout(para_parser) :
                 error_msg = "CRP timeout limit has reached, will not take snapshot."
                 errMsg = error_msg
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate)
@@ -351,12 +331,6 @@ def daemon():
                 temp_status= 'error'
                 exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
-        if(para_parser.taskId is not None and para_parser.taskId != ""):
-            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
-            exit_if_same_taskId(para_parser.taskId) 
-            taskIdentity = TaskIdentity()
-            taskIdentity.save_identity(para_parser.taskId)
-        
         hutil.save_seq()
 
         commandToExecute = para_parser.commandToExecute
@@ -587,30 +561,44 @@ def daemon():
     sys.exit(0)
 
 def uninstall():
-    hutil.do_parse_context('Uninstall')
+    global configSeqNo
+    hutil.do_parse_context('Uninstall', configSeqNo)
     hutil.do_exit(0,'Uninstall','success','0', 'Uninstall succeeded')
 
 def disable():
-    hutil.do_parse_context('Disable')
+    global configSeqNo
+    hutil.do_parse_context('Disable', configSeqNo)
     hutil.do_exit(0,'Disable','success','0', 'Disable Succeeded')
 
 def update():
-    hutil.do_parse_context('Upadate')
+    global configSeqNo
+    hutil.do_parse_context('Upadate', configSeqNo)
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
-    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro
+    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo
     try:
-        hutil.do_parse_context('Enable')
+        hutil.do_parse_context('Enable', configSeqNo)
 
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
 
         hutil.exit_if_same_seq()
 
+        hutil.save_seq()
+
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
+
+        if(para_parser.taskId is not None and para_parser.taskId != ""):
+            backup_logger.log('taskId: ' + str(para_parser.taskId), True)
+            randomSleepTime = random.randint(500, 5000)
+            backup_logger.log('Sleeping for milliseconds: ' + str(randomSleepTime), True)
+            time.sleep(randomSleepTime / 1000)
+            exit_if_same_taskId(para_parser.taskId)
+            taskIdentity = TaskIdentity()
+            taskIdentity.save_identity(para_parser.taskId)
 
         temp_status= 'success'
         temp_result=CommonVariables.ExtensionTempTerminalState
