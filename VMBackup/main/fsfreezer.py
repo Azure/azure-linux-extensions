@@ -111,7 +111,7 @@ class FsFreezer:
         self.hutil = hutil
         self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
         self.isArm64Machine = False
-        
+
         try:
             platformMachine = platform.machine()
             architectureFromUname = os.uname()[-1]
@@ -124,7 +124,7 @@ class FsFreezer:
 
         if(self.isArm64Machine == True):
             self.logger.log("isArm64Machine : " + str(self.isArm64Machine) + " Using ARM64 safefreeze binary")
-            self.safeFreezeFolderPath = "safefreeze/bin/safefreezeArm64"
+            self.safeFreezeFolderPath = "safefreezeArm64/bin/safefreeze"
         else:
             self.logger.log("isArm64Machine : " + str(self.isArm64Machine) + " Using x64 safefreeze binary")
             self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
