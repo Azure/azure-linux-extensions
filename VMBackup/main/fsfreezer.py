@@ -109,8 +109,9 @@ class FsFreezer:
         self.patching = patching
         self.logger = logger
         self.hutil = hutil
-
+        self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
         self.isArm64Machine = False
+        
         try:
             platformMachine = platform.machine()
             architectureFromUname = os.uname()[-1]

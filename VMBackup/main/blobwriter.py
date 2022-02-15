@@ -46,12 +46,9 @@ class BlobWriter(object):
         try:
             # get the blob type
             if(blobUri is not None):
-<<<<<<< HEAD
-=======
                 if (self.IsEmptyBlob(blobUri) == False):
                     raise Exception("Cannot perform write operation on a non empty blob")
                 
->>>>>>> upstream/master
                 blobProperties = self.GetBlobProperties(blobUri)
                 blobType = "pageblob"
 
