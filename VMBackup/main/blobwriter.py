@@ -67,7 +67,7 @@ class BlobWriter(object):
         except Exception as e:
             self.hutil.log("Failed to committing the log with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
 
-    def WriteBlockBlob(self,msg,blobUri,blobProperties):
+    def WriteBlockBlob(self,msg,blobUri):
         retry_times = 3
         while(retry_times > 0):
             try:
