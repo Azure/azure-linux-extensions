@@ -21,6 +21,7 @@
 
 import inspect
 import os
+from time import sleep
 
 from OSEncryptionState import OSEncryptionState
 from CommandExecutor import ProcessCommunicator
@@ -103,6 +104,7 @@ class PatchBootSystemState(OSEncryptionState):
                                                 status_code=CommonVariables.success,
                                                 message="Restarting vm after patching")
 
+            sleep(5)
             # the restarted vm shall see the marker and advance the state machine
             self.command_executor.Execute('reboot')
         else:

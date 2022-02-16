@@ -623,11 +623,12 @@ def mark_encryption(command, volume_type, disk_format_query, encryption_mode=Non
     return encryption_marker
 
 def should_perform_online_encryption(disk_util, encryption_command, volume_type):
-    if disk_util.get_luks_header_size() != CommonVariables.luks_header_size_v2:
-        return False
     if DistroPatcher.distro_info[0].lower() != "redhat":
         return False
     if LooseVersion(DistroPatcher.distro_info[1]) < LooseVersion('8.1'):
+        return False
+    DistroPatcher.install_cryptsetup()
+    if disk_util.get_luks_header_size() != CommonVariables.luks_header_size_v2:
         return False
     if encryption_command == CommonVariables.EnableEncryptionFormatAll:
         if volume_type.lower() == CommonVariables.VolumeTypeAll.lower():
