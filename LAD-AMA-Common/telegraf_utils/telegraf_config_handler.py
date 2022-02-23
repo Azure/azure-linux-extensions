@@ -189,7 +189,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 if plugin not in storage_namepass_list:
                     storage_namepass_list.append(plugin + "_mdsd")
             else:
-                ama_plugin_name = plugin + "_total"
+                ama_plugin_name = plugin + "_mdsd_la_perf"
                 ama_rename_str += "\n[[processors.rename]]\n"
                 ama_rename_str += " "*2 + "namepass = [\"" + ama_plugin_name + "\"]\n"
                 if ama_plugin_name not in storage_namepass_list:
@@ -283,9 +283,15 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             #Add respective operations for aggregators
             # if is_lad:
             if not is_vmi and not is_vmi_rate_counter:
+                suffix = ""
+                if is_lad:
+                    suffix = "_total\"]\n"
+                else:
+                    suffix = "_mdsd_la_perf\"]\n"
+                    
                 if rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
-                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
                     aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
@@ -293,7 +299,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
                 if non_rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
-                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
                     aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
