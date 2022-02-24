@@ -28,6 +28,7 @@ import tempfile
 import traceback
 import uuid
 import shutil
+from distutils.version import LooseVersion
 
 from Utils import HandlerUtil
 from Common import CommonVariables, CryptItem
@@ -47,6 +48,7 @@ from EncryptionEnvironment import EncryptionEnvironment
 from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
+from OnlineEncryptionHandler import OnlineEncryptionHandler
 from io import open
 
 
@@ -166,7 +168,7 @@ def disable_encryption():
                       message=message)
 
 
-def stamp_disks_with_settings(items_to_encrypt, encryption_config):
+def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_marker=None):
 
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
@@ -194,8 +196,13 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config):
 
     # exit transitioning state by issuing a status report indicating
     # that the necessary encryption settings are stamped successfully
+    # For online encryption transistioning phase will not be exited at this point.
+    # It will be exited after the online encryption is setup.
+    status = CommonVariables.extension_success_status
+    if encryption_marker is not None and encryption_marker.get_encryption_mode() == CommonVariables.EncryptionModeOnline:
+        status = CommonVariables.extension_transitioning_status
     hutil.do_status_report(operation='StartEncryption',
-                           status=CommonVariables.extension_success_status,
+                           status=status,
                            status_code=str(CommonVariables.success),
                            message='Encryption settings stamped')
 
@@ -360,7 +367,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             logger.log('Secret has already been updated')
             disk_util.log_lsblk_output()
 
-            if extension_parameter.passphrase and extension_parameter.passphrase != open(existing_passphrase_file,'r').read():
+            if extension_parameter.passphrase and extension_parameter.passphrase.decode("utf-8") != open(existing_passphrase_file,'r').read():
                 logger.log("The new passphrase has not been placed in BEK volume yet")
                 logger.log("Skipping removal of old passphrase")
                 exit_without_status_report()
@@ -368,7 +375,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             logger.log('Removing old passphrase')
 
             temp_oldkeyfile = tempfile.NamedTemporaryFile(delete=False)
-            temp_oldkeyfile.write(old_passphrase)
+            temp_oldkeyfile.write(old_passphrase.encode("utf-8"))
             temp_oldkeyfile.close()
 
             for crypt_item in crypt_mount_config_util.get_crypt_items():
@@ -594,14 +601,48 @@ def main():
             daemon()
 
 
-def mark_encryption(command, volume_type, disk_format_query):
+def mark_encryption(command, volume_type, disk_format_query, encryption_mode=None, encryption_phase=None):
     encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
     encryption_marker.command = command
     encryption_marker.volume_type = volume_type
     encryption_marker.diskFormatQuery = disk_format_query
+    update_status = False
+    if encryption_mode is not None and encryption_mode == CommonVariables.EncryptionModeOnline:
+        logger.log("Disks will be encrypted with online mode")
+        encryption_marker.encryption_mode = encryption_mode
+        if encryption_phase is not None and encryption_phase == CommonVariables.EncryptionPhaseResume:
+            logger.log("Marking Online encryption resume phase.")
+            encryption_marker.encryption_phase = encryption_phase
+            update_status = True
     encryption_marker.commit()
+    if update_status:
+        hutil.do_status_report(operation='StartEncryption',
+                               status=CommonVariables.extension_success_status,
+                               status_code=str(CommonVariables.success),
+                               message='Online Encryption initialized.')
     return encryption_marker
 
+def should_perform_online_encryption(disk_util, encryption_command, volume_type):
+    if DistroPatcher.distro_info[0].lower() != "redhat":
+        return False
+    if LooseVersion(DistroPatcher.distro_info[1]) < LooseVersion('8.1'):
+        return False
+    DistroPatcher.install_cryptsetup()
+    if disk_util.get_luks_header_size() != CommonVariables.luks_header_size_v2:
+        return False
+    if encryption_command == CommonVariables.EnableEncryptionFormatAll:
+        if volume_type.lower() == CommonVariables.VolumeTypeAll.lower():
+            return True
+        else:
+            return False
+    if encryption_command != CommonVariables.EnableEncryption:
+        return False
+    return True
+
+def is_resume_phase(encryption_phase):
+    if encryption_phase is not None and encryption_phase == CommonVariables.EncryptionPhaseResume:
+        return True
+    return False
 
 def is_daemon_running():
     handler_path = os.path.join(os.getcwd(), __file__).encode('utf-8')
@@ -872,6 +913,15 @@ def enable_encryption():
         encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
         if encryption_marker.config_file_exists():
             # verify the encryption mark
+            # Mark encryption phase as Resume if OS is patched for Online Encryption
+            if encryption_marker.get_encryption_mode() == CommonVariables.EncryptionModeOnline:
+                patch_system_marker_file = os.path.join(encryption_environment.os_encryption_markers_path, 'PatchBootSystemState')
+                if os.path.exists(patch_system_marker_file) and not is_resume_phase(encryption_marker.get_encryption_phase()):
+                    encryption_marker = mark_encryption(command=encryption_marker.get_current_command(),
+                                                        volume_type=encryption_marker.get_volume_type(),
+                                                        disk_format_query=encryption_marker.get_encryption_disk_format_query(),
+                                                        encryption_mode=CommonVariables.EncryptionModeOnline,
+                                                        encryption_phase=CommonVariables.EncryptionPhaseResume)
             logger.log(msg="encryption mark is there, starting daemon.", level=CommonVariables.InfoLevel)
             start_daemon('EnableEncryption')
         else:
@@ -886,7 +936,8 @@ def enable_encryption():
                 logger.log(msg="config file exists and passphrase file exists.", level=CommonVariables.WarningLevel)
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
-                                                    disk_format_query=extension_parameter.DiskFormatQuery)
+                                                    disk_format_query=extension_parameter.DiskFormatQuery,
+                                                    encryption_mode=CommonVariables.EncryptionModeOnline if should_perform_online_encryption(disk_util, extension_parameter.command, extension_parameter.VolumeType) else None)
                 start_daemon('EnableEncryption')
             else:
                 # prepare to create secret, place on key volume, and request key vault update via wire protocol
@@ -937,7 +988,8 @@ def enable_encryption():
                             logger.log("Resource Disk is either absent or encrypted successfully.")
                 encryption_marker = mark_encryption(command=extension_parameter.command,
                                                     volume_type=extension_parameter.VolumeType,
-                                                    disk_format_query=extension_parameter.DiskFormatQuery)
+                                                    disk_format_query=extension_parameter.DiskFormatQuery,
+                                                    encryption_mode=CommonVariables.EncryptionModeOnline if should_perform_online_encryption(disk_util, extension_parameter.command, extension_parameter.VolumeType) else None)
                 start_daemon('EnableEncryption')
 
     except Exception as e:
@@ -982,7 +1034,7 @@ def perform_migration(encryption_config, crypt_mount_config_util):
                   message="Migration Succeeded")
 
 
-def enable_encryption_format(passphrase, encryption_format_items, disk_util, crypt_mount_config_util, force=False, os_items_to_stamp=[]):
+def enable_encryption_format(passphrase, encryption_format_items, disk_util, crypt_mount_config_util, force=False, os_items_to_stamp=[], encryption_marker=None):
     logger.log('enable_encryption_format')
     logger.log('disk format query is {0}'.format(json.dumps(encryption_format_items)))
 
@@ -1018,7 +1070,8 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
         encryption_config = EncryptionConfig(encryption_environment, logger)
         if not are_disks_stamped_with_current_config(encryption_config):
             stamp_disks_with_settings(items_to_encrypt=device_items_to_stamp,
-                                      encryption_config=encryption_config)
+                                      encryption_config=encryption_config,
+                                      encryption_marker=encryption_marker)
 
     for device_item, encryption_item, dev_path_in_query in zip(device_items_to_encrypt, encrypt_format_items_to_encrypt, query_dev_paths_to_encrypt):
         if device_item.mount_point:
@@ -1577,10 +1630,10 @@ def enable_encryption_all_format(passphrase_file, encryption_marker, disk_util, 
                            status_code=str(CommonVariables.success),
                            message=msg)
 
-    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, crypt_mount_config_util, True, os_items_to_stamp)
+    return encrypt_format_device_items(passphrase_file, device_items_to_encrypt, disk_util, crypt_mount_config_util, True, os_items_to_stamp, encryption_marker)
 
 
-def encrypt_format_device_items(passphrase, device_items, disk_util, crypt_mount_config_util, force=False, os_items_to_stamp=[]):
+def encrypt_format_device_items(passphrase, device_items, disk_util, crypt_mount_config_util, force=False, os_items_to_stamp=[], encryption_marker=None):
     """
     Formats the block devices represented by the supplied device_item.
 
@@ -1612,7 +1665,7 @@ def encrypt_format_device_items(passphrase, device_items, disk_util, crypt_mount
 
     encryption_format_items = list(map(device_item_to_encryption_format_item, device_items))
 
-    return enable_encryption_format(passphrase, encryption_format_items, disk_util, crypt_mount_config_util, force, os_items_to_stamp=os_items_to_stamp)
+    return enable_encryption_format(passphrase, encryption_format_items, disk_util, crypt_mount_config_util, force, os_items_to_stamp=os_items_to_stamp, encryption_marker=encryption_marker)
 
 
 def os_device_to_encrypt(disk_util):
@@ -1667,7 +1720,36 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
         encryption_config = EncryptionConfig(encryption_environment, logger)
         if not are_disks_stamped_with_current_config(encryption_config):
             stamp_disks_with_settings(items_to_encrypt=device_items_to_stamp,
-                                      encryption_config=encryption_config)
+                                      encryption_config=encryption_config,
+                                      encryption_marker=encryption_marker)
+
+    if encryption_marker.get_encryption_mode() == CommonVariables.EncryptionModeOnline:
+        logger.log("Starting Online Encryption for data disks.")
+        online_enc_handle = OnlineEncryptionHandler(logger)
+        if encryption_marker.get_encryption_phase() is not None and encryption_marker.get_encryption_phase() == CommonVariables.EncryptionPhaseResume:
+            logger.log("Entering online encryption resume phase.")
+            num_devices = online_enc_handle.get_device_items_for_resume(crypt_mount_config_util, disk_util)
+            hutil.do_status_report(operation='EnableEncryption',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message='Background Encrypting {0} volume(s).'.format(num_devices))
+            online_enc_handle.handle_resume_encryption(disk_util)
+            return
+        failed_item = online_enc_handle.handle(device_items_to_encrypt, passphrase_file, disk_util, crypt_mount_config_util, bek_util)
+        if failed_item is not None:
+            return failed_item
+        if encryption_marker.get_volume_type().lower() == CommonVariables.VolumeTypeData.lower():
+            encryption_marker = mark_encryption(command=encryption_marker.get_current_command(),
+                                                volume_type=encryption_marker.get_volume_type(),
+                                                disk_format_query=encryption_marker.get_encryption_disk_format_query(),
+                                                encryption_mode=CommonVariables.EncryptionModeOnline,
+                                                encryption_phase=CommonVariables.EncryptionPhaseResume)
+            hutil.do_status_report(operation='EnableEncryption',
+                           status=CommonVariables.extension_success_status,
+                           status_code=str(CommonVariables.success),
+                           message='Background Encrypting {0} data volume(s).'.format(online_enc_handle.devices.qsize()))
+            online_enc_handle.handle_resume_encryption(disk_util)
+        return
 
     msg = 'Encrypting {0} data volumes'.format(len(device_items_to_encrypt))
     logger.log(msg)
@@ -1854,10 +1936,22 @@ def daemon_encrypt():
                           code=CommonVariables.encryption_failed,
                           message=message)
         else:
+            # For Online Encryption extension needs to be transistioning state till OS disk encryption is setup
+            # If Encryption is already in resume phase then we can return success state
+            status = CommonVariables.extension_success_status
+            message = 'Encryption succeeded for data volumes'
+            if volume_type == CommonVariables.VolumeTypeAll.lower():
+                encryption_mode = encryption_marker.get_encryption_mode()
+                encryption_phase = encryption_marker.get_encryption_phase()
+                encryption_cmd = encryption_marker.get_current_command().lower()
+                if encryption_mode == CommonVariables.EncryptionModeOnline and encryption_phase != CommonVariables.EncryptionPhaseResume:
+                    status = CommonVariables.extension_transitioning_status
+                    if encryption_cmd == CommonVariables.EnableEncryption.lower():
+                        message = 'Online encryption initialized for data volumes'
             hutil.do_status_report(operation='EnableEncryptionDataVolumes',
-                                   status=CommonVariables.extension_success_status,
+                                   status=status,
                                    status_code=str(CommonVariables.success),
-                                   message='Encryption succeeded for data volumes')
+                                   message=message)
             disk_util.log_lsblk_output()
             mount_encrypted_disks(disk_util=disk_util,
                                   crypt_mount_config_util=crypt_mount_config_util,
@@ -1958,7 +2052,7 @@ def daemon_encrypt():
 
         try:
             if not disk_util.is_in_memfs_root() and not are_disks_stamped_with_current_config(encryption_config):
-                stamp_disks_with_settings(os_items_to_stamp, encryption_config)
+                stamp_disks_with_settings(os_items_to_stamp, encryption_config, encryption_marker)
 
             os_encryption.start_encryption()
 
