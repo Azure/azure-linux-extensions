@@ -31,6 +31,7 @@ class EncryptionMarkConfig(object):
         self.volume_type = None
         self.diskFormatQuery = None
         self.encryption_mode = None
+        self.encryption_phase = None
         self.encryption_mark_config = ConfigUtil(self.encryption_environment.azure_crypt_request_queue_path,
                                                  'encryption_request_queue',
                                                  self.logger)
@@ -46,6 +47,9 @@ class EncryptionMarkConfig(object):
 
     def get_encryption_mode(self):
         return self.encryption_mark_config.get_config(CommonVariables.EncryptionModeKey)
+
+    def get_encryption_phase(self):
+        return self.encryption_mark_config.get_config(CommonVariables.EncryptionPhaseKey)
 
     def config_file_exists(self):
         """
@@ -64,6 +68,8 @@ class EncryptionMarkConfig(object):
         key_value_pairs.append(disk_format_query)
         encryption_mode = ConfigKeyValuePair(CommonVariables.EncryptionModeKey, self.encryption_mode)
         key_value_pairs.append(encryption_mode)
+        encryption_phase = ConfigKeyValuePair(CommonVariables.EncryptionPhaseKey, self.encryption_phase)
+        key_value_pairs.append(encryption_phase)
         self.encryption_mark_config.save_configs(key_value_pairs)
 
     def clear_config(self):

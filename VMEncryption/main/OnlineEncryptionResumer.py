@@ -59,7 +59,7 @@ class OnlineEncryptionResumer:
 
         resume_cmd = None
         if self.crypt_item.luks_header_path is None:
-            resume_cmd = "cryptsetup reencrypt --resume-only --active-name {0} -d {1} --resilience journal".format(self.crypt_item.mapper_name, self.bek_file_path)
+            resume_cmd = "cryptsetup reencrypt --resume-only --active-name {0} -d {1}".format(self.crypt_item.mapper_name, self.bek_file_path)
         else:
             resume_cmd = "cryptsetup reencrypt --resume-only --active-name {0} --header {1} -d {2} --resilience journal".format(self.crypt_item.mapper_name, self.crypt_item.luks_header_path, self.bek_file_path)
         status_file_path = self._get_status_file()
