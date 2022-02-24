@@ -1,3 +1,7 @@
+1.2.0.91
+- Enable Online Encryption for data disks
+- Setup encryption layer for all disks and do encryption in background
+
 1.2.0.90
 - Support for RHEL 8.3, 8.4
 - Support for CentOS 8.3, 8.4
