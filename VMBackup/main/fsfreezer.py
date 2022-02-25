@@ -21,6 +21,7 @@ from mounts import Mounts
 import datetime
 import threading
 import os
+import platform
 import time
 import sys
 import signal
@@ -108,6 +109,26 @@ class FsFreezer:
         self.patching = patching
         self.logger = logger
         self.hutil = hutil
+        self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
+        self.isArm64Machine = False
+
+        try:
+            platformMachine = platform.machine()
+            architectureFromUname = os.uname()[-1]
+            self.logger.log("platformMachine : " + str(platformMachine) + " architectureFromUname : " + str(architectureFromUname))
+            if((platformMachine != None and (platformMachine.startswith("aarch64") or platformMachine.startswith("arm64"))) or (architectureFromUname != None and (architectureFromUname.startswith("aarch64") or architectureFromUname.startswith("arm64")))):
+                self.isArm64Machine = True
+        except Exception as e:
+            errorMsg = "Unable to fetch machine processor architecture, error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(errorMsg, 'Error')
+
+        if(self.isArm64Machine == True):
+            self.logger.log("isArm64Machine : " + str(self.isArm64Machine) + " Using ARM64 safefreeze binary")
+            self.safeFreezeFolderPath = "safefreezeArm64/bin/safefreeze"
+        else:
+            self.logger.log("isArm64Machine : " + str(self.isArm64Machine) + " Using x64 safefreeze binary")
+            self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
+
         try:
             self.mounts = Mounts(patching = self.patching, logger = self.logger)
         except Exception as e:
@@ -150,7 +171,7 @@ class FsFreezer:
             self.logger.log(errMsg,True,'Warning')
         try:
             freeze_result = FreezeResult()
-            freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
+            freezebin=os.path.join(os.getcwd(),os.path.dirname(__file__),self.safeFreezeFolderPath)
             args=[freezebin,str(timeout)]
             no_mount_found = True
             for mount in self.mounts.mounts:
