@@ -45,6 +45,7 @@ packages_array = []
 main_folder = 'main'
 main_entry = main_folder + '/handle.sh'
 binary_entry = main_folder + '/safefreeze'
+arm64_binary_entry = main_folder + '/safefreezeArm64'
 packages_array.append(main_folder)
 
 plugin_folder = main_folder + '/tempPlugin'
@@ -202,7 +203,7 @@ copybinary(workload_customscripts_folder, final_workload_customscripts_path)
 copybinary(workloadutils_folder, final_workloadutils_path)
 final_plugin_conf_path = final_folder_path + '/main'
 copybinary(binary_entry, final_binary_path)
-copybinary(binary_entry, final_Arm64binary_path)
+copybinary(arm64_binary_entry, final_Arm64binary_path)
 copybinary(plugin_folder, final_plugin_path)
 copy(plugin_conf, final_plugin_conf_path)
 copy(manifest,final_folder_path)

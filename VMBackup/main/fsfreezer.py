@@ -115,8 +115,8 @@ class FsFreezer:
         try:
             platformMachine = platform.machine()
             architectureFromUname = os.uname()[-1]
-            self.logger.log("platformMachine : " + platformMachine + " architectureFromUname : " + architectureFromUname)
-            if(platformMachine.startswith("aarch64") or platformMachine.startswith("arm64") or architectureFromUname.startswith("aarch64") or architectureFromUname.startswith("arm64")):
+            self.logger.log("platformMachine : " + str(platformMachine) + " architectureFromUname : " + str(architectureFromUname))
+            if((platformMachine != None and (platformMachine.startswith("aarch64") or platformMachine.startswith("arm64"))) or (architectureFromUname != None and (architectureFromUname.startswith("aarch64") or architectureFromUname.startswith("arm64")))):
                 self.isArm64Machine = True
         except Exception as e:
             errorMsg = "Unable to fetch machine processor architecture, error: %s, stack trace: %s" % (str(e), traceback.format_exc())
