@@ -704,8 +704,8 @@ def get_managed_identity():
         identifier_name = managedIdentity.get("identifier-name")
         identifier_value = managedIdentity.get("identifier-value")
 
-        if identifier_name not in ["object_id", "client_id", "mi_res_id"]:
-            return identifier_name, identifier_value, 'Invalid identifier-name provided; must be "object_id", "client_id", or "mi_res_id"'
+        if identifier_name not in ["client_id", "mi_res_id"]:
+            return identifier_name, identifier_value, 'Invalid identifier-name provided; must be "client_id" or "mi_res_id"'
 
         if not identifier_value:
             return identifier_name, identifier_value, 'Invalid identifier-value provided; cannot be empty'
