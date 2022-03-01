@@ -247,6 +247,11 @@ class OSEncryptionState(object):
         else:
             return True
 
+    def _is_arm64(self):
+        if self.command_executor.ExecuteInBash('uname -p | grep -i aarch64') == 0:
+            self.context.logger.log('ARM64 VM detected')
+            return True
+        return False
 
 OSEncryptionStateContext = namedtuple('OSEncryptionStateContext',
                                       ['hutil',
