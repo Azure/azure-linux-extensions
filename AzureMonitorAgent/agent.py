@@ -1030,13 +1030,28 @@ def parse_context(operation):
 def set_os_arch():
     """
     Checks if the current system architecture is present in the SupportedArch set and replaces 
-    the package name accordingly
+    the package names accordingly
     """
     global BundleFileName, SupportedArch
     current_arch = platform.machine()
 
     if current_arch in SupportedArch:
+
+        # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
+
+        # Rename the Arch appropriate metrics extension binary to MetricsExtension
+        MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
+        SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
+
+        if os.path.exists(SupportedMEPath):
+            os.replace(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
+
+        # Cleanup unused ME binaries
+        for f in os.listdir(MetricsExtensionDir):
+            if f != 'MetricsExtension':
+                os.remove(os.path.join(MetricsExtensionDir, f))
+    
 
 def find_package_manager(operation):
     """
