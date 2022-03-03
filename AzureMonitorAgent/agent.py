@@ -1061,7 +1061,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner", "mariner", "rhel"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner", "mariner", "rhel", "almalinux", "rocky"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1130,6 +1130,8 @@ def is_vm_supported_for_extension(operation):
     """
     supported_dists = {'redhat' : ['7', '8'], # Rhel
                        'centos' : ['7', '8'], # CentOS
+                       'rocky' : ['8'], # Rocky Linux
+                       'almalinux' : ['8'], # Alma Linux
                        'red hat' : ['7', '8'], # Oracle, RHEL
                        'oracle' : ['7', '8'], # Oracle
                        'debian' : ['9', '10'], # Debian
