@@ -24,7 +24,8 @@ Schema for the public configuration file looks like this:
 ```json
 {
   "workspaceId": "<workspace-id (guid)>",
-  "stopOnMultipleConnections": true/false
+  "stopOnMultipleConnections": true/false,
+  "skipDockerProviderInstall": true/false
 }
 ```
 
@@ -115,7 +116,8 @@ $Version = '<version>'
 
 $PublicConf = '{
     "workspaceId": "<workspace id>",
-    "stopOnMultipleConnections": true/false
+    "stopOnMultipleConnections": true/false,
+    "skipDockerProviderInstall": true/false
 }'
 $PrivateConf = '{
     "workspaceKey": "<workspace key>",
@@ -149,7 +151,8 @@ $Version = '<version>'
 
 $PublicConf = '{
     "workspaceId": "<workspace id>",
-    "stopOnMultipleConnections": true/false
+    "stopOnMultipleConnections": true/false,
+    "skipDockerProviderInstall": true/false
 }'
 $PrivateConf = '{
     "workspaceKey": "<workspace key>",
@@ -180,7 +183,8 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
     "typeHandlerVersion": "1.4",
     "settings": {
       "workspaceId": "<workspace id>",
-      "stopOnMultipleConnections": true/false
+      "stopOnMultipleConnections": true/false,
+      "skipDockerProviderInstall": true/false
     },
     "protectedSettings": {
       "workspaceKey": "<workspace key>",
@@ -197,7 +201,8 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 ```json
 {
   "workspaceId": "MyWorkspaceId",
-  "stopOnMultipleConnections": true
+  "stopOnMultipleConnections": true,
+  "skipDockerProviderInstall": true
 }
 ```
 ```json
