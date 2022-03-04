@@ -109,7 +109,7 @@ ExtensionStateSubdirectory = 'state'
 
 # Commands
 # Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
-InstallCommandTemplate = '{0} --upgrade'
+InstallCommandTemplate = '{0} --upgrade {1}'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
 OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
@@ -300,7 +300,7 @@ def main():
                 hutil_log_error(errmsg)
             else:
                 log_and_exit(operation, errmsg)
-        
+
         # invoke operation
         exit_code, output = operations[operation]()
 
@@ -472,7 +472,16 @@ def install():
     bundle_path = os.path.join(package_directory, BundleFileName)
 
     os.chmod(bundle_path, 100)
-    cmd = InstallCommandTemplate.format(bundle_path)
+    skipDockerProviderInstall = public_settings.get(
+        'skipDockerProviderInstall')
+
+    if (skipDockerProviderInstall is not None
+            and skipDockerProviderInstall is True):
+        cmd = InstallCommandTemplate.format(
+            bundle_path, '--skip-docker-provider-install')
+    else:
+        cmd = InstallCommandTemplate.format(bundle_path, '')
+
     hutil_log_info('Running command "{0}"'.format(cmd))
 
     # Retry, since install can fail due to concurrent package operations
@@ -703,7 +712,7 @@ def remove_workspace_configuration():
     shutil.rmtree(etc_remove_path, True)
     shutil.rmtree(var_remove_path, True)
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
-    
+
 def is_arc_installed():
     """
     Check if the system is on an Arc machine
@@ -736,14 +745,14 @@ def get_imds_endpoint():
         imds_endpoint = get_arc_endpoint()
         if imds_endpoint:
             imds_endpoint += '/metadata/instance?api-version=2019-08-15'
-        else: 
+        else:
             # Fall back to the traditional IMDS endpoint; the cloud domain and VM
             # resource id detection logic are resilient to failed queries to IMDS
             imds_endpoint = azure_imds_endpoint
             hutil_log_info('Falling back to default Azure IMDS endpoint')
     else:
         imds_endpoint = azure_imds_endpoint
-    
+
     hutil_log_info('Using IMDS endpoint "{0}"'.format(imds_endpoint))
     return imds_endpoint
 
