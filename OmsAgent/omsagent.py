@@ -1324,10 +1324,16 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         elif exit_code is 33:
             if "Permission denied" in output:
                 # Enable failures
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+                # 52 is the exit code for missing dependency. 
+                # DSC metaconfig generation failure due to permissions.
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions, and omsconfig MetaConfig.mof can be generated. For details, check logs in /var/opt/microsoft/omsconfig/omsconfig.log and /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+        elif exit_code is 18:
+                # Install failures
+                # DSC install failure
+                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+                output = "Installation failed due to omsconfig package not being able to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
         elif exit_code is 5:
             if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
                 # Enable failures
@@ -1357,11 +1363,11 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 exit_code = 52
                 output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
             if "Permission denied" in output:
-                # Enable failures
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+                # Install/Enable failures
+                # 52 is the exit code for missing dependency.
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 52
-                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install and onboard. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
     except:
         hutil_log_info('Failed to write output to STDERR')
 
