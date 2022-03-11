@@ -18,7 +18,7 @@
 
 # future imports have no effect on python 3 (verified in official docs)
 # importing from source causes import errors on python 3, lets skip import
-from platform import platform
+import platform
 import sys
 if sys.version_info[0] < 3:
     from future import standard_library
