@@ -1,6 +1,9 @@
 {
   "redhat": [
         {
+          "Version" : "8.5"
+        },
+        {
           "Version" : "8.4"
         },
         {
@@ -56,6 +59,9 @@
         }
     ],
     "centos" : [
+        {
+          "Version" : "8.5"
+        },
         {
           "Version" : "8.4"
         },
