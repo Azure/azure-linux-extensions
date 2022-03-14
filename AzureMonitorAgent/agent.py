@@ -638,7 +638,7 @@ def disable():
 
     # stop PA and agent launcher
     hutil_log_info('Handler initiating PA and agent launcher')
-    if is_systemd():
+    if is_systemd() and platform.machine() != 'aarch64':
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
         # in case AL is not cleaning up properly
@@ -670,12 +670,16 @@ def update():
     return 0, ""
 
 def restart_pa():
+    if platform.machine() == 'aarch64':
+        return
     # start PA and agent launcher
     hutil_log_info('Handler initiating PA')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl start azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
 
 def restart_launcher():
+    if platform.machine() == 'aarch64':
+        return
     # start PA and agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
