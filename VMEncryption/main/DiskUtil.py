@@ -940,6 +940,11 @@ class DiskUtil(object):
             DiskUtil.os_disk_lvm = False
             return False
 
+        if self.distro_patcher.support_online_encryption:
+            if os.system("lsblk -o TYPE,MOUNTPOINT | grep lvm | grep -q '/$'") == 0:
+                DiskUtil.os_disk_lvm = True
+                return True
+
         lvm_items = [item for item in self.get_lvm_items() if item.vg_name == "rootvg"]
 
         current_lv_names = set([item.lv_name for item in lvm_items])

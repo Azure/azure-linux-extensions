@@ -28,6 +28,7 @@ import time
 import traceback
 import datetime
 import subprocess
+from distutils.version import LooseVersion
 class AbstractPatching(object):
     """
     AbstractPatching defines a skeleton neccesary for a concrete Patching class.
@@ -50,6 +51,8 @@ class AbstractPatching(object):
         self.resize2fs_path = '/sbin/resize2fs'
         self.umount_path = '/usr/bin/umount'
         self.kernel_version = platform.release()
+        self.min_version_online_encryption = ''
+        self.support_online_encryption = False
 
     def install_cryptsetup(self):
         pass
@@ -58,4 +61,14 @@ class AbstractPatching(object):
         pass
 
     def update_prereq(self):
+        pass
+
+    def validate_online_encryption_support(self):
+        distro_version = self.distro_info[1]
+        if len(self.min_version_online_encryption) > 0 and LooseVersion(distro_version) >= LooseVersion(self.min_version_online_encryption):
+            self.logger.log("Distro {0} {1} is a candidate for online encryption.".format(self.distro_info[0], distro_version))
+            return True
+        return False
+
+    def patch_machine(self):
         pass

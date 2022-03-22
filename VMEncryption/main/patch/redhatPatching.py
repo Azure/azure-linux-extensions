@@ -78,6 +78,10 @@ class redhatPatching(AbstractPatching):
             self.resize2fs_path = '/sbin/resize2fs'
             self.touch_path = '/usr/bin/touch'
             self.umount_path = '/usr/bin/umount'
+        self.min_version_online_encryption = '8.1'
+        if type(self).__name__.startswith('redhat'):
+            # Should not be called when actual instance is of subclass like oracle
+            self.support_online_encryption = self.validate_online_encryption_support()
 
     def install_cryptsetup(self):
         if self.distro_info[1].startswith("6."):

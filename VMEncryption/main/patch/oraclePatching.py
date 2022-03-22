@@ -70,16 +70,26 @@ class oraclePatching(redhatPatching):
             self.openssl_path = '/usr/bin/openssl'
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/usr/bin/umount'
+        self.min_version_online_encryption = '8.5'
+        self.support_online_encryption = self.validate_online_encryption_support()
 
-    def install_cryptsetup(self):
-        packages = ['cryptsetup']
-        for package in packages:
-            self.logger.log("installation for " + package + 'result is ' + str(subprocess.call(['yum', 'install','-y', package])))
+    # install_cryptsetup from redhatPatching will be used.
 
     def install_extras(self):
         common_extras = ['cryptsetup','lsscsi']
-        for extra in common_extras:
-            self.logger.log("installation for " + extra + 'result is ' + str(subprocess.call(['yum', 'install','-y', extra])))
+        if self.command_executor.Execute("rpm -q " + " ".join(common_extras)):
+            self.command_executor.Execute("yum install -y " + " ".join(common_extras))
 
     def update_prereq(self):
         pass
+
+    def patch_machine(self):
+        grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
+            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
+        ]
+
+        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
+
+        for grub_cfg_path, grub_env_path in grub_cfg_paths:
+            self.command_executor.Execute('grub2-mkconfig -o {0}'.format(grub_cfg_path), True)

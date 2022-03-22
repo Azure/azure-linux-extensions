@@ -192,7 +192,7 @@ class CheckUtil(object):
         if not volume_type.lower() in [x.lower() for x in supported_volume_types] :
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_volume_types))
 
-    def validate_lvm_os(self, public_settings):
+    def validate_lvm_os(self, public_settings, DistroPatcher):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         if not encryption_operation:
             self.logger.log("LVM OS validation skipped (no encryption operation)")
@@ -207,6 +207,11 @@ class CheckUtil(object):
             return
         elif volume_type.lower() == CommonVariables.VolumeTypeData.lower():
             self.logger.log("LVM OS validation skipped (Volume Type: DATA)")
+            return
+
+        
+        if DistroPatcher.support_online_encryption:
+            self.logger.log('Distro supports online encryption. Skipping LVM validation.')
             return
 
         #  run lvm check if volume type, encryption operation were specified and OS type is LVM
@@ -259,6 +264,7 @@ class CheckUtil(object):
         if encryption_status["os"] != "NotEncrypted":
             self.logger.log("OS volume already encrypted. Skipping OS encryption validation check.")
             return
+
         distro_name = DistroPatcher.distro_info[0]
         distro_name = distro_name.replace('ubuntu','Ubuntu') # to upper if needed
         distro_version = DistroPatcher.distro_info[1]
@@ -269,10 +275,11 @@ class CheckUtil(object):
                 versions = data[distro_name]
                 for version in versions:
                     if distro_version.startswith(version['Version']):
+                        if 'MinSupportedVersion' in version and LooseVersion(distro_version) < LooseVersion(version['MinSupportedVersion']):
+                            raise Exception('Minimum supported version for distro {0} is {1}.'.format(distro_name, version['MinSupportedVersion']))
                         if 'Kernel' in version and LooseVersion(DistroPatcher.kernel_version) < LooseVersion(version['Kernel']):
                             raise Exception('Kernel version {0} is not supported. Upgrade to kernel version {1}'.format(DistroPatcher.kernel_version, version['Kernel']))
-                        else:
-                            return
+                        return
             raise Exception('Distro {0} {1} is not supported for OS encryption'.format(distro_name, distro_version))
 
     def validate_volume_type_for_enable(self, public_settings, existing_volume_type):
@@ -296,7 +303,7 @@ class CheckUtil(object):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings)
-        self.validate_lvm_os(public_settings)
+        self.validate_lvm_os(public_settings, DistroPatcher)
         self.validate_vfat()
         self.validate_memory_os_encryption(public_settings, encryption_status)
         self.is_supported_os(public_settings, DistroPatcher, encryption_status)
