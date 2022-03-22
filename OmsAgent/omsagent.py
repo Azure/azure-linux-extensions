@@ -142,6 +142,7 @@ EnableErrorResolvingHost = 7
 EnableErrorOnboarding = 8
 EnableCalledBeforeSuccessfulInstall = 52 # since install is a missing dependency
 UnsupportedOpenSSL = 55 #60, temporary as it excludes from SLA
+UnsupportedGpg = 55
 # OneClick error codes
 OneClickErrorCode = 40
 ManagedIdentityExtMissingErrorCode = 41
@@ -283,6 +284,8 @@ def main():
     if exit_code is not 0:
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)
+        
+    exit_if_gpg_unavailable(operation)
 
     # Invoke operation
     try:
@@ -1010,6 +1013,17 @@ def exit_if_openssl_unavailable(operation):
     exit_code, output = run_get_output('which openssl', True, False)
     if exit_code is not 0:
         log_and_exit(operation, UnsupportedOpenSSL, 'OpenSSL is not available')
+    return 0
+
+
+def exit_if_gpg_unavailable(operation):
+    """
+    Check if gpg is available to use
+    If not, throw error to return UnsupportedGpg error code
+    """
+    exit_code, output = run_get_output('which gpg', True, False)
+    if exit_code is not 0:
+        log_and_exit(operation, UnsupportedGpg, 'GPG is not available')
     return 0
 
 
