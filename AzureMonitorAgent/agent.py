@@ -1049,7 +1049,7 @@ def set_os_arch():
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
 
         if os.path.exists(SupportedMEPath):
-            os.replace(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
+            os.rename(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
 
         # Cleanup unused ME binaries
         for f in os.listdir(MetricsExtensionDir):
