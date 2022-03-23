@@ -1133,6 +1133,7 @@ def is_vm_supported_for_extension(operation):
     this VM extension. All other distros will get error code 51
     """
     supported_dists = {'redhat' : ['7', '8'], # Rhel
+                       'rhel' : ['7', '8'], # Rhel
                        'centos' : ['7', '8'], # CentOS
                        'red hat' : ['7', '8'], # Oracle, RHEL
                        'oracle' : ['7', '8'], # Oracle
