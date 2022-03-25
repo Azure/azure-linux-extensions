@@ -327,6 +327,14 @@ def install():
     # Copy the PA and agentlauncher binaries
     copy_pa_binaries()
 
+    # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
+    # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
+    if vm_dist.replace(' ','').lower().startswith('redhat') and vm_ver == '8.6' and platform.machine() == 'aarch64':
+        exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
+                                         retry_check = retry_if_dpkg_or_rpm_locked,
+                                         final_check = final_check_if_dpkg_or_rpm_locked)
+
+
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
     if exit_code == 0:
