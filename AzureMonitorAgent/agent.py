@@ -120,6 +120,10 @@ IndeterminateOperatingSystem = 51
 MissingorInvalidParameterErrorCode = 53
 DPKGOrRPMLockedErrorCode = 56
 
+# Settings
+GenevaConfigKey = "genevaConfiguration"
+AzureMonitorConfigKey = "azureMonitorConfiguration"
+
 # Configuration
 HUtilObject = None
 SettingsSequenceNumber = None
@@ -394,7 +398,7 @@ def enable():
     # start the metrics watcher if its not already running
     if ((protected_settings is None or len(protected_settings) == 0) or
         (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application") or
-        (public_settings is not None and public_settings.get("azureMonitorConfiguration") is not None and public_settings.get("azureMonitorConfiguration").get("ensure") == True)):
+        (public_settings is not None and public_settings.get(AzureMonitorConfigKey) is not None and public_settings.get(AzureMonitorConfigKey).get("ensure") == True)):
         start_metrics_process()
 
     exit_if_vm_not_supported('Enable')
@@ -427,10 +431,10 @@ def enable():
     """
 
     # Next-generation schema
-    if public_settings is not None and (public_settings.get("genevaConfiguration") or public_settings.get("azureMonitorConfiguration")):
+    if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):
 
-        geneva_configuration = public_settings.get("genevaConfiguration")
-        azure_monitor_configuration = public_settings.get("azureMonitorConfiguration")
+        geneva_configuration = public_settings.get(GenevaConfigKey)
+        azure_monitor_configuration = public_settings.get(AzureMonitorConfigKey)
 
         # Check for mix-and match of next-generation and legacy schema content
         if len(public_settings) > 1 and ((geneva_configuration and not azure_monitor_configuration) or (azure_monitor_configuration and not geneva_configuration)):
@@ -444,7 +448,7 @@ def enable():
             hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
             ensure["azuremonitoragent"] = True
             azure_monitor_public_settings = azure_monitor_configuration.get("configuration")
-            azure_monitor_protected_settings = protected_settings.get("azureMonitorConfiguration") if protected_settings is not None else None
+            azure_monitor_protected_settings = protected_settings.get(AzureMonitorConfigKey) if protected_settings is not None else None
             handle_mcs_config(azure_monitor_public_settings, azure_monitor_protected_settings, default_configs)
 
     # Legacy schema
