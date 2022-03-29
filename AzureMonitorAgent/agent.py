@@ -334,7 +334,11 @@ def install():
                                          retry_check = retry_if_dpkg_or_rpm_locked,
                                          final_check = final_check_if_dpkg_or_rpm_locked)
 
-
+    # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
+    if is_systemd() and platform.machine() == 'aarch64':
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+    
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
     if exit_code == 0:
