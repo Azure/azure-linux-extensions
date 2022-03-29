@@ -1347,7 +1347,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
                 # 53 is the exit code for configuration errors
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
                 exit_code = 53
-                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+                output = "Installation failed due to either incorrect workspace key or networking error. Please verify the connectivity to the url and the correctness of the workspace key. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
 
         if exit_code is not 0 and exit_code is not 52:
             if "dpkg:" in output or "dpkg :" in output or "rpmdb:" in output or "rpm.lock" in output:
