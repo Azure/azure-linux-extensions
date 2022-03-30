@@ -253,13 +253,6 @@ def get_service_command(service, *operations):
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service))
         return '/etc/init.d/{0} {1}'.format(service, operations[0])
 
-def get_service_name():
-    public_settings, protected_settings = get_settings()
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
-        return "azuremonitoragentmgr"
-    else:
-        return "azuremonitoragent"
-
 def check_kill_process(pstring):
     for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
         fields = line.split()
@@ -682,8 +675,6 @@ def disable():
     #stop the metrics process
     stop_metrics_process()
 
-    service_name = get_service_name()
-
     # stop PA and agent launcher
     hutil_log_info('Handler initiating PA and agent launcher')
     if is_systemd() and platform.machine() != 'aarch64':
@@ -743,6 +734,12 @@ def get_managed_identity():
     """
     identifier_name = identifier_value = ""
     public_settings, _ = get_settings()
+
+    if public_settings is not None and public_settings.get(AzureMonitorConfigKey):
+        azure_monitor_configuration = public_settings.get(AzureMonitorConfigKey)
+
+        if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
+            public_settings = azure_monitor_configuration.get("configuration")
 
     if public_settings is not None and "authentication" in public_settings and "managedIdentity" in public_settings.get("authentication"):
         managedIdentity = public_settings.get("authentication").get("managedIdentity")
