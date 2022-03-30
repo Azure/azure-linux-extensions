@@ -634,7 +634,7 @@ def handle_gcs_config(public_settings, protected_settings, default_configs):
 
 def handle_mcs_config(public_settings, protected_settings, default_configs):
     """
-    Populate the defualts for MCS mode
+    Populate the defaults for MCS mode
     """
     default_configs["ENABLE_MCS"] = "true"
     default_configs["PA_GIG_BRIDGE_MODE"] = "true"
