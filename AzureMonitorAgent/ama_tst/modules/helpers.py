@@ -114,3 +114,4 @@ def find_wkspc_id():
 
 def find_vm_region():
     return None
+    

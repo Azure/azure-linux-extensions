@@ -241,4 +241,3 @@ def run_logcollector(output_location):
     print("--------------------------------------------------------------------------------")
     print("You can find the AMA logs at the following location: {0}".format(tgz_filepath))
     return
-
