@@ -3,6 +3,7 @@
 COMMAND="./modules/main.py"
 PYTHON=""
 FUTURE_PATH=""
+TST_VERSION="1.0"  # update when changes are made to TST
 
 find_python() {
     local python_exec_command=$1
@@ -34,5 +35,7 @@ else
     echo ""
 fi
 
+echo "Starting AMA Troubleshooting Tool v.$TST_VERSION..."
+echo ""
 PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND}
 exit $?
