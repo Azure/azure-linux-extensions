@@ -8,6 +8,12 @@ try:
 except NameError:
     pass
 
+# backwards compatible devnull variable for Python 3.3 vs earlier
+try:
+    DEVNULL = subprocess.DEVNULL
+except:
+    DEVNULL = open(os.devnull)
+
 
 def get_input(question, check_ans, no_fit):
     answer = input(" {0}: ".format(question))
@@ -57,22 +63,36 @@ def find_vm_distro():
 
 def find_package_manager():
     """
-    Checks if the dist is debian based or centos based and assigns the package manager accordingly
+    Checks which package manager is on the system
     """
     pkg_manager = ""
-    dist, _ = find_vm_distro()
-
-    dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner", "mariner", "rhel"])
-    for dpkg_dist in dpkg_set:
-        if dist.startswith(dpkg_dist):
+    
+    # check if debian system
+    if (os.path.isfile("/etc/debian_version")):
+        try:
+            subprocess.check_call("command -v dpkg", shell=True, stdout=DEVNULL)
             pkg_manager = "dpkg"
-            break
-
-    for rpm_dist in rpm_set:
-        if dist.startswith(rpm_dist):
+        except subprocess.CalledProcessError:
+            pass
+    # check if redhat system
+    elif (os.path.isfile("/etc/redhat_version")):
+        try:
+            subprocess.check_call("command -v rpm", shell=True, stdout=DEVNULL)
             pkg_manager = "rpm"
-            break
+        except subprocess.CalledProcessError:
+            pass
+
+    # likely SUSE or modified VM, just check dpkg and rpm
+    if (pkg_manager == ""):
+        try:
+            subprocess.check_call("command -v dpkg", shell=True, stdout=DEVNULL)
+            pkg_manager = "dpkg"
+        except subprocess.CalledProcessError:
+            try:
+                subprocess.check_call("command -v rpm", shell=True, stdout=DEVNULL)
+                pkg_manager = "rpm"
+            except subprocess.CalledProcessError:
+                pass
 
     return pkg_manager
 
