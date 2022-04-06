@@ -61,12 +61,12 @@ class Test_UbuntuPatching(unittest.TestCase):
         self.assertEqual(exists_mock.call_count, 2)
 
         # Test 2: Other Entries along with osencrypt
-        crypttab_contents="mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        crypttab_contents="mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
         "osencrypt /dev/sda1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
-        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
-        expected_crypttab_contents="mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        expected_crypttab_contents="mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
         "osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
-        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        "mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
         open_mock.reset_mock()
         ce_mock.reset_mock()
         exists_mock.reset_mock()
@@ -79,11 +79,11 @@ class Test_UbuntuPatching(unittest.TestCase):
 
         # Test 3: osencrypt already with /dev/disk/azure/root-part1
         crypttab_contents="""osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh
-        mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
-        mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
+        mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail
+        mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
         expected_crypttab_contents="""osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh
-        mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
-        mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
+        mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail
+        mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
         open_mock.reset_mock()
         ce_mock.reset_mock()
         exists_mock.reset_mock()
@@ -96,15 +96,15 @@ class Test_UbuntuPatching(unittest.TestCase):
 
         # Test 4: crypttab has comments and empty lines
         crypttab_contents="#This is mock crypttab file\n"\
-        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
         "osencrypt /dev/sda1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
         "\n"\
-        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        "mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
         expected_crypttab_contents="#This is mock crypttab file\n"\
-        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
         "osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
         "\n"\
-        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        "mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
         open_mock.reset_mock()
         ce_mock.reset_mock()
         exists_mock.reset_mock()
@@ -117,15 +117,15 @@ class Test_UbuntuPatching(unittest.TestCase):
 
         # Test 5: osencrypt entry with /dev/disk/by-id/wwn-*
         crypttab_contents="#This is mock crypttab file\n"\
-        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
         "osencrypt /dev/disk/by-id/wwn-0x60022480b469b749f472dfc8093da5dd-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
         "\n"\
-        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        "mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
         expected_crypttab_contents="#This is mock crypttab file\n"\
-        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
         "osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
         "\n"\
-        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        "mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
         open_mock.reset_mock()
         ce_mock.reset_mock()
         exists_mock.reset_mock()
@@ -138,15 +138,15 @@ class Test_UbuntuPatching(unittest.TestCase):
 
         # Test 6: osencrypt entry with /dev/disk/by-id/scsi-*
         crypttab_contents="#This is mock crypttab file\n"\
-        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
         "osencrypt /dev/disk/by-id/scsi-0x60022480b469b749f472dfc8093da5dd-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
         "\n"\
-        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        "mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
         expected_crypttab_contents="#This is mock crypttab file\n"\
-        "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
+        "mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail\n"\
         "osencrypt /dev/disk/azure/root-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n"\
         "\n"\
-        "mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        "mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
         open_mock.reset_mock()
         ce_mock.reset_mock()
         exists_mock.reset_mock()
@@ -159,11 +159,11 @@ class Test_UbuntuPatching(unittest.TestCase):
 
         # Test 7: /dev/disk/azure/root-part1 does not exist
         crypttab_contents="""osencrypt /dev/disk/azure/scsi0/lun0-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh
-        mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
-        mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
+        mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail
+        mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
         expected_crypttab_contents="""osencrypt /dev/disk/azure/scsi0/lun0-part1 none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh
-        mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,nofail
-        mapper_name1 /dev/dev_path1 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
+        mapper_name /dev/dev_path /azure_bek_disk/LinuxPassPhraseFileName luks,nofail
+        mapper_name1 /dev/dev_path1 /azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"""
         open_mock.reset_mock()
         ce_mock.reset_mock()
         exists_mock.reset_mock()

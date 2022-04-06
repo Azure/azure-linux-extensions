@@ -42,9 +42,9 @@ numtries=${3:-10}
 
 info "luksOpen $device $luksname"
 
-ls /mnt/azure_bek_disk/LinuxPassPhraseFileName* || (mkdir -p /mnt/azure_bek_disk/ && mount -L "BEK VOLUME" /mnt/azure_bek_disk/)
+ls /azure_bek_disk/LinuxPassPhraseFileName* || (mkdir -p /azure_bek_disk/ && mount -L "BEK VOLUME" /azure_bek_disk/)
 
-for luksfile in $(ls /mnt/azure_bek_disk/LinuxPassPhraseFileName*); do
+for luksfile in $(ls /azure_bek_disk/LinuxPassPhraseFileName*); do
     break;
 done
 
@@ -77,7 +77,7 @@ if [ $ask_passphrase -ne 0 ]; then
     unset luks_open
 fi
 
-umount /mnt/azure_bek_disk
+umount /azure_bek_disk
 
 unset device luksname luksfile
 
