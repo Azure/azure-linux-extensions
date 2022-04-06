@@ -1,3 +1,7 @@
+1.2.0.92
+- Add support for Ubuntu 20.04 ARM64 image
+- Add support for RHEL 8.5
+
 1.2.0.91
 - Enable Online Encryption for data disks
 - Setup encryption layer for all disks and do encryption in background
