@@ -16,7 +16,7 @@ class Test_Bek_Util(unittest.TestCase):
     @mock.patch('DiskUtil.DiskUtil', autospec=True)
     def test_is_bek_volume_mounted_and_formatted_expected(self, disk_util_mock):
         bek_util = BekUtil(disk_util_mock, self.logger)
-        disk_util_mock.get_mount_items.return_value = [{"src":"/dev/sdc1", "dest":"/mnt/azure_bek_disk", "fs":"vfat"}]
+        disk_util_mock.get_mount_items.return_value = [{"src":"/dev/sdc1", "dest":"/azure_bek_disk", "fs":"vfat"}]
         bek_expected, fault_reason = bek_util.is_bek_volume_mounted_and_formatted()
         self.assertTrue(bek_expected)
 
@@ -31,7 +31,7 @@ class Test_Bek_Util(unittest.TestCase):
     @mock.patch('DiskUtil.DiskUtil', autospec=True)
     def test_is_bek_volume_mounted_and_formatted_wrong_fs(self, disk_util_mock):
         bek_util = BekUtil(disk_util_mock, self.logger)
-        disk_util_mock.get_mount_items.return_value = [{"src":"/dev/sdc1", "dest":"/mnt/azure_bek_disk", "fs":"wrongFS"}, {"src":"/dev/sda1", "dest":"/", "fs":"ext4"}]
+        disk_util_mock.get_mount_items.return_value = [{"src":"/dev/sdc1", "dest":"/azure_bek_disk", "fs":"wrongFS"}, {"src":"/dev/sda1", "dest":"/", "fs":"ext4"}]
         bek_expected, fault_reason = bek_util.is_bek_volume_mounted_and_formatted()
         self.assertFalse(bek_expected)
         self.assertEqual(fault_reason, bek_util.wrong_fs_msg)

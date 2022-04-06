@@ -40,7 +40,7 @@ class BekUtil(object):
     def __init__(self, disk_util, logger):
         self.disk_util = disk_util
         self.logger = logger
-        self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
+        self.bek_filesystem_mount_point = '/azure_bek_disk'
         self.bek_label = 'BEK VOLUME'
         self.bek_filesystem = 'vfat'
         self.wrong_fs_msg = "BEK does not have vfat filesystem."

@@ -128,7 +128,7 @@ class PatchBootSystemState(OSEncryptionState):
             # add root partition UUID to boot script cryptsetup command
             self.command_executor.Execute("sed -i 's/ROOTPARTUUID/{0}/g' /usr/share/initramfs-tools/scripts/init-premount/crypt-ade-boot".format(root_partition_uuid), True)
             # add root partition UUID to /etc/crypttab
-            entry = 'osencrypt /dev/disk/by-partuuid/{0} /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partition_uuid)
+            entry = 'osencrypt /dev/disk/by-partuuid/{0} /azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partition_uuid)
             self._append_contents_to_file(entry, '/etc/crypttab')
         else:
             message = "Failed to get root partition UUID"
