@@ -1195,7 +1195,7 @@ def is_vm_supported_for_extension(operation):
                        'ubuntu' : ['16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
-                       'mariner' : ['2.0'] # Mariner 2.0
+                       'mariner' : ['2'] # Mariner 2.0
     }
 
     vm_supported = False
