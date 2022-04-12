@@ -496,11 +496,11 @@ def enable():
     except Exception as e:
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
-    if "ENABLE_MCS" in default_configs:
+    if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == True:
         set_amacoreagent_to_tenantdirectoryconfig_mode()
         restart_amacoreagent()
         restart_launcher()
-    elif ensure["azuremonitoragentmgr"]:
+    elif "azuremonitoragentmgr" in ensure and ensure["azuremonitoragentmgr"] == True:
         # If azuremonitoragentmgr is enabled, allow for tenants to leverage AMACoreAgent in GIG mode. Launch AMACoreAgent in "config port mode".
         set_amacoreagent_to_configport_mode()
         restart_amacoreagent()
@@ -732,9 +732,9 @@ def set_amacoreagent_config_mode(is_tenant_directory_mode = True):
                     for line in current:
                         if line.startswith("ExecStart="):
                             if is_tenant_directory_mode:
-                                new.write("ExecStart=/opt/microsoft/azuremonitoragent/bin/amacoreagent -c /etc/opt/microsoft/azuremonitoragent/amacoreagent")
+                                new.write("ExecStart=/opt/microsoft/azuremonitoragent/bin/amacoreagent -c /etc/opt/microsoft/azuremonitoragent/amacoreagent\n")
                             else:
-                                new.write("ExecStart=/opt/microsoft/azuremonitoragent/bin/amacoreagent")
+                                new.write("ExecStart=/opt/microsoft/azuremonitoragent/bin/amacoreagent\n")
                         else:
                             new.write(line)
             os.rename(temp_service_file, service_file)
