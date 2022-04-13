@@ -497,12 +497,9 @@ def enable():
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == True:
-        set_amacoreagent_to_tenantdirectoryconfig_mode()
         restart_amacoreagent()
         restart_launcher()
     elif "azuremonitoragentmgr" in ensure and ensure["azuremonitoragentmgr"] == True:
-        # If azuremonitoragentmgr is enabled, allow for tenants to leverage AMACoreAgent in GIG mode. Launch AMACoreAgent in "config port mode".
-        set_amacoreagent_to_configport_mode()
         restart_amacoreagent()
 
     hutil_log_info('Handler initiating onboarding.')
@@ -721,33 +718,6 @@ def update():
     """
 
     return 0, ""
-
-def set_amacoreagent_config_mode(is_tenant_directory_mode = True):
-    service_file = "/etc/systemd/system/azuremonitor-coreagent.service"
-    temp_service_file = "/etc/systemd/system/azuremonitor-coreagent.service.temp"
-    try:
-        if os.path.isfile(service_file):
-            with open(service_file, "rt") as current:
-                with open(temp_service_file, "wt") as new:
-                    for line in current:
-                        if line.startswith("ExecStart="):
-                            if is_tenant_directory_mode:
-                                new.write("ExecStart=/opt/microsoft/azuremonitoragent/bin/amacoreagent -c /etc/opt/microsoft/azuremonitoragent/amacoreagent\n")
-                            else:
-                                new.write("ExecStart=/opt/microsoft/azuremonitoragent/bin/amacoreagent\n")
-                        else:
-                            new.write(line)
-            os.rename(temp_service_file, service_file)
-    except Exception as e:
-        log_and_exit("Enable", GenericErrorCode, "Failed to set AMACoreAgent config mode in {0}: {1}".format(service_file, e))
-
-def set_amacoreagent_to_tenantdirectoryconfig_mode():
-    hutil_log_info('Setting amacoreagent to tenant directory config mode')
-    set_amacoreagent_config_mode(True)
-
-def set_amacoreagent_to_configport_mode():
-    hutil_log_info('Setting amacoreagent to config port mode')
-    set_amacoreagent_config_mode(False)
 
 def restart_amacoreagent():
     if platform.machine() == 'aarch64':
