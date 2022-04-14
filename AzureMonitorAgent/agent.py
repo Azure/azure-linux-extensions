@@ -277,11 +277,11 @@ def compare_and_copy_bin(src, dest):
         
         os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
 
-def copy_pa_binaries():
-    pa_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
-    pa_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent" 
+def copy_amacoreagent_binaries():
+    amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
+    amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
 
-    compare_and_copy_bin(pa_bin_local_path, pa_bin)
+    compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
@@ -322,8 +322,8 @@ def install():
                                          retry_check = retry_if_dpkg_or_rpm_locked,
                                          final_check = final_check_if_dpkg_or_rpm_locked)
 
-    # Copy the PA and agentlauncher binaries
-    copy_pa_binaries()
+    # Copy the AMACoreAgent and agentlauncher binaries
+    copy_amacoreagent_binaries()
 
     # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
     # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
@@ -496,9 +496,11 @@ def enable():
     except Exception as e:
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
-    if "ENABLE_MCS" in default_configs:
-        restart_pa()
+    if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == True:
+        restart_amacoreagent()
         restart_launcher()
+    elif "azuremonitoragentmgr" in ensure and ensure["azuremonitoragentmgr"] == True:
+        restart_amacoreagent()
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -687,8 +689,8 @@ def disable():
     #stop the metrics process
     stop_metrics_process()
 
-    # stop PA and agent launcher
-    hutil_log_info('Handler initiating PA and agent launcher')
+    # stop amacoreagent and agent launcher
+    hutil_log_info('Handler initiating Core Agent and agent launcher')
     if is_systemd() and platform.machine() != 'aarch64':
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
@@ -717,18 +719,18 @@ def update():
 
     return 0, ""
 
-def restart_pa():
+def restart_amacoreagent():
     if platform.machine() == 'aarch64':
         return
-    # start PA and agent launcher
-    hutil_log_info('Handler initiating PA')
+    # start Core Agent and agent launcher
+    hutil_log_info('Handler initiating Core Agent')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl start azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
 
 def restart_launcher():
     if platform.machine() == 'aarch64':
         return
-    # start PA and agent launcher
+    # start Core Agent and agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
