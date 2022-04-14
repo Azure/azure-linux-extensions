@@ -54,7 +54,8 @@ class PrereqState(OSEncryptionState):
            (distro_info[0] == 'centos' and distro_info[1].startswith('8.2')) or
            (distro_info[0] == 'centos' and distro_info[1].startswith('8.3')) or
            (distro_info[0] == 'centos' and distro_info[1].startswith('8.4')) or
-           (distro_info[0] == 'centos' and distro_info[1].startswith('8.5'))):
+           (distro_info[0] == 'centos' and distro_info[1].startswith('8.5')) or
+           (distro_info[0] == 'mariner' and distro_info[1].startswith('1.0'))):
             self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
                                                                                       distro_info[1]))
         else:

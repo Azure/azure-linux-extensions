@@ -2006,7 +2006,8 @@ def daemon_encrypt():
               (distro_name == 'centos' and distro_version.startswith('8.4')) or
               (distro_name == 'centos' and distro_version.startswith('8.3')) or
               (distro_name == 'centos' and distro_version.startswith('8.2')) or
-              (distro_name == 'centos' and distro_version.startswith('8.1'))):
+              (distro_name == 'centos' and distro_version.startswith('8.1')) or
+              (distro_name == 'mariner' and distro_version.startswith('1.0'))):
             from oscrypto.rhel_81 import RHEL81EncryptionStateMachine
             os_encryption = RHEL81EncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,
