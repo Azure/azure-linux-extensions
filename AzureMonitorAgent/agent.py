@@ -1196,7 +1196,8 @@ def is_vm_supported_for_extension(operation):
                        'debian' : ['9', '10'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'], # SLES
-                       'cbl-mariner' : ['1'] # Mariner
+                       'cbl-mariner' : ['1'], # Mariner 1.0
+                       'mariner' : ['2'] # Mariner 2.0
     }
 
     vm_supported = False
@@ -1260,7 +1261,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', "rhel"]:
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel']:
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 
