@@ -1188,7 +1188,7 @@ def is_vm_supported_for_extension(operation):
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['7', '8'], # Rhel
+    supported_dists_x86_64 = {'redhat' : ['7', '8'], # Rhel
                        'rhel' : ['7', '8'], # Rhel
                        'centos' : ['7', '8'], # CentOS
                        'red hat' : ['7', '8'], # Oracle, RHEL
@@ -1199,6 +1199,15 @@ def is_vm_supported_for_extension(operation):
                        'cbl-mariner' : ['1'], # Mariner 1.0
                        'mariner' : ['2'] # Mariner 2.0
     }
+
+    supported_dists_aarch64 = {'rhel' : ['8'], # Rhel
+                       'ubuntu' : ['18.04', '20.04'], # Ubuntu
+    }
+
+    if platform.machine() == 'aarch64':
+        supported_dists = supported_dists_aarch64
+    else:
+        supported_dists = supported_dists_x86_64
 
     vm_supported = False
     vm_dist, vm_ver = find_vm_distro(operation)
