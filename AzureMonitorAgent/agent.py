@@ -1200,7 +1200,7 @@ def is_vm_supported_for_extension(operation):
                        'mariner' : ['2'] # Mariner 2.0
     }
 
-    supported_dists_aarch64 = {'rhel' : ['8'], # Rhel
+    supported_dists_aarch64 = {'redhat' : ['8'], # Rhel
                        'ubuntu' : ['18.04', '20.04'], # Ubuntu
     }
 
