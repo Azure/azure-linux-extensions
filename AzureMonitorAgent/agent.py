@@ -652,8 +652,10 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     """
     default_configs["ENABLE_MCS"] = "true"
     default_configs["PA_GIG_BRIDGE_MODE"] = "true"
-    # this port will be dynamic in future
+    # April 2022: PA_FLUENT_SOCKET_PORT setting is being deprecated in place of PA_DATA_PORT. Remove when AMA 1.17 and earlier no longer need servicing.
     default_configs["PA_FLUENT_SOCKET_PORT"] = "13000"
+    # this port will be dynamic in future
+    default_configs["PA_DATA_PORT"] = "13000"
 
     # fetch proxy settings
     if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
