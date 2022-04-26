@@ -506,15 +506,23 @@ def enable():
 
     if HUtilObject and HUtilObject.is_seq_smaller():
         # Either upgrade has just happened (in which case we need to start), or enable was called with no change to extension config
-        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the LKG sequence number. Starting agent only if it is not yet running.")
+        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the LKG sequence number. Starting service(s) only if it is not yet running.")
         operations = ["start", "enable"]
     else:
         # Either this is a clean install (in which case restart is effectively start), or extension config has changed
-        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is greater than the LKG sequence number. Restarting agent to pick up the new config.")
+        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is greater than the LKG sequence number. Restarting service(s) to pick up the new config.")
         operations = ["restart", "enable"]
 
+    output = ""
+
+    # Ensure non-required services are not running; do not block if this step fails
+    for service in [s for s in ensure.keys() if not ensure[s]]:
+        exit_code, disable_output = run_command_and_log(get_service_command(service, "stop", "disable"))
+        output += disable_output
+
     for service in [s for s in ensure.keys() if ensure[s]]:
-        exit_code, output = run_command_and_log(get_service_command(service, *operations))
+        exit_code, enable_output = run_command_and_log(get_service_command(service, *operations))
+        output += enable_output
 
         if exit_code != 0:
             status_command = get_service_command(service, "status")
