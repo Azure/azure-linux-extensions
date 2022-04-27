@@ -1129,7 +1129,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner", "mariner", "rhel"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner", "mariner", "rhel", "rocky"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1205,7 +1205,8 @@ def is_vm_supported_for_extension(operation):
                        'ubuntu' : ['16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
-                       'mariner' : ['2'] # Mariner 2.0
+                       'mariner' : ['2'], # Mariner 2.0
+                       'rocky' : ['8'] # Rocky
     }
 
     supported_dists_aarch64 = {'redhat' : ['8'], # Rhel
@@ -1279,7 +1280,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel']:
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel', 'rocky']:
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 
