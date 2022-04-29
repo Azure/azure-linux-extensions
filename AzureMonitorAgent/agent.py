@@ -1199,8 +1199,6 @@ def is_vm_supported_for_extension(operation):
     supported_dists_x86_64 = {'redhat' : ['7', '8'], # Rhel
                        'rhel' : ['7', '8'], # Rhel
                        'centos' : ['7', '8'], # CentOS
-                       'rocky' : ['8'], # Rocky Linux
-                       'almalinux' : ['8'], # Alma Linux
                        'red hat' : ['7', '8'], # Oracle, RHEL
                        'oracle' : ['7', '8'], # Oracle
                        'debian' : ['9', '10'], # Debian
@@ -1208,7 +1206,9 @@ def is_vm_supported_for_extension(operation):
                        'suse' : ['12'], 'sles' : ['15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
                        'mariner' : ['2'], # Mariner 2.0
-                       'rocky' : ['8'] # Rocky
+                       'rocky' : ['8'], # Rocky
+                       'almalinux' : ['8'] # Alma Linux
+
     }
 
     supported_dists_aarch64 = {'redhat' : ['8'], # Rhel
