@@ -113,20 +113,16 @@ FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
-# Commands
-AMAInstallCommand = ''
-AMAUninstallCommand = ''
-AMAServiceStartCommand = ''
-AMAServiceRestartCommand = ''
-AMAServiceStopCommand = ''
-AMAServiceStatusCommand = ''
-
 # Error codes
 GenericErrorCode = 1
 UnsupportedOperatingSystem = 51
 IndeterminateOperatingSystem = 51
 MissingorInvalidParameterErrorCode = 53
 DPKGOrRPMLockedErrorCode = 56
+
+# Settings
+GenevaConfigKey = "genevaConfiguration"
+AzureMonitorConfigKey = "azureMonitorConfiguration"
 
 # Configuration
 HUtilObject = None
@@ -247,12 +243,15 @@ def is_systemd():
     """
     return os.path.isdir("/run/systemd/system")
 
-def get_service_name():
-    public_settings, protected_settings = get_settings()
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
-        return "azuremonitoragentmgr"
+def get_service_command(service, *operations):
+    """
+    Get the appropriate service command [sequence] for the provided service name and operation(s)
+    """
+    if is_systemd():
+        return " && ".join(["systemctl {0} {1}".format(operation, service) for operation in operations])
     else:
-        return "azuremonitoragent"
+        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service))
+        return '/etc/init.d/{0} {1}'.format(service, operations[0])
 
 def check_kill_process(pstring):
     for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
@@ -278,11 +277,11 @@ def compare_and_copy_bin(src, dest):
         
         os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
 
-def copy_pa_binaries():
-    pa_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
-    pa_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent" 
+def copy_amacoreagent_binaries():
+    amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
+    amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
 
-    compare_and_copy_bin(pa_bin_local_path, pa_bin)
+    compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
@@ -296,7 +295,6 @@ def install():
     Note: install operation times out from WAAgent at 15 minutes, so do not
     wait longer.
     """
-    global AMAInstallCommand
 
     find_package_manager("Install")
     set_os_arch()
@@ -324,9 +322,21 @@ def install():
                                          retry_check = retry_if_dpkg_or_rpm_locked,
                                          final_check = final_check_if_dpkg_or_rpm_locked)
 
-    # Copy the PA and agentlauncher binaries
-    copy_pa_binaries()
+    # Copy the AMACoreAgent and agentlauncher binaries
+    copy_amacoreagent_binaries()
 
+    # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
+    # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
+    if vm_dist.replace(' ','').lower().startswith('redhat') and vm_ver == '8.6' and platform.machine() == 'aarch64':
+        exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
+                                         retry_check = retry_if_dpkg_or_rpm_locked,
+                                         final_check = final_check_if_dpkg_or_rpm_locked)
+
+    # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
+    if is_systemd() and platform.machine() == 'aarch64':
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+    
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
     if exit_code == 0:
@@ -359,7 +369,6 @@ def uninstall():
     This is a somewhat soft uninstall. It is not a purge.
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
-    global AMAUninstallCommand
 
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
@@ -388,15 +397,21 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
-    global AMAServiceStartCommand, AMAServiceRestartCommand, AMAServiceStatusCommand
 
-    # start the metrics process if its not already running
     public_settings, protected_settings = get_settings()
 
-    if (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+    # start the metrics watcher if its not already running
+    if ((protected_settings is None or len(protected_settings) == 0) or
+        (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application") or
+        (public_settings is not None and public_settings.get(AzureMonitorConfigKey) is not None and public_settings.get(AzureMonitorConfigKey).get("ensure") == True)):
         start_metrics_process()
 
     exit_if_vm_not_supported('Enable')
+
+    ensure = OrderedDict([
+        ("azuremonitoragent", False),
+        ("azuremonitoragentmgr", False)
+    ])
 
     # Use an Ordered Dictionary to ensure MDSD_OPTIONS (and other dependent variables) are written after their dependencies
     default_configs = OrderedDict([
@@ -414,157 +429,50 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
-    # Decide the mode
-    if public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
-        hutil_log_info("Detecting Auto-Config mode.")
+    """
+    Decide the mode and configuration. There are two supported configuration schema, mix-and-match between schemas is disallowed:
+        Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
+        Next-Generation: allows MCS, GCS multi tenant, or both
+    """
+
+    # Next-generation schema
+    if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):
+
+        geneva_configuration = public_settings.get(GenevaConfigKey)
+        azure_monitor_configuration = public_settings.get(AzureMonitorConfigKey)
+
+        # Check for mix-and match of next-generation and legacy schema content
+        if len(public_settings) > 1 and ((geneva_configuration and not azure_monitor_configuration) or (azure_monitor_configuration and not geneva_configuration)):
+            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Mixing genevaConfiguration or azureMonitorConfiguration with other configuration schemas is not allowed')
+
+        if geneva_configuration and geneva_configuration.get("enable") == True:
+            hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
+            ensure["azuremonitoragentmgr"] = True
+
+        if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
+            hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
+            ensure["azuremonitoragent"] = True
+            azure_monitor_public_settings = azure_monitor_configuration.get("configuration")
+            azure_monitor_protected_settings = protected_settings.get(AzureMonitorConfigKey) if protected_settings is not None else None
+            handle_mcs_config(azure_monitor_public_settings, azure_monitor_protected_settings, default_configs)
+
+    # Legacy schema
+    elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
+        hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
+        ensure["azuremonitoragentmgr"] = True
+
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
-        default_configs["ENABLE_MCS"] = "true"
-        default_configs["PA_GIG_BRIDGE_MODE"] = "true"
-        # this port will be dynamic in future
-        default_configs["PA_FLUENT_SOCKET_PORT"] = "13000"
+        hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
+        ensure["azuremonitoragent"] = True
+        handle_mcs_config(public_settings, protected_settings, default_configs)
 
-        # fetch proxy settings
-        if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
-            default_configs["MDSD_PROXY_MODE"] = "application"
-
-            if "address" in public_settings.get("proxy"):
-                default_configs["MDSD_PROXY_ADDRESS"] = public_settings.get("proxy").get("address")
-            else:
-                log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
-
-            if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
-                if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
-                    default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
-                    default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
-                else:
-                    log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
-
-        # add managed identity settings if they were provided
-        identifier_name, identifier_value, error_msg = get_managed_identity()
-
-        if error_msg:
-            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Failed to determine managed identity settings. {0}.'.format(error_msg))
-
-        if identifier_name and identifier_value:
-            default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
     else:
-        # look for LA protected settings
-        for var in list(protected_settings.keys()):
-            if "_key" in var or "_id" in var:
-                default_configs[var] = protected_settings.get(var)
-
-        # check if required GCS params are available
-        MONITORING_GCS_CERT_CERTFILE = None
-        if "certificate" in protected_settings:
-            MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
-
-        if "certificatePath" in protected_settings:
-            try:
-                with open(protected_settings.get("certificatePath"), 'r') as f:
-                    MONITORING_GCS_CERT_CERTFILE = f.read()
-            except Exception as ex:
-                log_and_exit('Enable', MissingorInvalidParameterErrorCode, 'Failed to read certificate {0}: {1}'.format(protected_settings.get("certificatePath"), ex))
-
-        MONITORING_GCS_CERT_KEYFILE = None
-        if "certificateKey" in protected_settings:
-            MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(protected_settings.get("certificateKey"))
-
-        if "certificateKeyPath" in protected_settings:
-            try:
-                with open(protected_settings.get("certificateKeyPath"), 'r') as f:
-                    MONITORING_GCS_CERT_KEYFILE = f.read()
-            except Exception as ex:
-                log_and_exit('Enable', MissingorInvalidParameterErrorCode, 'Failed to read certificate key {0}: {1}'.format(protected_settings.get("certificateKeyPath"), ex))
-
-        MONITORING_GCS_ENVIRONMENT = ""
-        if "monitoringGCSEnvironment" in protected_settings:
-            MONITORING_GCS_ENVIRONMENT = protected_settings.get("monitoringGCSEnvironment")
-
-        MONITORING_GCS_NAMESPACE = ""
-        if "namespace" in protected_settings:
-            MONITORING_GCS_NAMESPACE = protected_settings.get("namespace")
-
-        MONITORING_GCS_ACCOUNT = ""
-        if "monitoringGCSAccount" in protected_settings:
-            MONITORING_GCS_ACCOUNT = protected_settings.get("monitoringGCSAccount")
-
-        MONITORING_GCS_REGION = ""
-        if "monitoringGCSRegion" in protected_settings:
-            MONITORING_GCS_REGION = protected_settings.get("monitoringGCSRegion")
-
-        MONITORING_CONFIG_VERSION = ""
-        if "configVersion" in protected_settings:
-            MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
-
-        MONITORING_GCS_AUTH_ID_TYPE = ""
-        if "monitoringGCSAuthIdType" in protected_settings:
-            MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("monitoringGCSAuthIdType")
-
-        MONITORING_GCS_AUTH_ID = ""
-        if "monitoringGCSAuthId" in protected_settings:
-            MONITORING_GCS_AUTH_ID = protected_settings.get("monitoringGCSAuthId")
-
-        MONITORING_TENANT = ""
-        if "monitoringTenant" in protected_settings:
-            MONITORING_TENANT = protected_settings.get("monitoringTenant")
-
-        MONITORING_ROLE = ""
-        if "monitoringRole" in protected_settings:
-            MONITORING_ROLE = protected_settings.get("monitoringRole")
-
-        MONITORING_ROLE_INSTANCE = ""
-        if "monitoringRoleInstance" in protected_settings:
-            MONITORING_ROLE_INSTANCE = protected_settings.get("monitoringRoleInstance")
-
-
-        if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE == "")) or MONITORING_GCS_ENVIRONMENT == "" or MONITORING_GCS_NAMESPACE == "" or MONITORING_GCS_ACCOUNT == "" or MONITORING_GCS_REGION == "" or MONITORING_CONFIG_VERSION == "":
-            waagent_log_error('Not all required GCS parameters are provided')
-            raise ParameterMissingException
-        else:
-            # set the values for GCS
-            default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"
-            default_configs["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
-            default_configs["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
-            default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
-            default_configs["MONITORING_GCS_REGION"] = MONITORING_GCS_REGION
-            default_configs["MONITORING_CONFIG_VERSION"] = MONITORING_CONFIG_VERSION
-
-            # write the certificate and key to disk
-            uid = pwd.getpwnam("syslog").pw_uid
-            gid = grp.getgrnam("syslog").gr_gid
-
-            if MONITORING_GCS_AUTH_ID_TYPE != "":
-                default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
-
-            if MONITORING_GCS_AUTH_ID != "":
-                default_configs["MONITORING_GCS_AUTH_ID"] = MONITORING_GCS_AUTH_ID
-
-            if MONITORING_GCS_CERT_CERTFILE is not None:
-                default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/opt/microsoft/azuremonitoragent/gcscert.pem"
-                with open("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", "wb") as f:
-                    f.write(MONITORING_GCS_CERT_CERTFILE)
-                os.chown("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", 400))
-
-            if MONITORING_GCS_CERT_KEYFILE is not None:
-                default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/opt/microsoft/azuremonitoragent/gcskey.pem"
-                with open("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", "wb") as f:
-                    f.write(MONITORING_GCS_CERT_KEYFILE)
-                os.chown("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", uid, gid)
-                os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", 400))
-
-            if MONITORING_TENANT != "":
-                default_configs["MONITORING_TENANT"] = MONITORING_TENANT
-
-            if MONITORING_ROLE != "":
-                default_configs["MONITORING_ROLE"] = MONITORING_ROLE
-
-            if MONITORING_TENANT != "":
-                default_configs["MONITORING_ROLE_INSTANCE"] = MONITORING_ROLE_INSTANCE
+        hutil_log_info("Detected Geneva mode; azuremonitoragent service will be started to handle Geneva configuration")
+        ensure["azuremonitoragent"] = True
+        handle_gcs_config(public_settings, protected_settings, default_configs)
 
     config_file = "/etc/default/azuremonitoragent"
     temp_config_file = "/etc/default/azuremonitoragent_temp"
-    config_updated = False
 
     try:
         if os.path.isfile(config_file):
@@ -588,75 +496,225 @@ def enable():
     except Exception as e:
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
-    service_name = get_service_name()
-
-    if "ENABLE_MCS" in default_configs:
-        restart_pa()
+    if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == True:
+        start_amacoreagent()
         restart_launcher()
-
-    # Start and enable systemd services so they are started after system reboot.
-    AMAServiceStartCommand = 'systemctl start {0} && systemctl enable {0}'.format(service_name)
-    AMAServiceRestartCommand = 'systemctl restart {0} && systemctl enable {0}'.format(service_name)
-    AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
-    if not is_systemd():
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service_name))
-        AMAServiceStartCommand = '/etc/init.d/{0} start'.format(service_name)
-        AMAServiceRestartCommand = '/etc/init.d/{0} restart'.format(service_name)
-        AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
 
     hutil_log_info('Handler initiating onboarding.')
 
     if HUtilObject and HUtilObject.is_seq_smaller():
         # Either upgrade has just happened (in which case we need to start), or enable was called with no change to extension config
-        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the LKG sequence number. Starting agent only if it is not yet running.")
-        exit_code, output = run_command_and_log(AMAServiceStartCommand)
+        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is not greater than the LKG sequence number. Starting service(s) only if it is not yet running.")
+        operations = ["start", "enable"]
     else:
         # Either this is a clean install (in which case restart is effectively start), or extension config has changed
-        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is greater than the LKG sequence number. Restarting agent to pick up the new config.")
-        exit_code, output = run_command_and_log(AMAServiceRestartCommand)
+        hutil_log_info("Current sequence number, " + HUtilObject._context._seq_no + ", is greater than the LKG sequence number. Restarting service(s) to pick up the new config.")
+        operations = ["restart", "enable"]
 
-    if exit_code == 0:
-        HUtilObject.save_seq()
-    else:
-        status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
-        if status_exit_code != 0:
-            output += "Output of '{0}':\n{1}".format(AMAServiceStatusCommand, status_output)
+    output = ""
+
+    # Ensure non-required services are not running; do not block if this step fails
+    for service in [s for s in ensure.keys() if not ensure[s]]:
+        exit_code, disable_output = run_command_and_log(get_service_command(service, "stop", "disable"))
+        output += disable_output
+
+    for service in [s for s in ensure.keys() if ensure[s]]:
+        exit_code, enable_output = run_command_and_log(get_service_command(service, *operations))
+        output += enable_output
+
+        if exit_code != 0:
+            status_command = get_service_command(service, "status")
+            status_exit_code, status_output = run_command_and_log(status_command)
+
+            if status_exit_code != 0:
+                output += "Output of '{0}':\n{1}".format(status_command, status_output)
+                return exit_code, output
+
+    # Service(s) were successfully configured and started; increment sequence number
+    HUtilObject.save_seq()
 
     return exit_code, output
+
+def handle_gcs_config(public_settings, protected_settings, default_configs):
+    """
+    Populate the defaults for legacy-path GCS mode
+    """
+    # look for LA protected settings
+    for var in list(protected_settings.keys()):
+        if "_key" in var or "_id" in var:
+            default_configs[var] = protected_settings.get(var)
+
+    # check if required GCS params are available
+    MONITORING_GCS_CERT_CERTFILE = None
+    if "certificate" in protected_settings:
+        MONITORING_GCS_CERT_CERTFILE = base64.standard_b64decode(protected_settings.get("certificate"))
+
+    if "certificatePath" in protected_settings:
+        try:
+            with open(protected_settings.get("certificatePath"), 'r') as f:
+                MONITORING_GCS_CERT_CERTFILE = f.read()
+        except Exception as ex:
+            log_and_exit('Enable', MissingorInvalidParameterErrorCode, 'Failed to read certificate {0}: {1}'.format(protected_settings.get("certificatePath"), ex))
+
+    MONITORING_GCS_CERT_KEYFILE = None
+    if "certificateKey" in protected_settings:
+        MONITORING_GCS_CERT_KEYFILE = base64.standard_b64decode(protected_settings.get("certificateKey"))
+
+    if "certificateKeyPath" in protected_settings:
+        try:
+            with open(protected_settings.get("certificateKeyPath"), 'r') as f:
+                MONITORING_GCS_CERT_KEYFILE = f.read()
+        except Exception as ex:
+            log_and_exit('Enable', MissingorInvalidParameterErrorCode, 'Failed to read certificate key {0}: {1}'.format(protected_settings.get("certificateKeyPath"), ex))
+
+    MONITORING_GCS_ENVIRONMENT = ""
+    if "monitoringGCSEnvironment" in protected_settings:
+        MONITORING_GCS_ENVIRONMENT = protected_settings.get("monitoringGCSEnvironment")
+
+    MONITORING_GCS_NAMESPACE = ""
+    if "namespace" in protected_settings:
+        MONITORING_GCS_NAMESPACE = protected_settings.get("namespace")
+
+    MONITORING_GCS_ACCOUNT = ""
+    if "monitoringGCSAccount" in protected_settings:
+        MONITORING_GCS_ACCOUNT = protected_settings.get("monitoringGCSAccount")
+
+    MONITORING_GCS_REGION = ""
+    if "monitoringGCSRegion" in protected_settings:
+        MONITORING_GCS_REGION = protected_settings.get("monitoringGCSRegion")
+
+    MONITORING_CONFIG_VERSION = ""
+    if "configVersion" in protected_settings:
+        MONITORING_CONFIG_VERSION = protected_settings.get("configVersion")
+
+    MONITORING_GCS_AUTH_ID_TYPE = ""
+    if "monitoringGCSAuthIdType" in protected_settings:
+        MONITORING_GCS_AUTH_ID_TYPE = protected_settings.get("monitoringGCSAuthIdType")
+
+    MONITORING_GCS_AUTH_ID = ""
+    if "monitoringGCSAuthId" in protected_settings:
+        MONITORING_GCS_AUTH_ID = protected_settings.get("monitoringGCSAuthId")
+
+    MONITORING_TENANT = ""
+    if "monitoringTenant" in protected_settings:
+        MONITORING_TENANT = protected_settings.get("monitoringTenant")
+
+    MONITORING_ROLE = ""
+    if "monitoringRole" in protected_settings:
+        MONITORING_ROLE = protected_settings.get("monitoringRole")
+
+    MONITORING_ROLE_INSTANCE = ""
+    if "monitoringRoleInstance" in protected_settings:
+        MONITORING_ROLE_INSTANCE = protected_settings.get("monitoringRoleInstance")
+
+
+    if ((MONITORING_GCS_CERT_CERTFILE is None or MONITORING_GCS_CERT_KEYFILE is None) and (MONITORING_GCS_AUTH_ID_TYPE == "")) or MONITORING_GCS_ENVIRONMENT == "" or MONITORING_GCS_NAMESPACE == "" or MONITORING_GCS_ACCOUNT == "" or MONITORING_GCS_REGION == "" or MONITORING_CONFIG_VERSION == "":
+        log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Not all required GCS parameters are provided')
+    else:
+        # set the values for GCS
+        default_configs["MONITORING_USE_GENEVA_CONFIG_SERVICE"] = "true"
+        default_configs["MONITORING_GCS_ENVIRONMENT"] = MONITORING_GCS_ENVIRONMENT
+        default_configs["MONITORING_GCS_NAMESPACE"] = MONITORING_GCS_NAMESPACE
+        default_configs["MONITORING_GCS_ACCOUNT"] = MONITORING_GCS_ACCOUNT
+        default_configs["MONITORING_GCS_REGION"] = MONITORING_GCS_REGION
+        default_configs["MONITORING_CONFIG_VERSION"] = MONITORING_CONFIG_VERSION
+
+        # write the certificate and key to disk
+        uid = pwd.getpwnam("syslog").pw_uid
+        gid = grp.getgrnam("syslog").gr_gid
+
+        if MONITORING_GCS_AUTH_ID_TYPE != "":
+            default_configs["MONITORING_GCS_AUTH_ID_TYPE"] = MONITORING_GCS_AUTH_ID_TYPE
+
+        if MONITORING_GCS_AUTH_ID != "":
+            default_configs["MONITORING_GCS_AUTH_ID"] = MONITORING_GCS_AUTH_ID
+
+        if MONITORING_GCS_CERT_CERTFILE is not None:
+            default_configs["MONITORING_GCS_CERT_CERTFILE"] = "/etc/opt/microsoft/azuremonitoragent/gcscert.pem"
+            with open("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", "wb") as f:
+                f.write(MONITORING_GCS_CERT_CERTFILE)
+            os.chown("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", uid, gid)
+            os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcscert.pem", 400))
+
+        if MONITORING_GCS_CERT_KEYFILE is not None:
+            default_configs["MONITORING_GCS_CERT_KEYFILE"] = "/etc/opt/microsoft/azuremonitoragent/gcskey.pem"
+            with open("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", "wb") as f:
+                f.write(MONITORING_GCS_CERT_KEYFILE)
+            os.chown("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", uid, gid)
+            os.system('chmod {1} {0}'.format("/etc/opt/microsoft/azuremonitoragent/gcskey.pem", 400))
+
+        if MONITORING_TENANT != "":
+            default_configs["MONITORING_TENANT"] = MONITORING_TENANT
+
+        if MONITORING_ROLE != "":
+            default_configs["MONITORING_ROLE"] = MONITORING_ROLE
+
+        if MONITORING_TENANT != "":
+            default_configs["MONITORING_ROLE_INSTANCE"] = MONITORING_ROLE_INSTANCE
+
+def handle_mcs_config(public_settings, protected_settings, default_configs):
+    """
+    Populate the defaults for MCS mode
+    """
+    default_configs["ENABLE_MCS"] = "true"
+    default_configs["PA_GIG_BRIDGE_MODE"] = "true"
+    # April 2022: PA_FLUENT_SOCKET_PORT setting is being deprecated in place of PA_DATA_PORT. Remove when AMA 1.17 and earlier no longer need servicing.
+    default_configs["PA_FLUENT_SOCKET_PORT"] = "13000"
+    # this port will be dynamic in future
+    default_configs["PA_DATA_PORT"] = "13000"
+
+    # fetch proxy settings
+    if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
+        default_configs["MDSD_PROXY_MODE"] = "application"
+
+        if "address" in public_settings.get("proxy"):
+            default_configs["MDSD_PROXY_ADDRESS"] = public_settings.get("proxy").get("address")
+        else:
+            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
+
+        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
+            if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
+                default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
+                default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
+            else:
+                log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+
+    # add managed identity settings if they were provided
+    identifier_name, identifier_value, error_msg = get_managed_identity()
+
+    if error_msg:
+        log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Failed to determine managed identity settings. {0}.'.format(error_msg))
+
+    if identifier_name and identifier_value:
+        default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
 
 def disable():
     """
     Disable Azure Monitor Linux Agent process on the VM.
     Note: disable operation times out from WAAgent at 15 minutes
     """
-    global AMAServiceStopCommand, AMAServiceStatusCommand
 
     #stop the metrics process
     stop_metrics_process()
 
-    service_name = get_service_name()
-
-    # stop PA and agent launcher
-    hutil_log_info('Handler initiating PA and agent launcher')
-    if is_systemd():
+    # stop amacoreagent and agent launcher
+    hutil_log_info('Handler initiating Core Agent and agent launcher')
+    if is_systemd() and platform.machine() != 'aarch64':
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
         # in case AL is not cleaning up properly
         check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
 
     # Stop and disable systemd services so they are not started after system reboot.
-    AMAServiceStopCommand = 'systemctl stop {0} && systemctl disable {0}'.format(service_name)
-    AMAServiceStatusCommand = 'systemctl status {0}'.format(service_name)
-    if not is_systemd():
-        hutil_log_info("The VM doesn't have systemctl. Using the init.d service to stop {0}.".format(service_name))
-        AMAServiceStopCommand = '/etc/init.d/{0} stop'.format(service_name)
-        AMAServiceStatusCommand = '/etc/init.d/{0} status'.format(service_name)
+    for service in ["azuremonitoragent", "azuremonitoragentmgr"]:
+        exit_code, output = run_command_and_log(get_service_command(service, "stop", "disable"))
 
-    exit_code, output = run_command_and_log(AMAServiceStopCommand)
-    if exit_code != 0:
-        status_exit_code, status_output = run_command_and_log(AMAServiceStatusCommand)
-        if status_exit_code != 0:
-            output += "Output of '{0}':\n{1}".format(AMAServiceStatusCommand, status_output)
+        if exit_code != 0:
+            status_command = get_service_command(service, "status")
+            status_exit_code, status_output = run_command_and_log(status_command)
+
+            if status_exit_code != 0:
+                output += "Output of '{0}':\n{1}".format(status_command, status_output)
 
     return exit_code, output
 
@@ -669,14 +727,18 @@ def update():
 
     return 0, ""
 
-def restart_pa():
-    # start PA and agent launcher
-    hutil_log_info('Handler initiating PA')
+def start_amacoreagent():
+    if platform.machine() == 'aarch64':
+        return
+    # start Core Agent
+    hutil_log_info('Handler initiating Core Agent')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl start azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
 
 def restart_launcher():
-    # start PA and agent launcher
+    if platform.machine() == 'aarch64':
+        return
+    # start agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
@@ -694,6 +756,12 @@ def get_managed_identity():
     """
     identifier_name = identifier_value = ""
     public_settings, _ = get_settings()
+
+    if public_settings is not None and public_settings.get(AzureMonitorConfigKey):
+        azure_monitor_configuration = public_settings.get(AzureMonitorConfigKey)
+
+        if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
+            public_settings = azure_monitor_configuration.get("configuration")
 
     if public_settings is not None and "authentication" in public_settings and "managedIdentity" in public_settings.get("authentication"):
         managedIdentity = public_settings.get("authentication").get("managedIdentity")
@@ -1045,7 +1113,7 @@ def set_os_arch():
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
 
         if os.path.exists(SupportedMEPath):
-            os.replace(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
+            os.rename(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
 
         # Cleanup unused ME binaries
         for f in os.listdir(MetricsExtensionDir):
@@ -1061,7 +1129,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner", "mariner", "rhel", "almalinux", "rocky"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner", "mariner", "rhel", "rocky", "almalinux"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1128,7 +1196,8 @@ def is_vm_supported_for_extension(operation):
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['7', '8'], # Rhel
+    supported_dists_x86_64 = {'redhat' : ['7', '8'], # Rhel
+                       'rhel' : ['7', '8'], # Rhel
                        'centos' : ['7', '8'], # CentOS
                        'rocky' : ['8'], # Rocky Linux
                        'almalinux' : ['8'], # Alma Linux
@@ -1137,8 +1206,20 @@ def is_vm_supported_for_extension(operation):
                        'debian' : ['9', '10'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'], # SLES
-                       'cbl-mariner' : ['1'] # Mariner
+                       'cbl-mariner' : ['1'], # Mariner 1.0
+                       'mariner' : ['2'], # Mariner 2.0
+                       'rocky' : ['8'] # Rocky
     }
+
+    supported_dists_aarch64 = {'redhat' : ['8'], # Rhel
+                       'ubuntu' : ['18.04', '20.04'], # Ubuntu
+                       'centos' : ['7'] # CentOS
+    }
+
+    if platform.machine() == 'aarch64':
+        supported_dists = supported_dists_aarch64
+    else:
+        supported_dists = supported_dists_x86_64
 
     vm_supported = False
     vm_dist, vm_ver = find_vm_distro(operation)
@@ -1201,7 +1282,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', "rhel"]:
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel', 'rocky']:
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 

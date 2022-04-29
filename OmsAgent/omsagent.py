@@ -109,7 +109,7 @@ ExtensionStateSubdirectory = 'state'
 
 # Commands
 # Always use upgrade - will handle install if scx, omi are not installed or upgrade if they are.
-InstallCommandTemplate = '{0} --upgrade'
+InstallCommandTemplate = '{0} --upgrade {1}'
 UninstallCommandTemplate = '{0} --remove'
 WorkspaceCheckCommand = '{0} -l'.format(OMSAdminPath)
 OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
@@ -300,7 +300,7 @@ def main():
                 hutil_log_error(errmsg)
             else:
                 log_and_exit(operation, errmsg)
-        
+
         # invoke operation
         exit_code, output = operations[operation]()
 
@@ -472,11 +472,20 @@ def install():
     bundle_path = os.path.join(package_directory, BundleFileName)
 
     os.chmod(bundle_path, 100)
-    cmd = InstallCommandTemplate.format(bundle_path)
+    skipDockerProviderInstall = public_settings.get(
+        'skipDockerProviderInstall')
+
+    if (skipDockerProviderInstall is not None
+            and skipDockerProviderInstall is True):
+        cmd = InstallCommandTemplate.format(
+            bundle_path, '--skip-docker-provider-install')
+    else:
+        cmd = InstallCommandTemplate.format(bundle_path, '')
+
     hutil_log_info('Running command "{0}"'.format(cmd))
 
     # Retry, since install can fail due to concurrent package operations
-    exit_code, output = run_command_with_retries_output(cmd, retries = 15,
+    exit_code, output = run_command_with_retries_output(cmd, retries = 10,
                                          retry_check = retry_if_dpkg_locked_or_curl_is_not_found,
                                          final_check = final_check_if_dpkg_locked)
 
@@ -703,7 +712,7 @@ def remove_workspace_configuration():
     shutil.rmtree(etc_remove_path, True)
     shutil.rmtree(var_remove_path, True)
     hutil_log_info('Moved oms etc configuration directory and cleaned up var directory')
-    
+
 def is_arc_installed():
     """
     Check if the system is on an Arc machine
@@ -736,14 +745,14 @@ def get_imds_endpoint():
         imds_endpoint = get_arc_endpoint()
         if imds_endpoint:
             imds_endpoint += '/metadata/instance?api-version=2019-08-15'
-        else: 
+        else:
             # Fall back to the traditional IMDS endpoint; the cloud domain and VM
             # resource id detection logic are resilient to failed queries to IMDS
             imds_endpoint = azure_imds_endpoint
             hutil_log_info('Falling back to default Azure IMDS endpoint')
     else:
         imds_endpoint = azure_imds_endpoint
-    
+
     hutil_log_info('Using IMDS endpoint "{0}"'.format(imds_endpoint))
     return imds_endpoint
 
@@ -1271,90 +1280,88 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     else:
         hutil_log_info('Output: \n{0}'.format(output))
 
-    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB
-    # take only the last 100 characters as extension cuts off after that
-    try:
-        if exit_code is not 0:
-            sys.stderr.write(output[-500:])
+    # For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log
+    if exit_code is 17:
+        if "Failed dependencies:" in output:
+            # 52 is the exit code for missing dependency
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+        elif "waiting for transaction lock" in output or "dpkg: error processing package systemd" in output or "dpkg-deb" in output or "dpkg:" in output:
+            # 52 is the exit code for missing dependency
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "There seems to be an issue in your package manager dpkg or rpm being in lock state. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+        elif "Errors were encountered while processing:" in output:
+            # 52 is the exit code for missing dependency
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "There seems to be an issue while processing triggers in systemd. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+        elif "Cannot allocate memory" in output:
+            # 52 is the exit code for missing dependency
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "There seems to be insufficient memory for the installation. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+    elif exit_code is 19:
+        if "rpmdb" in output or "cannot open Packages database" in output or "dpkg (subprocess): cannot set security execution context for maintainer script" in output or "is locked by another process" in output:
+            # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
+            # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "There seems to be an issue in your package manager dpkg or rpm being in lock state. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+        elif "libc6 is not installed" in output or "libpam-runtime is not installed" in output or "exited with status 52" in output or "/bin/sh is needed" in output:
+            # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
+            # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+    elif exit_code is 33:
+        if "Permission denied" in output:
+            # Enable failures
+            # 52 is the exit code for missing dependency. 
+            # DSC metaconfig generation failure due to permissions.
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions, and omsconfig MetaConfig.mof can be generated. For details, check logs in /var/opt/microsoft/omsconfig/omsconfig.log and /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+    elif exit_code is 18:
+            # Install failures
+            # DSC install failure
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            output = "Installation failed due to omsconfig package not being able to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+    elif exit_code is 5:
+        if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
+            # Enable failures
+            # 53 is the exit code for configuration errors
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 53
+            output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+    elif exit_code is 8:
+        if "Check the correctness of the workspace ID and shared key" in output or "internet connectivity" in output:
+            # Enable failures
+            # 53 is the exit code for configuration errors
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 53
+            output = "Installation failed due to curl error while onboarding. Please check the internet connectivity or the workspace key. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
 
-        # For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log
-        if exit_code is 17:
-            if "Failed dependencies:" in output:
-                # 52 is the exit code for missing dependency
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-            elif "waiting for transaction lock" in output or "dpkg: error processing package systemd" in output or "dpkg-deb" in output or "dpkg:" in output:
-                # 52 is the exit code for missing dependency
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-            elif "Errors were encountered while processing:" in output:
-                # 52 is the exit code for missing dependency
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "There seems to be an issue while processing triggers in systemd. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-            elif "Cannot allocate memory" in output:
-                # 52 is the exit code for missing dependency
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "There seems to be insufficient memory for the installation. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-        elif exit_code is 19:
-            if "rpmdb" in output or "cannot open Packages database" in output or "dpkg (subprocess): cannot set security execution context for maintainer script" in output or "error: dpkg status database is locked by another process" in output:
-                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-            elif "libc6 is not installed" in output or "libpam-runtime is not installed" in output or "exited with status 52" in output or "/bin/sh is needed" in output:
-                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-        elif exit_code is 33:
-            if "Permission denied" in output:
-                # Enable failures
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-        elif exit_code is 5:
-            if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
-                # Enable failures
-                # 53 is the exit code for configuration errors
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 53
-                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-        elif exit_code is 8:
-            if "Check the correctness of the workspace ID and shared key" in output:
-                # Enable failures
-                # 53 is the exit code for configuration errors
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 53
-                output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-
-        if exit_code is not 0 and exit_code is not 52:
-            if "dpkg:" in output or "dpkg :" in output or "rpmdb:" in output or "rpm.lock" in output:
-                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "There seems to be an issue in your package manager dpkg or rpm. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-            if "conflicts with file from package" in output or "Failed dependencies:" in output or "Please install curl" in output or "is needed by" in output or "check_version_installable" in output or "Error: curl was not installed" in output or "Please install the ctypes package" in output or "gpg is not installed" in output:
-                # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-            if "Permission denied" in output:
-                # Enable failures
-                # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                exit_code = 52
-                output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-    except:
-        hutil_log_info('Failed to write output to STDERR')
+    if exit_code is not 0 and exit_code is not 52:
+        if "dpkg:" in output or "dpkg :" in output or "rpmdb:" in output or "rpm.lock" in output or "locked by another process" in output:
+            # If we get rpmdb failures, its a system issue.
+            # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "There seems to be an issue in your package manager dpkg or rpm being in lock state when installing omsagent bundle for one of the dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+        if "conflicts with file from package" in output or "Failed dependencies:" in output or "Please install curl" in output or "is needed by" in output or "check_version_installable" in output or "Error: curl was not installed" in output or "Please install the ctypes package" in output or "gpg is not installed" in output:
+            # If we get rpmdb failures, its a system issue
+            # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
+        if "Permission denied" in output:
+            # Install/Enable failures
+            # 52 is the exit code for missing dependency.
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            exit_code = 52
+            output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions to install and onboard. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
 
     return exit_code, output
 
