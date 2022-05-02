@@ -1738,7 +1738,15 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
         failed_item = online_enc_handle.handle(device_items_to_encrypt, passphrase_file, disk_util, crypt_mount_config_util, bek_util)
         if failed_item is not None:
             return failed_item
+        
+        should_enter_resume_phase = False
+        encryption_status = json.loads(disk_util.get_encryption_status())
         if encryption_marker.get_volume_type().lower() == CommonVariables.VolumeTypeData.lower():
+            should_enter_resume_phase = True
+        elif encryption_status['os'].lower() == "encrypted": # Volume type ALL and OS disk already encrypted
+            should_enter_resume_phase = True
+        
+        if should_enter_resume_phase: 
             encryption_marker = mark_encryption(command=encryption_marker.get_current_command(),
                                                 volume_type=encryption_marker.get_volume_type(),
                                                 disk_format_query=encryption_marker.get_encryption_disk_format_query(),
