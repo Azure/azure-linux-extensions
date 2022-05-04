@@ -205,12 +205,6 @@ class DebianActions(CommonActions):
     def remove_lad_mdsd(self):
         return self.log_run_get_output('dpkg -P lad-mdsd')
 
-    def patch_lad_omi(self, openssl_ver):
-        # openssl_ver must be 100 or 110
-        cmd = "dpkg -i --refuse-downgrade omi-*.ssl_OPENSSLVER.ulinux.x64.deb".replace("OPENSSLVER", openssl_ver)
-        return self.log_run_get_output(cmd)
-
-
 class CredativActions(DebianActions):
     def __init__(self, logger):
         DebianActions.__init__(self, logger)
@@ -264,18 +258,6 @@ class RedhatActions(CommonActions):
 
     def remove_lad_mdsd(self):
         return self.log_run_get_output('rpm -e lad-mdsd')
-
-    def patch_lad_omi(self, openssl_ver):
-        # openssl_ver must be 100 or 110
-        omi_install_check_result = self.log_run_ignore_output("rpm -q omi")
-        if omi_install_check_result == 0:
-            # omi is present; run a 'freshen' install. This will possibly upgrade (but not downgrade OMI)
-            cmd = "rpm -Fhv omi-*.ssl_OPENSSLVER.ulinux.x64.rpm".replace("OPENSSLVER", openssl_ver)
-        else:
-            # omi is not present; run a normal install.
-            cmd = "rpm -Uhv omi-*.ssl_OPENSSLVER.ulinux.x64.rpm".replace("OPENSSLVER", openssl_ver)
-        return self.log_run_get_output(cmd)
-
 
 class Suse11Actions(RedhatActions):
     def __init__(self, logger):

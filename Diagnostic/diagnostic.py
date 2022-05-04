@@ -171,36 +171,6 @@ def setup_dependencies_and_mdsd(configurator):
     # Run mdsd prep commands
     g_dist_config.prepare_for_mdsd_install()
 
-    # Need to determine openssl version prior to OMI install
-    openssl_ver = ''
-    cmd_exit_code, cmd_output = g_dist_config.log_run_get_output('openssl version')
-    if cmd_exit_code != 0:
-        return 5, 'Could not determine openssl version. Exit code={0}, Output={1}'.format(cmd_exit_code, cmd_output)
-    openssl_version = cmd_output.split()[1]
-    if re.match('^1.0.*', openssl_version):
-        openssl_ver = '100'
-    elif re.match('^1.1.*', openssl_version):
-        openssl_ver = '110'
-    else:
-        return 6, 'Unsupported openssl version. OpenSSL 1.0 or 1.1 must be installed. Detected version={0}'.format(openssl_version)
-
-    # Install patched OMI (if LAD contains a newer version)
-    is_omi_setup_correctly = False
-    maxTries = 5  # Try up to 5 times to install omi
-    for trialNum in range(1, maxTries + 1):
-        cmd_exit_code, cmd_output = g_dist_config.patch_lad_omi(openssl_ver)
-        if cmd_exit_code == 0:  # Successfully set up
-            is_omi_setup_correctly = True
-            break
-        hutil.error("omi setup failed (trial #" + str(trialNum) + ").")
-        if trialNum < maxTries:
-            hutil.error("Retrying in 30 seconds...")
-            time.sleep(30)
-    if not is_omi_setup_correctly:
-        hutil.error("omi setup failed " + str(maxTries) + " times. Giving up...")
-        return 7, "omi setup failed {0} times. " \
-                  "Last exit code={1}, Output={2}".format(maxTries, cmd_exit_code, cmd_output)
-
     # Set up omsagent
     omsagent_setup_exit_code, omsagent_setup_output = oms.setup_omsagent(configurator, RunGetOutput,
                                                                          hutil.log, hutil.error)
