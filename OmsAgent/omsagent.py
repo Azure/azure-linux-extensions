@@ -541,13 +541,6 @@ def enable():
     the settings provided are incomplete or incorrect.
     Note: enable operation times out from WAAgent at 5 minutes
     """
-
-    if HUtilObject is not None:
-        if HUtilObject.is_seq_smaller():
-            log_output = "Current sequence number {0} is not greater than the sequence number of the most recent executed configuration, skipping enable.".format(HUtilObject._context._seq_no)
-            hutil_log_info(log_output)
-            return 0, log_output
-
     exit_if_vm_not_supported('Enable')
 
     public_settings, protected_settings = get_settings()
@@ -684,11 +677,15 @@ def enable():
         # Sleep to prevent bombarding the processes, then restart all processes
         # to resolve any issues with auto-started processes from --upgrade
         time.sleep(PostOnboardingSleepSeconds)
-        run_command_and_log(RestartOMSAgentServiceCommand)
-
-        #start telemetry process if enable is successful
-        start_telemetry_process()
-
+        if HUtilObject and HUtilObject.is_seq_smaller():
+            log_output = "Current sequence number {0} is smaller than or egual to the sequence number of the most recent executed configuration, skipping omsagent process restart.".format(HUtilObject._context._seq_no)
+            hutil_log_info(log_output)
+        else:
+            hutil_log_info('Restart omsagent service via service_control script.')
+            run_command_and_log(RestartOMSAgentServiceCommand)
+            #start telemetry process if enable is successful
+            start_telemetry_process()
+            
         #save sequence number
         HUtilObject.save_seq()
 
