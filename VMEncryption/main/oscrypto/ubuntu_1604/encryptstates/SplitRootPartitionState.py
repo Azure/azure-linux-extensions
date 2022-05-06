@@ -130,9 +130,14 @@ class SplitRootPartitionState(OSEncryptionState):
                                   start=desired_root_partition_start,
                                   end=desired_root_partition_end)
 
-        desired_boot_partition_start = disk.getFreeSpaceRegions()[1].start
-        desired_boot_partition_end = disk.getFreeSpaceRegions()[1].end
-        desired_boot_partition_size = disk.getFreeSpaceRegions()[1].length
+        if self._is_arm64():
+            desired_boot_partition_start = desired_root_partition_end
+            desired_boot_partition_end = original_root_partition_end
+            desired_boot_partition_size = desired_boot_partition_size
+        else:
+            desired_boot_partition_start = disk.getFreeSpaceRegions()[1].start
+            desired_boot_partition_end = disk.getFreeSpaceRegions()[1].end
+            desired_boot_partition_size = disk.getFreeSpaceRegions()[1].length
 
         self.context.logger.log("Desired boot partition start (sectors): {0}".format(desired_boot_partition_start))
         self.context.logger.log("Desired boot partition end (sectors): {0}".format(desired_boot_partition_end))
