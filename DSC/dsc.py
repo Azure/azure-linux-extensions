@@ -43,11 +43,11 @@ ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.6.8-1.ssl_'
+omi_package_prefix = 'packages/omi-1.6.9-1.ssl_'
 dsc_package_prefix = 'packages/dsc-1.1.1-926.ssl_'
 omi_major_version = 1
 omi_minor_version = 6
-omi_build = 8
+omi_build = 9
 omi_release = 1
 dsc_major_version = 1
 dsc_minor_version = 1
@@ -56,7 +56,7 @@ dsc_release = 926
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.71.1.28"
+extension_handler_version = "2.71.2.0"
 
 # Error codes
 UnsupportedDistro = 51 #excludes from SLA
