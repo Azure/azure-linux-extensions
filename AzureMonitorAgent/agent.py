@@ -533,6 +533,11 @@ def enable():
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
 
+    # Syslog logging doesn't work on arm64 AlmaLinux until the rsyslog service has been restarted
+    vm_dist, vm_ver = find_vm_distro('Enable')
+    if is_systemd() and vm_dist.startswith('alma') and platform.machine() == 'aarch64':
+        exit_code, output = run_command_and_log('systemctl restart rsyslog')
+
     return exit_code, output
 
 def handle_gcs_config(public_settings, protected_settings, default_configs):
@@ -1211,7 +1216,8 @@ def is_vm_supported_for_extension(operation):
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
-                       'ubuntu' : ['18.04', '20.04'] # Ubuntu
+                       'ubuntu' : ['18.04', '20.04'], # Ubuntu
+                       'alma' : ['8'] # Alma
     }
 
     if platform.machine() == 'aarch64':
