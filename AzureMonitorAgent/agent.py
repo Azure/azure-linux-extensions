@@ -1210,7 +1210,7 @@ def is_vm_supported_for_extension(operation):
                        'alma' : ['8'] # Alma
     }
 
-    supported_dists_aarch64 = {'redhat' : ['8'], # Rhel
+    supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
                        'ubuntu' : ['18.04', '20.04'] # Ubuntu
     }
 
