@@ -180,61 +180,68 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
     # Skip LVM OS validation when OS volume is not being targeted
     def test_skip_lvm_os_check_if_data_only_enable(self):
         # skip lvm detection if data only 
-        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "DATA", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption})
+        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "DATA", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     def test_skip_lvm_os_check_if_data_only_ef(self):
         # skip lvm detection if data only 
-        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "DATA", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormat})
+        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "DATA", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormat}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     def test_skip_lvm_os_check_if_data_only_efa(self):
         # skip lvm detection if data only 
-        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "DATA", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll})
+        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "DATA", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     def test_skip_lvm_os_check_if_data_only_disable(self):
         # skip lvm detection if data only 
-        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "DATA", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.DisableEncryption})
+        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "DATA", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.DisableEncryption}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     def test_skip_lvm_os_check_if_query(self):
         # skip lvm detection if query status operation is invoked without volume type
-        self.cutil.validate_lvm_os({CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.QueryEncryptionStatus})
+        self.cutil.validate_lvm_os({CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.QueryEncryptionStatus}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     def test_skip_lvm_no_encryption_operation(self):
         # skip lvm detection if no encryption operation 
-        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL"})
+        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL"}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     def test_skip_lvm_no_volume_type(self):
         # skip lvm detection if no volume type specified
-        self.cutil.validate_lvm_os({CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll})
+        self.cutil.validate_lvm_os({CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryptionFormatAll}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     @mock.patch("os.system", return_value=-1)
     def test_no_lvm_no_config(self, os_system):
         # simulate no LVM OS, no config 
-        self.cutil.validate_lvm_os({})
+        self.cutil.validate_lvm_os({}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     @mock.patch("os.system", return_value=0)
     def test_lvm_no_config(self, os_system):
         # simulate valid LVM OS, no config
-        self.cutil.validate_lvm_os({})
+        self.cutil.validate_lvm_os({}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     @mock.patch("os.system", side_effect=[0, -1])
     def test_invalid_lvm_no_config(self, os_system):
         # simulate invalid LVM naming scheme, but no config setting to encrypt OS
-        self.cutil.validate_lvm_os({})
+        self.cutil.validate_lvm_os({}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     @mock.patch("os.system", return_value=-1)
     def test_lvm_os_lvm_absent(self, os_system):
         # using patched return value of -1, simulate no LVM OS 
-        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption})
+        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     @mock.patch("os.system", return_value=0)
     def test_lvm_os_valid(self, os_system):
         # simulate a valid LVM OS and a valid naming scheme by always returning 0
-        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption})
+        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
 
     @mock.patch("os.system", side_effect=[0, -1])
     def test_lvm_os_lv_missing_expected_name(self, os_system):
         # using patched side effects, first simulate LVM OS present, then simulate not finding the expected LV name 
-        self.assertRaises(Exception, self.cutil.validate_lvm_os, {CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption})
+        self.assertRaises(Exception, self.cutil.validate_lvm_os, {CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption}, MockDistroPatcher('Ubuntu', '14.04', '4.4'))
+
+    @mock.patch("os.system", side_effect=[0, -1])
+    def test_lvm_os_lv_online_encryption(self, os_system):
+        mock_patcher = MockDistroPatcher('Redhat', '8.2', '4.4')
+        mock_patcher.support_online_encryption = True
+        # using patched side effects, first simulate LVM OS present, then simulate not finding the expected LV name. Test should pass as online encryption does not restrict LVM layout. 
+        self.cutil.validate_lvm_os({CommonVariables.VolumeTypeKey: "ALL", CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption}, mock_patcher)
     
     @mock.patch("CommandExecutor.CommandExecutor.Execute", return_value=0)
     def test_vfat(self, mocked_exec):
@@ -319,6 +326,29 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         # test exception is not raised for DATA volume
         self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "DATA"},
                                    MockDistroPatcher('SuSE', '12.4', ''), {"os" : "NotEncrypted"})
+
+    def test_supported_os_online_encryption(self):
+        # test exception is not raised for redhat 8.5
+        self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
+                                    MockDistroPatcher('redhat', '8.5', '4.4'), {"os" : "NotEncrypted"})
+        # test exception is not raised for redhat 8.15
+        self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
+                                    MockDistroPatcher('redhat', '8.15', '4.4'), {"os" : "NotEncrypted"})
+        # test exception is raised for redhat 8.0
+        self.assertRaises(Exception, self.cutil.is_supported_os, {
+            CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('redhat', '8.0', '4.4'), {"os" : "NotEncrypted"})
+        # test exception is raised for redhat 9.0
+        self.assertRaises(Exception, self.cutil.is_supported_os, {
+            CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('redhat', '9.0', '4.4'), {"os" : "NotEncrypted"})
+        # test exception is not raised for oracle 8.5
+        self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
+                                    MockDistroPatcher('oracle', '8.5', '4.4'), {"os" : "NotEncrypted"})
+        # test exception is raised for oracle 8.4
+        self.assertRaises(Exception, self.cutil.is_supported_os, {
+            CommonVariables.VolumeTypeKey: "ALL"
+            }, MockDistroPatcher('oracle', '8.4', '4.4'), {"os" : "NotEncrypted"})
 
     def test_volume_type_enable_common(self):
         self.cutil.validate_volume_type_for_enable({

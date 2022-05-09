@@ -1,20 +1,9 @@
 {
   "redhat": [
         {
-          "Version" : "8.5"
-        },
-        {
-          "Version" : "8.4"
-        },
-        {
-          "Version" : "8.3"
-        },
-        {
-          "Version" : "8.2"
-        },
-        {
-          "Version" : "8.1"
-        },    
+          "Version" : "8",
+          "MinSupportedVersion" : "8.1"
+        },   
         {
           "Version" : "7.9"
         },
@@ -103,6 +92,12 @@
         },
         {
           "Version" : "6.8"
+        }
+    ],
+    "oracle" : [
+        {
+          "Version" : "8",
+          "MinSupportedVersion" : "8.5"
         }
     ]
 }

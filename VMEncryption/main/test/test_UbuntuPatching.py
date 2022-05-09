@@ -1,5 +1,4 @@
 import unittest
-import mock
 import os.path
 
 from patch.UbuntuPatching import UbuntuPatching

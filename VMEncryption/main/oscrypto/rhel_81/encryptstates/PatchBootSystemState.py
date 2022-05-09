@@ -88,7 +88,7 @@ class PatchBootSystemState(OSEncryptionState):
             self._add_kernelopts(["root=/dev/mapper/osencrypt"])
 
         # Everything is ready, repack dracut. None of the changes above will take affect until this line is executed.
-        self.command_executor.ExecuteInBash('dracut -f -v', True)
+        self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
@@ -143,6 +143,8 @@ class PatchBootSystemState(OSEncryptionState):
                              "rd.luks.ade.bootuuid={0}".format(boot_uuid),
                              "rd.debug"]
         self._add_kernelopts(additional_params)
+
+        self.context.distro_patcher.patch_machine()
 
         # For clarity after reboot, we should also add the correct info to crypttab
         crypt_item = CryptItem()

@@ -623,9 +623,7 @@ def mark_encryption(command, volume_type, disk_format_query, encryption_mode=Non
     return encryption_marker
 
 def should_perform_online_encryption(disk_util, encryption_command, volume_type):
-    if DistroPatcher.distro_info[0].lower() != "redhat":
-        return False
-    if LooseVersion(DistroPatcher.distro_info[1]) < LooseVersion('8.1'):
+    if not DistroPatcher.support_online_encryption:
         return False
     DistroPatcher.install_cryptsetup()
     if disk_util.get_luks_header_size() != CommonVariables.luks_header_size_v2:
@@ -1997,11 +1995,7 @@ def daemon_encrypt():
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
-        elif ((distro_name == 'redhat' and distro_version.startswith('8.1')) or
-              (distro_name == 'redhat' and distro_version.startswith('8.2')) or
-              (distro_name == 'redhat' and distro_version.startswith('8.3')) or
-              (distro_name == 'redhat' and distro_version.startswith('8.4')) or
-              (distro_name == 'redhat' and distro_version.startswith('8.5')) or
+        elif ((DistroPatcher.support_online_encryption) or
               (distro_name == 'centos' and distro_version.startswith('8.5')) or
               (distro_name == 'centos' and distro_version.startswith('8.4')) or
               (distro_name == 'centos' and distro_version.startswith('8.3')) or
