@@ -496,7 +496,7 @@ def enable():
     except Exception as e:
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
-    if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == True:
+    if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
         start_amacoreagent()
         restart_launcher()
 
