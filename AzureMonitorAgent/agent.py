@@ -948,11 +948,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
-                            hutil_log("Start setting up ME")
-
                             me_handler.setup_me(is_lad=False)
-
-                            hutil_log("Start setting up telegraf")
 
                             start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
                             if start_telegraf_res:
