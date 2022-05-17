@@ -1220,7 +1220,8 @@ def is_vm_supported_for_extension(operation):
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
                        'ubuntu' : ['18.04', '20.04'], # Ubuntu
-                       'alma' : ['8'] # Alma
+                       'alma' : ['8'], # Alma
+                       'centos' : ['7'] # CentOS
     }
 
     if platform.machine() == 'aarch64':
