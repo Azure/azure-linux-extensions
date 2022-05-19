@@ -1024,9 +1024,12 @@ def exit_if_gpg_unavailable(operation):
     """
     check_exit_code, _ = run_get_output('which gpg', True, False)
     if check_exit_code is not 0:
+        hutil_log_info('GPG not found, attempting to install')
         exit_code, output = run_get_output(InstallExtraPackageCommand.format('gpg'))
         if exit_code is not 0:
             log_and_exit(operation, UnsupportedGpg, 'GPG could not be installed: {0}'.format(output))
+        else:
+            hutil_log_info('GPG successfully installed')
     return 0
 
 
