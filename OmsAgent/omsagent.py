@@ -117,6 +117,9 @@ OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
+InstallExtraPackageCommand = 'apt-get -y update && apt-get -y install {0} || yum install -y {0} '\
+                    '|| zypper --non-interactive refresh && zypper --non-interactive install {0}'
+
 # Cloud Environments
 PublicCloudName     = "AzurePublicCloud"
 FairfaxCloudName    = "AzureUSGovernmentCloud"
@@ -1016,11 +1019,14 @@ def exit_if_openssl_unavailable(operation):
 def exit_if_gpg_unavailable(operation):
     """
     Check if gpg is available to use
-    If not, throw error to return UnsupportedGpg error code
+    If not, attempt to install
+    If install fails, throw error to return UnsupportedGpg error code
     """
-    exit_code, output = run_get_output('which gpg', True, False)
-    if exit_code is not 0:
-        log_and_exit(operation, UnsupportedGpg, 'GPG is not available')
+    check_exit_code, _ = run_get_output('which gpg', True, False)
+    if check_exit_code is not 0:
+        exit_code, output = run_get_output(InstallExtraPackageCommand.format('gpg'))
+        if exit_code is not 0:
+            log_and_exit(operation, UnsupportedGpg, 'GPG could not be installed: {0}'.format(output))
     return 0
 
 
