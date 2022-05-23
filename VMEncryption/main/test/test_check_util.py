@@ -516,3 +516,20 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         self.assertRaises(Exception, self.cutil.check_kv_name, { kv_id, kv_url_2, "" })
         self.assertRaises(Exception, self.cutil.check_kv_name, { None, kv_url, "" })
         self.assertRaises(Exception, self.cutil.check_kv_name, { kv_id, None, "" })
+
+    def test_vmss_os_encryption_supported(self):
+        public_settings_sup = {
+        CommonVariables.VolumeTypeKey: "Os",
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption,
+        CommonVariables.EnableVmssOsEncryptionKey: True
+        }
+        public_settings_not_sup = {
+        CommonVariables.VolumeTypeKey: "Os",
+        CommonVariables.EncryptionEncryptionOperationKey: CommonVariables.EnableEncryption
+        }
+        distro_patcher_sup = MockDistroPatcher('redhat', '8.5', '4.4')
+        distro_patcher_sup.support_online_encryption = True
+        distro_patcher_not_sup = MockDistroPatcher('redhat', '7.9', '4.4')
+
+        self.assertTrue(self.cutil.is_vmss_os_encryption_supported(public_settings_sup, distro_patcher_sup))
+        self.assertFalse(self.cutil.is_vmss_os_encryption_supported(public_settings_not_sup, distro_patcher_not_sup))

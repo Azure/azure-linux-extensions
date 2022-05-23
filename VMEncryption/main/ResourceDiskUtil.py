@@ -360,9 +360,12 @@ class ResourceDiskUtil(object):
         crypt_item.dev_path = self._get_rd_dev_path()
         crypt_item.mapper_name = self.RD_MAPPER_NAME
         crypt_item.uses_cleartext_key = False
+        crypt_item.mount_point = self.RD_MOUNT_POINT
         self.crypt_mount_config_util.remove_crypt_item(crypt_item)  # Remove old item in case it was already there
-        self.crypt_mount_config_util.add_crypt_item_to_crypttab(crypt_item)
         self.add_to_fstab()
+        backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")
+        self.crypt_mount_config_util.add_crypt_item_to_crypttab(crypt_item, backup_folder=backup_folder)
+        #self.add_to_fstab()
 
     def automount(self):
         """

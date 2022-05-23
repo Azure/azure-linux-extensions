@@ -2272,8 +2272,13 @@ def daemon():
 
     logger.log("daemon lock acquired sucessfully.")
 
-    logger.log("waiting for 1 minute before continuing the daemon")
-    time.sleep(60)
+    sleep_time = 60
+    public_settings = get_public_settings()
+    if CommonVariables.EnableVmssOsEncryptionKey in public_settings and public_settings.get(CommonVariables.EnableVmssOsEncryptionKey):
+        sleep_time = 5  #Reduce sleep time for VMSS OS Disk Encryption
+    
+    logger.log("waiting for {0} seconds before continuing the daemon".format(sleep_time))
+    time.sleep(sleep_time)
 
     logger.log("Installing pre-requisites")
     DistroPatcher.install_extras()

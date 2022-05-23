@@ -171,7 +171,7 @@ class CheckUtil(object):
                 raise Exception(
                     "The KEK KeyVault ID was specified but the KEK URL was missing")
 
-    def validate_volume_type(self, public_settings):
+    def validate_volume_type(self, public_settings, DistroPatcher=None):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         if encryption_operation in [CommonVariables.QueryEncryptionStatus]:
             # No need to validate volume type for Query Encryption Status operation
@@ -185,12 +185,22 @@ class CheckUtil(object):
         # get supported volume types
         instance = MetadataUtil(self.logger)
         if instance.is_vmss():
-            supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
+            if self.is_vmss_os_encryption_supported(public_settings, DistroPatcher):
+                self.logger.log("VMSS OS Disk Encryption Supported.")
+                supported_volume_types = CommonVariables.SupportedVolumeTypes
+            else:
+                supported_volume_types = CommonVariables.SupportedVolumeTypesVMSS
         else:
             supported_volume_types = CommonVariables.SupportedVolumeTypes
 
         if not volume_type.lower() in [x.lower() for x in supported_volume_types] :
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_volume_types))
+    
+    def is_vmss_os_encryption_supported(self, public_settings, DistroPatcher):
+        if CommonVariables.EnableVmssOsEncryptionKey in public_settings and public_settings.get(CommonVariables.EnableVmssOsEncryptionKey):
+            if DistroPatcher is not None and DistroPatcher.support_online_encryption:
+                return True
+        return False
 
     def validate_lvm_os(self, public_settings, DistroPatcher):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
@@ -302,7 +312,7 @@ class CheckUtil(object):
     def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher, existing_volume_type):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
-        self.validate_volume_type(public_settings)
+        self.validate_volume_type(public_settings, DistroPatcher)
         self.validate_lvm_os(public_settings, DistroPatcher)
         self.validate_vfat()
         self.validate_memory_os_encryption(public_settings, encryption_status)
