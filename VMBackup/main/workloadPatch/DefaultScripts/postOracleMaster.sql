@@ -106,6 +106,56 @@ END;
 
 REM
 REM ********************************************************************************
+REM Force a switch of the online redo logfiles, which will force a full checkpoint,
+REM and then archive the current logfile...
+REM ********************************************************************************
+
+DECLARE
+      --
+      v_errcontext            varchar2(128);
+      noArchiveLogMode        exception;
+      pragma                  exception_init(noArchiveLogMode, -258);
+      --
+BEGIN
+      --
+      v_errcontext := 'azmessage-3';
+      sysbackup.azmessage('INFO - AzBackup post-script: starting ARCHIVE LOG CURRENT...');
+      --
+      v_errcontext := 'ARCHIVE LOG CURRENT';
+      execute immediate 'ALTER SYSTEM ARCHIVE LOG CURRENT';
+      --
+      v_errcontext := 'azmessage-4';
+      sysbackup.azmessage('INFO - AzBackup post-script: ARCHIVE LOG CURRENT succeeded');
+      --
+EXCEPTION
+      --
+      when noArchiveLogMode then
+              begin
+                      --
+                      v_errcontext := 'azmessage-5';
+                      sysbackup.azmessage('INFO - AzBackup post-script: starting SWITCH LOGFILE...');
+                      --
+                      v_errcontext := 'SWITCH LOGFILE';
+                      execute immediate 'ALTER SYSTEM SWITCH LOGFILE';
+                      --
+                      v_errcontext := 'azmessage-6';
+                      sysbackup.azmessage('INFO - AzBackup post-script: SWITCH LOGFILE succeeded');
+                      --
+              exception
+                      when others then
+                              sysbackup.azmessage('FAIL - AzBackup post-script: ' || v_errcontext || ' failed');
+                              raise;
+              end;
+      --
+      when others then
+              sysbackup.azmessage('FAIL - AzBackup post-script: ' || v_errcontext || ' failed');
+              raise;
+      --
+END;
+/
+
+REM
+REM ********************************************************************************
 REM Exit from Oracle SQL*Plus with SUCCESS exit status...
 REM ********************************************************************************
 
