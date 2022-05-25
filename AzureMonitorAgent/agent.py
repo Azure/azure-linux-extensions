@@ -1112,6 +1112,10 @@ def set_os_arch():
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
 
+        vm_dist, vm_ver = find_vm_distro()
+        if current_arch == 'aarch64' and vm_dist.startsWith('centos') and vm_ver.startsWith('7'): 
+            SupportedMEPath += '_centos7' 
+ 
         if os.path.exists(SupportedMEPath):
             os.rename(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
 
@@ -1212,7 +1216,8 @@ def is_vm_supported_for_extension(operation):
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
                        'ubuntu' : ['18.04', '20.04'], # Ubuntu
-                       'alma' : ['8'] # Alma
+                       'alma' : ['8'], # Alma
+                       'centos' : ['7'] # CentOS
     }
 
     if platform.machine() == 'aarch64':
