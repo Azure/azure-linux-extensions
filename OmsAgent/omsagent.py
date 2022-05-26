@@ -117,9 +117,6 @@ OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
-InstallExtraPackageCommand = 'apt-get -y update && apt-get -y install {0} || yum install -y {0} '\
-                    '|| zypper --non-interactive refresh && zypper --non-interactive install {0}'
-
 # Cloud Environments
 PublicCloudName     = "AzurePublicCloud"
 FairfaxCloudName    = "AzureUSGovernmentCloud"
@@ -145,7 +142,6 @@ EnableErrorResolvingHost = 7
 EnableErrorOnboarding = 8
 EnableCalledBeforeSuccessfulInstall = 52 # since install is a missing dependency
 UnsupportedOpenSSL = 55 #60, temporary as it excludes from SLA
-UnsupportedGpg = 55
 # OneClick error codes
 OneClickErrorCode = 40
 ManagedIdentityExtMissingErrorCode = 41
@@ -287,8 +283,6 @@ def main():
     if exit_code is not 0:
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)
-        
-    exit_if_gpg_unavailable(operation)
 
     # Invoke operation
     try:
@@ -927,7 +921,7 @@ def is_vm_supported_for_extension():
     supported_dists = {'redhat' : ['6', '7', '8'], 'red hat' : ['6', '7', '8'], 'rhel' : ['6', '7', '8'], # Red Hat
                        'centos' : ['6', '7', '8'], # CentOS
                        'oracle' : ['6', '7', '8'], 'ol': ['6', '7', '8'], # Oracle
-                       'debian' : ['8', '9', '10'], # Debian
+                       'debian' : ['8', '9'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'amzn' : ['2'] # AWS
@@ -1013,23 +1007,6 @@ def exit_if_openssl_unavailable(operation):
     exit_code, output = run_get_output('which openssl', True, False)
     if exit_code is not 0:
         log_and_exit(operation, UnsupportedOpenSSL, 'OpenSSL is not available')
-    return 0
-
-
-def exit_if_gpg_unavailable(operation):
-    """
-    Check if gpg is available to use
-    If not, attempt to install
-    If install fails, throw error to return UnsupportedGpg error code
-    """
-    check_exit_code, _ = run_get_output('which gpg', True, False)
-    if check_exit_code is not 0:
-        hutil_log_info('GPG not found, attempting to install')
-        exit_code, output = run_get_output(InstallExtraPackageCommand.format('gpg'))
-        if exit_code is not 0:
-            log_and_exit(operation, UnsupportedGpg, 'GPG could not be installed: {0}'.format(output))
-        else:
-            hutil_log_info('GPG successfully installed')
     return 0
 
 
