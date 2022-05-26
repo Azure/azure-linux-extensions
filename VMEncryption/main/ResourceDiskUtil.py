@@ -23,7 +23,7 @@ import os
 
 from CommandExecutor import CommandExecutor
 from Common import CommonVariables, CryptItem
-
+from BekUtil import BekUtil, BekMissingException
 
 class ResourceDiskUtil(object):
     """ Resource Disk Encryption Utilities """
@@ -36,9 +36,10 @@ class ResourceDiskUtil(object):
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
-    def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info):
+    def __init__(self, logger, bek_util, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info):
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
+        self.bek_util = bek_util
         self.disk_util = disk_util
         self.crypt_mount_config_util = crypt_mount_config_util
         self.passphrase_filename = passphrase_filename  # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
@@ -247,6 +248,14 @@ class ResourceDiskUtil(object):
         self.logger.log('unable to make resource disk partition')
         return False
 
+    def _prepare_rd_passphrase_file(self)
+        # create a passphrase file for resource disk encryption if needed
+        self.bek_util.mount_bek_volume()
+        passphrase_file = os.path.join(CommonVariables.encryption_key_file_name,CommonVariables.encryption_key_mount_point)
+        if not os.path.exists(passphrase_file):
+            with open(passphrase_file, "wb") as f:
+                f.write(self.bek_util.generate_passphrase())
+
     def _wipe_partition_header(self):
         """ clear any possible header (luke or filesystem) by overwriting with 10MB of entropy """
         if not self._resource_disk_partition_exists():
@@ -307,6 +316,7 @@ class ResourceDiskUtil(object):
             self._remove_device_mappers()
             self._wipe_partition_header()
         self._prepare_partition()
+        self._prepare_rd_passphrase_file()
         return True
 
     def add_to_fstab(self):
@@ -377,3 +387,4 @@ class ResourceDiskUtil(object):
             return True
         else:
             return self.encrypt_format_mount()
+           

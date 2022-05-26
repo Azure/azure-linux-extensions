@@ -531,6 +531,7 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
     if encryption_config.config_file_exists():
         volume_type = encryption_config.get_volume_type().lower()
         if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
+            bek_util.mount_bek_volume()
             resource_disk_util.automount()
             logger.log("mounted resource disk")
     else:
