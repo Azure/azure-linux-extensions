@@ -178,29 +178,29 @@ class Test_UbuntuPatching(unittest.TestCase):
     def test_packages_installed(self, ce_mock):
         ce_mock.return_value = True
         packages = []
-        self.assertTrue(self.UbuntuPatching._packages_installed(packages))
+        self.assertTrue(self.UbuntuPatching.packages_installed(packages))
         self.assertEqual(ce_mock.call_count, 0)
 
         ce_mock.reset_mock()
         ce_mock.return_value = True
         packages = ["a"]
-        self.assertTrue(self.UbuntuPatching._packages_installed(packages))
+        self.assertTrue(self.UbuntuPatching.packages_installed(packages))
         self.assertEqual(ce_mock.call_count, 1)
 
         ce_mock.reset_mock()
         ce_mock.return_value = False
         packages = ["a"]
-        self.assertFalse(self.UbuntuPatching._packages_installed(packages))
+        self.assertFalse(self.UbuntuPatching.packages_installed(packages))
         self.assertEqual(ce_mock.call_count, 1)
 
         ce_mock.reset_mock()
         ce_mock.return_value = True
         packages = ["a", "b", "c"]
-        self.assertTrue(self.UbuntuPatching._packages_installed(packages))
+        self.assertTrue(self.UbuntuPatching.packages_installed(packages))
         self.assertEqual(ce_mock.call_count, 3)
 
         ce_mock.reset_mock()
         ce_mock.return_value = False
         packages = ["a", "b", "c"]
-        self.assertFalse(self.UbuntuPatching._packages_installed(packages))
+        self.assertFalse(self.UbuntuPatching.packages_installed(packages))
         self.assertEqual(ce_mock.call_count, 3)
