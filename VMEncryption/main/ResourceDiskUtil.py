@@ -248,7 +248,7 @@ class ResourceDiskUtil(object):
         self.logger.log('unable to make resource disk partition')
         return False
 
-    def _prepare_rd_passphrase_file(self)
+    def _prepare_rd_passphrase_file(self):
         # create a passphrase file for resource disk encryption if needed
         self.bek_util.mount_bek_volume()
         passphrase_file = os.path.join(CommonVariables.encryption_key_file_name,CommonVariables.encryption_key_mount_point)

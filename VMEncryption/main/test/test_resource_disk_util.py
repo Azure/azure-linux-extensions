@@ -23,11 +23,13 @@ import os
 
 from ResourceDiskUtil import ResourceDiskUtil
 from DiskUtil import DiskUtil
+from BekUtil import BekUtil, BekMissingException
 from CryptMountConfigUtil import CryptMountConfigUtil
 from Common import CommonVariables
 from .console_logger import ConsoleLogger
 try:
     import unittest.mock as mock  # python3+
+    from unittest.mock import patch, mock_open
 except ImportError:
     import mock  # python2
 
@@ -305,24 +307,20 @@ class TestResourceDiskUtil(unittest.TestCase):
         rd_base_path = self.resource_disk._get_rd_base_dev_path()
         self.assertEqual("test_base_dev_path", rd_base_path)
 
-    @mock.patch('os.write', return_value=True)
-    @mock.patch('os.open', return_value=True)
+    @mock.patch('builtins.open', new_callable=mock_open, read_data="data")
     @mock.patch('os.path.exists', return_value=True)
-    @mock.patch('BekUtil.BekUtil.mount_bek_volume', return_value=True)
-    def test_try_prep_rd_passphrase_file_exists(self, mock_mount, mock_exists, mock_open, mock_write):
+    def test_try_prep_rd_passphrase_file_exists(self, mock_exists, mock_open):
         self.resource_disk._prepare_rd_passphrase_file()
-        self.assertEqual(mock_mount.call_count, 1)
         self.assertEqual(mock_exists.call_count, 1)
-        self.assertEqual(mock_open.call_count, 1)
-        self.assertEqual(mock_write.call_count, 1)
+        self.assertEqual(mock_open.call_count, 0)
+        handle = mock_open()
+        self.assertEqual(handle.write.call_count, 0)
 
-    @mock.patch('os.write', return_value=True)
-    @mock.patch('os.open', return_value=True)
+    @mock.patch('builtins.open', new_callable=mock_open, read_data="data")
     @mock.patch('os.path.exists', return_value=False)
-    @mock.patch('BekUtil.BekUtil.mount_bek_volume', return_value=True)
-    def test_try_prep_rd_passphrase_file_missing(self, mock_mount, mock_exists, mock_open, mock_write):
+    def test_try_prep_rd_passphrase_file_missing(self, mock_exists, mock_open):
         self.resource_disk._prepare_rd_passphrase_file()
-        self.assertEqual(mock_mount.call_count, 1)
         self.assertEqual(mock_exists.call_count, 1)
         self.assertEqual(mock_open.call_count, 1)
-        self.assertEqual(mock_write.call_count, 1)
+        handle = mock_open()
+        self.assertEqual(handle.write.call_count, 1)
