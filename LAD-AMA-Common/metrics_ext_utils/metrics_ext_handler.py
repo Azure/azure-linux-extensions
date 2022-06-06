@@ -620,7 +620,7 @@ def setup_me(is_lad, HUtilObj=None):
     
     except Exception as e:
         aad_auth_url = "https://login.windows.net/72f988bf-86f1-41af-91ab-2d7cd011db47"
-        message = "Unable to obtain auth url, falling back to use default value: " + aad_auth_url
+        message = "Unable to find AAD Authentication URL in the request error response. Falling back to default value: " + aad_auth_url
         if HUtilObj is not None:
             HUtilObj.log(message)
         else:
