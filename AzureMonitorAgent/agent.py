@@ -297,7 +297,7 @@ def install():
     """
 
     find_package_manager("Install")
-    set_os_arch()
+    set_os_arch('Install')
     exit_if_vm_not_supported('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
@@ -1095,7 +1095,7 @@ def parse_context(operation):
             raise ParameterMissingException
     return hutil
 
-def set_os_arch():
+def set_os_arch(operation):
     """
     Checks if the current system architecture is present in the SupportedArch set and replaces 
     the package names accordingly
@@ -1112,7 +1112,7 @@ def set_os_arch():
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
 
-        vm_dist, vm_ver = find_vm_distro()
+        vm_dist, vm_ver = find_vm_distro(operation)
         if current_arch == 'aarch64' and vm_dist.startsWith('centos') and vm_ver.startsWith('7'): 
             SupportedMEPath += '_centos7' 
  
