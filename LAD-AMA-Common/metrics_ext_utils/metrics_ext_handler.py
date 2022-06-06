@@ -585,7 +585,7 @@ def get_metrics_extension_service_path():
         raise Exception("Systemd unit files do not exist at /etc/systemd/system, /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
 
 
-def setup_me(is_lad):
+def setup_me(is_lad, HUtilObj=None):
     """
     The main method for creating and writing MetricsExtension configuration as well as service setup
     :param is_lad: Boolean value for whether the extension is Lad or not (AMA)
@@ -617,9 +617,14 @@ def setup_me(is_lad):
                         data = line.split("=")
                         aad_auth_url = data[1][1:-1] # Removing the quotes from the front and back
                         break
-
-    if aad_auth_url == "":
-        raise Exception("Unable to find AAD Authentication URL in the request error response. Failed to set up ME.")
+    
+    except Exception as e:
+        aad_auth_url = "https://login.windows.net/72f988bf-86f1-41af-91ab-2d7cd011db47"
+        message = "Unable to obtain auth url, falling back to use default value: " + aad_auth_url
+        if HUtilObj is not None:
+            HUtilObj.log(message)
+        else:
+            print('Info: {0}'.format(message))
 
     #create metrics conf
     me_conf = create_metrics_extension_conf(az_resource_id, aad_auth_url)
