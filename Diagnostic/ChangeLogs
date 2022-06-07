@@ -1,5 +1,8 @@
+2022-06-08: LAD-3.0.139
+    - Update OMSAgent to 1.14.15
+
 2022-05-04: LAD-3.0.137
-    - Pending
+    - Update OMSAgent to 1.14.12
 
 2021-09-17: LAD-3.0.135
     - This release incorporates security updates for the OMI agent subcomponent, addressing CVE-2021-38645, CVE-2021-38649, CVE-2021-38648, and CVE-2021-38647
