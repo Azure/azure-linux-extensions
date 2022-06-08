@@ -287,7 +287,7 @@ def main():
     if exit_code is not 0:
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)
-        
+
     exit_if_gpg_unavailable(operation)
 
     # Invoke operation
@@ -1021,17 +1021,11 @@ def exit_if_openssl_unavailable(operation):
 def exit_if_gpg_unavailable(operation):
     """
     Check if gpg is available to use
-    If not, attempt to install
-    If install fails, throw error to return UnsupportedGpg error code
+    If not found, throw error to return UnsupportedGpg error code
     """
     check_exit_code, _ = run_get_output('which gpg', True, False)
     if check_exit_code is not 0:
-        hutil_log_info('GPG not found, attempting to install')
-        exit_code, output = run_get_output(InstallExtraPackageCommand.format('gpg'))
-        if exit_code is not 0:
-            log_and_exit(operation, UnsupportedGpg, 'GPG could not be installed: {0}'.format(output))
-        else:
-            hutil_log_info('GPG successfully installed')
+        log_and_exit(operation, UnsupportedGpg, 'GPG not found, please install GPG and try again.')
     return 0
 
 
