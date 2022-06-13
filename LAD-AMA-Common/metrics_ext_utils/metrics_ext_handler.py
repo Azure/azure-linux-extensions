@@ -619,7 +619,7 @@ def setup_me(is_lad, HUtilObj=None):
                         break
     
     except Exception as e:
-        message = "Failed to retrieve AAD Authentication URL from " + arm_url + " with Exception={0}".format(e)
+        message = "Failed to retrieve AAD Authentication URL from " + arm_url + " with Exception='{0}'. ".format(e)
         message += "Continuing with metrics setup without AAD auth url."
         if HUtilObj is not None:
             HUtilObj.log(message)
