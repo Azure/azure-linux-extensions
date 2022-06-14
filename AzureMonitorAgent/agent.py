@@ -1218,7 +1218,8 @@ def is_vm_supported_for_extension(operation):
                        'ubuntu' : ['18.04', '20.04'], # Ubuntu
                        'alma' : ['8'], # Alma
                        'centos' : ['7'], # CentOS
-                       'mariner' : ['2'] # Mariner 2.0
+                       'mariner' : ['2'], # Mariner 2.0
+                       'sles' : ['15']
     }
 
     if platform.machine() == 'aarch64':
