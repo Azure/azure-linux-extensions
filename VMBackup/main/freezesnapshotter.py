@@ -450,4 +450,4 @@ class FreezeSnapshotter(object):
             return delta.days * 86400 + delta.seconds
         else:
             return delta.total_seconds()
-            
+

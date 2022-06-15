@@ -38,4 +38,4 @@ class DDSnapshotIdentifier:
 
     def convertToDictionary(self):
         return dict(creationTime = self.creationTime, id = self.id, token = self.token)
-        
+

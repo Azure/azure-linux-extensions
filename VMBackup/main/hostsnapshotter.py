@@ -176,4 +176,4 @@ class HostSnapshotter(object):
             self.logger.log(errorMsg)
 
         return blobsnapshotinfo_array, all_failed
-        
+
