@@ -173,8 +173,9 @@ class FreezeSnapshotter(object):
 
         self.logger.log('updating snapshot info array from blob snapshot info')
         if blob_snapshot_info_array != None and blob_snapshot_info_array !=[]:
-            for blob_snapshot_info in blob_snapshot_info_array:                  
-                snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage, blob_snapshot_info.blobUri, blob_snapshot_info.DDSnapshotIdentifier))
+            for blob_snapshot_info in blob_snapshot_info_array:
+                if blob_snapshot_info != None:                
+                    snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage, blob_snapshot_info.blobUri, blob_snapshot_info.DDSnapshotIdentifier))
 
         return snapshot_info_array
 
@@ -449,3 +450,4 @@ class FreezeSnapshotter(object):
             return delta.days * 86400 + delta.seconds
         else:
             return delta.total_seconds()
+            

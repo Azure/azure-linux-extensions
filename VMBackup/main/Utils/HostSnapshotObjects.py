@@ -1,5 +1,4 @@
 import json
-from pickle import NONE
 
 class HostDoSnapshotRequestBody:
     def __init__(self, taskId, diskIds, snapshotTaskToken, snapshotMetadata):
@@ -20,7 +19,7 @@ class HostPreSnapshotRequestBody:
         return dict(taskId = self.taskId, snapshotTaskToken = self.snapshotTaskToken)
 
 class BlobSnapshotInfo:
-    def __init__(self, isSuccessful, snapshotUri, errorMessage, statusCode, blobUri, DDSnapshotIdentifier = NONE):
+    def __init__(self, isSuccessful, snapshotUri, errorMessage, statusCode, blobUri, DDSnapshotIdentifier = None):
         self.isSuccessful = isSuccessful
         self.snapshotUri = snapshotUri
         self.errorMessage = errorMessage
@@ -39,3 +38,4 @@ class DDSnapshotIdentifier:
 
     def convertToDictionary(self):
         return dict(creationTime = self.creationTime, id = self.id, token = self.token)
+        
