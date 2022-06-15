@@ -101,4 +101,4 @@ class ExtensionResponse:
 
     def convertToDictionary(self):
         return dict(messageStr = self.messageStr, snapshotConsistency = self.snapshotConsistency, jobMessage = self.jobMessage)
-        
+
