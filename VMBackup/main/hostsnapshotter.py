@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from asyncio.windows_events import NULL
 import os
 try:
     import urlparse as urlparser
@@ -162,8 +163,12 @@ class HostSnapshotter(object):
             if(responseBody != None):
                 json_reponseBody = json.loads(responseBody)
                 for snapshot_info in json_reponseBody['snapshotInfo']:
-                    blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
-                    self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
+                    self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}, BlobUri: {4}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], snapshot_info['blobUri']))
+                    if('DDSnapshotIdentifier' in snapshot_info and snapshot_info['DDSnapshotIdentifier']!= NULL):
+                        blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], snapshot_info['blobUri'], snapshot_info['DDSnapshotIdentifier']))
+                        self.logger.log("DDSnapshotIdentifier: ",snapshot_info['DDSnapshotIdentifier'])
+                    else:
+                        blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], snapshot_info['blobUri']))
                     if (snapshot_info['isSuccessful'] == 'true'):
                         all_failed = False
         except Exception as e:

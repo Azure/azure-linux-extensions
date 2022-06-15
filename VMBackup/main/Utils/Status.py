@@ -58,13 +58,24 @@ class StorageDetails:
         return dict(partitionCount = self.partitionCount, totalUsedSizeInBytes = self.totalUsedSizeInBytes, isStoragespacePresent = self.isStoragespacePresent, isSizeComputationFailed = self.isSizeComputationFailed)
 
 class SnapshotInfoObj:
-    def __init__(self, isSuccessful, snapshotUri, errorMessage):
+    def __init__(self, isSuccessful, snapshotUri, errorMessage, blobUri, DirectDriveSnapshotIdentifier):
         self.isSuccessful = isSuccessful
         self.snapshotUri = snapshotUri
         self.errorMessage = errorMessage
+        self.blobUri = blobUri
+        self.DirectDriveSnapshotIdentifier = DirectDriveSnapshotIdentifier
+ 
+    def convertToDictionary(self):
+        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, blobUri = self.blobUri, DDSnapshotInfoObj = self.DirectDriveSnapshotIdentifier)
+
+class DirectDriveSnapshotIdentifier:
+    def __init__(self, creationTime, id, token):
+        self.creationTime = creationTime
+        self.id = id
+        self.token = token
 
     def convertToDictionary(self):
-        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage)
+        return dict(creationTime = self.creationTime, id = self.id, token = self.token)
 
 class FormattedMessage:
     def __init__(self, lang, message):
@@ -90,4 +101,3 @@ class ExtensionResponse:
 
     def convertToDictionary(self):
         return dict(messageStr = self.messageStr, snapshotConsistency = self.snapshotConsistency, jobMessage = self.jobMessage)
-

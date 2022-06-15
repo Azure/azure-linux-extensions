@@ -52,7 +52,7 @@ class FreezeSnapshotter(object):
         self.g_fsfreeze_on = g_fsfreeze_on
         self.para_parser = para_parser
         if(para_parser.snapshotTaskToken == None):
-            para_parser.snapshotTaskToken = '' #making snaoshot string empty when snapshotTaskToken is null
+            para_parser.snapshotTaskToken = '' #making snapshot string empty when snapshotTaskToken is null
         self.logger.log('snapshotTaskToken : ' + str(para_parser.snapshotTaskToken))
         self.takeSnapshotFrom = CommonVariables.firstHostThenGuest
         self.isManaged = False
@@ -120,6 +120,11 @@ class FreezeSnapshotter(object):
                         self.logger.log('Vmgs Blob is included. Setting the snapshot mode to onlyHost.')
                         self.takeSnapshotFrom = CommonVariables.onlyHost
 
+                if(para_parser.includedDisks != None and CommonVariables.isAnyDirectDriveDiskIncluded in para_parser.includedDisks.keys()):
+                    if (para_parser.includedDisks[CommonVariables.isAnyDirectDriveDiskIncluded] == True):
+                        self.logger.log('DirectDrive Disk is included. Setting the snapshot mode to onlyHost.')
+                        self.takeSnapshotFrom = CommonVariables.onlyHost
+
                 self.isManaged = customSettings['isManagedVm']
                 if( "backupTaskId" in customSettings.keys()):
                     self.taskId = customSettings["backupTaskId"]
@@ -168,9 +173,8 @@ class FreezeSnapshotter(object):
 
         self.logger.log('updating snapshot info array from blob snapshot info')
         if blob_snapshot_info_array != None and blob_snapshot_info_array !=[]:
-            for blob_snapshot_info in blob_snapshot_info_array:
-                if blob_snapshot_info != None:
-                    snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage))
+            for blob_snapshot_info in blob_snapshot_info_array:                  
+                snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage, blob_snapshot_info.blobUri, blob_snapshot_info.DDSnapshotIdentifier))
 
         return snapshot_info_array
 
@@ -445,4 +449,3 @@ class FreezeSnapshotter(object):
             return delta.days * 86400 + delta.seconds
         else:
             return delta.total_seconds()
-
