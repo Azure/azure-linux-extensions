@@ -163,12 +163,14 @@ class HostSnapshotter(object):
                 json_reponseBody = json.loads(responseBody)
                 for snapshot_info in json_reponseBody['snapshotInfo']:
                     self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
+                    
+                    ddSnapshotIdentifierInfo = None
                     if('DDSnapshotIdentifier' in snapshot_info and snapshot_info['DDSnapshotIdentifier'] != None):
                         ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(snapshot_info['DDSnapshotIdentifier']['creationTime'], snapshot_info['DDSnapshotIdentifier']['id'], snapshot_info['DDSnapshotIdentifier']['token'])
-                        blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], ddSnapshotIdentifierInfo))
-                        self.logger.log("DDSnapshotIdentifier Information- creationTime : {0}, id : {1}, token : {2}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token)
-                    else:
-                        blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
+                        self.logger.log("DDSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}, token : {2}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token)
+
+                    blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], ddSnapshotIdentifierInfo))
+                    
                     if (snapshot_info['isSuccessful'] == 'true'):
                         all_failed = False
         except Exception as e:
