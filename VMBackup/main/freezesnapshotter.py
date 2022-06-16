@@ -175,7 +175,23 @@ class FreezeSnapshotter(object):
         if blob_snapshot_info_array != None and blob_snapshot_info_array !=[]:
             for blob_snapshot_info in blob_snapshot_info_array:
                 if blob_snapshot_info != None:
-                    snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage, blob_snapshot_info.blobUri, blob_snapshot_info.DDSnapshotIdentifier))
+                    self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}".format(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage))
+
+                    blobUri = blob_snapshot_info.snapshotUri
+                    if(not blob_snapshot_info.snapshotUri):
+                        endIndexOfBlobUri = blob_snapshot_info.snapshotUri.find('?')
+                        if(endIndexOfBlobUri != -1):
+                            blobUri = blobUri[0:endIndexOfBlobUri]
+                        else:
+                            self.logger.log("Unable to find a '?' in snapshotUri. Assigning snapshotUri to blobUri. This {0} a DirectDrive disk".format("is" if(blob_snapshot_info.DDSnapshotIdentifier != None) else "is not"))
+                    self.logger.log("blobUri : {0}".format(blobUri))
+
+                    if(blob_snapshot_info.DDSnapshotIdentifier != None):
+                        ddSnapshotIdentifierInfo = Status.DirectDriveSnapshotIdentifier(blob_snapshot_info.DDSnapshotIdentifier.creationTime, blob_snapshot_info.DDSnapshotIdentifier.id, blob_snapshot_info.DDSnapshotIdentifier.token)
+                        snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage, blobUri, ddSnapshotIdentifierInfo))
+                        self.logger.log("DDSnapshotIdentifier Information to CRP- creationTime : {0}, id : {1}, token : {2}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token)
+                    else:
+                        snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage, blobUri, blob_snapshot_info.DDSnapshotIdentifier))
 
         return snapshot_info_array
 

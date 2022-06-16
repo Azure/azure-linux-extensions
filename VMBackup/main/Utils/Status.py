@@ -58,7 +58,7 @@ class StorageDetails:
         return dict(partitionCount = self.partitionCount, totalUsedSizeInBytes = self.totalUsedSizeInBytes, isStoragespacePresent = self.isStoragespacePresent, isSizeComputationFailed = self.isSizeComputationFailed)
 
 class SnapshotInfoObj:
-    def __init__(self, isSuccessful, snapshotUri, errorMessage, blobUri, DirectDriveSnapshotIdentifier):
+    def __init__(self, isSuccessful, snapshotUri, errorMessage, blobUri, DirectDriveSnapshotIdentifier = None):
         self.isSuccessful = isSuccessful
         self.snapshotUri = snapshotUri
         self.errorMessage = errorMessage
