@@ -191,7 +191,7 @@ class FreezeSnapshotter(object):
                     ddSnapshotIdentifierInfo = blob_snapshot_info.DDSnapshotIdentifier
                     if(ddSnapshotIdentifierInfo != None):
                         ddSnapshotIdentifierInfo = Status.DirectDriveSnapshotIdentifier(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token)
-                        self.logger.log("DDSnapshotIdentifier Information to CRP- creationTime : {0}, id : {1}, token : {2}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token)
+                        self.logger.log("DDSnapshotIdentifier Information to CRP- creationTime : {0}, id : {1}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id)
                     
                     snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage, blobUri, ddSnapshotIdentifierInfo))
 

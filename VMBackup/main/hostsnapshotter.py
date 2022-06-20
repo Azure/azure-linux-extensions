@@ -167,7 +167,7 @@ class HostSnapshotter(object):
                     ddSnapshotIdentifierInfo = None
                     if('DDSnapshotIdentifier' in snapshot_info and snapshot_info['DDSnapshotIdentifier'] != None):
                         ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(snapshot_info['DDSnapshotIdentifier']['creationTime'], snapshot_info['DDSnapshotIdentifier']['id'], snapshot_info['DDSnapshotIdentifier']['token'])
-                        self.logger.log("DDSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}, token : {2}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token)
+                        self.logger.log("DDSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id)
 
                     blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], ddSnapshotIdentifierInfo))
                     
