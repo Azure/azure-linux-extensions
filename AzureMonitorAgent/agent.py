@@ -826,7 +826,7 @@ def stop_metrics_process():
                 if os.path.exists(cmd_file):
                     with open(cmd_file, "r") as pidf:
                         cmdline = pidf.readlines()
-                        if cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
+                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
                             kill_cmd = "kill " + pid
                             run_command_and_log(kill_cmd)
 
@@ -842,7 +842,7 @@ def is_metrics_process_running():
                 if os.path.exists(cmd_file):
                     with open(cmd_file, "r") as pidf:
                         cmdline = pidf.readlines()
-                        if cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
+                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
                             return True
 
     return False
