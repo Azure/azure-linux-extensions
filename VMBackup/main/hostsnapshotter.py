@@ -28,7 +28,6 @@ try:
 except ImportError:
     import configparser as ConfigParsers
 import multiprocessing as mp
-import datetime
 import json
 from common import CommonVariables
 from HttpUtil import HttpUtil
@@ -162,12 +161,16 @@ class HostSnapshotter(object):
             if(responseBody != None):
                 json_reponseBody = json.loads(responseBody)
                 for snapshot_info in json_reponseBody['snapshotInfo']:
-                    self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
+                    self.logger.log("From Host- IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
                     
                     ddSnapshotIdentifierInfo = None
                     if('DDSnapshotIdentifier' in snapshot_info and snapshot_info['DDSnapshotIdentifier'] != None):
-                        ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(snapshot_info['DDSnapshotIdentifier']['creationTime'], snapshot_info['DDSnapshotIdentifier']['id'], snapshot_info['DDSnapshotIdentifier']['token'])
+                        DateTimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
+                        creationTime = datetime.datetime.strptime(snapshot_info['DDSnapshotIdentifier']['creationTime'],DateTimeFormat)
+                        ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTime , snapshot_info['DDSnapshotIdentifier']['id'], snapshot_info['DDSnapshotIdentifier']['token'])
                         self.logger.log("DDSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id)
+                    else:
+                        self.logger.log("DDSnapshotIdentifier absent in Host Response")
 
                     blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], ddSnapshotIdentifierInfo))
                     

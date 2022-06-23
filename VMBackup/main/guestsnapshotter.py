@@ -28,7 +28,6 @@ try:
 except ImportError:
     import configparser as ConfigParsers
 import multiprocessing as mp
-import datetime
 from common import CommonVariables
 from HttpUtil import HttpUtil
 from Utils import Status

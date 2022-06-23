@@ -187,11 +187,13 @@ class FreezeSnapshotter(object):
                         else:
                             self.logger.log("Unable to find end index of blobUri in snapshotUri. Assigning default snapshotUri to blobUri. This {0} a DirectDrive disk".format("is" if(blob_snapshot_info.DDSnapshotIdentifier != None) else "is not"))
                     self.logger.log("blobUri : {0}".format(blobUri))
-
+                        
                     ddSnapshotIdentifierInfo = blob_snapshot_info.DDSnapshotIdentifier
                     if(ddSnapshotIdentifierInfo != None):
                         ddSnapshotIdentifierInfo = Status.DirectDriveSnapshotIdentifier(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token)
                         self.logger.log("DDSnapshotIdentifier Information to CRP- creationTime : {0}, id : {1}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id)
+                    else:
+                        self.logger.log("No DD Snapshot Identifier Found. Hence DirectDriveSnapshotIdentifier will be Null")
                     
                     snapshot_info_array.append(Status.SnapshotInfoObj(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage, blobUri, ddSnapshotIdentifierInfo))
 

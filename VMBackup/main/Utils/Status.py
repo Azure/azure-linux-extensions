@@ -66,7 +66,7 @@ class SnapshotInfoObj:
         self.DirectDriveSnapshotIdentifier = DirectDriveSnapshotIdentifier
  
     def convertToDictionary(self):
-        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, blobUri = self.blobUri, DDSnapshotInfoObj = self.DirectDriveSnapshotIdentifier)
+        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, blobUri = self.blobUri, DirectDriveSnapshotIdentifier = self.DirectDriveSnapshotIdentifier)
 
 class DirectDriveSnapshotIdentifier:
     def __init__(self, creationTime, id, token):
