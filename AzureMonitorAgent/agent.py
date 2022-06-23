@@ -948,7 +948,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
-                            me_handler.setup_me(is_lad=False)
+                            me_handler.setup_me(is_lad=False, HUtilObj=HUtilObject)
 
                             start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
                             if start_telegraf_res:
@@ -1217,7 +1217,9 @@ def is_vm_supported_for_extension(operation):
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
                        'ubuntu' : ['18.04', '20.04'], # Ubuntu
                        'alma' : ['8'], # Alma
-                       'centos' : ['7'] # CentOS
+                       'centos' : ['7'], # CentOS
+                       'mariner' : ['2'], # Mariner 2.0
+                       'sles' : ['15']
     }
 
     if platform.machine() == 'aarch64':

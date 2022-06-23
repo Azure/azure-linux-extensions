@@ -444,7 +444,22 @@ class HandlerUtility:
             //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
 
             '''
-            output = self.command_output_from_subprocess(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], 30)
+            onlyLocalDisks = False
+            try:
+                configfile='/etc/azure/vmbackup.conf'
+                config = ConfigParsers.ConfigParser()
+                config.read(configfile) 
+                if config.has_option('SizeCalculation','onlyLocalDisks'):
+                    onlyLocalDisks = config.get('SizeCalculation','onlyLocalDisks')   
+            except Exception as e:
+                errMsg='cannot read config file or file not present'
+                self.logger.log(errMsg, True, 'Warning')
+
+            if onlyLocalDisks:  
+                output = self.command_output_from_subprocess(["df" , "-kl" , "--output=source,fstype,size,used,avail,pcent,target"], 30)
+            else:
+                output = self.command_output_from_subprocess(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], 30)
+
             output = output.split("\n")
             total_used = 0
             total_used_network_shares = 0
