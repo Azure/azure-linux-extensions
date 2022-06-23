@@ -23,13 +23,11 @@ import os
 
 from ResourceDiskUtil import ResourceDiskUtil
 from DiskUtil import DiskUtil
-from BekUtil import BekUtil, BekMissingException
 from CryptMountConfigUtil import CryptMountConfigUtil
 from Common import CommonVariables
 from .console_logger import ConsoleLogger
 try:
     import unittest.mock as mock  # python3+
-    from unittest.mock import patch, mock_open
 except ImportError:
     import mock  # python2
 
@@ -37,12 +35,11 @@ except ImportError:
 class TestResourceDiskUtil(unittest.TestCase):
     def setUp(self):
         self.logger = ConsoleLogger()
-        self.mock_bek_util = mock.create_autospec(BekUtil)
         self.mock_disk_util = mock.create_autospec(DiskUtil)
         self.mock_crypt_mount_config_util = mock.create_autospec(CryptMountConfigUtil)
         self.mock_passphrase_filename = "mock_passphrase_filename"
         mock_public_settings = {}
-        self.resource_disk = ResourceDiskUtil(self.logger, self.mock_bek_util, self.mock_disk_util, self.mock_crypt_mount_config_util, self.mock_passphrase_filename, mock_public_settings, ["ubuntu", "16"])
+        self.resource_disk = ResourceDiskUtil(self.logger, self.mock_disk_util, self.mock_crypt_mount_config_util, self.mock_passphrase_filename, mock_public_settings, ["ubuntu", "16"])
 
     def _test_resource_disk_partition_dependant_method(self, method, mock_partition_exists, mock_execute):
         """
@@ -181,12 +178,11 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.assertEqual(self.resource_disk.try_remount(), True)
         mock_mount.assert_called_with(mock_rd_part_path)
 
-    @mock.patch('ResourceDiskUtil.ResourceDiskUtil._prepare_rd_passphrase_file', return_value=True)
     @mock.patch('ResourceDiskUtil.ResourceDiskUtil._is_crypt_mounted', return_value=False)
     @mock.patch('ResourceDiskUtil.ResourceDiskUtil._is_plain_mounted', return_value=True)
     @mock.patch('ResourceDiskUtil.ResourceDiskUtil.encrypt_format_mount')
     @mock.patch('ResourceDiskUtil.ResourceDiskUtil.try_remount')
-    def test_automount(self, mock_try_remount, mock_encrypt_format_mount, mock_is_plain_mounted, mock_is_crypt_mounted, mock_prep_rd_pass):
+    def test_automount(self, mock_try_remount, mock_encrypt_format_mount, mock_is_plain_mounted, mock_is_crypt_mounted):
         # Case 1: try_remount succeds
         mock_try_remount.return_value = True
         self.assertEqual(self.resource_disk.automount(), True)
@@ -306,21 +302,3 @@ class TestResourceDiskUtil(unittest.TestCase):
         self.resource_disk._RD_BASE_DEV_PATH_CACHE = "test_base_dev_path"
         rd_base_path = self.resource_disk._get_rd_base_dev_path()
         self.assertEqual("test_base_dev_path", rd_base_path)
-
-    @mock.patch('builtins.open', new_callable=mock_open, read_data="data")
-    @mock.patch('os.path.exists', return_value=True)
-    def test_try_prep_rd_passphrase_file_exists(self, mock_exists, mock_open):
-        self.resource_disk._prepare_rd_passphrase_file()
-        self.assertEqual(mock_exists.call_count, 1)
-        self.assertEqual(mock_open.call_count, 0)
-        handle = mock_open()
-        self.assertEqual(handle.write.call_count, 0)
-
-    @mock.patch('builtins.open', new_callable=mock_open, read_data="data")
-    @mock.patch('os.path.exists', return_value=False)
-    def test_try_prep_rd_passphrase_file_missing(self, mock_exists, mock_open):
-        self.resource_disk._prepare_rd_passphrase_file()
-        self.assertEqual(mock_exists.call_count, 1)
-        self.assertEqual(mock_open.call_count, 1)
-        handle = mock_open()
-        self.assertEqual(handle.write.call_count, 1)
