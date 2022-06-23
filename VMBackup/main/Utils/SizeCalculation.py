@@ -5,6 +5,10 @@ try:
     import imp as imp
 except ImportError:
     import importlib as imp
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 import base64
 import json
 import tempfile
@@ -25,6 +29,7 @@ class SizeCalculation(object):
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'rootfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.isOnlyOSDiskBackupEnabled = False
+        self.onlyLocalDisks = False
         try:
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
@@ -68,7 +73,22 @@ class SizeCalculation(object):
     def get_total_used_size(self):
         try:
             size_calc_failed = False
-            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+
+            try:
+                configfile='/etc/azure/vmbackup.conf'
+                config = ConfigParsers.ConfigParser()
+                config.read(configfile) 
+                if config.has_option('SizeCalculation','onlyLocalDisks'):
+                    self.onlyLocalDisks = config.get('SizeCalculation','onlyLocalDisks')   
+            except Exception as e:
+                errMsg='cannot read config file or file not present'
+                self.logger.log(errMsg, True, 'Warning')
+
+            if self.onlyLocalDisks:  
+                df = subprocess.Popen(["df" , "-kl"], stdout=subprocess.PIPE)
+            else:
+                df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+
             '''
             Sample output of the df command
 
