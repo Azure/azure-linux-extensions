@@ -54,9 +54,10 @@ def is_arc_installed():
 
 # Log collecting functions
 
-def collect_logs(output_dirpath):
-    # collect MDSD logs
-    copy_dircontents("/var/opt/microsoft/azuremonitoragent/log", os.path.join(output_dirpath,"mdsd"))
+def collect_logs(output_dirpath, pkg_manager):
+    # collect MDSD information
+    copy_file("/etc/default/azuremonitoragent", os.path.join(output_dirpath,"mdsd"))
+    copy_dircontents("/var/opt/microsoft/azuremonitoragent/log", os.path.join(output_dirpath,"mdsd","logs"))
     # collect AMA DCR
     copy_dircontents("/etc/opt/microsoft/azuremonitoragent", os.path.join(output_dirpath,"DCR"))
 
@@ -67,10 +68,26 @@ def collect_logs(output_dirpath):
         copy_dircontents(os.path.join("/var/lib/waagent",config_dir,"status"), os.path.join(output_dirpath,ver+"-status"))
         copy_dircontents(os.path.join("/var/lib/waagent",config_dir,"config"), os.path.join(output_dirpath,ver+"-config"))
 
+    # collect system logs
+    system_logs = ""
+    if (pkg_manager == "dpkg"):
+        system_logs = "syslog"
+    elif (pkg_manager == "rpm"):
+        system_logs = "messages"
+    if (system_logs != ""):
+        for systemlog_file in filter((lambda x : x.startswith(system_logs)), os.listdir("/var/log")):
+            copy_file(os.path.join("/var/log",systemlog_file), os.path.join(output_dirpath,"system_logs"))
+
+    # collect rsyslog information (if present)
+    copy_file("/etc/rsyslog.conf", os.path.join(output_dirpath,"rsyslog"))
+    copy_dircontents("/etc/rsyslog.d", os.path.join(output_dirpath,"rsyslog","rsyslog.d"))
+    # collect syslog-ng information (if present)
+    copy_dircontents("/etc/syslog-ng", os.path.join(output_dirpath,"syslog-ng"))
+
     return
 
 
-def collect_arc_logs(output_dirpath):
+def collect_arc_logs(output_dirpath, pkg_manager):
     # collect GC Extension logs
     copy_dircontents("/var/lib/GuestConfig/ext_mgr_logs", os.path.join(output_dirpath,"GC_Extension"))
     # collect AMA Extension logs
@@ -80,13 +97,13 @@ def collect_arc_logs(output_dirpath):
         copy_dircontents(os.path.join("/var/lib/GuestConfig/extension_logs",config_dir), os.path.join(output_dirpath,ver+"-extension_logs"))
     
     # collect logs same to both Arc + Azure VM
-    collect_logs(output_dirpath)
+    collect_logs(output_dirpath, pkg_manager)
 
     print("Arc logs collected")
     return
 
 
-def collect_azurevm_logs(output_dirpath):
+def collect_azurevm_logs(output_dirpath, pkg_manager):
     # collect waagent logs
     os.mkdir(os.path.join(output_dirpath, "waagent"))
     for waagent_file in filter((lambda x : x.startswith("waagent.log")), os.listdir("/var/log")):
@@ -95,7 +112,7 @@ def collect_azurevm_logs(output_dirpath):
     copy_dircontents("/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent", os.path.join(output_dirpath,"Microsoft.Azure.Monitor.AzureMonitorLinuxAgent"))
     
     # collect logs same to both Arc + Azure VM
-    collect_logs(output_dirpath)
+    collect_logs(output_dirpath, pkg_manager)
 
     print("Azure VM logs collected")
     return
@@ -104,7 +121,7 @@ def collect_azurevm_logs(output_dirpath):
 
 # Outfile function
     
-def create_outfile(output_dirpath, vm_type, logs_date):
+def create_outfile(output_dirpath, logs_date, pkg_manager):
     with open(os.path.join(output_dirpath,"amalinux.out"), 'w') as outfile:
         outfile.write("Log Collection Start Time: {0}\n".format(logs_date))
         outfile.write("--------------------------------------------------------------------------------\n")
@@ -118,7 +135,6 @@ def create_outfile(output_dirpath, vm_type, logs_date):
             outfile.write("Indeterminate OS.\n")
 
         # detected package manager
-        pkg_manager = helpers.find_package_manager()
         if (pkg_manager != ""):
             outfile.write("Package manager detected: {0}\n".format(pkg_manager))
         else:
@@ -214,20 +230,23 @@ def run_logcollector(output_location):
         print("ERROR: Could not create output directory: {0}".format(e))
         return
 
+    # get VM information needed for log collection
+    pkg_manager = helpers.find_package_manager()
+
     # collect the logs
     if (is_arc_vm):
         print("Azure Arc detected, collecting logs for Azure Arc.")
         print("--------------------------------------------------------------------------------")
-        collect_arc_logs(output_dirpath)
+        collect_arc_logs(output_dirpath, pkg_manager)
     else:
         print("Azure Arc not detected, collected logs for Azure VM.")
         print("--------------------------------------------------------------------------------")
-        collect_azurevm_logs(output_dirpath)
+        collect_azurevm_logs(output_dirpath, pkg_manager)
     print("--------------------------------------------------------------------------------")
 
     # create out file (for simple checks)
     print("Creating 'amalinux.out' file")
-    create_outfile(output_dirpath, vm_type, logs_date)
+    create_outfile(output_dirpath, logs_date, pkg_manager)
     print("--------------------------------------------------------------------------------")
 
     # zip up logs
