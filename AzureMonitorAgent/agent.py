@@ -1219,7 +1219,8 @@ def is_vm_supported_for_extension(operation):
                        'alma' : ['8'], # Alma
                        'centos' : ['7'], # CentOS
                        'mariner' : ['2'], # Mariner 2.0
-                       'sles' : ['15']
+                       'sles' : ['15'], # SLES
+                       'debian' : ['11'] # Debian
     }
 
     if platform.machine() == 'aarch64':
