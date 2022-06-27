@@ -19,6 +19,8 @@ def copy_file(src, dst):
     if (os.path.isfile(src)):
         print("Copying file {0}".format(src))
         try:
+            if (not os.path.isdir(dst)):
+                os.mkdir(dst)
             shutil.copy2(src, dst)
         except Exception as e:
             print("ERROR: Could not copy {0}: {1}".format(src, e))
@@ -105,7 +107,6 @@ def collect_arc_logs(output_dirpath, pkg_manager):
 
 def collect_azurevm_logs(output_dirpath, pkg_manager):
     # collect waagent logs
-    os.mkdir(os.path.join(output_dirpath, "waagent"))
     for waagent_file in filter((lambda x : x.startswith("waagent.log")), os.listdir("/var/log")):
         copy_file(os.path.join("/var/log",waagent_file), os.path.join(output_dirpath,"waagent"))
     # collect AMA Extension logs
