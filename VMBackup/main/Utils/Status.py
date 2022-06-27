@@ -58,15 +58,15 @@ class StorageDetails:
         return dict(partitionCount = self.partitionCount, totalUsedSizeInBytes = self.totalUsedSizeInBytes, isStoragespacePresent = self.isStoragespacePresent, isSizeComputationFailed = self.isSizeComputationFailed)
 
 class SnapshotInfoObj:
-    def __init__(self, isSuccessful, snapshotUri, errorMessage, blobUri, DirectDriveSnapshotIdentifier = None):
+    def __init__(self, isSuccessful, snapshotUri, errorMessage, blobUri, directDriveSnapshotIdentifier = None):
         self.isSuccessful = isSuccessful
         self.snapshotUri = snapshotUri
         self.errorMessage = errorMessage
         self.blobUri = blobUri
-        self.DirectDriveSnapshotIdentifier = DirectDriveSnapshotIdentifier
+        self.directDriveSnapshotIdentifier = directDriveSnapshotIdentifier
  
     def convertToDictionary(self):
-        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, blobUri = self.blobUri, DirectDriveSnapshotIdentifier = self.DirectDriveSnapshotIdentifier)
+        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, blobUri = self.blobUri, directDriveSnapshotIdentifier = self.directDriveSnapshotIdentifier)
 
 class DirectDriveSnapshotIdentifier:
     def __init__(self, creationTime, id, token):
