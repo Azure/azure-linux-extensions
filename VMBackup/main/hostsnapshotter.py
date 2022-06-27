@@ -165,12 +165,13 @@ class HostSnapshotter(object):
                     
                     ddSnapshotIdentifierInfo = None
                     if('DDSnapshotIdentifier' in snapshot_info and snapshot_info['DDSnapshotIdentifier'] != None):
-                        DateTimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
-                        creationTime = datetime.datetime.strptime(snapshot_info['DDSnapshotIdentifier']['creationTime'],DateTimeFormat)
+                        dateTimeFormat = "%Y-%m-%dT%H:%M:%S"
+                        creationTimeString = snapshot_info['DDSnapshotIdentifier']['creationTime'][0:19]
+                        creationTime = datetime.datetime.strptime(creationTimeString, dateTimeFormat)
                         ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTime , snapshot_info['DDSnapshotIdentifier']['id'], snapshot_info['DDSnapshotIdentifier']['token'])
                         self.logger.log("DDSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id)
                     else:
-                        self.logger.log("DDSnapshotIdentifier absent in Host Response")
+                        self.logger.log("DDSnapshotIdentifier absent/None in Host Response")
 
                     blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], ddSnapshotIdentifierInfo))
                     
