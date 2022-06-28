@@ -3,7 +3,7 @@
 COMMAND="./modules/main.py"
 PYTHON=""
 FUTURE_PATH=""
-TST_VERSION="1.0"  # update when changes are made to TST
+TST_VERSION="1.1"  # update when changes are made to TST
 
 find_python() {
     local python_exec_command=$1
