@@ -1113,7 +1113,7 @@ def set_os_arch(operation):
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
 
         vm_dist, vm_ver = find_vm_distro(operation)
-        if current_arch == 'aarch64' and vm_dist.startsWith('centos') and vm_ver.startsWith('7'): 
+        if current_arch == 'aarch64' and vm_dist.startswith('centos') and vm_ver.startswith('7'): 
             SupportedMEPath += '_centos7' 
  
         if os.path.exists(SupportedMEPath):
