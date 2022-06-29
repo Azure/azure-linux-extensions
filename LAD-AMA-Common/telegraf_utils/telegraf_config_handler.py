@@ -417,7 +417,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     if is_lad:
         agentconf += "  fielddrop = [" + excess_diskio_field_drop_list_str[:-2] + "]\n"
     agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
-    agentconf += "  udp_payload = \"1024B\"\n\n"
+    agentconf += "  udp_payload = \"2048B\"\n\n"
     if has_mdsd_output:
         agentconf += "\n# Configuration for sending metrics to MDSD\n"
         agentconf += "[[outputs.socket_writer]]\n"
