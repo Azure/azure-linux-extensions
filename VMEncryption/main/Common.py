@@ -102,7 +102,6 @@ class CommonVariables:
     PassphraseKey = 'Passphrase'
     MigrateKey = 'MigrateFlag'
     MigrateValue = 'Migrate'
-    EnableVmssOsEncryptionKey = 'EnableVmssOsEncryption'
 
     """
     value for VolumeType could be Data

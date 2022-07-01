@@ -185,7 +185,7 @@ class CheckUtil(object):
         # get supported volume types
         instance = MetadataUtil(self.logger)
         if instance.is_vmss():
-            if self.is_vmss_os_encryption_supported(public_settings, DistroPatcher):
+            if DistroPatcher is not None and DistroPatcher.support_online_encryption:
                 self.logger.log("VMSS OS Disk Encryption Supported.")
                 supported_volume_types = CommonVariables.SupportedVolumeTypes
             else:
@@ -195,12 +195,6 @@ class CheckUtil(object):
 
         if not volume_type.lower() in [x.lower() for x in supported_volume_types] :
             raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(volume_type, supported_volume_types))
-    
-    def is_vmss_os_encryption_supported(self, public_settings, DistroPatcher):
-        if CommonVariables.EnableVmssOsEncryptionKey in public_settings and public_settings.get(CommonVariables.EnableVmssOsEncryptionKey):
-            if DistroPatcher is not None and DistroPatcher.support_online_encryption:
-                return True
-        return False
 
     def validate_lvm_os(self, public_settings, DistroPatcher):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
