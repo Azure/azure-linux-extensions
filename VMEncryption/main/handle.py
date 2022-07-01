@@ -2271,8 +2271,12 @@ def daemon():
 
     logger.log("daemon lock acquired sucessfully.")
 
-    logger.log("waiting for 1 minute before continuing the daemon")
-    time.sleep(60)
+    sleep_time = 60
+    if DistroPatcher is not None and DistroPatcher.support_online_encryption:
+        sleep_time = 5  #Reduce sleep time for online encryption
+    
+    logger.log("waiting for {0} seconds before continuing the daemon".format(sleep_time))
+    time.sleep(sleep_time)
 
     logger.log("Installing pre-requisites")
     DistroPatcher.install_extras()

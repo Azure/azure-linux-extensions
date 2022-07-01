@@ -106,6 +106,13 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "os"})
         self.assertRaises(Exception, self.cutil.validate_volume_type, {})
 
+        distro_patcher_sup = MockDistroPatcher('redhat', '8.5', '4.4')
+        distro_patcher_sup.support_online_encryption = True
+        distro_patcher_not_sup = MockDistroPatcher('redhat', '7.9', '4.4')
+
+        self.cutil.validate_volume_type({CommonVariables.VolumeTypeKey: "All"}, distro_patcher_sup)
+        self.assertRaises(Exception, self.cutil.validate_volume_type, {CommonVariables.VolumeTypeKey: "OS"}, distro_patcher_not_sup)
+
     @mock.patch('check_util.CheckUtil.validate_memory_os_encryption')
     @mock.patch('CommandExecutor.CommandExecutor.Execute', return_value=0)
     @mock.patch('MetadataUtil.MetadataUtil.is_vmss')

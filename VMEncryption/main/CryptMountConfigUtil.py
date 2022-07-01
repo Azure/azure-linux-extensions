@@ -130,9 +130,6 @@ class CryptMountConfigUtil(object):
 
                 crypt_item = CryptItem()
                 crypt_item.dev_path = azure_name_table[device_item_path] if device_item_path in azure_name_table else device_item_path
-                if crypt_item.dev_path == "/dev/disk/azure/resource-part1":
-                    # Ignore the resource disk. We have other code for that.
-                    continue
                 # dev_path will always start with "/" so we strip that out and generate a temporary mapper name from the rest
                 # e.g. /dev/disk/azure/scsi1/lun1 --> dev-disk-azure-scsi1-lun1-unlocked  | /dev/mapper/lv0 --> dev-mapper-lv0-unlocked
                 crypt_item.mapper_name = crypt_item.dev_path[5:].replace("/", "-") + "-unlocked"
@@ -197,10 +194,15 @@ class CryptMountConfigUtil(object):
                         if fstab_backup_line is not None:
                             with open("/etc/fstab", 'a') as f:
                                 f.writelines([fstab_backup_line])
+                            device, mountpoint, fs, opts = self.parse_fstab_line(fstab_backup_line)
+                            if mountpoint is not None:
+                                self.disk_util.make_sure_path_exists(mountpoint)
 
                 # close the file and then unmount and close
                 self.disk_util.umount(temp_mount_point)
                 self.disk_util.luks_close(crypt_item.mapper_name)
+
+        self.add_bek_in_fstab()
 
     def get_crypt_items(self):
         """
@@ -707,5 +709,16 @@ class CryptMountConfigUtil(object):
             os.rename(self.encryption_environment.azure_crypt_mount_config_path, new_name)
         else:
             self.logger.log(msg=("the azure crypt mount file not exist: {0}".format(self.encryption_environment.azure_crypt_mount_config_path)), level=CommonVariables.InfoLevel)
+
+    def add_bek_in_fstab(self):
+        with open('/etc/fstab', 'r') as f:
+            lines = f.readlines()
+        
+        if not self.is_bek_in_fstab_file(lines):
+            self.logger.log("BEK volume not detected in fstab. Adding it now.")
+            lines.append(self.get_fstab_bek_line())
+            self.add_bek_to_default_cryptdisks()
+            with open('/etc/fstab', 'w') as f:
+                f.writelines(lines)
 
 
