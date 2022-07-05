@@ -41,7 +41,7 @@ class CommonVariables:
     customSettings = 'customSettings'
     statusBlobUploadError = 'statusBlobUploadError'
     TempStatusFileName = 'tempStatusFile.status'
-    onlyLocalDisks = 'onlyLocalDisks'
+    onlyLocalFilesystems = 'onlyLocalFilesystems'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'

@@ -75,14 +75,14 @@ class SizeCalculation(object):
         try:
             size_calc_failed = False
 
-            onlyLocalDisks = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalDisks, "False") 
+            onlyLocalFilesystems = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalFilesystems, "False") 
 
-            if onlyLocalDisks in ['True', 'true']:  
+            if onlyLocalFilesystems in ['True', 'true']:  
                 df = subprocess.Popen(["df" , "-kl"], stdout=subprocess.PIPE)
             else:
                 df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
 
-            self.logger.log("onlyLocalDisks : {0}".format(str(onlyLocalDisks)))
+            self.logger.log("onlyLocalFilesystems : {0}".format(str(onlyLocalFilesystems)))
             '''
             Sample output of the df command
 

@@ -327,7 +327,7 @@ class HandlerUtility:
     isanysnapshotfailed = False
     UploadStatusAndLog = True
     WriteLog = True
-    onlyLocalDisks = True
+    onlyLocalFilesystems = True
 
     seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
