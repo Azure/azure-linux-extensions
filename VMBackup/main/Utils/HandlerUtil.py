@@ -327,6 +327,7 @@ class HandlerUtility:
     isanysnapshotfailed = False
     UploadStatusAndLog = True
     WriteLog = True
+    onlyLocalDisks = True
 
     seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
@@ -340,7 +341,7 @@ class HandlerUtility:
                 config = ConfigParsers.ConfigParser()
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)
+                    value = config.get('SnapshotThread',key)  
         except Exception as e:
             pass
 
@@ -423,75 +424,6 @@ class HandlerUtility:
         self.log("Unique Machine Id  : {0}".format(machine_id))
         return machine_id
 
-    def get_total_used_size(self):
-        try:
-            '''
-            Sample output of the df command
-
-            Filesystem                                              Type     1K-blocks    Used    Avail Use% Mounted on
-            /dev/sda2                                               xfs       52155392 3487652 48667740   7% /
-            devtmpfs                                                devtmpfs   7170976       0  7170976   0% /dev
-            tmpfs                                                   tmpfs      7180624       0  7180624   0% /dev/shm
-            tmpfs                                                   tmpfs      7180624  760496  6420128  11% /run
-            tmpfs                                                   tmpfs      7180624       0  7180624   0% /sys/fs/cgroup
-            /dev/sda1                                               ext4        245679  151545    76931  67% /boot
-            /dev/sdb1                                               ext4      28767204 2142240 25140628   8% /mnt/resource
-            /dev/mapper/mygroup-thinv1                              xfs        1041644   33520  1008124   4% /bricks/brick1
-            /dev/mapper/mygroup-85197c258a54493da7880206251f5e37_0  xfs        1041644   33520  1008124   4% /run/gluster/snaps/85197c258a54493da7880206251f5e37/brick2
-            /dev/mapper/mygroup2-thinv2                             xfs       15717376 5276944 10440432  34% /tmp/test
-            /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0 xfs       15717376 5276944 10440432  34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
-            tmpfs                                                   tmpfs      1436128       0  1436128   0% /run/user/1000
-            //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
-
-            '''
-            onlyLocalDisks = False
-            try:
-                configfile='/etc/azure/vmbackup.conf'
-                config = ConfigParsers.ConfigParser()
-                config.read(configfile) 
-                if config.has_option('SizeCalculation','onlyLocalDisks'):
-                    onlyLocalDisks = config.get('SizeCalculation','onlyLocalDisks')   
-            except Exception as e:
-                errMsg='cannot read config file or file not present'
-                self.logger.log(errMsg, True, 'Warning')
-
-            if onlyLocalDisks:  
-                output = self.command_output_from_subprocess(["df" , "-kl" , "--output=source,fstype,size,used,avail,pcent,target"], 30)
-            else:
-                output = self.command_output_from_subprocess(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], 30)
-
-            output = output.split("\n")
-            total_used = 0
-            total_used_network_shares = 0
-            total_used_gluster = 0
-            network_fs_types = []
-            for i in range(1,len(output)-1):
-                device, fstype, size, used, available, percent, mountpoint = output[i].split()
-                self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
-                if "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
-                    if fstype not in network_fs_types :
-                        network_fs_types.append(fstype)
-                    self.log("Not Adding as network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
-                    total_used_network_shares = total_used_network_shares + int(used)
-                elif (mountpoint.startswith('/run/gluster/snaps/')):
-                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
-                    total_used_gluster = total_used_gluster + int(used)
-                else:
-                    self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
-                    total_used = total_used + int(used) #return in KB
-
-            if not len(network_fs_types) == 0:
-                HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
-                HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
-                self.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024))
-            if total_used_gluster !=0 :
-                HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
-            self.log("Total used space in Bytes : {0}".format(total_used * 1024))
-            return total_used * 1024,False #Converting into Bytes
-        except Exception as e:
-            errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg)
-            return 0,True
 
     def get_storage_details(self,total_size,failure_flag):
         self.storageDetailsObj = Utils.Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
