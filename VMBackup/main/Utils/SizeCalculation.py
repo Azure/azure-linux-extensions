@@ -19,17 +19,18 @@ import Utils.HandlerUtil
 import traceback
 import subprocess
 import shlex
+from common import CommonVariables
 
 class SizeCalculation(object):
 
-    def __init__(self,patching,logger,para_parser):
+    def __init__(self,patching, hutil, logger,para_parser):
         self.patching=patching
         self.logger=logger
+        self.hutil = hutil
         self.file_systems_info = []
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'rootfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.isOnlyOSDiskBackupEnabled = False
-        self.onlyLocalDisks = False
         try:
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
@@ -74,21 +75,14 @@ class SizeCalculation(object):
         try:
             size_calc_failed = False
 
-            try:
-                configfile='/etc/azure/vmbackup.conf'
-                config = ConfigParsers.ConfigParser()
-                config.read(configfile) 
-                if config.has_option('SizeCalculation','onlyLocalDisks'):
-                    self.onlyLocalDisks = config.get('SizeCalculation','onlyLocalDisks')   
-            except Exception as e:
-                errMsg='cannot read config file or file not present'
-                self.logger.log(errMsg, True, 'Warning')
+            onlyLocalDisks = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalDisks, "False") 
 
-            if self.onlyLocalDisks:  
+            if onlyLocalDisks in ['True', 'true']:  
                 df = subprocess.Popen(["df" , "-kl"], stdout=subprocess.PIPE)
             else:
                 df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
 
+            self.logger.log("onlyLocalDisks : {0}".format(str(onlyLocalDisks)))
             '''
             Sample output of the df command
 
