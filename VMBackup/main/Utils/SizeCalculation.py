@@ -5,6 +5,10 @@ try:
     import imp as imp
 except ImportError:
     import importlib as imp
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 import base64
 import json
 import tempfile
@@ -15,12 +19,14 @@ import Utils.HandlerUtil
 import traceback
 import subprocess
 import shlex
+from common import CommonVariables
 
 class SizeCalculation(object):
 
-    def __init__(self,patching,logger,para_parser):
+    def __init__(self,patching, hutil, logger,para_parser):
         self.patching=patching
         self.logger=logger
+        self.hutil = hutil
         self.file_systems_info = []
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'rootfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
@@ -68,7 +74,15 @@ class SizeCalculation(object):
     def get_total_used_size(self):
         try:
             size_calc_failed = False
-            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+
+            onlyLocalFilesystems = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalFilesystems, "False") 
+
+            if onlyLocalFilesystems in ['True', 'true']:  
+                df = subprocess.Popen(["df" , "-kl"], stdout=subprocess.PIPE)
+            else:
+                df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+
+            self.logger.log("onlyLocalFilesystems : {0}".format(str(onlyLocalFilesystems)))
             '''
             Sample output of the df command
 
