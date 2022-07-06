@@ -302,7 +302,7 @@ def install():
     vm_dist, vm_ver = find_vm_distro('Install')
 
     # Check if SUSE 15 VMs have /sbin/insserv package (required for AMA 1.14.4+)
-    if (vm_dist.lower().startswith('suse') or vm_dist.lower().startswith('sles') or vm_dist.lower().startswith('opensuse')) and vm_ver.startswith('15'):
+    if (vm_dist.startswith('suse') or vm_dist.startswith('sles') or vm_dist.startswith('opensuse')) and vm_ver.startswith('15'):
         check_insserv, _ = run_command_and_log("which insserv")
         if check_insserv != 0:
             hutil_log_info("'insserv-compat' package missing from SUSE 15 machine, installing to allow AMA to run.")
