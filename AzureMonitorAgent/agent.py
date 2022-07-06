@@ -302,7 +302,7 @@ def install():
     vm_dist, vm_ver = find_vm_distro('Install')
 
     # Check if SUSE 15 VMs have /sbin/insserv package (required for AMA 1.14.4+)
-    if (vm_dist.lower().startswith('suse') or vm_dist.lower().startswith('sles')) and vm_ver.startswith('15'):
+    if (vm_dist.lower().startswith('suse') or vm_dist.lower().startswith('sles') or vm_dist.lower().startswith('opensuse')) and vm_ver.startswith('15'):
         check_insserv, _ = run_command_and_log("which insserv")
         if check_insserv != 0:
             hutil_log_info("'insserv-compat' package missing from SUSE 15 machine, installing to allow AMA to run.")
@@ -1133,7 +1133,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "cbl-mariner", "mariner", "rhel", "rocky", "alma"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1211,7 +1211,8 @@ def is_vm_supported_for_extension(operation):
                        'cbl-mariner' : ['1'], # Mariner 1.0
                        'mariner' : ['2'], # Mariner 2.0
                        'rocky' : ['8'], # Rocky
-                       'alma' : ['8'] # Alma
+                       'alma' : ['8'], # Alma
+                       'opensuse' : ['15'] # openSUSE
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
@@ -1293,7 +1294,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 
-    for name in ['suse', 'sles']:
+    for name in ['suse', 'sles', 'opensuse']:
         if distro.startswith(name):
             if version.startswith('12'):
                 return 'SSL_CERT_DIR', '/var/lib/ca-certificates/openssl'
