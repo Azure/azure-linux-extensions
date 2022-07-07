@@ -19,15 +19,15 @@ class HostPreSnapshotRequestBody:
         return dict(taskId = self.taskId, snapshotTaskToken = self.snapshotTaskToken)
 
 class BlobSnapshotInfo:
-    def __init__(self, isSuccessful, snapshotUri, errorMessage, statusCode, DDSnapshotIdentifier = None):
+    def __init__(self, isSuccessful, snapshotUri, errorMessage, statusCode, ddSnapshotIdentifier = None):
         self.isSuccessful = isSuccessful
         self.snapshotUri = snapshotUri
         self.errorMessage = errorMessage
         self.statusCode = statusCode
-        self.DDSnapshotIdentifier = DDSnapshotIdentifier
+        self.ddSnapshotIdentifier = ddSnapshotIdentifier
 
     def convertToDictionary(self):
-        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, statusCode = self.statusCode, DDSnapshotIdentifier = self.DDSnapshotIdentifier)
+        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, statusCode = self.statusCode, ddSnapshotIdentifier = self.ddSnapshotIdentifier)
 
 class DDSnapshotIdentifier:
     def __init__(self, creationTime, id, token):

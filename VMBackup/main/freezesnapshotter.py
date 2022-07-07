@@ -177,21 +177,29 @@ class FreezeSnapshotter(object):
                 if blob_snapshot_info != None:
                     self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}".format(blob_snapshot_info.isSuccessful, blob_snapshot_info.snapshotUri, blob_snapshot_info.errorMessage))
 
+                    # Sample SnapshotBlobUri Format
+                    # UltraDisk:     https://md-dd-e470ba041280442aabc964b73060460b.z48.disk.storage.azure.net/disks/e470ba04-1280-442a-abc9-64b73060460b/snapshots?snapshotId=C8E4AC08-8BA6-46B6-973A-BD6C0BD22CD7
+                    # Standard Disk: https://md-pbhlk3l5mb1q.z27.blob.storage.azure.net:443/zzvgfnxr4fgw/abcd?snapshot=2021-07-31T10:07:37.6596865Z
+
                     blobUri = blob_snapshot_info.snapshotUri
-                    if(not blob_snapshot_info.snapshotUri):
+                    if(blob_snapshot_info.snapshotUri):
                         endIndexOfBlobUri = blob_snapshot_info.snapshotUri.find('?')
-                        if(blob_snapshot_info.DDSnapshotIdentifier != None):
+                        if(blob_snapshot_info.ddSnapshotIdentifier != None):
                             endIndexOfBlobUri = blob_snapshot_info.snapshotUri.find("/snapshots")
                         if(endIndexOfBlobUri != -1):
                             blobUri = blobUri[0:endIndexOfBlobUri]
                         else:
-                            self.logger.log("Unable to find end index of blobUri in snapshotUri. Assigning default snapshotUri to blobUri. This {0} a DirectDrive disk".format("is" if(blob_snapshot_info.DDSnapshotIdentifier != None) else "is not"))
+                            self.logger.log("Unable to find end index of blobUri in snapshotUri. Assigning default snapshotUri to blobUri. This {0} a DirectDrive disk".format("is" if(blob_snapshot_info.ddSnapshotIdentifier != None) else "is not"))
                     self.logger.log("blobUri : {0}".format(blobUri))
                         
-                    ddSnapshotIdentifierInfo = blob_snapshot_info.DDSnapshotIdentifier
-                    if(ddSnapshotIdentifierInfo != None):
-                        ddSnapshotIdentifierInfo = Status.DirectDriveSnapshotIdentifier(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token)
-                        self.logger.log("DDSnapshotIdentifier Information to CRP- creationTime : {0}, id : {1}", ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id)
+                    ddSnapshotIdentifierInfo = None
+                    if(blob_snapshot_info.ddSnapshotIdentifier != None):
+                        # snapshotUri is None for DD Disks. It is populated only for XStore disks
+                        blob_snapshot_info.snapshotUri = None
+                        creationTimeStr = '\/Date(' + blob_snapshot_info.ddSnapshotIdentifier.creationTime + ')\/'
+                        creationTimeObj = Status.CreationTime(creationTimeStr, 0)
+                        ddSnapshotIdentifierInfo = Status.DirectDriveSnapshotIdentifier(creationTimeObj, blob_snapshot_info.ddSnapshotIdentifier.id, blob_snapshot_info.ddSnapshotIdentifier.token)
+                        self.logger.log("DDSnapshotIdentifier Information to CRP- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime.DateTime, ddSnapshotIdentifierInfo.id))
                     else:
                         self.logger.log("No DD Snapshot Identifier Found. Hence directDriveSnapshotIdentifier will be Null")
                     
