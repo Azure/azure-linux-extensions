@@ -166,6 +166,7 @@ class HostSnapshotter(object):
                     ddSnapshotIdentifierInfo = None
                     if('ddSnapshotIdentifier' in snapshot_info and snapshot_info['ddSnapshotIdentifier'] != None):
                         creationTimeString = snapshot_info['ddSnapshotIdentifier']['creationTime']
+                        self.logger.log("creationTime string from BHS : {0} ".format(creationTimeString))
                         try:
                             creationTimeObj = datetime.datetime.strptime(creationTimeString, "%Y-%m-%dT%H:%M:%S.%fZ")
                         except:
