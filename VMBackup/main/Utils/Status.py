@@ -58,13 +58,32 @@ class StorageDetails:
         return dict(partitionCount = self.partitionCount, totalUsedSizeInBytes = self.totalUsedSizeInBytes, isStoragespacePresent = self.isStoragespacePresent, isSizeComputationFailed = self.isSizeComputationFailed)
 
 class SnapshotInfoObj:
-    def __init__(self, isSuccessful, snapshotUri, errorMessage):
+    def __init__(self, isSuccessful, snapshotUri, errorMessage, blobUri, directDriveSnapshotIdentifier = None):
         self.isSuccessful = isSuccessful
-        self.snapshotUri = snapshotUri
+        self.snapshotUri = snapshotUri  # snapshotUri is populated only for XStore disks (will be None for DD disks)
         self.errorMessage = errorMessage
+        self.blobUri = blobUri  # blobUri is populated for both XStore and DD disks (this is base blobUri, NOT snapshotUri)
+        self.directDriveSnapshotIdentifier = directDriveSnapshotIdentifier  # This is populated only for DD disks (will be None for XStore disks)
+ 
+    def convertToDictionary(self):
+        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, blobUri = self.blobUri, directDriveSnapshotIdentifier = self.directDriveSnapshotIdentifier)
+
+class DirectDriveSnapshotIdentifier:
+    def __init__(self, creationTime, id, token):
+        self.creationTime = creationTime
+        self.id = id
+        self.token = token
 
     def convertToDictionary(self):
-        return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage)
+        return dict(creationTime = self.creationTime, id = self.id, token = self.token)
+
+class CreationTime:
+    def __init__(self, DateTime, OffsetMinutes):
+        self.DateTime = DateTime
+        self.OffsetMinutes = OffsetMinutes
+
+    def convertToDictionary(self):
+        return dict(DateTime = self.DateTime, OffsetMinutes = self.OffsetMinutes)
 
 class FormattedMessage:
     def __init__(self, lang, message):
