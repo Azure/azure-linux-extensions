@@ -118,8 +118,6 @@ RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
 InstallExtraPackageCommandApt = 'apt-get -y update && apt-get -y install {0}'
-InstallExtraPackageCommandYum = 'yum install -y {0}'
-InstallExtraPackageCommandZypper = 'zypper --non-interactive refresh && zypper --non-interactive install {0}'
 
 # Cloud Environments
 PublicCloudName     = "AzurePublicCloud"
