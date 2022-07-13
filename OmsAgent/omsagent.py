@@ -1039,9 +1039,9 @@ def exit_if_gpg_unavailable(operation):
             else:
                 hutil_log_info('GPG successfully installed')
     
-    else:
-        hutil_log_info('GPG already present on VM')
-        return 0
+        else:
+            hutil_log_info('GPG already present on VM')
+            return 0
 
 
 def check_workspace_id_and_key(workspace_id, workspace_key):
