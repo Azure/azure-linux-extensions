@@ -117,8 +117,7 @@ OnboardCommandWithOptionalParams = '{0} -w {1} -s {2} {3}'
 RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
-InstallExtraPackageCommand = 'apt-get -y update && apt-get -y install {0} || yum install -y {0} '\
-                    '|| zypper --non-interactive refresh && zypper --non-interactive install {0}'
+InstallExtraPackageCommandApt = 'apt-get -y update && apt-get -y install {0}'
 
 # Cloud Environments
 PublicCloudName     = "AzurePublicCloud"
@@ -1021,12 +1020,26 @@ def exit_if_openssl_unavailable(operation):
 def exit_if_gpg_unavailable(operation):
     """
     Check if gpg is available to use
-    If not found, throw error to return UnsupportedGpg error code
+    If not, attempt to install
+    If install fails, throw error to return UnsupportedGpg error code
     """
-    check_exit_code, _ = run_get_output('which gpg', True, False)
-    if check_exit_code is not 0:
-        log_and_exit(operation, UnsupportedGpg, 'GPG not found, please install GPG and try again.')
-    return 0
+    # Check if VM is Debian (Debian 10 doesn't have gpg)
+    vm_supp, vm_dist, _ = is_vm_supported_for_extension()
+    if (vm_supp and (vm_dist.lower().startswith('debian'))):
+        # Check if GPG already on VM
+        check_exit_code, _ = run_get_output('which gpg', True, False)
+        if check_exit_code is not 0:
+            # GPG not on VM, attempt to install
+            hutil_log_info('GPG not found, attempting to install')
+            exit_code, output = run_get_output(InstallExtraPackageCommandApt.format('gpg'))
+            if exit_code is not 0:
+                log_and_exit(operation, UnsupportedGpg, 'GPG could not be installed: {0}'.format(output))
+            else:
+                hutil_log_info('GPG successfully installed')
+    
+        else:
+            hutil_log_info('GPG already present on VM')
+            return 0
 
 
 def check_workspace_id_and_key(workspace_id, workspace_key):
