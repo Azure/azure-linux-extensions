@@ -1,4 +1,10 @@
 {
+  "mariner": [
+    {
+      "Version" : "2.0",
+      "MinSupportedVersion" : "2.0"
+    }
+  ],
   "redhat": [
         {
           "Version" : "8",

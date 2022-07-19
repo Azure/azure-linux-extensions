@@ -1329,6 +1329,18 @@ class oracleDistro(redhatDistro):
     def __init__(self):
         super(oracleDistro, self).__init__()
 
+############################################################
+#   marinerDistro
+############################################################    
+
+class marinerDistro(redhatDistro):
+    """
+    Mariner Distro concrete class
+    Put Mariner specific behavior here...
+    """
+
+    def __init__(self):
+        super(marinerDistro, self).__init__()
 
 ############################################################
 #   asianuxDistro

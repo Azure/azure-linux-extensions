@@ -201,9 +201,7 @@ class OSEncryptionState(object):
 
         grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
 
-        for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            for arg in args_to_add:
-                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
+        self.context.distro_patcher.add_kernelopts(args_to_add, grub_cfg_paths)
 
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" {0} "\n'.format(" ".join(args_to_add)),
                                       '/etc/default/grub')

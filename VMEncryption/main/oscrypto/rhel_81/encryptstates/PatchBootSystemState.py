@@ -89,6 +89,7 @@ class PatchBootSystemState(OSEncryptionState):
 
         # Everything is ready, repack dracut. None of the changes above will take affect until this line is executed.
         self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)
+        self.context.distro_patcher.patch_initial_root_fs()
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
