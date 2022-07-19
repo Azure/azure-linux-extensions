@@ -246,7 +246,7 @@ class RedhatActions(CommonActions):
     def install_required_packages(self):
         # policycoreutils-python missing on Oracle Linux (still needed to manipulate SELinux policy).
         # tar is really missing on Oracle Linux 7!
-        return self.install_extra_packages(('policycoreutils-python', 'tar'), True)
+        return self.install_extra_packages(('policycoreutils-python-utils', 'tar'), True)
 
     def is_package_handler(self, package_manager):
         return package_manager == "rpm"
