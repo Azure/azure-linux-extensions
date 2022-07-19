@@ -70,7 +70,7 @@ class AbstractPatching(object):
             return True
         return False
 
-    def patch_machine(self, **kwargs):
+    def patch_machine(self):
         pass
     
     def patch_initial_root_fs(self):
