@@ -212,3 +212,15 @@ class redhatPatching(AbstractPatching):
 
         command_executor.Execute('/usr/sbin/dracut -f -v', True)
         command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
+
+    def add_kernelopts(self, args_to_add):
+        grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
+            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
+        ]
+
+        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
+
+        for grub_cfg_path, grub_env_path in grub_cfg_paths:
+            for arg in args_to_add:
+                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
