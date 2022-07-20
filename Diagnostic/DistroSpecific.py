@@ -318,7 +318,7 @@ class CentosActions(RedhatActions):
 
     def install_required_packages(self):
         # policycoreutils-python missing on CentOS (still needed to manipulate SELinux policy)
-        return self.install_extra_packages(('policycoreutils-python',), True)
+        return self.install_extra_packages(('policycoreutils-python-utils',), True)
 
 
 DistroMap = {
