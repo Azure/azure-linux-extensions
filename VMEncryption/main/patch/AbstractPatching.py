@@ -76,5 +76,5 @@ class AbstractPatching(object):
     def patch_initial_root_fs(self):
         pass
 
-    def add_kernelopts(self, args_to_add, grub_cfg_paths):
+    def add_kernelopts(self, args_to_add):
         pass

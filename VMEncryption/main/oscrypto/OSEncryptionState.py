@@ -194,14 +194,8 @@ class OSEncryptionState(object):
         But we can't tell at this stage easily which one to use if both are present. so we will just update both.
         Moreover, in case somebody runs grub2-mkconfig on the machine we don't want the changes to get nuked out, we will update grub defaults file too.
         """
-        grub_cfg_paths = [
-            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
-            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
-        ]
 
-        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
-
-        self.context.distro_patcher.add_kernelopts(args_to_add, grub_cfg_paths)
+        self.context.distro_patcher.add_kernelopts(args_to_add)
 
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" {0} "\n'.format(" ".join(args_to_add)),
                                       '/etc/default/grub')

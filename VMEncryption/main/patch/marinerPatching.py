@@ -25,7 +25,7 @@ class marinerPatching(redhatPatching):
         new_n = "initrd"
         self.command_executor.ExecuteInBash("for file in {0}{1}*; do mv '$file' '${{file/{1}/{2}}}".format(boot_dir, prev_n, new_n))
 
-    def add_kernelopts(self, args_to_add, grub_cfg_paths):
+    def add_kernelopts(self, args_to_add):
         grub_cfg_path = "/boot/grub2/grub.cfg"
         for arg in args_to_add:
             if "root=" in arg:
