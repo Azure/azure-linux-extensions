@@ -160,6 +160,10 @@ def setup_dependencies_and_mdsd(configurator):
     """
     install_package_error = ""
     retry = 3
+
+    if os.uname()[1].find('ladrollbacktest') >= 0:
+        return 5, 'Failing install for rollback testing.'
+
     while retry > 0:
         error, msg = g_dist_config.install_required_packages()
         hutil.log(msg)
