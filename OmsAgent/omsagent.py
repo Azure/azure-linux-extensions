@@ -456,10 +456,6 @@ def install():
     """
     exit_if_vm_not_supported('Install')
 
-    vm_supp, vm_dist, _ = is_vm_supported_for_extension()
-    if (vm_supp and (vm_dist.lower().startswith('debian'))):
-        log_and_exit("Install", 1, "Testing extension auto rollback for debian system...")
-        
     public_settings, protected_settings = get_settings()
     if public_settings is None:
         raise ParameterMissingException('Public configuration must be ' \
