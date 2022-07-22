@@ -2003,12 +2003,7 @@ def daemon_encrypt():
                                                              distro_patcher=DistroPatcher,
                                                              logger=logger,
                                                              encryption_environment=encryption_environment)
-        elif ((DistroPatcher.support_online_encryption) or
-              (distro_name == 'centos' and distro_version.startswith('8.5')) or
-              (distro_name == 'centos' and distro_version.startswith('8.4')) or
-              (distro_name == 'centos' and distro_version.startswith('8.3')) or
-              (distro_name == 'centos' and distro_version.startswith('8.2')) or
-              (distro_name == 'centos' and distro_version.startswith('8.1'))):
+        elif (DistroPatcher.support_online_encryption):
             from oscrypto.rhel_81 import RHEL81EncryptionStateMachine
             os_encryption = RHEL81EncryptionStateMachine(hutil=hutil,
                                                          distro_patcher=DistroPatcher,

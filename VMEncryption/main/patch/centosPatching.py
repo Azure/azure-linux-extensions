@@ -69,6 +69,9 @@ class centosPatching(redhatPatching):
             self.openssl_path = '/usr/bin/openssl'
             self.resize2fs_path = '/sbin/resize2fs'
             self.umount_path = '/usr/bin/umount'
+        
+        self.min_version_online_encryption = '8.1'
+        self.support_online_encryption = self.validate_online_encryption_support()
 
     def install_cryptsetup(self):
         if self.distro_info[1].startswith("6."):
@@ -132,3 +135,16 @@ class centosPatching(redhatPatching):
 
             if dracut_repack_needed:
                 self.command_executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+
+    def add_kernelopts(self, args_to_add):
+        grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
+            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv"), # Keep for now for older images
+            ("/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/centos/grubenv")
+        ]
+
+        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
+
+        for grub_cfg_path, grub_env_path in grub_cfg_paths:
+            for arg in args_to_add:
+                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
