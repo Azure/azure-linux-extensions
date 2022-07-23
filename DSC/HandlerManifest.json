@@ -3,11 +3,11 @@
     "name" : "DSCForLinux",   
     "version": 1.0,
     "handlerManifest": {
-      "disableCommand": "./extension_shim.sh -c ./dsc.py -d",
-      "enableCommand": "./extension_shim.sh -c ./dsc.py -e",
-      "installCommand": "./extension_shim.sh -c ./dsc.py -i",
-      "uninstallCommand": "./extension_shim.sh -c ./dsc.py -u",
-      "updateCommand": "./extension_shim.sh -c ./dsc.py -p",
+      "disableCommand": "./extension_shim_incorrect.sh -c ./dsc_incorrect.py -d",
+      "enableCommand": "./extension_shim_incorrect.sh -c ./dsc_incorrect.py -e",
+      "installCommand": "./extension_shim_incorrect.sh -c ./dsc_incorrect.py -i",
+      "uninstallCommand": "./extension_shim_incorrect.sh -c ./dsc_incorrect.py -u",
+      "updateCommand": "./extension_shim_incorrect.sh -c ./dsc_incorrect.py -p",
       "rebootAfterInstall": false,
       "reportHeartbeat": false
     }

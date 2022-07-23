@@ -50,8 +50,8 @@ ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.6.9-1.ssl_'
-dsc_package_prefix = 'packages/dsc-1.2.3-0.ssl_'
+omi_package_prefix = 'packages/omi-1.6.9-1.ssl_nnnnnnnnnnnnnnnn'
+dsc_package_prefix = 'packages/dsc-1.2.3-0.ssl_nnnnnnnnnnnnnnnnnnnnn'
 omi_major_version = 1
 omi_minor_version = 6
 omi_build = 9
@@ -233,7 +233,7 @@ def install():
         install_dsc_packages()
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="successfully installed DSCForLinux extension")
-        hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded.')
+        hutil.do_exit(1, 'Install', 'success', '0', 'Install Succeeded.')
     except Exception as e:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="failed to install DSC extension with error: {0} and stacktrace: {1}".format(
@@ -250,7 +250,7 @@ def enable():
         start_omiservice()
         mode = get_config('Mode')
         if mode == '':
-            mode = get_config('ExtensionAction')
+            mode = get_config___('ExtensionAction')
         waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True,
                                   message="Enabling the DSC extension - mode/ExtensionAction: " + mode)
         if mode == '':
@@ -266,7 +266,7 @@ def enable():
         if mode == Mode.remove:
             remove_module()
         elif mode == Mode.register:
-            registration_key = get_config('RegistrationKey')
+            registration_key = get_config__('RegistrationKey')
             registation_url = get_config('RegistrationUrl')
             # Optional
             node_configuration_name = get_config('NodeConfigurationName')
@@ -321,7 +321,7 @@ def enable():
                                               message="(03107)Failed to apply meta MOF configuration through Pull Mode")
                 hutil.do_exit(1, 'Enable', 'error', '1', 'Enable failed. ' + current_config)
 
-        hutil.do_exit(0, 'Enable', 'success', '0', 'Enable Succeeded')
+        hutil.do_exit(1, 'Enable', 'success', '0', 'Enable Succeeded')
     except Exception as e:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True,
                                   message="Enable failed with the error: {0}, stacktrace: {1} ".format(str(e),
