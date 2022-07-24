@@ -185,7 +185,22 @@ class OSEncryptionState(object):
             return matches[0]
 
     def _get_boot_uuid(self):
-        return self._parse_uuid_from_fstab('/boot')
+        boot_uuid = None
+        dev = os.lstat('/boot').st_dev
+        for mp_item in self.disk_util.get_mount_items():
+            if os.path.exists(mp_item["dest"]):
+                if dev == os.lstat(mp_item["dest"]).st_dev:
+                    bootfs_dev_path = mp_item["src"]
+                    self.context.logger.log("Found bootfs dev path {0}".format(bootfs_dev_path))
+                    boot_device_items = self.disk_util.get_device_items(bootfs_dev_path)
+                    if len(boot_device_items) > 1:
+                        self.context.logger.log("boot device cannot have more than one partition")
+                        continue
+                    boot_item = boot_device_items[0]
+                    self.context.logger.log("Finding uuid for {0}".format(boot_item.name))
+                    boot_uuid = self.disk_util.get_device_items_property(boot_item.name, "UUID")
+        return boot_uuid
+
 
     def _add_kernelopts(self, args_to_add):
         """
