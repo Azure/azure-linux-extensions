@@ -226,6 +226,8 @@ def check_supported_OS():
 
 def install():
     hutil.do_parse_context('Install')
+    hutil.error("Failing install intentionally to trigger rollback")
+    hutil.do_exit(1, 'Install', 'error', '1', 'Failed install for rollback')
     try:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="Installing DSCForLinux extension")
