@@ -164,7 +164,7 @@ def setup_dependencies_and_mdsd(configurator):
     retry = 3
 
     if os.uname()[1].find('ladrollbacktest') >= 0:
-        return 5, 'Failing install for rollback testing.'
+        raise Exception("Failing install for rollback testing")
 
     while retry > 0:
         error, msg = g_dist_config.install_required_packages()
@@ -350,6 +350,7 @@ def main(command):
             if dependencies_err != 0:
                 g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
                 hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
+                hutil.exit
                 return
 
             if g_dist_config.use_systemd():
