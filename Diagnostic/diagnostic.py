@@ -450,7 +450,7 @@ def start_daemon():
     raise an exception (often OSError)
     :return: None
     """
-    args = ['python', g_diagnostic_py_filepath, "-daemon"]
+    args = ['python2', g_diagnostic_py_filepath, "-daemon"]
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil.log('start daemon ' + str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
