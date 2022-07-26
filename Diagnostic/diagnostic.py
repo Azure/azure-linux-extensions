@@ -163,10 +163,6 @@ def setup_dependencies_and_mdsd(configurator):
     install_package_error = ""
     retry = 3
 
-    if os.uname()[1].find('ladrollbacktest') >= 0:
-        waagent_ext_event_type = wala_event_type_for_telemetry(g_ext_op_type)
-        hutil.do_exit(5, waagent_ext_event_type, 'Error', '5', "Failing install for rollback testing")
-
     while retry > 0:
         error, msg = g_dist_config.install_required_packages()
         hutil.log(msg)
