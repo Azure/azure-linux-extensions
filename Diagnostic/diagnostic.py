@@ -162,7 +162,6 @@ def setup_dependencies_and_mdsd(configurator):
     """
     install_package_error = ""
     retry = 3
-
     while retry > 0:
         error, msg = g_dist_config.install_required_packages()
         hutil.log(msg)
@@ -347,7 +346,6 @@ def main(command):
             if dependencies_err != 0:
                 g_lad_log_helper.report_mdsd_dependency_setup_failure(waagent_ext_event_type, dependencies_msg)
                 hutil.do_status_report(g_ext_op_type, "error", '-1', "Install failed")
-                hutil.exit
                 return
 
             if g_dist_config.use_systemd():
