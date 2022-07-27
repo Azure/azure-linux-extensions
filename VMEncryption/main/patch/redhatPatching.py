@@ -224,3 +224,6 @@ class redhatPatching(AbstractPatching):
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
             for arg in args_to_add:
                 self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
+
+    def pack_initial_root_fs(self):
+        self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)

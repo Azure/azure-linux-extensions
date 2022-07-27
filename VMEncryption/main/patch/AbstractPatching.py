@@ -73,7 +73,7 @@ class AbstractPatching(object):
     def patch_machine(self):
         pass
     
-    def patch_initial_root_fs(self):
+    def pack_initial_root_fs(self):
         pass
 
     def add_kernelopts(self, args_to_add):

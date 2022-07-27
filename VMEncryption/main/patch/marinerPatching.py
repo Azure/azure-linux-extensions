@@ -19,11 +19,8 @@ class marinerPatching(redhatPatching):
         self.min_version_online_encryption = '2.0'
         self.support_online_encryption = self.validate_online_encryption_support()
 
-    def patch_initial_root_fs(self):
-        boot_dir = "/boot/"
-        prev_n = "initramfs"
-        new_n = "initrd"
-        self.command_executor.ExecuteInBash("for file in {0}{1}*; do mv '$file' '${{file/{1}/{2}}}".format(boot_dir, prev_n, new_n))
+    def pack_initial_root_fs(self):
+        self.command_executor.ExecuteInBash('mkinitrd -f -v', True)
 
     def add_kernelopts(self, args_to_add):
         grub_cfg_path = "/boot/grub2/grub.cfg"
