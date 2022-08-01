@@ -14,6 +14,14 @@ try:
 except:
     DEVNULL = open(os.devnull)
 
+general_info = dict()
+
+def geninfo_lookup(key):
+    try:
+        val = general_info[key]
+    except KeyError:
+        return None
+    return val
 
 def get_input(question, check_ans, no_fit):
     answer = input(" {0}: ".format(question))
@@ -22,6 +30,11 @@ def get_input(question, check_ans, no_fit):
         answer = input(" {0}: ".format(question))
     return answer
 
+def find_vm_bits():
+    cpu_info = subprocess.check_output(['lscpu'], universal_newlines=True)
+    cpu_opmodes = (cpu_info.split('\n'))[1]
+    cpu_bits = cpu_opmodes[-6:]
+    return cpu_bits
 
 def find_vm_distro():
     """
@@ -93,16 +106,77 @@ def find_package_manager():
                 pkg_manager = "rpm"
             except subprocess.CalledProcessError:
                 pass
-
+    general_info['PKG_MANAGER'] = pkg_manager
     return pkg_manager
 
+def get_package_version(pkg):
+    pkg_mngr = geninfo_lookup('PKG_MANAGER')
+    # dpkg
+    if (pkg_mngr == 'dpkg'):
+        return get_dpkg_pkg_version(pkg)
+    # rpm
+    elif (pkg_mngr == 'rpm'):
+        return get_rpm_pkg_version(pkg)
+    else:
+        return None
+    
+# Package Info
+def get_dpkg_pkg_version(pkg):
+    try:
+        dpkg_info = subprocess.check_output(['dpkg', '-s', pkg], universal_newlines=True,\
+                                            stderr=subprocess.STDOUT)
+        dpkg_lines = dpkg_info.split('\n')
+        for line in dpkg_lines:
+            if (line.startswith('Package: ') and not line.endswith(pkg)):
+                # wrong package
+                return None
+            if (line.startswith('Status: ') and not line.endswith('installed')):
+                # not properly installed
+                return None
+            if (line.startswith('Version: ')):
+                version = (line.split())[-1]
+                general_info['{0}_VERSION'.format(pkg.upper())] = version
+                return version
+        return None
+    except subprocess.CalledProcessError:
+        return None
+
+def get_rpm_pkg_version(pkg):
+    try:
+        rpm_info = subprocess.check_output(['rpm', '-qi', pkg], universal_newlines=True,\
+                                            stderr=subprocess.STDOUT)
+        if ("package {0} is not installed".format(pkg) in rpm_info):
+            # didn't find package
+            return None
+        rpm_lines = rpm_info.split('\n')
+        for line in rpm_lines:
+            # parse line
+            # note: parsing is weird bc rpm puts various information into two columns
+            parsed_line = line.split()
+            if (parsed_line[0] == 'Name'):
+                # ['Name', ':', name, 'Relocations', ':', relocations]
+                name = parsed_line[2]
+                if (name != pkg):
+                    # wrong package
+                    return None
+            if (parsed_line[0] == 'Version'):
+                # ['Version', ':', version, 'Vendor', ':', 'MSFT']
+                version = parsed_line[2]
+                general_info['{0}_VERSION'.format(pkg.upper())] = version
+                return version
+        return None
+    except subprocess.CalledProcessError:
+        return None
 
 def find_ama_version():
     """
     Gets a list of all AMA versions installed on the VM
     """
-    config_dirs = filter((lambda x : x.startswith("Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-")), os.listdir("/var/lib/waagent"))
-    ama_vers = list(map((lambda x : (x.split('-'))[-1]), config_dirs))
+    try:
+        config_dirs = filter((lambda x : x.startswith("Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-")), os.listdir("/var/lib/waagent"))
+        ama_vers = list(map((lambda x : (x.split('-'))[-1]), config_dirs))
+    except:
+        return None
     return ama_vers
 
 

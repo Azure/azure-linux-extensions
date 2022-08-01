@@ -1,7 +1,10 @@
 import os
 
-from helpers import get_input
-from logcollector import run_logcollector
+from helpers        import get_input
+from logcollector   import run_logcollector
+from error_codes    import *
+from errors         import get_input, print_errors, err_summary
+from install.install import check_installation
 
 # check to make sure the user is running as root
 def check_sudo():
@@ -41,15 +44,19 @@ def run_troubleshooter():
     while (run_again):
         print("================================================================================\n"\
             # TODO: come up with scenarios
-              "(NOTE: troubleshooting scenarios are coming, currently only log collection is available)\n"\
+              "1: Installation failures. \n"\
+              "2: Onboarding failures. \n"\
               "================================================================================\n"\
               "L: Collect the logs for AMA.\n"\
               "Q: Press 'Q' to quit.\n"\
               "================================================================================")
+        switcher = {
+            '1': check_installation,
+        }
         issue = get_input("Please select an option",\
-                        (lambda x : x.lower() in ['q','quit','l']),\
-                        "Please enter 'L' to run the log collector, or 'Q' to quit.")
-
+                        (lambda x : x.lower() in ['1','q','quit','l']),\
+                        "Please enter an integer corresponding with your issue (1-1) to\n"\
+                        "continue, 'L' to run the log collector, or 'Q' to quit.")
         # quit troubleshooter
         if (issue.lower() in ['q','quit']):
             print("Exiting the troubleshooter...")
@@ -60,7 +67,62 @@ def run_troubleshooter():
             collect_logs()
             return
 
+        # silent vs interactive mode
+        print("--------------------------------------------------------------------------------")
+        print("The troubleshooter can be run in two different modes.\n"\
+            "  - Silent Mode runs through with no input required\n"\
+            "  - Interactive Mode includes extra checks that require input")
+        mode = get_input("Do you want to run the troubleshooter in silent (s) or interactive (i) mode?",\
+                        (lambda x : x.lower() in ['s','silent','i','interactive','q','quit']),\
+                        "Please enter 's'/'silent' to run silent mode, 'i'/'interactive' to run \n"\
+                            "interactive mode, or 'q'/'quit' to quit.")
+        if (mode.lower() in ['q','quit']):
+            print("Exiting the troubleshooter...")
+            return
+        elif (mode.lower() in ['s','silent']):
+            print("Running troubleshooter in silent mode...")
+            interactive_mode = False
+        elif (mode.lower() in ['i','interactive']):
+            print("Running troubleshooter in interactive mode...")
+            interactive_mode = True
+
+        # run troubleshooter
+        section = switcher.get(issue.upper(), lambda: "Invalid input")
+        print("================================================================================")
+        success = section(interactive=interactive_mode)
     
+        print("================================================================================")
+        print("================================================================================")
+        # print out all errors/warnings
+        if (len(err_summary) > 0):
+            print("ALL ERRORS/WARNINGS ENCOUNTERED:")
+            for err in err_summary:
+                print("  {0}".format(err))
+                print("--------------------------------------------------------------------------------")
+            
+        # no errors found
+        if (success == NO_ERROR):
+            print("No errors were found.")
+        # user requested to exit
+        elif (success == USER_EXIT):
+            return
+        # error found
+        else:
+            print("Please review the errors found above.")
+
+        # if user ran single scenario, ask if they want to run again
+        if (issue in ['1','2']):
+            run_again = get_input("Do you want to run another scenario? (y/n)",\
+                                  (lambda x : x.lower() in ['y','yes','n','no']),\
+                                  "Please type either 'y'/'yes' or 'n'/'no' to proceed.")
+            
+            if (run_again.lower() in ['y', 'yes']):
+                print("Please select another scenario below:")
+            elif (run_again.lower() in ['n', 'no']):
+                run_again = False
+        else:
+            run_again = False
+            
     # give information to user about next steps
     print("================================================================================")
     print("If you still have an issue, please run the troubleshooter again and collect the logs for AMA.\n"\
