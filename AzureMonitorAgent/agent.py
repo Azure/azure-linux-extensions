@@ -1205,7 +1205,7 @@ def is_vm_supported_for_extension(operation):
                        'centos' : ['7', '8'], # CentOS
                        'red hat' : ['7', '8'], # Oracle, RHEL
                        'oracle' : ['7', '8'], # Oracle
-                       'debian' : ['9', '10'], # Debian
+                       'debian' : ['9', '10', '11'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
