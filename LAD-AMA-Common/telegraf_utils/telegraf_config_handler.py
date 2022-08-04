@@ -515,15 +515,16 @@ def stop_telegraf_service(is_lad):
     # If the VM has systemd, then we will use that to stop
     if metrics_utils.is_systemd():
         code = 1
-        telegraf_service_path, telegraf_service_name = get_telegraf_service_path(is_lad)
+        telegraf_service_path = get_telegraf_service_path(is_lad)
+        telegraf_service_name = get_telegraf_service_name(is_lad)
 
         if os.path.isfile(telegraf_service_path):
             code = os.system("sudo systemctl stop {0}".format(telegraf_service_name))
         else:
-            return False, "Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service."
+            return False, "Telegraf service file does not exist. Failed to stop telegraf service: {0}.service.".format(telegraf_service_name)
 
         if code != 0:
-            return False, "Unable to stop telegraf service: metrics-sourcer.service. Run systemctl status metrics-sourcer.service for more info."
+            return False, "Unable to stop telegraf service: {0}.service. Run systemctl status {0}.service for more info.".format(telegraf_service_name)
 
     # Whether or not VM has systemd, let's check if we have any telegraf pids saved and if so, terminate the associated process
     _, configFolder = get_handler_vars()
@@ -627,7 +628,7 @@ def start_telegraf(is_lad):
 
     # Ensure that any old telegraf processes are cleaned up to avoid duplication
     stop_telegraf_service(is_lad)
-    
+
     # If the VM has systemd, telegraf will be managed as a systemd service
     telegraf_service_name = get_telegraf_service_name(is_lad)
     if metrics_utils.is_systemd():
