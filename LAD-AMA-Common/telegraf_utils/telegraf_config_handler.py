@@ -674,9 +674,9 @@ def get_telegraf_service_path(is_lad):
     """
     if is_lad:
         if os.path.exists("/lib/systemd/system/"):
-            return metrics_constants.telegraf_service_path_lad
+            return metrics_constants.lad_telegraf_service_path
         elif os.path.exists("/usr/lib/systemd/system/"):
-            return metrics_constants.telegraf_service_path_usr_lib_lad
+            return metrics_constants.lad_telegraf_service_path_usr_lib
         else:
             raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
     else:
@@ -692,7 +692,7 @@ def get_telegraf_service_name(is_lad):
     Utility method to get the service name
     """
     if(is_lad):    
-        return metrics_constants.telegraf_service_name_lad
+        return metrics_constants.lad_telegraf_service_name
     else:
         return metrics_constants.telegraf_service_name
         
