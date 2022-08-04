@@ -518,7 +518,7 @@ def stop_telegraf_service(is_lad):
         telegraf_service_path, telegraf_service_name = get_telegraf_service_path(is_lad)
 
         if os.path.isfile(telegraf_service_path):
-            code = os.system("sudo systemctl stop " + telegraf_service_name)
+            code = os.system("sudo systemctl stop {0}".format(telegraf_service_name))
         else:
             return False, "Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service."
 
@@ -553,7 +553,8 @@ def remove_telegraf_service(is_lad):
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
 
-    telegraf_service_path, telegraf_service_name = get_telegraf_service_path(is_lad)
+    telegraf_service_path = get_telegraf_service_path(is_lad)
+    telegraf_service_name = get_telegraf_service_name(is_lad)
 
     if os.path.isfile(telegraf_service_path):
         os.remove(telegraf_service_path)
@@ -562,9 +563,9 @@ def remove_telegraf_service(is_lad):
 
     # Checking To see if the file was successfully removed, since os.remove doesn't return an error code
     if os.path.isfile(telegraf_service_path):
-        return False, "Unable to remove telegraf service: metrics-sourcer.service at {0}.".format(telegraf_service_path)
+        return False, "Unable to remove telegraf service: {0}.service at {1}.".format(telegraf_service_name, telegraf_service_path)
 
-    return True, "Successfully removed metrics-sourcer service"
+    return True, "Successfully removed {0} service".format(telegraf_service_name)
 
 
 def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf):
@@ -575,7 +576,7 @@ def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_a
     :param telegraf_d_conf_dir: path to telegraf .d conf subdirectory
     :param telegraf_agent_conf: path to telegraf .conf file
     """
-    telegraf_service_path, telegraf_service_name = get_telegraf_service_path(is_lad)
+    telegraf_service_path = get_telegraf_service_path(is_lad)
     telegraf_service_template_path = os.getcwd() + "/services/metrics-sourcer.service"
 
     if not os.path.exists(telegraf_d_conf_dir):
@@ -627,10 +628,10 @@ def start_telegraf(is_lad):
     # Ensure that any old telegraf processes are cleaned up to avoid duplication
     stop_telegraf_service(is_lad)
     
-    telegraf_service_path, telegraf_service_name = get_telegraf_service_path(is_lad)
     # If the VM has systemd, telegraf will be managed as a systemd service
+    telegraf_service_name = get_telegraf_service_name(is_lad)
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart " + telegraf_service_name)
+        service_restart_status = os.system("sudo systemctl restart {0}".format(telegraf_service_name))
         if service_restart_status != 0:
             log_messages += "Unable to start Telegraf service. Failed to start telegraf service."
             return False, log_messages
@@ -672,19 +673,28 @@ def get_telegraf_service_path(is_lad):
     """
     if is_lad:
         if os.path.exists("/lib/systemd/system/"):
-            return metrics_constants.telegraf_service_path_lad, "metrics-sourcer-lad"
+            return metrics_constants.telegraf_service_path_lad
         elif os.path.exists("/usr/lib/systemd/system/"):
-            return metrics_constants.telegraf_service_path_usr_lib_lad, "metrics-sourcer-lad"
+            return metrics_constants.telegraf_service_path_usr_lib_lad
         else:
             raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
     else:
         if os.path.exists("/lib/systemd/system/"):
-            return metrics_constants.telegraf_service_path, "metrics-sourcer"
+            return metrics_constants.telegraf_service_path
         elif os.path.exists("/usr/lib/systemd/system/"):
-            return metrics_constants.telegraf_service_path_usr_lib, "metrics-sourcer"
+            return metrics_constants.telegraf_service_path_usr_lib
         else:
             raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
 
+def get_telegraf_service_name(is_lad):
+    """
+    Utility method to get the service name
+    """
+    if(is_lad):    
+        return metrics_constants.telegraf_service_name_lad
+    else:
+        return metrics_constants.telegraf_service_name
+        
 
 def handle_config(config_data, me_url, mdsd_url, is_lad):
     """
