@@ -576,8 +576,6 @@ def get_metrics_extension_service_path(is_lad):
     Utility method to get the service path
     """
     if(is_lad):
-        if os.path.exists("/etc/systemd/system"):
-            return metrics_constants.metrics_extension_service_path_etc_lad, "metrics-extension-lad"
         if os.path.exists("/lib/systemd/system/"):
             return metrics_constants.metrics_extension_service_path_lad, "metrics-extension-lad"
         elif os.path.exists("/usr/lib/systemd/system/"):
