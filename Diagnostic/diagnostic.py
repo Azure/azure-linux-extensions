@@ -325,7 +325,7 @@ def main(command):
             oms.tear_down_omsagent_for_lad(RunGetOutput, True)
 
             #Delete the telegraf and ME services
-            tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+            tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service(is_lad=True)
             if tel_rm_out:
                 hutil.log(tel_rm_msg)
             else:

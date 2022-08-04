@@ -458,15 +458,16 @@ def stop_telegraf_service(is_lad):
     # If the VM has systemd, then we will use that to stop
     if metrics_utils.is_systemd():
         code = 1
-        telegraf_service_path = get_telegraf_service_path()
+        telegraf_service_path = get_telegraf_service_path(is_lad)
+        telegraf_service_name = get_telegraf_service_name(is_lad)
 
         if os.path.isfile(telegraf_service_path):
-            code = os.system("sudo systemctl stop metrics-sourcer")
+            code = os.system("sudo systemctl stop {0}".format(telegraf_service_name))
         else:
-            return False, "Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service."
+            return False, "Telegraf service file does not exist. Failed to stop telegraf service: {0}.service.".format(telegraf_service_name)
 
         if code != 0:
-            return False, "Unable to stop telegraf service: metrics-sourcer.service. Run systemctl status metrics-sourcer.service for more info."
+            return False, "Unable to stop telegraf service: {0}.service. Run systemctl status {0}.service for more info.".format(telegraf_service_name)
 
     # Whether or not VM has systemd, let's check if we have any telegraf pids saved and if so, terminate the associated process
     _, configFolder = get_handler_vars()
@@ -489,14 +490,15 @@ def stop_telegraf_service(is_lad):
     return True, "Successfully stopped metrics-sourcer service"
 
 
-def remove_telegraf_service():
+def remove_telegraf_service(is_lad):
     """
     Remove the telegraf service if the VM is using systemd as well as the telegraf Binary
     This method is called after stop_telegraf_service by the main extension code during Extension uninstall
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
 
-    telegraf_service_path = get_telegraf_service_path()
+    telegraf_service_path = get_telegraf_service_path(is_lad)
+    telegraf_service_name = get_telegraf_service_name(is_lad)
 
     if os.path.isfile(telegraf_service_path):
         os.remove(telegraf_service_path)
@@ -505,12 +507,12 @@ def remove_telegraf_service():
 
     # Checking To see if the file was successfully removed, since os.remove doesn't return an error code
     if os.path.isfile(telegraf_service_path):
-        return False, "Unable to remove telegraf service: metrics-sourcer.service at {0}.".format(telegraf_service_path)
+        return False, "Unable to remove telegraf service: {0}.service at {1}.".format(telegraf_service_name, telegraf_service_path)
 
-    return True, "Successfully removed metrics-sourcer service"
+    return True, "Successfully removed {0} service".format(telegraf_service_name)
 
 
-def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf):
+def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf):
     """
     Add the metrics-sourcer service if the VM is using systemd
     This method is called in handle_config
@@ -518,7 +520,7 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
     :param telegraf_d_conf_dir: path to telegraf .d conf subdirectory
     :param telegraf_agent_conf: path to telegraf .conf file
     """
-    telegraf_service_path = get_telegraf_service_path()
+    telegraf_service_path = get_telegraf_service_path(is_lad)
     telegraf_service_template_path = os.getcwd() + "/services/metrics-sourcer.service"
 
     if not os.path.exists(telegraf_d_conf_dir):
@@ -571,8 +573,9 @@ def start_telegraf(is_lad):
     stop_telegraf_service(is_lad)
 
     # If the VM has systemd, telegraf will be managed as a systemd service
+    telegraf_service_name = get_telegraf_service_name(is_lad)
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart metrics-sourcer")
+        service_restart_status = os.system("sudo systemctl restart {0}".format(telegraf_service_name))
         if service_restart_status != 0:
             log_messages += "Unable to start Telegraf service. Failed to start telegraf service."
             return False, log_messages
@@ -608,17 +611,34 @@ def start_telegraf(is_lad):
     return True, log_messages
 
 
-def get_telegraf_service_path():
+def get_telegraf_service_path(is_lad):
     """
     Utility method to get the service path in case /lib/systemd/system doesnt exist on the OS
     """
-    if os.path.exists("/lib/systemd/system/"):
-        return metrics_constants.telegraf_service_path
-    elif os.path.exists("/usr/lib/systemd/system/"):
-        return metrics_constants.telegraf_service_path_usr_lib
+    if is_lad:
+        if os.path.exists("/lib/systemd/system/"):
+            return metrics_constants.lad_telegraf_service_path
+        elif os.path.exists("/usr/lib/systemd/system/"):
+            return metrics_constants.lad_telegraf_service_path_usr_lib
+        else:
+            raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
     else:
-        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
+        if os.path.exists("/lib/systemd/system/"):
+            return metrics_constants.telegraf_service_path
+        elif os.path.exists("/usr/lib/systemd/system/"):
+            return metrics_constants.telegraf_service_path_usr_lib
+        else:
+            raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
 
+def get_telegraf_service_name(is_lad):
+    """
+    Utility method to get the service name
+    """
+    if(is_lad):    
+        return metrics_constants.lad_telegraf_service_name
+    else:
+        return metrics_constants.telegraf_service_name
+        
 
 def handle_config(config_data, me_url, mdsd_url, is_lad):
     """
@@ -708,7 +728,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     # Setup Telegraf service.
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
     if metrics_utils.is_systemd():
-        telegraf_service_setup = setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)
+        telegraf_service_setup = setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)
         if not telegraf_service_setup:
             return False, []
 

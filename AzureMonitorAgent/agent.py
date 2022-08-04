@@ -473,7 +473,7 @@ def stop_metrics_process():
             HUtilObject.error(tel_msg)
         
         #Delete the telegraf and ME services
-        tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+        tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service(is_lad=False)
         if tel_rm_out:
             HUtilObject.log(tel_rm_msg)
         else:
@@ -549,8 +549,8 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 HUtilObject.error(tel_msg)
 
-                            #Delete the telegraf and ME services
-                            tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service()
+                            # Delete the telegraf and ME services
+                            tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service(is_lad=False)
                             if tel_rm_out:
                                 HUtilObject.log(tel_rm_msg)
                             else:
