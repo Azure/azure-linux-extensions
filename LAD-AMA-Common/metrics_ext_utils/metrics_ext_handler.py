@@ -89,15 +89,16 @@ def stop_metrics_service(is_lad):
     # If the VM has systemd, then we will use that to stop
     if metrics_utils.is_systemd():
         code = 1
-        metrics_service_path = get_metrics_extension_service_path()
+        metrics_service_path = get_metrics_extension_service_path(is_lad)
+        metrics_service_name = get_metrics_extension_service_name(is_lad)
 
         if os.path.isfile(metrics_service_path):
-            code = os.system("sudo systemctl stop metrics-extension")
+            code = os.system("sudo systemctl stop {0}".format(metrics_service_name))
         else:
-            return False, "Metrics Extension service file does not exist. Failed to stop ME service: metrics-extension.service ."
+            return False, "Metrics Extension service file does not exist. Failed to stop ME service: {0}.service.".format(metrics_service_name)
 
         if code != 0:
-            return False, "Unable to stop Metrics Extension service: metrics-extension.service. Failed with code {0}".format(code)
+            return False, "Unable to stop Metrics Extension service: {0}. Failed with code {1}".format(metrics_service_name, code)
     else:
         #This VM does not have systemd, So we will use the pid from the last ran metrics process and terminate it
         _, configFolder = get_handler_vars()
@@ -130,7 +131,7 @@ def remove_metrics_service(is_lad):
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
 
-    metrics_service_path = get_metrics_extension_service_path()
+    metrics_service_path = get_metrics_extension_service_path(is_lad)
 
     if os.path.isfile(metrics_service_path):
         code = os.remove(metrics_service_path)
@@ -282,7 +283,7 @@ def generate_MSI_token(identifier_name = '', identifier_value = ''):
         return True, expiry_epoch_time, log_messages
 
 
-def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
+def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
     """
     Setup the metrics service if VM is using systemd
     :param configFolder: Path for the config folder for metrics extension
@@ -291,7 +292,7 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
     :param me_influx_port: Influxdb port that metrics extension will listen on
     """
 
-    me_service_path = get_metrics_extension_service_path()
+    me_service_path = get_metrics_extension_service_path(is_lad)
     me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
     daemon_reload_status = 1
 
@@ -341,12 +342,12 @@ def start_metrics(is_lad):
     else:
         me_influx_port = metrics_constants.ama_metrics_extension_udp_port
 
-
     # If the VM has systemd, then we use that to start/stop
+    metrics_service_name = get_metrics_extension_service_name(is_lad)
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart metrics-extension")
+        service_restart_status = os.system("sudo systemctl restart {0}".format(metrics_service_name))
         if service_restart_status != 0:
-            log_messages += "Unable to start metrics-extension.service. Failed to start ME service."
+            log_messages += "Unable to start {0}. Failed to start ME service.".format(metrics_service_name)
             return False, log_messages
 
     #Else start ME as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
@@ -571,20 +572,36 @@ def get_arm_domain(az_environment):
     return domain
 
 
-def get_metrics_extension_service_path():
+def get_metrics_extension_service_path(is_lad):
     """
     Utility method to get the service path
     """
-    if os.path.exists("/etc/systemd/system"):
-        return metrics_constants.metrics_extension_service_path_etc
-    if os.path.exists("/lib/systemd/system/"):
-        return metrics_constants.metrics_extension_service_path
-    elif os.path.exists("/usr/lib/systemd/system/"):
-        return metrics_constants.metrics_extension_service_path_usr_lib
+    if(is_lad):
+        if os.path.exists("/lib/systemd/system/"):
+            return metrics_constants.lad_metrics_extension_service_path
+        elif os.path.exists("/usr/lib/systemd/system/"):
+            return metrics_constants.lad_metrics_extension_service_path_usr_lib
+        else:
+            raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
     else:
-        raise Exception("Systemd unit files do not exist at /etc/systemd/system, /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
+        if os.path.exists("/etc/systemd/system"):
+            return metrics_constants.metrics_extension_service_path_etc
+        if os.path.exists("/lib/systemd/system/"):
+            return metrics_constants.metrics_extension_service_path
+        elif os.path.exists("/usr/lib/systemd/system/"):
+            return metrics_constants.metrics_extension_service_path_usr_lib
+        else:
+            raise Exception("Systemd unit files do not exist at /etc/systemd/system, /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
 
-
+def get_metrics_extension_service_name(is_lad):
+    """
+    Utility method to get the service name
+    """
+    if(is_lad):    
+        return metrics_constants.lad_metrics_extension_service_name
+    else:
+        return metrics_constants.metrics_extension_service_name
+        
 def setup_me(is_lad, HUtilObj=None):
     """
     The main method for creating and writing MetricsExtension configuration as well as service setup
@@ -700,6 +717,6 @@ def setup_me(is_lad, HUtilObj=None):
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
     if metrics_utils.is_systemd():
-        setup_me_service(me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port)
+        setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port)
 
     return True
