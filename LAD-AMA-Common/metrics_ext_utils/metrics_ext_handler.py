@@ -283,7 +283,7 @@ def generate_MSI_token(identifier_name = '', identifier_value = ''):
         return True, expiry_epoch_time, log_messages
 
 
-def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
+def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port, HUtilObj=None):
     """
     Setup the metrics service if VM is using systemd
     :param configFolder: Path for the config folder for metrics extension
@@ -309,7 +309,12 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
             daemon_reload_status = os.system("sudo systemctl daemon-reload")
             if daemon_reload_status != 0:
-                raise Exception("Unable to reload systemd after ME service file change. Failed to set up ME service.")
+                message = "Unable to reload systemd after ME service file change. Failed to set up ME service."
+                if HUtilObj is not None:
+                    HUtilObj.log(message)
+                else:
+                    print('Info: {0}'.format(message))
+
         else:
             raise Exception("Unable to copy Metrics extension service file to {0}. Failed to set up ME service.".format(me_service_path))
     else:
@@ -717,6 +722,6 @@ def setup_me(is_lad, HUtilObj=None):
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
     if metrics_utils.is_systemd():
-        setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port)
+        setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port, HUtilObj)
 
     return True
