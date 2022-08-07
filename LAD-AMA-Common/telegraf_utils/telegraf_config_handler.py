@@ -569,7 +569,7 @@ def remove_telegraf_service(is_lad):
     return True, "Successfully removed {0} service".format(telegraf_service_name)
 
 
-def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf):
+def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf, HUtilObj=None):
     """
     Add the metrics-sourcer service if the VM is using systemd
     This method is called in handle_config
@@ -597,7 +597,12 @@ def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_a
 
             daemon_reload_status = os.system("sudo systemctl daemon-reload")
             if daemon_reload_status != 0:
-                raise Exception("Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service.")
+                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service."
+                if HUtilObj is not None:
+                    HUtilObj.log(message)
+                else:
+                    print('Info: {0}'.format(message))
+
         else:
             raise Exception("Unable to copy Telegraf service template file to {0}. Failed to setup telegraf service.".format(telegraf_service_path))
     else:
