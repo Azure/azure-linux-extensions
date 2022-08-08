@@ -73,6 +73,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
     MetricsExtensionNamepsace = metrics_constants.metrics_extension_namespace
     has_mdsd_output = False
+    has_me_output = False
     
     if len(data) == 0:
         raise Exception("Empty config data received.")
@@ -86,6 +87,8 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         sink = item["sink"]
         if "mdsd" in sink:
             has_mdsd_output = True
+        if "me" in sink:
+            has_me_output = True
         counter = item["displayName"]
         if counter in name_map:
             plugin = name_map[counter]["plugin"]
@@ -410,14 +413,15 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agentconf += "  \"microsoft.regionName\"= \"" + region + "\"\n"
     agentconf += "  \"microsoft.resourceId\"= \"" + az_resource_id + "\"\n"
     if virtual_machine_name != "":
-        agentconf += "  \"VMInstanceId\"= \"" + virtual_machine_name + "\"\n"
-    agentconf += "\n# Configuration for sending metrics to MetricsExtension\n"
-    agentconf += "[[outputs.influxdb]]\n"
-    agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
-    if is_lad:
-        agentconf += "  fielddrop = [" + excess_diskio_field_drop_list_str[:-2] + "]\n"
-    agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
-    agentconf += "  udp_payload = \"2048B\"\n\n"
+        agentconf += "  \"VMInstanceId\"= \"" + virtual_machine_name + "\"\n"    
+    if has_me_output or is_lad:
+        agentconf += "\n# Configuration for sending metrics to MetricsExtension\n"
+        agentconf += "[[outputs.influxdb]]\n"
+        agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
+        if is_lad:
+            agentconf += "  fielddrop = [" + excess_diskio_field_drop_list_str[:-2] + "]\n"
+        agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
+        agentconf += "  udp_payload = \"2048B\"\n\n"
     if has_mdsd_output:
         agentconf += "\n# Configuration for sending metrics to MDSD\n"
         agentconf += "[[outputs.socket_writer]]\n"
