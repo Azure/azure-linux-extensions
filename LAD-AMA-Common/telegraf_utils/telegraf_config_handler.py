@@ -414,7 +414,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agentconf += "  \"microsoft.resourceId\"= \"" + az_resource_id + "\"\n"
     if virtual_machine_name != "":
         agentconf += "  \"VMInstanceId\"= \"" + virtual_machine_name + "\"\n"    
-    if has_me_output:
+    if has_me_output or is_lad:
         agentconf += "\n# Configuration for sending metrics to MetricsExtension\n"
         agentconf += "[[outputs.influxdb]]\n"
         agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
