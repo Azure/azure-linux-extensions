@@ -1,0 +1,24 @@
+instance of LinuxEncryptionCompliance as $ASM_LinuxAuditResource154ref
+{
+	ResourceID = "Audit Encryption Compliance";
+	PolicyName = "AzureLinuxVMEncryptionCompliance";
+	SourceInfo = "::4::5::LinuxAuditResource";
+	ModuleName = "GuestConfiguration";
+	ModuleVersion = "1.19.4";
+	ConfigurationName = "OMS.Linux";
+};
+
+instance of OMI_ConfigurationDocument
+{
+	Version="2.0.0";
+
+	CompatibleVersionAdditionalProperties= {"Omi_BaseResource:ConfigurationName"};
+
+	Author="mb";
+
+	GenerationDate="07/23/2022 19:53:31";
+
+	GenerationHost="mberrueta-baselines";
+
+	Name="OMS.Linux";
+};
