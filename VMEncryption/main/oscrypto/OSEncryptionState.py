@@ -199,6 +199,9 @@ class OSEncryptionState(object):
                     boot_item = boot_device_items[0]
                     self.context.logger.log("Finding uuid for {0}".format(boot_item.name))
                     boot_uuid = self.disk_util.get_device_items_property(boot_item.name, "UUID")
+        if not boot_uuid:
+            self.context.logger.log("Cannot get boot UUID from device properties. Falling back to fstab") 
+            boot_uuid = self._parse_uuid_from_fstab('/boot')
         return boot_uuid
 
 
