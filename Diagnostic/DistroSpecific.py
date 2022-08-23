@@ -315,6 +315,14 @@ class CentosActions(RedhatActions):
         return self.install_extra_packages(('policycoreutils-python',), True)
 
 
+class Centos8Actions(RedhatActions):
+    def __init__(self, logger):
+        RedhatActions.__init__(self, logger)
+
+    def install_required_packages(self):
+        return self.install_extra_packages(('policycoreutils-python-utils', 'tar'), True)
+
+
 DistroMap = {
     'debian': CredativActions,  # Credative Debian Linux took the 'debian' platform name with the curl deficiency,
                                 # when all other Debian-based distros have curl, so is this strange mapping...
@@ -324,11 +332,13 @@ DistroMap = {
     'ubuntu:18.04': Ubuntu1510OrHigherActions,
     'redhat': RedhatActions,
     'centos': CentosActions,
+    'centos:8':Centos8Actions,
     'oracle': RedhatActions,
     'suse:12': Suse12Actions,
     'suse': Suse12Actions,
     'sles:15': Suse12Actions,
-    'opensuse:15':Suse12Actions
+    'opensuse:15':Suse12Actions,
+    'almalinux':Redhat8Actions
 }
 
 
