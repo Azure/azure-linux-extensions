@@ -1,3 +1,6 @@
+1.2.0.94
+- Enable Linux VMSS OS disk encryption
+
 1.2.0.93
 - Add support for Oracle 8.5
 - Auto support Minor version upgrades
