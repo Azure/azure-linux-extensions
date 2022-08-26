@@ -1,3 +1,8 @@
+1.2.0.95
+- Add support for Mariner
+- Fix centOS no boot issue
+- Onboard CentOS to online encryption
+
 1.2.0.94
 - Enable Linux VMSS OS disk encryption
 
