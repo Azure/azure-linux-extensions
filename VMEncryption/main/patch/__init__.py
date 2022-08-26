@@ -26,6 +26,7 @@ from .redhatPatching import redhatPatching
 from .centosPatching import centosPatching
 from .SuSEPatching import SuSEPatching
 from .oraclePatching import oraclePatching
+from .marinerPatching import marinerPatching
 
 try:
     import distro # python3.8+

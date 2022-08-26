@@ -185,7 +185,25 @@ class OSEncryptionState(object):
             return matches[0]
 
     def _get_boot_uuid(self):
-        return self._parse_uuid_from_fstab('/boot')
+        boot_uuid = None
+        dev = os.lstat('/boot').st_dev
+        for mp_item in self.disk_util.get_mount_items():
+            if os.path.exists(mp_item["dest"]):
+                if dev == os.lstat(mp_item["dest"]).st_dev:
+                    bootfs_dev_path = mp_item["src"]
+                    self.context.logger.log("Found bootfs dev path {0}".format(bootfs_dev_path))
+                    boot_device_items = self.disk_util.get_device_items(bootfs_dev_path)
+                    if len(boot_device_items) > 1:
+                        self.context.logger.log("boot device cannot have more than one partition")
+                        continue
+                    boot_item = boot_device_items[0]
+                    self.context.logger.log("Finding uuid for {0}".format(boot_item.name))
+                    boot_uuid = self.disk_util.get_device_items_property(boot_item.name, "UUID")
+        if not boot_uuid:
+            self.context.logger.log("Cannot get boot UUID from device properties. Falling back to fstab") 
+            boot_uuid = self._parse_uuid_from_fstab('/boot')
+        return boot_uuid
+
 
     def _add_kernelopts(self, args_to_add):
         """
@@ -194,16 +212,8 @@ class OSEncryptionState(object):
         But we can't tell at this stage easily which one to use if both are present. so we will just update both.
         Moreover, in case somebody runs grub2-mkconfig on the machine we don't want the changes to get nuked out, we will update grub defaults file too.
         """
-        grub_cfg_paths = [
-            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
-            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
-        ]
 
-        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
-
-        for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            for arg in args_to_add:
-                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
+        self.context.distro_patcher.add_kernelopts(args_to_add)
 
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" {0} "\n'.format(" ".join(args_to_add)),
                                       '/etc/default/grub')

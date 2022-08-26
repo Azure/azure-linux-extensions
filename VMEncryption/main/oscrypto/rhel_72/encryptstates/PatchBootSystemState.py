@@ -143,10 +143,6 @@ class PatchBootSystemState(OSEncryptionState):
         self._append_contents_to_file('\nadd_drivers+=" dm_crypt "\n',
                                       '/etc/dracut.conf.d/ade.conf')
 
-        # Change config so that dracut will add the fstab line to the initrd
-        self._append_contents_to_file('\nadd_fstab+=" /lib/dracut/modules.d/91adeOnline/ade_fstab_line "\n',
-                                      '/etc/dracut.conf.d/ade.conf')
-
         # Add the new kernel param
         additional_params = ["rd.luks.ade.partuuid={0}".format(root_partuuid),
                              "rd.luks.ade.bootuuid={0}".format(boot_uuid),

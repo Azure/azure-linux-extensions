@@ -87,8 +87,8 @@ class PatchBootSystemState(OSEncryptionState):
                                           '/etc/dracut.conf.d/ade.conf')
             self._add_kernelopts(["root=/dev/mapper/osencrypt"])
 
-        # Everything is ready, repack dracut. None of the changes above will take affect until this line is executed.
-        self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)
+        # Everything is ready, repack using dracut/mkinitrd. None of the changes above will take affect until this line is executed.
+        self.context.distro_patcher.pack_initial_root_fs()
 
     def should_exit(self):
         self.context.logger.log("Verifying if machine should exit patch_boot_system state")
