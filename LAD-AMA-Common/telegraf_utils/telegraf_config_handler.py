@@ -597,7 +597,7 @@ def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_a
 
             daemon_reload_status = os.system("sudo systemctl daemon-reload")
             if daemon_reload_status != 0:
-                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service."
+                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service. Exit code:" + str(daemon_reload_status)
                 if HUtilObj is not None:
                     HUtilObj.log(message)
                 else:
