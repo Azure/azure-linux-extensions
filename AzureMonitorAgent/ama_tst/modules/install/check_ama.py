@@ -1,22 +1,20 @@
 import re
 import requests
-from bs4 import BeautifulSoup
+from lxml import html
 
 from error_codes import *
 from errors      import error_info, get_input
-from helpers     import get_package_version
+from helpers     import get_package_version, check_internet_connect
 
 AMA_URL = 'https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions'
 
 def get_curr_ama_version(ama_version):
     try:
         r = requests.get(AMA_URL)
-        html_doc = BeautifulSoup(r.text, 'html.parser')
-        rows = html_doc.find("table").find("tbody").find_all("tr")
+        root = html.fromstring(r.text)
+        versions = root.xpath('//table/tbody/tr/td[4]/text()')
 
-        for row in rows:
-            cells = row.find_all("td")
-            version = cells[3].get_text()
+        for version in versions:
             version = re.sub('[A-Za-z ]+', '', version)
             if (version == ''):
                 continue
@@ -49,9 +47,7 @@ def ask_update_old_version(ama_version, curr_ama_version):
     # user does want to update
     if (answer.lower() in ['y', 'yes']):
         print("--------------------------------------------------------------------------------")
-        print("Please head to the Github link below\n")
-        print("\n    https://github.com/Azure/azure-linux-extensions/tree/master/AzureMonitorAgent\n")
-        print("And follow the instructions given here:")
+        print("Please follow the instructions given here:")
         print("\n    https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-manage\n")
         return USER_EXIT
     # user doesn't want to update
@@ -66,7 +62,7 @@ def check_ama(interactive):
         return ERR_AMA_INSTALL
 
     ama_version = ama_version.split('-')[0]
-    if (not comp_versions_ge(ama_version, '1.9')):
+    if (not comp_versions_ge(ama_version, '1.21.0')):
         error_info.append((ama_version,))
         return ERR_OLD_AMA_VER
 
@@ -80,7 +76,13 @@ def check_ama(interactive):
             return ERR_GETTING_AMA_VER
         # couldn't connect
         else:
-            return e
+            checked_internet = check_internet_connect()
+            if (checked_internet == NO_ERROR):
+                print("WARNING: can't connect to {0}: {1}\n Skipping this check...".format(AMA_URL, e))
+                print("--------------------------------------------------------------------------------")
+            # issue with general internet connectivity
+            else:
+                return checked_internet
 
     # got current version
     else:

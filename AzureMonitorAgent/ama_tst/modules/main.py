@@ -45,7 +45,6 @@ def run_troubleshooter():
         print("================================================================================\n"\
             # TODO: come up with scenarios
               "1: Installation failures. \n"\
-              "2: Onboarding failures. \n"\
               "================================================================================\n"\
               "L: Collect the logs for AMA.\n"\
               "Q: Press 'Q' to quit.\n"\
@@ -111,7 +110,7 @@ def run_troubleshooter():
             print("Please review the errors found above.")
 
         # if user ran single scenario, ask if they want to run again
-        if (issue in ['1','2']):
+        if (issue in ['1']):
             run_again = get_input("Do you want to run another scenario? (y/n)",\
                                   (lambda x : x.lower() in ['y','yes','n','no']),\
                                   "Please type either 'y'/'yes' or 'n'/'no' to proceed.")

@@ -18,13 +18,17 @@ err_summary = []
 
 
 # # set of all errors which are actually warnings
-warnings = set([WARN_FILE_PERMS, WARN_LOG_ERRS, WARN_LOG_WARNS, WARN_LARGE_FILES, \
-                WARN_INTERNET_CONN, WARN_INTERNET, WARN_ENDPT])
+warnings = set([WARN_INTERNET_CONN, WARN_INTERNET])
 
 # dictionary correlating error codes to error messages
 error_messages = {
-#     ERR_SUDO_PERMS : "Couldn't access {0} due to inadequate permissions. Please run the troubleshooter "\
-#           "as root in order to allow access.",
+    WARN_INTERNET : "SSL connection couldn't be verified. Please run the command below for more information on this warning:\n"\
+          "\n  $ {0}\n",
+    WARN_INTERNET_CONN : "Machine is not connected to the internet: openssl command failed. "\
+          "Please run the command below for more information on the failure:\n"\
+          "\n  $ {0}\n",
+    ERR_SUDO_PERMS : "Couldn't access {0} due to inadequate permissions. Please run the troubleshooter "\
+          "as root in order to allow access.",
     ERR_FOUND : "Please go through the output above to find the errors caught by the troubleshooter.",
     ERR_BITS : "Couldn't get if CPU is not 32-bit or 64-bit.",
     ERR_OS_VER : "This version of {0} ({1}) is not supported. Please download {2}. To see all "\
@@ -36,11 +40,11 @@ error_messages = {
     ERR_FINDING_OS : "Coudln't determine Operating System. To see all supported Operating "\
           "Systems, please go to:\n"\
           "\n   https://docs.microsoft.com/en-us/azure/azure-monitor/agents/agents-overview#linux\n",
-    ERR_FREE_SPACE : "There isn't enough space in directory {0} to install OMS - there needs to be at least 500MB free, "\
+    ERR_FREE_SPACE : "There isn't enough space in directory {0} to install AMA - there needs to be at least 500MB free, "\
           "but {0} has {1}MB free. Please free up some space and try installing again.",
     ERR_PKG_MANAGER : "This system does not have a supported package manager. Please install 'dpkg' or 'rpm' "\
           "and run this troubleshooter again.",
-    ERR_MULTIPLE_AMA : "There are more than one AMA installed, please remove the extra AMA packages.",
+    ERR_MULTIPLE_AMA : "There is more than one instance of AMA installed, please remove the extra AMA packages.",
     ERR_AMA_INSTALL : "AMA package isn't installed correctly.",
     ERR_SUBMODULE_INSTALL : "Submodule(s) {0} not installed correctly.",
     ERR_LOG_DAEMON : "No logging daemon found. Please install rsyslog or syslog-ng.",
