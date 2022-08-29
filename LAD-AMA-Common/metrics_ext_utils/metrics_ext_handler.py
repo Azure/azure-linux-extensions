@@ -309,7 +309,7 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
             daemon_reload_status = os.system("sudo systemctl daemon-reload")
             if daemon_reload_status != 0:
-                message = "Unable to reload systemd after ME service file change. Failed to set up ME service."
+                message = "Unable to reload systemd after ME service file change. Failed to set up ME service. Exit code:" + str(daemon_reload_status)
                 if HUtilObj is not None:
                     HUtilObj.log(message)
                 else:
