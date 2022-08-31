@@ -335,7 +335,7 @@ def daemon():
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
-        backup_logger.log('The command '+ commandToExecute+ 'is being validated',True)
+        backup_logger.log('The command '+ commandToExecute+ ' is being validated',True)
         if(CommonVariables.iaas_install_command in commandToExecute.lower()):
             backup_logger.log('install succeed.',True)
             run_status = 'success'
