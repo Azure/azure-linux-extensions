@@ -47,7 +47,7 @@ class HttpUtil(object):
                 waagent.MyDistro = waagent.GetMyDistro()
                 Config = waagent.ConfigurationProvider(None)
             except Exception as e:
-                errorMsg = "Failed to construct ConfigurationProvider, which may due to the old wala code with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+                errorMsg = "Failed to construct ConfigurationProvider, which may be due to the old code with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
                 hutil.log(errorMsg)
                 Config = None
             cls.__instance.logger = hutil

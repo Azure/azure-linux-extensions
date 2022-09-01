@@ -236,7 +236,7 @@ def daemon():
     hutil.do_parse_context('Executing', configSeqNo)
 
     try:
-        backup_logger.log('starting daemon', True)
+        backup_logger.log('starting daemon initially', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
         # handle the restoring scenario.
         mi = MachineIdentity()
@@ -300,7 +300,7 @@ def daemon():
 
     try:
         # we need to freeze the file system first
-        backup_logger.log('starting daemon', True)
+        backup_logger.log('starting daemon for freezing the file system', True)
         """
         protectedSettings is the privateConfig passed from Powershell.
         WATCHOUT that, the _context_config are using the most freshest timestamp.
@@ -335,7 +335,7 @@ def daemon():
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
-        backup_logger.log(commandToExecute,True)
+        backup_logger.log('The command '+ commandToExecute+ ' is being validated',True)
         if(CommonVariables.iaas_install_command in commandToExecute.lower()):
             backup_logger.log('install succeed.',True)
             run_status = 'success'
@@ -350,7 +350,7 @@ def daemon():
                 error_msg = 'required field empty or not correct'
                 backup_logger.log(error_msg, True, 'Error')
             else:
-                backup_logger.log('commandToExecute is ' + commandToExecute, True)
+                backup_logger.log('commandToExecute for backup is ' + commandToExecute, True)
                 """
                 make sure the log is not doing when the file system is freezed.
                 """
@@ -365,7 +365,7 @@ def daemon():
                     backup_logger.commit_to_blob(para_parser.logsBlobUri)
                 else:
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
-                backup_logger.log('commandToExecute is ' + commandToExecute, True)
+                backup_logger.log('commandToExecute after commiting the blob is ' + commandToExecute, True)
                 
                 workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
                 #new flow only if workload name is present in workload.conf
