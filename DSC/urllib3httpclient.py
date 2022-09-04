@@ -96,7 +96,7 @@ def request_retry_handler(func):
     return decorated_func
 
 
-class Urllib2HttpClient(HttpClient):
+class Urllib3HttpClient(HttpClient):
     """Urllib2 http client. Inherits from HttpClient.
 
     Targets:
@@ -129,6 +129,9 @@ class Urllib2HttpClient(HttpClient):
             proxy_handler = ProxyHandler({'http': self.proxy_configuration,
                                                   'https': self.proxy_configuration})
             opener.add_handler(proxy_handler)
+        if sys.version_info >= (3,0):
+            if data is not None:
+                data = data.encode("utf-8")
         req = Request(url, data=data, headers=headers)
         req.get_method = lambda: method
         response = opener.open(req, timeout=30)
@@ -182,7 +185,7 @@ class Urllib2HttpClient(HttpClient):
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 
-        return RequestResponse(response.getcode(), response.read())
+        return RequestResponse(response.getcode(), response.read().decode('utf-8'))
 
     def put(self, url, headers=None, data=None):
         """Issues a PUT request to the provided url and using the provided headers.
@@ -209,7 +212,7 @@ class Urllib2HttpClient(HttpClient):
             exception_type, error = sys.exc_info()[:2]
             return RequestResponse(error.code)
 
-        return RequestResponse(response.getcode(), response.read())
+        return RequestResponse(response.getcode(), response.read().decode('utf-8'))
 
     def delete(self, url, headers=None, data=None):
         """Issues a DELETE request to the provided url and using the provided headers.
