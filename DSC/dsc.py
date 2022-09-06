@@ -22,9 +22,14 @@ import re
 import subprocess
 import sys
 import traceback
-import urllib.request
-import urllib.error
-import urllib.parse
+try:
+    from urllib.parse import urlparse, urlencode
+    from urllib.request import urlopen, Request
+    from urllib.error import HTTPError
+except ImportError:
+    from urlparse import urlparse
+    from urllib import urlencode
+    from urllib2 import urlopen, Request, HTTPError
 import time
 import platform
 import json
@@ -32,6 +37,7 @@ import datetime
 import serializerfactory
 import httpclient
 import urllib2httpclient
+import urllib3httpclient
 import httpclientfactory
 
 from azure.storage import BlobService
@@ -44,20 +50,23 @@ ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.4.2-5.ssl_'
-dsc_package_prefix = 'packages/dsc-1.1.1-926.ssl_'
+omi_package_prefix = 'packages/omi-1.6.8-0.ssl_'
+dsc_package_prefix = 'packages/dsc-1.2.1-0.ssl_'
 omi_major_version = 1
-omi_minor_version = 4
-omi_build = 2
-omi_release = 5
+omi_minor_version = 6
+omi_build = 8
+omi_release = 0
 dsc_major_version = 1
-dsc_minor_version = 1
+dsc_minor_version = 2
 dsc_build = 1
-dsc_release = 926
+dsc_release = 0
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
 date_time_format = "%Y-%m-%dT%H:%M:%SZ"
-extension_handler_version = "2.71.1.0"
+extension_handler_version = "3.0.0.1"
+python_command = 'python3' if sys.version_info >= (3,0) else 'python'
+dsc_script_path = '/opt/microsoft/dsc/Scripts/python3' if sys.version_info >= (3,0) else '/opt/microsoft/dsc/Scripts'
+space_string = " "
 
 # Error codes
 UnsupportedDistro = 51 #excludes from SLA
@@ -111,8 +120,9 @@ def main():
         protected_settings = {}
 
     global distro_category
-    distro_category = get_distro_category()
-    check_supported_OS()
+    vm_supported, vm_dist, vm_ver = check_supported_OS()
+    distro_category = get_distro_category(vm_dist.lower(), vm_ver.lower())
+    
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -127,15 +137,12 @@ def main():
             update()
 
 
-def get_distro_category():
-    distro_info = platform.dist()
-    distro_name = distro_info[0].lower()
-    distro_version = distro_info[1]
-    if distro_name == 'ubuntu' or (distro_name == 'debian'):
+def get_distro_category(distro_name,distro_version):
+    if distro_name.startswith('ubuntu') or (distro_name.startswith('debian')):
         return DistroCategory.debian
-    elif distro_name == 'centos' or distro_name == 'redhat' or distro_name == 'oracle':
+    elif distro_name.startswith('centos') or distro_name.startswith('redhat') or distro_name.startswith('oracle') or distro_name.startswith('red hat'):
         return DistroCategory.redhat
-    elif distro_name == 'suse':
+    elif distro_name.startswith('suse') or distro_name.startswith('sles'):
         return DistroCategory.suse 
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Unsupported distro :" + distro_name + "; distro_version: " + distro_version)
     hutil.do_exit(UnsupportedDistro, 'Install', 'error', str(UnsupportedDistro), distro_name + 'is not supported.')
@@ -148,21 +155,41 @@ def check_supported_OS():
     digits must match.
     All other distros not supported will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7'], # CentOS
-                       'centos' : ['6', '7'], # CentOS
-                       'red hat' : ['6', '7'], # Redhat
-                       'debian' : ['8'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04'], # Ubuntu
+    supported_dists = {'redhat' : ['6', '7', '8'], # CentOS
+                       'centos' : ['6', '7', '8'], # CentOS
+                       'red hat' : ['6', '7', '8'], # Redhat
+                       'debian' : ['8', '9', '10'], # Debian
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'oracle' : ['6', '7'], # Oracle
-                       'suse' : ['11', '12'], #SLES
-                       'opensuse' : ['13', '42.3'] #OpenSuse
+                       'suse' : ['12', '15'], #SLES
+                       'sles' : ['12', '15']
     }
-    vm_supported = False
-
+    vm_dist, vm_ver, vm_supported = '', '', False
+    
     try:
         vm_dist, vm_ver, vm_id = platform.linux_distribution()
     except AttributeError:
-        vm_dist, vm_ver, vm_id = platform.dist()
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except:
+            waagent.Log("Falling back to /etc/os-release distribution parsing")
+
+    # Fallback if either of the above fail; on some (especially newer)
+    # distros, linux_distribution() and dist() are unreliable or deprecated
+    if not vm_dist and not vm_ver:
+        try:
+            with open('/etc/os-release', 'r') as fp:
+                for line in fp:
+                    if line.startswith('ID='):
+                        vm_dist = line.split('=')[1]
+                        vm_dist = vm_dist.split('-')[0]
+                        vm_dist = vm_dist.replace('\"', '').replace('\n', '')
+                    elif line.startswith('VERSION_ID='):
+                        vm_ver = line.split('=')[1]
+                        vm_ver = vm_ver.replace('\"', '').replace('\n', '')
+        except:
+            waagent.Log('Indeterminate operating system')
+            return vm_supported, 'Indeterminate operating system', ''
 
     # Find this VM distribution in the supported list
     for supported_dist in supported_dists.keys():
@@ -193,6 +220,8 @@ def check_supported_OS():
     if not vm_supported:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True, message="Unsupported OS :" + vm_dist + "; distro_version: " + vm_ver)
         hutil.do_exit(UnsupportedDistro, 'Install', 'error', str(UnsupportedDistro), vm_dist + "; distro_version: " + vm_ver + ' is not supported.')
+    
+    return vm_supported, vm_dist, vm_ver
 
 
 def install():
@@ -309,7 +338,7 @@ def send_heart_beat_msg_to_agent_service(status_event_type):
         while retry_count <= 5 and canRetry:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                                       message="In send_heart_beat_msg_to_agent_service method")
-            code, output, stderr = run_cmd("python /opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py")
+            code, output, stderr = run_cmd( python_command + space_string +  dsc_script_path + "/GetDscLocalConfigurationManager.py")
             if code == 0 and "RefreshMode=Pull" in output:
                 waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                                           message="sends heartbeat message in pullmode")
@@ -360,14 +389,41 @@ def construct_node_extension_properties(lcmconfig, status_event_type):
     waagent.AddExtensionEvent(name=ExtensionShortName, op='HeartBeatInProgress', isSuccess=True,
                               message="Getting properties")
     OMSCLOUD_ID = get_omscloudid()
-    distro_info = platform.dist()
-    if len(distro_info[1].split('.')) == 1:
-        major_version = distro_info[1].split('.')[0]
-        minor_version = 0
-    if len(distro_info[1].split('.')) >= 2:
-        major_version = distro_info[1].split('.')[0]
-        minor_version = distro_info[1].split('.')[1]
+    
+    vm_dist, vm_ver, vm_id = '', '', ''
+    
+    try:
+        vm_dist, vm_ver, vm_id = platform.linux_distribution()
+    except AttributeError:
+        try:
+            vm_dist, vm_ver, vm_id = platform.dist()
+        except AttributeError:
+            waagent.Log("Falling back to /etc/os-release distribution parsing")
 
+    # Fallback if either of the above fail; on some (especially newer)
+    # distros, linux_distribution() and dist() are unreliable or deprecated
+    if not vm_dist and not vm_ver:
+        try:
+            with open('/etc/os-release', 'r') as fp:
+                for line in fp:
+                    if line.startswith('ID='):
+                        vm_dist = line.split('=')[1]
+                        vm_dist = vm_dist.split('-')[0]
+                        vm_dist = vm_dist.replace('\"', '').replace('\n', '')
+                    elif line.startswith('VERSION_ID='):
+                        vm_ver = line.split('=')[1]
+                        vm_ver = vm_ver.replace('\"', '').replace('\n', '')
+        except:
+            waagent.Log('Indeterminate operating system')
+            vm_dist, vm_ver, vm_id = "Indeterminate operating system", "",""
+
+    if len(vm_ver.split('.')) == 1:
+        major_version = vm_ver.split('.')[0]
+        minor_version = 0
+    if len(vm_ver.split('.')) >= 2:
+        major_version = vm_ver.split('.')[0]
+        minor_version = vm_ver.split('.')[1]
+        
     VMUUID = get_vmuuid()
     node_config_names = get_lcm_config_setting('ConfigurationNames', lcmconfig)
     configuration_mode = get_lcm_config_setting("ConfigurationMode", lcmconfig)
@@ -390,7 +446,7 @@ def construct_node_extension_properties(lcmconfig, status_event_type):
             "Version": extension_handler_version
         },
         "OSProfile": {
-            "Name": distro_info[0],
+            "Name": vm_dist,
             "Type": "Linux",
             "MinorVersion": minor_version,
             "MajorVersion": major_version,
@@ -447,6 +503,8 @@ def run_cmd(cmd):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, close_fds=True)
     exit_code = proc.wait()
     stdout, stderr = proc.communicate()
+    stdout = stdout.decode("ISO-8859-1") if isinstance(stdout, bytes) else stdout
+    stderr = stderr.decode("ISO-8859-1") if isinstance(stderr, bytes) else stderr
     return exit_code, stdout, stderr
 
 def run_dpkg_cmd_with_retry(cmd):
@@ -597,7 +655,7 @@ def rpm_install_pkg(package_path, package_name, major_version, minor_version, bu
         else:
             waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                       message="Failed to install RPM package :" + package_path)
-             raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package_name, output, stderr))
+            raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package_name, output, stderr))
 
 
 def deb_install_pkg(package_path, package_name, major_version, minor_version, build, release, install_options):
@@ -639,7 +697,7 @@ def zypper_package_install(package):
     else:
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="Failed to install zypper package :" + package)
-         raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
+        raise Exception('Failed to install package {0}: stdout: {1}, stderr: {2}'.format(package, output, stderr))
 
 
 def yum_package_install(package):
@@ -666,15 +724,14 @@ def apt_package_install(package):
 
 def get_openssl_version():
     cmd_result = waagent.RunGetOutput("openssl version")
+    cmd_result = cmd_result.decode() if isinstance(cmd_result, bytes) else cmd_result
     openssl_version = cmd_result[1].split()[1]
     if re.match('^1.0.*', openssl_version):
         return '100'
-    elif re.match('^0.9.8*', openssl_version):
-        return '098'
     elif re.match('^1.1.*', openssl_version):
         return '110'
     else:
-        error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 0.9.8*, 1.0.*, 1.1.*'
+        error_msg = 'This system does not have a supported version of OpenSSL installed. Supported version: 1.0.*, 1.1.*'
         hutil.error(error_msg)
         waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                                   message="System doesn't have supported OpenSSL version:" + openssl_version)
@@ -773,12 +830,12 @@ def parse_blob_uri(blob_uri):
 
 
 def get_path_from_uri(uri):
-    uri = urllib.parse.urlparse(uri)
+    uri = urlparse(uri)
     return uri.path
 
 
 def get_host_base_from_uri(blob_uri):
-    uri = urllib.parse.urlparse(blob_uri)
+    uri = urlparse(blob_uri)
     netloc = uri.netloc
     if netloc is None:
         return None
@@ -813,7 +870,7 @@ def download_external_file(file_uri, download_dir):
 
 
 def download_and_save_file(uri, file_path):
-    src = urllib.request.urlopen(uri)
+    src = urlopen(uri)
     dest = open(file_path, 'wb')
     buf_size = 1024
     buf = src.read(buf_size)
@@ -833,12 +890,12 @@ def prepare_download_dir(seq_no):
 
 
 def apply_dsc_configuration(config_file_path):
-    cmd = '/opt/microsoft/dsc/Scripts/StartDscConfiguration.py -configurationmof ' + config_file_path
+    cmd = dsc_script_path + '/StartDscConfiguration.py -configurationmof ' + config_file_path
     waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True,
                               message='running the cmd: ' + cmd)
     code, output, stderr = run_cmd(cmd)
     if code == 0:
-        code, output, stderr = run_cmd('/opt/microsoft/dsc/Scripts/GetDscConfiguration.py')
+        code, output, stderr = run_cmd(dsc_script_path + '/GetDscConfiguration.py')
         return output
     else:
         error_msg = 'Failed to apply MOF configuration: stdout: {0}, stderr: {1}'.format(output, stderr)
@@ -848,12 +905,12 @@ def apply_dsc_configuration(config_file_path):
 
 
 def apply_dsc_meta_configuration(config_file_path):
-    cmd = '/opt/microsoft/dsc/Scripts/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path
+    cmd = dsc_script_path + '/SetDscLocalConfigurationManager.py -configurationmof ' + config_file_path
     waagent.AddExtensionEvent(name=ExtensionShortName, op='EnableInProgress', isSuccess=True,
                               message='running the cmd: ' + cmd)
     code, output, stderr = run_cmd(cmd)
     if code == 0:
-        code, output, stderr = run_cmd('/opt/microsoft/dsc/Scripts/GetDscLocalConfigurationManager.py')
+        code, output, stderr = run_cmd(dsc_script_path + '/GetDscLocalConfigurationManager.py')
         return output
     else:
         error_msg = 'Failed to apply Meta MOF configuration: stdout: {0}, stderr: {1}'.format(output, stderr)
@@ -986,7 +1043,7 @@ def check_dsc_configuration(current_config):
 
 def install_module(file_path):
     install_package('unzip')
-    cmd = '/opt/microsoft/dsc/Scripts/InstallModule.py ' + file_path
+    cmd = dsc_script_path + '/InstallModule.py ' + file_path
     code, output, stderr = run_cmd(cmd)
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op="InstallModuleInProgress",
@@ -1008,7 +1065,7 @@ def install_module(file_path):
 
 def remove_module():
     module_name = get_config('ResourceName')
-    cmd = '/opt/microsoft/dsc/Scripts/RemoveModule.py ' + module_name
+    cmd = dsc_script_path + '/RemoveModule.py ' + module_name
     code, output, stderr = run_cmd(cmd)
     waagent.AddExtensionEvent(name=ExtensionShortName,
                               op="RemoveModuleInProgress",
@@ -1086,7 +1143,7 @@ def register_automation(registration_key, registation_url, node_configuration_na
         hutil.error(err_msg + "It should be one of the values : (ApplyAndMonitor | ApplyAndAutoCorrect | ApplyOnly)")
         waagent.AddExtensionEvent(name=ExtensionShortName, op='RegisterInProgress', isSuccess=True, message=err_msg)
         return 51, err_msg
-    cmd = '/opt/microsoft/dsc/Scripts/Register.py' + ' --RegistrationKey ' + registration_key \
+    cmd = dsc_script_path + '/Register.py' + ' --RegistrationKey ' + registration_key \
           + ' --ServerURL ' + registation_url
     optional_parameters = ""
     if node_configuration_name != '':
