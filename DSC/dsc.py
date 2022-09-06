@@ -50,15 +50,15 @@ ExtensionName = 'Microsoft.OSTCExtensions.DSCForLinux'
 ExtensionShortName = 'DSCForLinux'
 DownloadDirectory = 'download'
 
-omi_package_prefix = 'packages/omi-1.6.9-1.ssl_'
-dsc_package_prefix = 'packages/dsc-1.2.3-0.ssl_'
+omi_package_prefix = 'packages/omi-1.6.10-2.ssl_'
+dsc_package_prefix = 'packages/dsc-1.2.4-0.ssl_'
 omi_major_version = 1
 omi_minor_version = 6
 omi_build = 9
 omi_release = 1
 dsc_major_version = 1
 dsc_minor_version = 2
-dsc_build = 3
+dsc_build = 4
 dsc_release = 0
 package_pattern = '(\d+).(\d+).(\d+).(\d+)'
 nodeid_path = '/etc/opt/omi/conf/dsc/agentid'
@@ -608,19 +608,44 @@ def install_dsc_packages():
     openssl_version = get_openssl_version()
     omi_package_path = omi_package_prefix + openssl_version
     dsc_package_path = dsc_package_prefix + openssl_version
+    compiler_mitigated_omi_flag = get_compiler_mitigated_omi_flag()
     waagent.AddExtensionEvent(name=ExtensionShortName, op='InstallInProgress', isSuccess=True,
                               message="Installing omipackage version: " + omi_package_path + "; dsc package version: " + dsc_package_path)
     if distro_category == DistroCategory.debian:
-        deb_install_pkg(omi_package_path + '.x64.deb', 'omi', omi_major_version, omi_minor_version, omi_build,
+        deb_install_pkg(omi_package_path + '.ulinux' + compiler_mitigated_omi_flag + '.x64.deb', 'omi', omi_major_version, omi_minor_version, omi_build,
                         omi_release, ' --force-confold --force-confdef --refuse-downgrade ')
         deb_install_pkg(dsc_package_path + '.x64.deb', 'dsc', dsc_major_version, dsc_minor_version, dsc_build,
                         dsc_release, '')
     elif distro_category == DistroCategory.redhat or distro_category == DistroCategory.suse:
-        rpm_install_pkg(omi_package_path + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build,
+        rpm_install_pkg(omi_package_path + '.ulinux' + compiler_mitigated_omi_flag + '.x64.rpm', 'omi', omi_major_version, omi_minor_version, omi_build,
                         omi_release)
         rpm_install_pkg(dsc_package_path + '.x64.rpm', 'dsc', dsc_major_version, dsc_minor_version, dsc_build,
                         dsc_release)
 
+def get_compiler_mitigated_omi_flag():
+    vm_supported, vm_dist, vm_ver = check_supported_OS()
+
+    if is_compiler_mitigated_omi_supported(vm_dist.lower(), vm_ver.lower()):
+        return '.s'
+
+    return ''
+
+def is_compiler_mitigated_omi_supported(dist_name, dist_version):
+    # Compiler-mitigated OMI is not supported in the following
+    # Redhat 6
+    # CentOS 6
+    # Oracle 6
+    # SLES 11
+    if (dist_name.startswith('redhat') or dist_name.startswith('red hat')) and dist_version.startswith('6'):
+        return False
+    elif dist_name.startswith('centos') and dist_version.startswith('6'):
+        return False
+    elif dist_name.startswith('oracle') and dist_version.startswith('6'):
+        return False
+    elif dist_name.startswith('sles') and dist_version.startswith('11'):
+        return False
+    
+    return True
 
 def compare_pkg_version(system_package_version, major_version, minor_version, build, release):
     version = re.match(package_pattern, system_package_version)
