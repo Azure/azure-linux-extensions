@@ -115,7 +115,9 @@ function compare_versions(){
 
 function get_compiler_mitigated_flag() {
 	OS_NAME=`grep '^NAME' /etc/os-release | tr -d 'NAME=' | tr -d '"' | tr '[:upper:]' '[:lower:]'`
+    echo "OS: ${OS_NAME}" >&2
     OS_VERSION=`grep '^VERSION_ID' /etc/os-release | tr -d 'VERSION_ID=' | tr -d '"' | tr '[:upper:]' '[:lower:]'`
+    echo "OS VERSION: ${OS_VERSION}" >&2
 	
 	FLAG=""
 	if [[ $OS_NAME == red* && $OS_VERSION == 6* ]]
