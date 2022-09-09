@@ -113,11 +113,38 @@ function compare_versions(){
     return 0
 }
 
+function get_compiler_mitigated_flag() {
+	OS_NAME=`grep '^NAME' /etc/os-release | tr -d 'NAME=' | tr -d '"' | tr '[:upper:]' '[:lower:]'`
+    echo "OS: ${OS_NAME}" >&2
+    OS_VERSION=`grep '^VERSION_ID' /etc/os-release | tr -d 'VERSION_ID=' | tr -d '"' | tr '[:upper:]' '[:lower:]'`
+    echo "OS VERSION: ${OS_VERSION}" >&2
+	
+	FLAG=""
+	if [[ $OS_NAME == red* && $OS_VERSION == 6* ]]
+	then
+		FLAG=""
+	elif [[ $OS_NAME == centos* && $OS_VERSION == 6* ]]
+	then
+		FLAG=""
+	elif [[ $OS_NAME == oracle* && $OS_VERSION == 6* ]]
+	then
+		FLAG=""
+	elif [[ $OS_NAME == sles* && $OS_VERSION == 11* ]]
+	then
+		FLAG=""
+	else
+		FLAG=".s"
+	fi
+	echo $FLAG
+}
+
 function ensure_required_omi_version_exists(){
     # Populate SSL Version
     get_openssl_version
 
     echo "Checking if OMI is installed. Required OMI version: ${REQUIRED_OMI_VERSION};" >&2
+
+    COMPILER_MITIGATED_VERSION_FLAG=$( get_compiler_mitigated_flag )
 
     # Check if RPM exists
     if command -v rpm >/dev/null 2>&1 ; then
@@ -131,7 +158,7 @@ function ensure_required_omi_version_exists(){
             echo "OMI is already installed. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE};" >&2 # Add current running status
             compare_versions ${INSTALLED_OMI_VERSION} ${REQUIRED_OMI_VERSION}
             if [ $? -eq 2 ]; then
-                OMI_PACKAGE_PATH="${OMI_PACKAGE_PREFIX}${OPENSSL_VERSION}.x64.rpm"
+                OMI_PACKAGE_PATH="${OMI_PACKAGE_PREFIX}${OPENSSL_VERSION}.ulinux${COMPILER_MITIGATED_VERSION_FLAG}.x64.rpm"
                 echo "Installed OMI version is lower than the Required OMI version. Trying to upgrade." >&2
                 if [ -f ${OMI_PACKAGE_PATH} ]; then
                     echo "The OMI package exists at ${OMI_PACKAGE_PATH}. Using this to upgrade." >&2
@@ -171,7 +198,7 @@ function ensure_required_omi_version_exists(){
                 echo "OMI is already installed. Installed OMI version: ${INSTALLED_OMI_VERSION}; OMI Service State: ${OMI_SERVICE_STATE};" >&2
                 compare_versions ${INSTALLED_OMI_VERSION} ${REQUIRED_OMI_VERSION}
                 if [ $? -eq 2 ]; then
-                    OMI_PACKAGE_PATH="${OMI_PACKAGE_PREFIX}${OPENSSL_VERSION}.x64.deb"
+                    OMI_PACKAGE_PATH="${OMI_PACKAGE_PREFIX}${OPENSSL_VERSION}.ulinux${COMPILER_MITIGATED_VERSION_FLAG}.x64.deb"
                     echo "Installed OMI version is lower than the Required OMI version. Trying to upgrade." >&2
                     if [ -f ${OMI_PACKAGE_PATH} ]; then
                         echo "The OMI package exists at ${OMI_PACKAGE_PATH}. Using this to upgrade." >&2
