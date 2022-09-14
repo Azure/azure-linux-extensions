@@ -19,12 +19,14 @@ Schema for the public configuration file looks like this:
 
 * `workspaceId`: (required, string) the OMS workspace id to onboard to
 * `stopOnMultipleConnections`: (optional, true/false) warn and stop onboarding if the machine already has a workspace connection; defaults to false
+* `noDigest`: (optional, true/false) RPM manager skips verification of package or header digests when reading (same as running rpm --nodigest --nofiledigest)
 * `skipDockerProviderInstall`: (optional, true/false) if the value is true, then skips the installation of the docker provider; default value is false
 
 ```json
 {
   "workspaceId": "<workspace-id (guid)>",
   "stopOnMultipleConnections": true/false,
+  "noDigest": true/false,
   "skipDockerProviderInstall": true/false
 }
 ```
@@ -117,6 +119,7 @@ $Version = '<version>'
 $PublicConf = '{
     "workspaceId": "<workspace id>",
     "stopOnMultipleConnections": true/false,
+    "noDigest": true/false,
     "skipDockerProviderInstall": true/false
 }'
 $PrivateConf = '{
@@ -152,6 +155,7 @@ $Version = '<version>'
 $PublicConf = '{
     "workspaceId": "<workspace id>",
     "stopOnMultipleConnections": true/false,
+    "noDigest": true/false,
     "skipDockerProviderInstall": true/false
 }'
 $PrivateConf = '{
@@ -184,6 +188,7 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
     "settings": {
       "workspaceId": "<workspace id>",
       "stopOnMultipleConnections": true/false,
+      "noDigest": true/false,
       "skipDockerProviderInstall": true/false
     },
     "protectedSettings": {
@@ -202,6 +207,7 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 {
   "workspaceId": "MyWorkspaceId",
   "stopOnMultipleConnections": true,
+  "noDigest": false,
   "skipDockerProviderInstall": true
 }
 ```
