@@ -118,6 +118,7 @@ RestartOMSAgentServiceCommand = '{0} restart'.format(OMSAgentServiceScript)
 DisableOMSAgentServiceCommand = '{0} disable'.format(OMSAgentServiceScript)
 
 InstallExtraPackageCommandApt = 'apt-get -y update && apt-get -y install {0}'
+SkipDigestCmdTemplate = '{0} --noDigest'
 
 # Cloud Environments
 PublicCloudName     = "AzurePublicCloud"
@@ -486,6 +487,13 @@ def install():
             bundle_path, '--skip-docker-provider-install')
     else:
         cmd = InstallCommandTemplate.format(bundle_path, '')
+
+    noDigest = public_settings.get(
+        'noDigest')
+
+    if (noDigest is not None
+            and noDigest is True):
+        cmd = SkipDigestCmdTemplate.format(cmd)
 
     hutil_log_info('Running command "{0}"'.format(cmd))
 
