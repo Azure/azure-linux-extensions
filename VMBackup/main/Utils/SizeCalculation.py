@@ -5,6 +5,10 @@ try:
     import imp as imp
 except ImportError:
     import importlib as imp
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 import base64
 import json
 import tempfile
@@ -14,12 +18,15 @@ from Utils.ResourceDiskUtil import ResourceDiskUtil
 import Utils.HandlerUtil
 import traceback
 import subprocess
+import shlex
+from common import CommonVariables
 
 class SizeCalculation(object):
 
-    def __init__(self,patching,logger,para_parser):
+    def __init__(self,patching, hutil, logger,para_parser):
         self.patching=patching
         self.logger=logger
+        self.hutil = hutil
         self.file_systems_info = []
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'rootfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
@@ -67,7 +74,15 @@ class SizeCalculation(object):
     def get_total_used_size(self):
         try:
             size_calc_failed = False
-            df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+
+            onlyLocalFilesystems = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalFilesystems, "False") 
+
+            if onlyLocalFilesystems in ['True', 'true']:  
+                df = subprocess.Popen(["df" , "-kl"], stdout=subprocess.PIPE)
+            else:
+                df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+
+            self.logger.log("onlyLocalFilesystems : {0}".format(str(onlyLocalFilesystems)))
             '''
             Sample output of the df command
 
@@ -95,9 +110,12 @@ class SizeCalculation(object):
             self.logger.log("df command executed for process wait time value" + str(process_wait_time), True)
             if(df is not None and df.poll() is not None):
                 self.logger.log("df return code"+str(df.returncode), True)
-                output = df.stdout.read()
+                output = df.stdout.read().decode()
             if sys.version_info > (3,):
-                output = str(output, encoding='utf-8', errors="backslashreplace")
+                try:
+                    output = str(output, encoding='utf-8', errors="backslashreplace")
+                except:
+                    output = str(output)
             else:
                 output = str(output)
             output = output.strip().split("\n")
@@ -126,16 +144,16 @@ class SizeCalculation(object):
             device_list=self.device_list_for_billing() #new logic: calculate the disk size for billing
 
             while index < output_length:
-                if(len(output[index].split()) < 6 ): #when a row is divided in 2 lines
+                if(len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) < 6 ): #when a row is divided in 2 lines
                     index = index+1
-                    if(index < output_length and len(output[index-1].split()) + len(output[index].split()) == 6):
+                    if(index < output_length and len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index-1])) + len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) == 6):
                         output[index] = output[index-1] + output[index]
                     else:
                         self.logger.log("Output of df command is not in desired format",True)
                         total_used = 0
                         size_calc_failed = True
                         break
-                device, size, used, available, percent, mountpoint = output[index].split()
+                device, size, used, available, percent, mountpoint =Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])
                 fstype = ''
                 isNetworkFs = False
                 isKnownFs = False

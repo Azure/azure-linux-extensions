@@ -28,6 +28,10 @@ import glob
 from common import DeviceItem
 import Utils.HandlerUtil
 import traceback
+try:
+        import ConfigParser as ConfigParsers
+except ImportError:
+        import configparser as ConfigParsers
 
 class DiskUtil(object):
     __instance__ = None
@@ -55,7 +59,7 @@ class DiskUtil(object):
 
     def get_device_items_property(self, lsblk_path, dev_name, property_name):
         get_property_cmd = lsblk_path + " /dev/" + dev_name + " -b -nl -o NAME," + property_name
-        get_property_cmd_args = shlex.split(get_property_cmd)
+        get_property_cmd_args =Utils.HandlerUtil.HandlerUtility.split(self.logger, get_property_cmd)
         get_property_cmd_p = Popen(get_property_cmd_args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         output,err = get_property_cmd_p.communicate()
         output= str(output)
@@ -63,7 +67,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = item_value_str.split()
+                disk_info_item_array =Utils.HandlerUtil.HandlerUtility.split(self.logger, item_value_str)
                 if(dev_name == disk_info_item_array[0]):
                     if(len(disk_info_item_array) > 1):
                         return disk_info_item_array[1]
@@ -77,7 +81,7 @@ class DiskUtil(object):
             get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME"
         else:
             get_device_cmd = self.patching.lsblk_path + " -b -nl -o NAME " + dev_path
-        get_device_cmd_args = shlex.split(get_device_cmd)
+        get_device_cmd_args =Utils.HandlerUtil.HandlerUtility.split(self.logger, get_device_cmd)
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
         out_lsblk_output = str(out_lsblk_output)
@@ -85,7 +89,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = item_value_str.split()
+                disk_info_item_array =Utils.HandlerUtil.HandlerUtility.split(self.logger, item_value_str)
                 device_item = DeviceItem()
                 device_item.name = disk_info_item_array[0]
                 device_items.append(device_item)
@@ -119,7 +123,7 @@ class DiskUtil(object):
             get_device_cmd = lsblk_path + " -b -nl -o NAME"
         else:
             get_device_cmd = lsblk_path + " -b -nl -o NAME " + dev_path
-        get_device_cmd_args = shlex.split(get_device_cmd)
+        get_device_cmd_args =Utils.HandlerUtil.HandlerUtility.split(self.logger, get_device_cmd)
         p = Popen(get_device_cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out_lsblk_output, err = p.communicate()
         if sys.version_info > (3,):
@@ -131,7 +135,7 @@ class DiskUtil(object):
         for i in range(0,len(lines)):
             item_value_str = lines[i].strip()
             if(item_value_str != ""):
-                disk_info_item_array = item_value_str.split()
+                disk_info_item_array =Utils.HandlerUtil.HandlerUtility.split(self.logger, item_value_str)
                 device_item = DeviceItem()
                 device_item.name = disk_info_item_array[0]
                 device_items_temp.append(device_item)
@@ -150,11 +154,40 @@ class DiskUtil(object):
 
     def get_lsblk_pairs_output(self, lsblk_path, dev_path):
         self.logger.log("get_lsblk_pairs_output : getting the blk info from " + str(dev_path) + " using lsblk_path " + str(lsblk_path), True)
+        
+        # If an alternate user is specified  in vmbackup.conf, run lsblk command through that user, not with root access. 
+        # Fixes issues found in some SUSE-related distros where lsblk command gets stuck with root access
+        # Sample vmbackup.conf file with such alternate user setting:
+        # [lsblkUser]
+        # username: vmadmin
+
+        configfile = '/etc/azure/vmbackup.conf'
+        command_user = ''
+        alternate_user = False
+
+        try :
+            if os.path.exists(configfile):
+                config = ConfigParsers.ConfigParser()
+                config.read(configfile)
+                if config.has_option('lsblkUser','username'):
+                    lsblk_user = config.get('lsblkUser','username')
+                    command_user = "su - " + lsblk_user + " -c"
+                    if (dev_path is None):
+                        command_user = command_user + ' \'' + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE' + '\''
+                    else:
+                        command_user = command_user + ' \'' + 'lsblk -b -n -P -o NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE' + ' ' + dev_path + '\''
+                    alternate_user = True
+        except Exception as e:
+            pass
+
         out_lsblk_output = None
         error_msg = None
         is_lsblk_path_wrong = False
         try:
-            if(dev_path is None):
+            if (alternate_user):
+                self.logger.log("Switching to alternate user to run this lsblk command: " + str(command_user), True)
+                p = Popen(command_user, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            elif(dev_path is None):
                 p = Popen([str(lsblk_path), '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
                 p = Popen([str(lsblk_path), '-b', '-n','-P','-o','NAME,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,SIZE',dev_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -230,7 +263,7 @@ class DiskUtil(object):
                 for i in range(0,len(lines)):
                     item_value_str = lines[i].strip()
                     if(item_value_str != ""):
-                        disk_info_item_array = item_value_str.split()
+                        disk_info_item_array =Utils.HandlerUtil.HandlerUtility.split(self.logger, item_value_str)
                         device_item = DeviceItem()
                         disk_info_item_array_length = len(disk_info_item_array)
                         for j in range(0, disk_info_item_array_length):
@@ -300,7 +333,7 @@ class DiskUtil(object):
             for line in lines:
                 line = line.strip()
                 if(line != ""):
-                    deviceName = line.split()[0]
+                    deviceName =Utils.HandlerUtil.HandlerUtility.split(self.logger, line)[0]
                     mountPrefixStr = " on /"
                     prefixIndex = line.find(mountPrefixStr)
                     if(prefixIndex >= 0):
@@ -344,7 +377,7 @@ class DiskUtil(object):
                 self.logger.log("print line by line :" + line , True)
                 line = line.strip()
                 if(line != ""):
-                    file_system = line.split()[0]
+                    file_system =Utils.HandlerUtil.HandlerUtility.split(self.logger, line)[0]
                     mountPrefixStr = " on /"
                     prefixIndex = line.find(mountPrefixStr)
                     if(prefixIndex >= 0):

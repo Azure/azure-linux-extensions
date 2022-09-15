@@ -27,7 +27,7 @@ waagent.Log(name+" - install.py starting.")
 
 logfile=waagent.Log
 
-hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),name,
+hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),name,
                'Install', 'transitioning', '0', 'Installing', 'Process Config', 'transitioning', '0', 'Parsing ' + settings_file)
 hutil.doHealthReport(heartbeat_file,'NotReady','0','Proccessing Settings')
 pub=""

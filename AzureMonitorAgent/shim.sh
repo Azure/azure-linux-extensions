@@ -19,6 +19,11 @@ function find_python() {
     elif command -v python2 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python2"
         eval ${future_path}="${PWD}/ext/future:"
+    elif command -v /usr/libexec/platform-python >/dev/null 2>&1 ; then
+        # If a user-installed python isn't available, check for a platform-python. This is typically only used in RHEL 8.0.
+        echo "User-installed python not found. Using /usr/libexec/platform-python as the python interpreter."
+        eval ${python_exec_command}="/usr/libexec/platform-python"
+        # do not set future_path; future seems to cause interference with preexisting packages in python 3 environment
     fi
 }
 
@@ -29,7 +34,7 @@ then
     echo "No Python interpreter found, which is an AMA extension dependency. Please install Python 3, or Python 2 if the former is unavailable." >&2
     exit 52 # Missing Dependency
 else
-    ${PYTHON} --version
+    ${PYTHON} --version 2>&1
 fi
 
 PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}

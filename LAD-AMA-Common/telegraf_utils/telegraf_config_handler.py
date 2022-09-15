@@ -72,18 +72,23 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     vmi_rate_counters_list = ["LogicalDisk\\BytesPerSecond", "LogicalDisk\\ReadBytesPerSecond", "LogicalDisk\\ReadsPerSecond",  "LogicalDisk\\WriteBytesPerSecond", "LogicalDisk\\WritesPerSecond", "LogicalDisk\\TransfersPerSecond", "Network\\ReadBytesPerSecond", "Network\\WriteBytesPerSecond"]
 
     MetricsExtensionNamepsace = metrics_constants.metrics_extension_namespace
-
+    has_mdsd_output = False
+    has_me_output = False
+    
     if len(data) == 0:
         raise Exception("Empty config data received.")
-        return []
 
     if me_url is None or mdsd_url is None:
         raise Exception("No url provided for Influxdb output plugin to ME, AMA.")
-        return []
 
     telegraf_json = {}
 
     for item in data:
+        sink = item["sink"]
+        if "mdsd" in sink:
+            has_mdsd_output = True
+        if "me" in sink:
+            has_me_output = True
         counter = item["displayName"]
         if counter in name_map:
             plugin = name_map[counter]["plugin"]
@@ -138,7 +143,6 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
     if len(telegraf_json) == 0:
         raise Exception("Unable to parse telegraf config into intermediate dictionary.")
-        return []
 
     excess_diskio_plugin_list_lad = ["total_transfers_filesystem", "read_bytes_filesystem", "total_bytes_filesystem", "write_bytes_filesystem", "reads_filesystem", "writes_filesystem"]
     excess_diskio_field_drop_list_str = ""
@@ -178,17 +182,19 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
 
             # If it's a lad config then add the namepass fields for sending totals to storage
-            if is_lad:
-                lad_plugin_name = plugin + "_total"
-                lad_specific_rename_str += "\n[[processors.rename]]\n"
-                lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"
-                if lad_plugin_name not in storage_namepass_list:
+            # always skip lad plugin names as they should be dropped from ME
+            lad_plugin_name = plugin + "_total"
+            if lad_plugin_name not in storage_namepass_list:
                     storage_namepass_list.append(lad_plugin_name)
+                    
+            if is_lad:                
+                lad_specific_rename_str += "\n[[processors.rename]]\n"
+                lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"                
             elif is_vmi  or is_vmi_rate_counter:                
                 if plugin not in storage_namepass_list:
                     storage_namepass_list.append(plugin + "_mdsd")
             else:
-                ama_plugin_name = plugin + "_total"
+                ama_plugin_name = plugin + "_mdsd_la_perf"
                 ama_rename_str += "\n[[processors.rename]]\n"
                 ama_rename_str += " "*2 + "namepass = [\"" + ama_plugin_name + "\"]\n"
                 if ama_plugin_name not in storage_namepass_list:
@@ -282,9 +288,15 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             #Add respective operations for aggregators
             # if is_lad:
             if not is_vmi and not is_vmi_rate_counter:
+                suffix = ""
+                if is_lad:
+                    suffix = "_total\"]\n"
+                else:
+                    suffix = "_mdsd_la_perf\"]\n"
+                    
                 if rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
-                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
                     aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
@@ -292,7 +304,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
 
                 if non_rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
-                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_total\"]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
                     aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
@@ -401,19 +413,21 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     agentconf += "  \"microsoft.regionName\"= \"" + region + "\"\n"
     agentconf += "  \"microsoft.resourceId\"= \"" + az_resource_id + "\"\n"
     if virtual_machine_name != "":
-        agentconf += "  \"VMInstanceId\"= \"" + virtual_machine_name + "\"\n"
-    agentconf += "\n# Configuration for sending metrics to MetricsExtension\n"
-    agentconf += "[[outputs.influxdb]]\n"
-    agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
-    if is_lad:
-        agentconf += "  fielddrop = [" + excess_diskio_field_drop_list_str[:-2] + "]\n"
-    agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
-    agentconf += "  udp_payload = \"1024B\"\n\n"
-    agentconf += "\n# Configuration for sending metrics to MDSD\n"
-    agentconf += "[[outputs.socket_writer]]\n"
-    agentconf += "  namepass = [" + storage_namepass_str[:-2] + "]\n"
-    agentconf += "  data_format = \"influx\"\n"
-    agentconf += "  address = \"" + str(mdsd_url) + "\"\n\n"
+        agentconf += "  \"VMInstanceId\"= \"" + virtual_machine_name + "\"\n"    
+    if has_me_output or is_lad:
+        agentconf += "\n# Configuration for sending metrics to MetricsExtension\n"
+        agentconf += "[[outputs.influxdb]]\n"
+        agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
+        if is_lad:
+            agentconf += "  fielddrop = [" + excess_diskio_field_drop_list_str[:-2] + "]\n"
+        agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
+        agentconf += "  udp_payload = \"2048B\"\n\n"
+    if has_mdsd_output:
+        agentconf += "\n# Configuration for sending metrics to MDSD\n"
+        agentconf += "[[outputs.socket_writer]]\n"
+        agentconf += "  namepass = [" + storage_namepass_str[:-2] + "]\n"
+        agentconf += "  data_format = \"influx\"\n"
+        agentconf += "  address = \"" + str(mdsd_url) + "\"\n\n"
     agentconf += "\n# Configuration for outputing metrics to file. Uncomment to enable.\n"
     agentconf += "#[[outputs.file]]\n"
     agentconf += "#  files = [\"./metrics_to_file.out\"]\n\n"
@@ -505,48 +519,47 @@ def stop_telegraf_service(is_lad):
     # If the VM has systemd, then we will use that to stop
     if metrics_utils.is_systemd():
         code = 1
-        telegraf_service_path = get_telegraf_service_path()
+        telegraf_service_path = get_telegraf_service_path(is_lad)
+        telegraf_service_name = get_telegraf_service_name(is_lad)
 
         if os.path.isfile(telegraf_service_path):
-            code = os.system("sudo systemctl stop metrics-sourcer")
+            code = os.system("sudo systemctl stop {0}".format(telegraf_service_name))
         else:
-            return False, "Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service ."
+            return False, "Telegraf service file does not exist. Failed to stop telegraf service: {0}.service.".format(telegraf_service_name)
 
         if code != 0:
-            return False, "Unable to stop telegraf service: metrics-sourcer.service. Run systemctl status metrics-sourcer.service for more info."
-    else:
-        #This VM does not have systemd, So we will use the pid from the last ran telegraf process and terminate it
-        _, configFolder = get_handler_vars()
-        telegraf_conf_dir = configFolder + "/telegraf_configs/"
-        telegraf_pid_path = telegraf_conf_dir + "telegraf_pid.txt"
-        if os.path.isfile(telegraf_pid_path):
-            pid = ""
-            with open(telegraf_pid_path, "r") as f:
-                pid = f.read()
-            if pid != "":
-                # Check if the process running is indeed telegraf, ignore if the process output doesn't contain telegraf
-                proc = subprocess.Popen(["ps -o cmd= {0}".format(pid)], stdout=subprocess.PIPE, shell=True)
-                output = proc.communicate()[0]
-                if telegraf_bin in output.decode('utf-8', 'ignore'):
-                    os.kill(int(pid), signal.SIGKILL)
-                else:
-                    return False, "Found a different process running with PID {0}. Failed to stop telegraf.".format(pid)
-            else:
-                return False, "No pid found for an currently running telegraf process in {0}. Failed to stop telegraf.".format(telegraf_pid_path)
-        else:
-            return False, "File containing the pid for the running telegraf process at {0} does not exit. Failed to stop telegraf".format(telegraf_pid_path)
+            return False, "Unable to stop telegraf service: {0}.service. Run systemctl status {0}.service for more info.".format(telegraf_service_name)
+
+    # Whether or not VM has systemd, let's check if we have any telegraf pids saved and if so, terminate the associated process
+    _, configFolder = get_handler_vars()
+    telegraf_conf_dir = configFolder + "/telegraf_configs/"
+    telegraf_pid_path = telegraf_conf_dir + "telegraf_pid.txt"
+    if os.path.isfile(telegraf_pid_path):
+        with open(telegraf_pid_path, "r") as f:
+            for pid in f.readlines():
+                # Verify the pid actually belongs to telegraf
+                cmd_path = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_path):
+                    with open(cmd_path, "r") as cmd_f:
+                        cmdline = cmd_f.readlines()
+                        if cmdline[0].find(telegraf_bin) >= 0:
+                            os.kill(int(pid), signal.SIGKILL)
+        os.remove(telegraf_pid_path)
+    elif not metrics_utils.is_systemd():
+        return False, "Could not find telegraf service nor process to stop."
 
     return True, "Successfully stopped metrics-sourcer service"
 
 
-def remove_telegraf_service():
+def remove_telegraf_service(is_lad):
     """
     Remove the telegraf service if the VM is using systemd as well as the telegraf Binary
     This method is called after stop_telegraf_service by the main extension code during Extension uninstall
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
 
-    telegraf_service_path = get_telegraf_service_path()
+    telegraf_service_path = get_telegraf_service_path(is_lad)
+    telegraf_service_name = get_telegraf_service_name(is_lad)
 
     if os.path.isfile(telegraf_service_path):
         os.remove(telegraf_service_path)
@@ -555,28 +568,27 @@ def remove_telegraf_service():
 
     # Checking To see if the file was successfully removed, since os.remove doesn't return an error code
     if os.path.isfile(telegraf_service_path):
-        return False, "Unable to remove telegraf service: metrics-sourcer.service at {0}.".format(telegraf_service_path)
+        return False, "Unable to remove telegraf service: {0}.service at {1}.".format(telegraf_service_name, telegraf_service_path)
 
-    return True, "Successfully removed metrics-sourcer service"
+    return True, "Successfully removed {0} service".format(telegraf_service_name)
 
 
-def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf):
+def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf, HUtilObj=None):
     """
-    Remove the metrics-sourcer service if the VM is using systemd
-    This method is called after stop_telegraf_service by the main extension code during Extension uninstall
-    :param is_lad: boolean whether the extension is LAD or not (AMA)
+    Add the metrics-sourcer service if the VM is using systemd
+    This method is called in handle_config
+    :param telegraf_bin: path to the telegraf binary
+    :param telegraf_d_conf_dir: path to telegraf .d conf subdirectory
+    :param telegraf_agent_conf: path to telegraf .conf file
     """
-    telegraf_service_path = get_telegraf_service_path()
+    telegraf_service_path = get_telegraf_service_path(is_lad)
     telegraf_service_template_path = os.getcwd() + "/services/metrics-sourcer.service"
-
 
     if not os.path.exists(telegraf_d_conf_dir):
         raise Exception("Telegraf config directory does not exist. Failed to setup telegraf service.")
-        return False
 
     if not os.path.isfile(telegraf_agent_conf):
         raise Exception("Telegraf agent config does not exist. Failed to setup telegraf service.")
-        return False
 
     if os.path.isfile(telegraf_service_template_path):
 
@@ -589,22 +601,24 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
 
             daemon_reload_status = os.system("sudo systemctl daemon-reload")
             if daemon_reload_status != 0:
-                raise Exception("Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service.")
-                return False
+                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service. Exit code:" + str(daemon_reload_status)
+                if HUtilObj is not None:
+                    HUtilObj.log(message)
+                else:
+                    print('Info: {0}'.format(message))
+
         else:
             raise Exception("Unable to copy Telegraf service template file to {0}. Failed to setup telegraf service.".format(telegraf_service_path))
-            return False
     else:
         raise Exception("Telegraf service template file does not exist at {0}. Failed to setup telegraf service.".format(telegraf_service_template_path))
-        return False
 
     return True
 
 
 def start_telegraf(is_lad):
     """
-    Start the telegraf service if VM is using is systemd, otherwise start the binary as a process and store the pid,
-    to a file in the telegraf config directory,
+    Start the telegraf service if VM is using is systemd, otherwise start the binary as a process and store the pid
+    to a file in the telegraf config directory
     This method is called after config setup is completed by the main extension code
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
@@ -621,14 +635,18 @@ def start_telegraf(is_lad):
         log_messages += "Telegraf binary does not exist. Failed to start telegraf service."
         return False, log_messages
 
-    # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
+    # Ensure that any old telegraf processes are cleaned up to avoid duplication
+    stop_telegraf_service(is_lad)
+
+    # If the VM has systemd, telegraf will be managed as a systemd service
+    telegraf_service_name = get_telegraf_service_name(is_lad)
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart metrics-sourcer")
+        service_restart_status = os.system("sudo systemctl restart {0}".format(telegraf_service_name))
         if service_restart_status != 0:
             log_messages += "Unable to start Telegraf service. Failed to start telegraf service."
             return False, log_messages
 
-    #Else start telegraf as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
+    # Otherwise, start telegraf as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
     else:
         _, configFolder = get_handler_vars()
         telegraf_conf_dir = configFolder + "/telegraf_configs/"
@@ -647,8 +665,11 @@ def start_telegraf(is_lad):
             telegraf_pid = proc.pid
 
             # Write this pid to a file for future use
-            with open(telegraf_pid_path, "w+") as f:
-                f.write(str(telegraf_pid))
+            try:
+                with open(telegraf_pid_path, "a") as f:
+                    f.write(str(telegraf_pid) + '\n')
+            except Exception as e:
+                log_messages += "Successfully started telegraf binary, but could not save telegraf pidfile."
         else:
             out, err = proc.communicate()
             log_messages += "Unable to run telegraf binary as a process due to error - {0}. Failed to start telegraf.".format(err)
@@ -656,17 +677,34 @@ def start_telegraf(is_lad):
     return True, log_messages
 
 
-def get_telegraf_service_path():
+def get_telegraf_service_path(is_lad):
     """
     Utility method to get the service path in case /lib/systemd/system doesnt exist on the OS
     """
-    if os.path.exists("/lib/systemd/system/"):
-        return metrics_constants.telegraf_service_path
-    elif os.path.exists("/usr/lib/systemd/system/"):
-        return metrics_constants.telegraf_service_path_usr_lib
+    if is_lad:
+        if os.path.exists("/lib/systemd/system/"):
+            return metrics_constants.lad_telegraf_service_path
+        elif os.path.exists("/usr/lib/systemd/system/"):
+            return metrics_constants.lad_telegraf_service_path_usr_lib
+        else:
+            raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
     else:
-        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
+        if os.path.exists("/lib/systemd/system/"):
+            return metrics_constants.telegraf_service_path
+        elif os.path.exists("/usr/lib/systemd/system/"):
+            return metrics_constants.telegraf_service_path_usr_lib
+        else:
+            raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup telegraf service.")
 
+def get_telegraf_service_name(is_lad):
+    """
+    Utility method to get the service name
+    """
+    if(is_lad):    
+        return metrics_constants.lad_telegraf_service_name
+    else:
+        return metrics_constants.telegraf_service_name
+        
 
 def handle_config(config_data, me_url, mdsd_url, is_lad):
     """
@@ -711,11 +749,9 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
 
     if retries > max_retries:
         raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup Telegraf.".format(max_retries))
-        return False
 
     if "resourceId" not in data["compute"]:
         raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup Telegraf.")
-        return False
 
     az_resource_id = data["compute"]["resourceId"]
 
@@ -728,19 +764,16 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
 
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup Telegraf.")
-        return False
 
     subscription_id = data["compute"]["subscriptionId"]
 
     if "resourceGroupName" not in data["compute"]:
         raise Exception("Unable to find 'resourceGroupName' key in imds query response. Failed to setup Telegraf.")
-        return False
 
     resource_group = data["compute"]["resourceGroupName"]
 
     if "location" not in data["compute"]:
         raise Exception("Unable to find 'location' key in imds query response. Failed to setup Telegraf.")
-        return False
 
     region = data["compute"]["location"]
 
@@ -768,7 +801,7 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     # Setup Telegraf service.
     # If the VM has systemd, then we will copy over the systemd unit file and use that to start/stop
     if metrics_utils.is_systemd():
-        telegraf_service_setup = setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)
+        telegraf_service_setup = setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf)
         if not telegraf_service_setup:
             return False, []
 

@@ -201,7 +201,7 @@ def doHealthReport(heartbeat_file,status,code,message):
         waagent.Error('Unable to wite heartbeat info to ' + heartbeat_file)    
 
 def doExit(name,seqNo,version,exit_code,status_file,heartbeat_file,operation,status,code,message,sub_operation,sub_status,sub_code,sub_message,health_state,health_code,health_message):
-    doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),name,
+    doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),name,
                    operation,status,code,message,sub_operation,sub_status,sub_code,sub_message)
     doHealthReport(heartbeat_file,'NotReady','1','Exiting')
     sys.exit(exit_code)

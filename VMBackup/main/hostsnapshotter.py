@@ -28,7 +28,6 @@ try:
 except ImportError:
     import configparser as ConfigParsers
 import multiprocessing as mp
-import datetime
 import json
 from common import CommonVariables
 from HttpUtil import HttpUtil
@@ -68,6 +67,8 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
+                if (paras.includeLunList != None and paras.includeLunList.count != 0):
+                    diskIds = paras.includeLunList
                 hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, paras.snapshotTaskToken, meta_data)
                 body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
@@ -135,6 +136,7 @@ class HostSnapshotter(object):
                 self.logger.log("presnapshot responseBody: " + responseBody)
                 if(httpResp != None):
                     statusCode = httpResp.status
+                    self.logger.log("PreSnapshot: Status Code: " + str(statusCode))
                     if(int(statusCode) == 200 or int(statusCode) == 201) and (responseBody == None or responseBody == "") :
                         self.logger.log("PreSnapshot:responseBody is empty but http status code is success")
                         statusCode = 557
@@ -150,7 +152,7 @@ class HostSnapshotter(object):
             self.logger.log(errorMsg, False, 'Error')
             statusCode = 558
         HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodePreSnapshot, str(statusCode))
-        return statusCode
+        return statusCode, responseBody
 
     def get_snapshot_info(self, responseBody):
         blobsnapshotinfo_array = []
@@ -159,8 +161,25 @@ class HostSnapshotter(object):
             if(responseBody != None):
                 json_reponseBody = json.loads(responseBody)
                 for snapshot_info in json_reponseBody['snapshotInfo']:
-                    blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
-                    self.logger.log("IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
+                    self.logger.log("From Host- IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
+                    
+                    ddSnapshotIdentifierInfo = None
+                    if('ddSnapshotIdentifier' in snapshot_info and snapshot_info['ddSnapshotIdentifier'] != None):
+                        creationTimeString = snapshot_info['ddSnapshotIdentifier']['creationTime']
+                        self.logger.log("creationTime string from BHS : {0} ".format(creationTimeString))
+                        try:
+                            creationTimeObj = datetime.datetime.strptime(creationTimeString, "%Y-%m-%dT%H:%M:%S.%fZ")
+                        except:
+                            creationTimeObj = datetime.datetime.strptime(creationTimeString, "%Y-%m-%dT%H:%M:%SZ")
+                        creationTimeObj = creationTimeObj.replace(tzinfo=datetime.timezone.utc)
+                        creationTimeObj = str(round(creationTimeObj.timestamp()*1000))
+                        ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeObj , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'])
+                        self.logger.log("ddSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id))
+                    else:
+                        self.logger.log("ddSnapshotIdentifier absent/None in Host Response")
+
+                    blobsnapshotinfo_array.append(HostSnapshotObjects.BlobSnapshotInfo(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode'], ddSnapshotIdentifierInfo))
+                    
                     if (snapshot_info['isSuccessful'] == 'true'):
                         all_failed = False
         except Exception as e:
