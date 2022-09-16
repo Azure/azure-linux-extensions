@@ -632,17 +632,10 @@ def get_compiler_mitigated_omi_flag():
 
 def is_compiler_mitigated_omi_supported(dist_name, dist_version):
     # Compiler-mitigated OMI is not supported in the following
-    # Redhat 6
-    # CentOS 6
-    # Oracle 6
     # SLES 11
-    if (dist_name.startswith('redhat') or dist_name.startswith('red hat')) and dist_version.startswith('6'):
-        return False
-    elif dist_name.startswith('centos') and dist_version.startswith('6'):
-        return False
-    elif dist_name.startswith('oracle') and dist_version.startswith('6'):
-        return False
-    elif dist_name.startswith('sles') and dist_version.startswith('11'):
+    
+    # To be enhanced if there are future distros not supporting compiler-mitigated OMI package
+    if dist_name.startswith('sles') and dist_version.startswith('11'):
         return False
     
     return True

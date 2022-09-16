@@ -114,22 +114,18 @@ function compare_versions(){
 }
 
 function get_compiler_mitigated_flag() {
-	OS_NAME=`grep '^NAME' /etc/os-release | tr -d 'NAME=' | tr -d '"' | tr '[:upper:]' '[:lower:]'`
+    OS_NAME=`grep '^NAME' /etc/os-release | tr -d 'NAME=' | tr -d '"' | tr '[:upper:]' '[:lower:]'`
     echo "OS: ${OS_NAME}" >&2
     OS_VERSION=`grep '^VERSION_ID' /etc/os-release | tr -d 'VERSION_ID=' | tr -d '"' | tr '[:upper:]' '[:lower:]'`
     echo "OS VERSION: ${OS_VERSION}" >&2
+
+    # Compiler-mitigated OMI is not supported in the following
+    # SLES 11
+    
+    # To be enhanced if there are future distros not supporting compiler-mitigated OMI package
 	
 	FLAG=""
-	if [[ $OS_NAME == red* && $OS_VERSION == 6* ]]
-	then
-		FLAG=""
-	elif [[ $OS_NAME == centos* && $OS_VERSION == 6* ]]
-	then
-		FLAG=""
-	elif [[ $OS_NAME == oracle* && $OS_VERSION == 6* ]]
-	then
-		FLAG=""
-	elif [[ $OS_NAME == sles* && $OS_VERSION == 11* ]]
+	if [[ $OS_NAME == sles* && $OS_VERSION == 11* ]]
 	then
 		FLAG=""
 	else
@@ -145,6 +141,7 @@ function ensure_required_omi_version_exists(){
     echo "Checking if OMI is installed. Required OMI version: ${REQUIRED_OMI_VERSION};" >&2
 
     COMPILER_MITIGATED_VERSION_FLAG=$( get_compiler_mitigated_flag )
+    echo "OMI compiler-mitigated flag: (${COMPILER_MITIGATED_VERSION_FLAG})" >&2
 
     # Check if RPM exists
     if command -v rpm >/dev/null 2>&1 ; then
