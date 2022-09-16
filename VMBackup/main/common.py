@@ -54,7 +54,7 @@ class CommonVariables:
     isOSDiskIncluded = 'isOSDiskIncluded'
     isVmgsBlobIncluded = 'isVmgsBlobIncluded'
     isAnyWADiskIncluded = 'isAnyWADiskIncluded'
-
+    isAnyDirectDriveDiskIncluded = 'isAnyDirectDriveDiskIncluded'
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'
     firstHostThenGuest = 'firstHostThenGuest'

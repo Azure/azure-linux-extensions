@@ -72,8 +72,6 @@ class SizeCalculation(object):
         for file_system_info in self.file_systems_info:
             if 'loop' in file_system_info[0]:
                 disk_loop_devices_file_systems.append(file_system_info[0])
-        self.logger.log("disk_loop_devices_file_systems")
-        self.logger.log(str(disk_loop_devices_file_systems))
         return disk_loop_devices_file_systems
   
     def device_list_for_billing(self):
@@ -81,6 +79,7 @@ class SizeCalculation(object):
         devices_to_bill = [] #list to store device names to be billed
         device_items = disk_util.get_device_items(None)
         for device_item in device_items :
+            self.logger.log("Device name : {0} ".format(str(device_item.name)),True)
             if str(device_item.name).startswith("sd"):
                 devices_to_bill.append("/dev/{0}".format(str(device_item.name)))
         self.logger.log("Initial billing items {0}".format(devices_to_bill))
@@ -140,6 +139,7 @@ class SizeCalculation(object):
             while(df is not None and process_wait_time >0 and df.poll() is None):
                 time.sleep(1)
                 process_wait_time -= 1
+            self.logger.log("df command executed for process wait time value" + str(process_wait_time), True)
             if(df is not None and df.poll() is not None):
                 self.logger.log("df return code "+str(df.returncode), True)
                 output = df.stdout.read().decode()
