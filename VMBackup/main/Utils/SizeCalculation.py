@@ -1,5 +1,6 @@
 import os
 import os.path
+
 import sys
 try:
     import imp as imp
@@ -27,10 +28,12 @@ class SizeCalculation(object):
         self.patching=patching
         self.logger=logger
         self.hutil = hutil
+        self.IncludedLunList=[]
         self.file_systems_info = []
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'rootfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.isOnlyOSDiskBackupEnabled = False
+        self.logger.log("customSettings {0}".format(para_parser.customSettings))
         try:
             if(para_parser.customSettings != None and para_parser.customSettings != ''):
                 self.logger.log('customSettings : ' + str(para_parser.customSettings))
@@ -46,10 +49,21 @@ class SizeCalculation(object):
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             self.isOnlyOSDiskBackupEnabled = False
+        self.command="sudo lsscsi"
+        self.dict1={}
+        self.lun1=[]
+        self.p=(os.popen(self.command).read())
+        self.lines1 = self.p.splitlines()
+        self.ti=[]
+        self.isAnyDiskExcluded=para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
+        self.IncludedLunList=para_parser.includeLunList
+        self.logger.log("IncludedLunList {0}".format(self.IncludedLunList))
+        self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
 
     def get_loop_devices(self):
         global disk_util
         disk_util = DiskUtil.get_instance(patching = self.patching,logger = self.logger)
+        self.logger.log("disk_util: {0}".format(str(disk_util)),True)
         if len(self.file_systems_info) == 0 :
             self.file_systems_info = disk_util.get_mount_file_systems()
         self.logger.log("file_systems list : ",True)
@@ -58,6 +72,8 @@ class SizeCalculation(object):
         for file_system_info in self.file_systems_info:
             if 'loop' in file_system_info[0]:
                 disk_loop_devices_file_systems.append(file_system_info[0])
+        self.logger.log("disk_loop_devices_file_systems")
+        self.logger.log(str(disk_loop_devices_file_systems))
         return disk_loop_devices_file_systems
   
     def device_list_for_billing(self):
@@ -65,9 +81,27 @@ class SizeCalculation(object):
         devices_to_bill = [] #list to store device names to be billed
         device_items = disk_util.get_device_items(None)
         for device_item in device_items :
-            # self.logger.log("Device name : {0} ".format(str(device_item.name)),True)
             if str(device_item.name).startswith("sd"):
                 devices_to_bill.append("/dev/{0}".format(str(device_item.name)))
+        self.logger.log("Initial billing items {0}".format(devices_to_bill))
+        self.logger.log("lines {0}".format(self.lines1))
+        for i in self.lines1:
+            lun=int(i[i.index(']')-1])
+            if lun not in self.IncludedLunList :
+                self.d=i.split()
+                #list containing the elements present in the row of the cmd sudo lsscsi
+                self.dvc=self.d[len(self.d)-1]#storing the corresponding device name
+                if lun not in self.dict1.keys():
+                    self.dict1[lun]=[]
+                self.dict1[lun].append(self.dvc)
+        self.logger.log("Lun numbers to be excluded {0}".format(self.dict1.keys()))
+        self.logger.log("Disks to be excluded {0}".format(self.dict1.values()))
+        for k in self.dict1.keys():
+            for v in self.dict1[k]:
+                for z in devices_to_bill:
+                    if v in z:
+                        self.ti.append(z)
+        self.logger.log("devices_not_to_bill: {0}".format(str(self.ti)),True)                   
         self.logger.log("exiting device_list_for_billing",True)
         return devices_to_bill
 
@@ -82,7 +116,6 @@ class SizeCalculation(object):
             else:
                 df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
 
-            self.logger.log("onlyLocalFilesystems : {0}".format(str(onlyLocalFilesystems)))
             '''
             Sample output of the df command
 
@@ -107,9 +140,8 @@ class SizeCalculation(object):
             while(df is not None and process_wait_time >0 and df.poll() is None):
                 time.sleep(1)
                 process_wait_time -= 1
-            self.logger.log("df command executed for process wait time value" + str(process_wait_time), True)
             if(df is not None and df.poll() is not None):
-                self.logger.log("df return code"+str(df.returncode), True)
+                self.logger.log("df return code "+str(df.returncode), True)
                 output = df.stdout.read().decode()
             if sys.version_info > (3,):
                 try:
@@ -119,6 +151,7 @@ class SizeCalculation(object):
             else:
                 output = str(output)
             output = output.strip().split("\n")
+            self.logger.log("output of df : {0}".format(str(output)),True)
             disk_loop_devices_file_systems = self.get_loop_devices()
             self.logger.log("outside loop device", True)
             total_used = 0
@@ -140,6 +173,7 @@ class SizeCalculation(object):
             index = 1
             self.resource_disk= ResourceDiskUtil(patching = self.patching, logger = self.logger)
             resource_disk_device= self.resource_disk.get_resource_disk_mount_point(0)
+            self.logger.log("resource_disk_device: {0}".format(resource_disk_device),True)
             resource_disk_device= "/dev/{0}".format(resource_disk_device)
             device_list=self.device_list_for_billing() #new logic: calculate the disk size for billing
 
@@ -157,12 +191,10 @@ class SizeCalculation(object):
                 fstype = ''
                 isNetworkFs = False
                 isKnownFs = False
-
-
                 for file_system_info in self.file_systems_info:
                     if device == file_system_info[0] and mountpoint == file_system_info[2]:
                         fstype = file_system_info[1]
-                self.logger.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint),True)
+                self.logger.log("index :{0} Device name : {1} fstype : {2} size : {3} used space in KB : {4} available space : {5} mountpoint : {6}".format(index,device,fstype,size,used,available,mountpoint),True)
 
                 for nonPhysicaFsType in self.non_physical_file_systems:
                     if nonPhysicaFsType in fstype.lower():
@@ -212,19 +244,20 @@ class SizeCalculation(object):
                     total_used_network_shares = total_used_network_shares + int(used)
 
                 else:
+
                     if(self.isOnlyOSDiskBackupEnabled == True):
                         if(mountpoint == '/'):
                             total_used = total_used + int(used)
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
                     else:
-                        self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                        total_used = total_used + int(used) #return in KB
+                        if device not in self.ti :
+                            self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            total_used = total_used + int(used) #return in KB
                     if not (isKnownFs or fstype == '' or fstype == None):
                         total_used_unknown_fs = total_used_unknown_fs + int(used)
 
                 index = index + 1
-                
             if not len(unknown_fs_types) == 0:
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("unknownFSTypeInDf",str(unknown_fs_types))
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedunknownFS",str(total_used_unknown_fs))
