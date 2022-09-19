@@ -155,12 +155,12 @@ def check_supported_OS():
     digits must match.
     All other distros not supported will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7', '8'], # CentOS
-                       'centos' : ['6', '7', '8'], # CentOS
-                       'red hat' : ['6', '7', '8'], # Redhat
+    supported_dists = {'redhat' : ['7', '8'], # CentOS
+                       'centos' : ['7', '8'], # CentOS
+                       'red hat' : ['7', '8'], # Redhat
                        'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
-                       'oracle' : ['6', '7'], # Oracle
+                       'oracle' : ['7'], # Oracle
                        'suse' : ['12', '15'], #SLES
                        'sles' : ['12', '15']
     }
