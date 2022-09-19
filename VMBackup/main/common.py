@@ -42,6 +42,7 @@ class CommonVariables:
     statusBlobUploadError = 'statusBlobUploadError'
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
+
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
     hostStatusCodePreSnapshot = 'hostStatusCodePreSnapshot'
@@ -55,6 +56,7 @@ class CommonVariables:
     isVmgsBlobIncluded = 'isVmgsBlobIncluded'
     isAnyWADiskIncluded = 'isAnyWADiskIncluded'
     isAnyDirectDriveDiskIncluded = 'isAnyDirectDriveDiskIncluded'
+
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'
     firstHostThenGuest = 'firstHostThenGuest'
