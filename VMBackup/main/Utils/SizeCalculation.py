@@ -28,7 +28,7 @@ class SizeCalculation(object):
         self.patching=patching
         self.logger=logger
         self.hutil = hutil
-        self.IncludedLunList=[]
+        self.includedLunList=[]
         self.file_systems_info = []
         self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'rootfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
@@ -50,16 +50,22 @@ class SizeCalculation(object):
             self.logger.log(errMsg, True, 'Error')
             self.isOnlyOSDiskBackupEnabled = False
         self.command="sudo lsscsi"
-        self.dict1={}
-        self.lun1=[]
-        self.p=(os.popen(self.command).read())
-        self.lines1 = self.p.splitlines()
-        self.ti=[]
+        self.disksToBeExcluded=[]
+        self.lunNumbers=[]
+        try:
+            self.output_lsscsi=(os.popen(self.command).read())
+            self.lsscsi_list = self.output_lsscsi.splitlines()
+        except Exception as e:
+            error_msg=" Failed to execute the command lsscsi because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(error_msg, True ,'Error')
+            self.output_lsscsi=""
+            self.lsscsi_list=[]
+        self.devicesToExclude=[] #partitions to be excluded
         self.isAnyDiskExcluded=para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
-        self.IncludedLunList=para_parser.includeLunList
-        self.logger.log("IncludedLunList {0}".format(self.IncludedLunList))
+        self.includedLunList=para_parser.includeLunList
+        self.logger.log("includedLunList {0}".format(self.includedLunList))
         self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
-
+        
     def get_loop_devices(self):
         global disk_util
         disk_util = DiskUtil.get_instance(patching = self.patching,logger = self.logger)
@@ -83,24 +89,29 @@ class SizeCalculation(object):
             if str(device_item.name).startswith("sd"):
                 devices_to_bill.append("/dev/{0}".format(str(device_item.name)))
         self.logger.log("Initial billing items {0}".format(devices_to_bill))
-        self.logger.log("lines {0}".format(self.lines1))
-        for i in self.lines1:
-            lun=int(i[i.index(']')-1])
-            if lun not in self.IncludedLunList :
-                self.d=i.split()
+        self.logger.log("lsscsi_list {0}".format(self.lsscsi_list))
+        if(len(self.lsscsi_list)!=0):
+            for i in self.lsscsi_list:
+                self.included=True
+                idxOfColon=i.rindex(':',0,i.index(']'))#to get the index of last ':'
+                idxOfColon+=1
+                lunNumbers=int(i[idxOfColon:i.index(']')])
+                self.temp=i.split()
                 #list containing the elements present in the row of the cmd sudo lsscsi
-                self.dvc=self.d[len(self.d)-1]#storing the corresponding device name
-                if lun not in self.dict1.keys():
-                    self.dict1[lun]=[]
-                self.dict1[lun].append(self.dvc)
-        self.logger.log("Lun numbers to be excluded {0}".format(self.dict1.keys()))
-        self.logger.log("Disks to be excluded {0}".format(self.dict1.values()))
-        for k in self.dict1.keys():
-            for v in self.dict1[k]:
-                for z in devices_to_bill:
-                    if v in z:
-                        self.ti.append(z)
-        self.logger.log("devices_not_to_bill: {0}".format(str(self.ti)),True)                   
+                self.device=self.temp[len(self.temp)-1]#storing the corresponding device name
+                if lunNumbers not in self.includedLunList :
+                    self.included=False
+                    self.disksToBeExcluded.append(self.device)
+                self.logger.log("LUN Number {0}, disk {1}, included {2}".format(lunNumbers,self.device,self.included))
+                    
+            self.logger.log("Disks to be excluded {0}".format(self.disksToBeExcluded))
+           
+            for z in self.disksToBeExcluded:
+                for v in devices_to_bill:
+                    if z in v:
+                        self.devicesToExclude.append(v)
+        
+        self.logger.log("devices_not_to_bill: {0}".format(str(self.devicesToExclude)),True)                   
         self.logger.log("exiting device_list_for_billing",True)
         return devices_to_bill
 
@@ -165,6 +176,8 @@ class SizeCalculation(object):
             total_sd_size=0
             network_fs_types = []
             unknown_fs_types = []
+            excluded_disks_used = 0
+            totalSpaceUsed = 0
       
             if len(self.file_systems_info) == 0 :
                 self.file_systems_info = disk_util.get_mount_file_systems()
@@ -251,9 +264,12 @@ class SizeCalculation(object):
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
                     else:
-                        if device not in self.ti :
-                            self.logger.log("Adding Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                        if device not in self.devicesToExclude :
+                            self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             total_used = total_used + int(used) #return in KB
+                        else:
+                            self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            excluded_disks_used = excluded_disks_used + int(used)
                     if not (isKnownFs or fstype == '' or fstype == None):
                         total_used_unknown_fs = total_used_unknown_fs + int(used)
 
@@ -279,6 +295,9 @@ class SizeCalculation(object):
             if total_used_loop_device != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
             self.logger.log("Total used space in Bytes : {0}".format(total_used * 1024),True)
+            self.logger.log("Total Excluded disks space used in Bytes : {0}".format(excluded_disks_used *1024),True)
+            totalSpaceUsed = total_used + excluded_disks_used
+            self.logger.log("Total space used ( both included and excluded disks ) : {0}".format(totalSpaceUsed *1024),True)
             if total_sd_size != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
             self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
