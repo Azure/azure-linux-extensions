@@ -22,10 +22,12 @@ import os
 import os.path
 import re
 import json
+import traceback
 from Common import CommonVariables
 from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
+import IMDSUtil
 try:
     from urllib.parse import urlparse #python3+
 except ImportError:
@@ -326,3 +328,21 @@ class CheckUtil(object):
             detected = True
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
         return detected
+
+    def preInitializationCheck(self,logger):
+        '''This funciton is checking the VM compatibility to apply ADE'''
+        logger.log('Pre initialization check Start.')
+        iMDSUtil = IMDSUtil(logger)
+        securityType = None
+        try:
+            securityType = iMDSUtil.get_security_type_IMDS()
+        except Exception as ex:
+            message = "Pre-initialization check: Exception thrown during IMDS call. \
+                       exception:{0}, \n stack-trace: {1}".format(str(ex),traceback.format_exc())
+            logger.log(msg=message,level=CommonVariables.ErrorLevel)
+            raise Exception(message)
+        if securityType == "ConfidentialVM":
+            message = "Pre-initialization check: ADE flow is blocked for confidential VM."
+            logger.log(msg=message,level=CommonVariables.ErrorLevel)
+            raise Exception(message) 
+        logger.log('Pre initialization check End.')

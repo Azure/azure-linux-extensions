@@ -18,6 +18,7 @@
 
 import filecmp
 import json
+from logging import exception
 import os
 import os.path
 import re
@@ -29,6 +30,7 @@ import traceback
 import uuid
 import shutil
 from distutils.version import LooseVersion
+from warnings import catch_warnings
 
 from Utils import HandlerUtil
 from Common import CommonVariables, CryptItem
@@ -39,6 +41,7 @@ from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import EncryptionConfig
+from VMEncryption.main import IMDSUtil
 from patch import GetDistroPatcher
 from BekUtil import BekUtil, BekMissingException
 from check_util import CheckUtil
@@ -660,10 +663,18 @@ def enable():
     try:
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
-
         public_settings = get_public_settings()
         logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
         cutil = CheckUtil(logger)
+        try:
+            cutil.preInitializationCheck(logger)
+        except Exception as ex:
+             hutil.do_exit(exit_code=CommonVariables.unknown_error,
+                    operation='preInitializationCheck',
+                    status=CommonVariables.extension_error_status,
+                    code=str(CommonVariables.unknown_error),
+                    message=str(ex)) 
+
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)

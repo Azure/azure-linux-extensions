@@ -49,6 +49,17 @@ class CommonVariables:
     encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
 
     """
+    IMDS IP:
+    """
+    static_IMDS_IP = '169.254.169.254'
+    IMDS_API_Version='2021-12-13'
+    IMDS_msg_headers = {
+        "Content-Type":"application/json",
+        "Metadata":True
+    }
+    IMDS_SecurityProfile_subDir="metadata/instance/compute/securityProfile"
+
+    """
     Find more on Azure wire service IP address here: "https://docs.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16"
     """
     static_wireserver_IP = '168.63.129.16'
