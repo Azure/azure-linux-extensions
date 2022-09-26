@@ -56,7 +56,7 @@ class SizeCalculation(object):
             self.output_lsscsi = (os.popen(self.command).read())
             self.lsscsi_list = self.output_lsscsi.splitlines()
         except Exception as e:
-            error_msg = " Failed to execute the command lsscsi because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command lsscsi because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.output_lsscsi = ""
             self.lsscsi_list = []
@@ -91,6 +91,12 @@ class SizeCalculation(object):
                 self.logger.log("Not adding device {0} as it does not start with sd".format(str(device_item.name)))
         self.logger.log("Initial billing items {0}".format(devices_to_bill))
         
+        '''
+            Sample output for file_systems_info
+            [('sysfs', 'sysfs', '/sys'), ('proc', 'proc', '/proc'), ('udev', 'devtmpfs', '/dev'),..]
+            Since root devices are at mount points '/' and '/boot/efi' we use file_system_info to find the root_devices based on the mount points.
+        '''
+
         for file_system in self.file_systems_info:
             if(file_system[2] in self.root_mount_points):
                 self.root_devices.append(file_system[0])
@@ -122,7 +128,9 @@ class SizeCalculation(object):
                         self.devicesToExclude.append(device)
 
             for device in self.root_devices:
+                # Checking whether an OS Disk is included or not and If it is included we remove from the disks to be excluded.
                 if -1 in self.includedLunList and device in self.devicesToExclude:
+                    self.logger.log("OS disk is included")
                     self.devicesToExclude.remove(device)
 
         self.logger.log("devices_not_to_bill: {0}".format(str(self.devicesToExclude)),True)                   
@@ -157,7 +165,6 @@ class SizeCalculation(object):
             /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0 xfs       15717376 5276944 10440432  34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
             tmpfs                                                   tmpfs      1436128       0  1436128   0% /run/user/1000
             //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
-
             '''
             output = ""
             process_wait_time = 300
@@ -289,6 +296,7 @@ class SizeCalculation(object):
                         total_used_unknown_fs = total_used_unknown_fs + int(used)
 
                 index = index + 1
+
             if not len(unknown_fs_types) == 0:
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("unknownFSTypeInDf",str(unknown_fs_types))
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalUsedunknownFS",str(total_used_unknown_fs))
@@ -309,10 +317,8 @@ class SizeCalculation(object):
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("ramDisksSize",str(total_used_ram_disks))
             if total_used_loop_device != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
-            self.logger.log("TotalUsedSpaceAfterExcludeLUN in Bytes : {0}".format(total_used * 1024),True)
-            self.logger.log("TotalLUNExcludedUsedSpace in Bytes : {0}".format(excluded_disks_used *1024),True)
             totalSpaceUsed = total_used + excluded_disks_used
-            self.logger.log("TotalUsedSpace ( both included and excluded disks ) in Bytes : {0}".format(totalSpaceUsed *1024),True)
+            self.logger.log("TotalUsedSpace ( both included and excluded disks ) in Bytes {0} , TotalUsedSpaceAfterExcludeLUN in Bytes : {1} , TotalLUNExcludedUsedSpace in Bytes {2} ".format(totalSpaceUsed *1024 , total_used * 1024 , excluded_disks_used *1024 ),True)
             if total_sd_size != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
             self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
