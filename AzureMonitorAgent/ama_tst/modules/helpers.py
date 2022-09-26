@@ -194,41 +194,6 @@ def check_ama_installed(ama_vers):
     ama_unique = (len(ama_installed_vers) == 1)
     return (ama_exists, ama_unique)
 
-
-# openssl connect to specific endpoint
-def check_endpt_ssl(ssl_cmd, endpoint):
-    try:
-        ssl_output = subprocess.check_output(ssl_cmd.format(endpoint), shell=True,\
-                     stderr=subprocess.STDOUT, universal_newlines=True)
-        ssl_output_lines = ssl_output.split('\n')
-        
-        (connected, verified) = (False, False)
-        for line in ssl_output_lines:
-            if (line == "CONNECTION ESTABLISHED"):
-                connected = True
-                continue
-            if (line == "Verification: OK"):
-                verified = True
-                continue
-
-        return (connected, verified)
-    except Exception:
-        return (False, False)
-
-
-# check general internet connectivity
-def check_internet_connect():
-    (connected_docs, verified_docs) = check_endpt_ssl(SSL_CMD, MSFT_DOC_URL)
-    if (connected_docs and verified_docs):
-        return NO_ERROR
-    elif (connected_docs and not verified_docs):
-        error_info.append((SSL_CMD.format(MSFT_DOC_URL),))
-        return WARN_INTERNET
-    else:
-        error_info.append((SSL_CMD.format(MSFT_DOC_URL),))
-        return WARN_INTERNET_CONN
-
-
 def run_cmd_output(cmd):
     """
     Common logic to run any command and check/get its output for further use

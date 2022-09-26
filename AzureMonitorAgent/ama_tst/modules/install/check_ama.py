@@ -1,25 +1,28 @@
 import re
 import requests
-from lxml import html
+import xml.dom.minidom
 
 from error_codes import *
 from errors      import error_info, get_input
-from helpers     import get_package_version, check_internet_connect
+from helpers     import get_package_version
 
 AMA_URL = 'https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions'
 
 def get_curr_ama_version(ama_version):
-    try:
-        r = requests.get(AMA_URL)
-        root = html.fromstring(r.text)
-        versions = root.xpath('//table/tbody/tr/td[4]/text()')
-
-        for version in versions:
-            version = re.sub('[A-Za-z ]+', '', version)
-            if (version == ''):
-                continue
-            if (comp_versions_ge(version, ama_version)):
-                return (version, None)
+    try:           
+        r = requests.get('https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions')
+        tbody = r.text.split("<tbody>")[1].split("</tbody>")[0]
+        tbody = "<tbody>" + tbody + "</tbody>"
+        with xml.dom.minidom.parseString(tbody) as dom:
+            rows = dom.getElementsByTagName("tr")
+            for row in rows:
+                cell = row.getElementsByTagName("td")[3]
+                version = cell.firstChild.nodeValue
+                version = re.sub('[A-Za-z ]+', '', version)
+                if (version == ''):
+                    continue
+                if (comp_versions_ge(version, ama_version)):
+                    return (version, None)
 
     except Exception as e:
         return (None, e)
@@ -65,7 +68,6 @@ def check_ama(interactive):
     if (not comp_versions_ge(ama_version, '1.21.0')):
         error_info.append((ama_version,))
         return ERR_OLD_AMA_VER
-
     # get most recent version
     (curr_ama_version, e) = get_curr_ama_version(ama_version)
 
@@ -76,13 +78,7 @@ def check_ama(interactive):
             return ERR_GETTING_AMA_VER
         # couldn't connect
         else:
-            checked_internet = check_internet_connect()
-            if (checked_internet == NO_ERROR):
-                print("WARNING: can't connect to {0}: {1}\n Skipping this check...".format(AMA_URL, e))
-                print("--------------------------------------------------------------------------------")
-            # issue with general internet connectivity
-            else:
-                return checked_internet
+            return e
 
     # got current version
     else:
