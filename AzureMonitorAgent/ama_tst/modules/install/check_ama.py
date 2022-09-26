@@ -36,10 +36,10 @@ def comp_versions_ge(version1, version2):
             v1 = versions1[i] if i < len(versions1) else 0
             v2 = versions2[i] if i < len(versions2) else 0
             if v1 > v2:
-                return 1
+                return True
             elif v1 < v2:
-                return -1
-        return 0
+                return False
+        return True
 
 def ask_update_old_version(ama_version, curr_ama_version):
     print("--------------------------------------------------------------------------------")
