@@ -82,6 +82,10 @@ class redhatPatching(AbstractPatching):
         if type(self).__name__.startswith('redhat'):
             # Should not be called when actual instance is of subclass like oracle
             self.support_online_encryption = self.validate_online_encryption_support()
+        self.grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
+            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
+        ]
 
     def install_cryptsetup(self):
         if self.distro_info[1].startswith("6."):
@@ -214,16 +218,10 @@ class redhatPatching(AbstractPatching):
         command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
 
     def add_kernelopts(self, args_to_add):
-        grub_cfg_paths = [
-            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
-            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
-        ]
-
-        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
+        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), self.grub_cfg_paths)
 
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            for arg in args_to_add:
-                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
+            self.command_executor.ExecuteInBash('grub2-mkconfig -o {0}'.format(grub_cfg_path), True)
 
     def pack_initial_root_fs(self):
         self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)

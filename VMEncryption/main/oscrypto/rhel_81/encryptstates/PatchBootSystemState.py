@@ -140,8 +140,6 @@ class PatchBootSystemState(OSEncryptionState):
                              "rd.debug"]
         self._add_kernelopts(additional_params)
 
-        self.context.distro_patcher.patch_machine()
-
         # For clarity after reboot, we should also add the correct info to crypttab
         crypt_item = CryptItem()
         crypt_item.dev_path = os.path.join("/dev/disk/by-partuuid/", root_partuuid)

@@ -69,9 +69,6 @@ class AbstractPatching(object):
             self.logger.log("Distro {0} {1} is a candidate for online encryption.".format(self.distro_info[0], distro_version))
             return True
         return False
-
-    def patch_machine(self):
-        pass
     
     def pack_initial_root_fs(self):
         pass

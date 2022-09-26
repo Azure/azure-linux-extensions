@@ -72,6 +72,10 @@ class oraclePatching(redhatPatching):
             self.umount_path = '/usr/bin/umount'
         self.min_version_online_encryption = '8.5'
         self.support_online_encryption = self.validate_online_encryption_support()
+        self.grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
+            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
+        ]
 
     # install_cryptsetup from redhatPatching will be used.
 
@@ -82,14 +86,3 @@ class oraclePatching(redhatPatching):
 
     def update_prereq(self):
         pass
-
-    def patch_machine(self):
-        grub_cfg_paths = [
-            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
-            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
-        ]
-
-        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
-
-        for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            self.command_executor.Execute('grub2-mkconfig -o {0}'.format(grub_cfg_path), True)
