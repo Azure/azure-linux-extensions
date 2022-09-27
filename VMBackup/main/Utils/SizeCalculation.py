@@ -127,11 +127,26 @@ class SizeCalculation(object):
                     if disk in device:
                         self.devicesToExclude.append(device)
 
-            for device in self.root_devices:
-                # Checking whether an OS Disk is included or not and If it is included we remove from the disks to be excluded.
-                if -1 in self.includedLunList and device in self.devicesToExclude:
-                    self.logger.log("OS disk is included")
-                    self.devicesToExclude.remove(device)
+            if -1 in self.includedLunList:
+                self.logger.log("OS Disk has to be included.")
+                isOSIncluded_flag = 0;
+                for device in self.root_devices:
+                    # Checking whether an OS Disk is included or not and If it is included we remove from the disks to be excluded.
+                    if device in self.devicesToExclude:
+                        isOSIncluded_flag = -1
+                        self.devicesToExclude.remove(device)
+                if(isOSIncluded_flag == -1):
+                    self.logger.log("OS Disk has been included.")
+            else:
+                # If dataDisk and OS have same LUN number 0 and dataDisk is included and OS disk is excluded
+                self.logger.log("OS disk should not be included")
+                isOSIncluded_flag = 1;
+                for device in self.root_devices:
+                    if device not in self.devicesToExclude:
+                        isOSIncluded_flag = 0;
+                        self.devicesToExclude.append(device)
+                if isOSIncluded_flag == 0:
+                    self.logger.log("OS disk has been removed.")
 
         self.logger.log("devices_not_to_bill: {0}".format(str(self.devicesToExclude)),True)                   
         self.logger.log("exiting device_list_for_billing",True)
@@ -318,7 +333,7 @@ class SizeCalculation(object):
             if total_used_loop_device != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("loopDevicesSize",str(total_used_loop_device))
             totalSpaceUsed = total_used + excluded_disks_used
-            self.logger.log("TotalUsedSpace ( both included and excluded disks ) in Bytes {0} , TotalUsedSpaceAfterExcludeLUN in Bytes : {1} , TotalLUNExcludedUsedSpace in Bytes {2} ".format(totalSpaceUsed *1024 , total_used * 1024 , excluded_disks_used *1024 ),True)
+            self.logger.log("TotalUsedSpace ( both included and excluded disks ) in Bytes : {0} , TotalUsedSpaceAfterExcludeLUN in Bytes : {1} , TotalLUNExcludedUsedSpace in Bytes : {2} ".format(totalSpaceUsed *1024 , total_used * 1024 , excluded_disks_used *1024 ),True)
             if total_sd_size != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
             self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
