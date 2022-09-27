@@ -49,7 +49,7 @@ class SizeCalculation(object):
             self.isOnlyOSDiskBackupEnabled = False
         # The command lsscsi is used for mapping the LUN numbers to the disk_names
         self.command = "sudo lsscsi"
-        self.disksToBeExcluded = []
+        self.disksToBeIncluded = []
         self.root_devices = []
         self.root_mount_points = ['/' , '/boot/efi']
         try:
@@ -60,7 +60,7 @@ class SizeCalculation(object):
             self.logger.log(error_msg, True ,'Error')
             self.output_lsscsi = ""
             self.lsscsi_list = []
-        self.devicesToExclude = [] #partitions to be excluded
+        self.devicesToInclude = [] #partitions to be included
         self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
         self.includedLunList = para_parser.includeLunList
         self.logger.log("includedLunList {0}".format(self.includedLunList))
@@ -117,38 +117,23 @@ class SizeCalculation(object):
                 self.item_split = item.split()
                 #storing the corresponding device name from the list
                 self.device_name = self.item_split[len(self.item_split)-1]
-                if lunNumber not in self.includedLunList :
-                    self.disksToBeExcluded.append(self.device_name)
+
+                for device in self.root_devices :
+                    if self.device_name in device :
+                        lunNumber = -1
+                        # Changing the Lun# of OS Disk to -1
+
+                if lunNumber in self.includedLunList :
+                    self.disksToBeIncluded.append(self.device_name)
                 self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,self.device_name))   
-            self.logger.log("Disks to be excluded {0}".format(self.disksToBeExcluded))
+            self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
            
-            for disk in self.disksToBeExcluded:
+            for disk in self.disksToBeIncluded:
                 for device in devices_to_bill:
                     if disk in device:
-                        self.devicesToExclude.append(device)
+                        self.devicesToInclude.append(device)
 
-            if -1 in self.includedLunList:
-                self.logger.log("OS Disk has to be included.")
-                isOSIncluded_flag = 0;
-                for device in self.root_devices:
-                    # Checking whether an OS Disk is included or not and If it is included we remove from the disks to be excluded.
-                    if device in self.devicesToExclude:
-                        isOSIncluded_flag = -1
-                        self.devicesToExclude.remove(device)
-                if(isOSIncluded_flag == -1):
-                    self.logger.log("OS Disk has been included.")
-            else:
-                # If dataDisk and OS have same LUN number 0 and dataDisk is included and OS disk is excluded
-                self.logger.log("OS disk should not be included")
-                isOSIncluded_flag = 1;
-                for device in self.root_devices:
-                    if device not in self.devicesToExclude:
-                        isOSIncluded_flag = 0;
-                        self.devicesToExclude.append(device)
-                if isOSIncluded_flag == 0:
-                    self.logger.log("OS disk has been removed.")
-
-        self.logger.log("devices_not_to_bill: {0}".format(str(self.devicesToExclude)),True)                   
+        self.logger.log("devices_to_bill: {0}".format(str(self.devicesToInclude)),True)                   
         self.logger.log("exiting device_list_for_billing",True)
         return devices_to_bill
 
@@ -157,7 +142,7 @@ class SizeCalculation(object):
             size_calc_failed = False
 
             onlyLocalFilesystems = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalFilesystems, "False") 
-
+            # df command gives the information of all the devices which have mount points
             if onlyLocalFilesystems in ['True', 'true']:  
                 df = subprocess.Popen(["df" , "-kl"], stdout=subprocess.PIPE)
             else:
@@ -301,7 +286,7 @@ class SizeCalculation(object):
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
                     else:
-                        if device not in self.devicesToExclude :
+                        if device in self.devicesToInclude :
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             total_used = total_used + int(used) #return in KB
                         else:
