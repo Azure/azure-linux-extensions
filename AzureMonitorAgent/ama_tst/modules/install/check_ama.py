@@ -8,7 +8,7 @@ from helpers     import get_package_version
 
 AMA_URL = 'https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions'
 
-def get_curr_ama_version(ama_version):
+def get_latest_ama_version(curr_version):
     try:           
         r = requests.get('https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions')
         tbody = r.text.split("<tbody>")[1].split("</tbody>")[0]
@@ -21,9 +21,10 @@ def get_curr_ama_version(ama_version):
                 version = re.sub('[A-Za-z ]+', '', version)
                 if (version == ''):
                     continue
-                if (comp_versions_ge(version, ama_version)):
+                if (comp_versions_ge(curr_version, version)):
+                    return (None, None)
+                else:
                     return (version, None)
-
     except Exception as e:
         return (None, e)
     return (None, None)
@@ -68,23 +69,18 @@ def check_ama(interactive):
     if (not comp_versions_ge(ama_version, '1.21.0')):
         error_info.append((ama_version,))
         return ERR_OLD_AMA_VER
-    # get most recent version
-    (curr_ama_version, e) = get_curr_ama_version(ama_version)
 
-    # getting current version failed
-    if (curr_ama_version == None):
-        # could connect, just formatting issue
+    (newer_ama_version, e) = get_latest_ama_version(ama_version)
+    if (newer_ama_version == None):
         if (e == None):
-            return ERR_GETTING_AMA_VER
-        # couldn't connect
+            return NO_ERROR
         else:
-            return e
-
-    # got current version
+            return ERR_GETTING_AMA_VER
+        
     else:
         # if not most recent version, ask if want to update
-        if (interactive and (not curr_ama_version == None)):
-            if (ask_update_old_version(ama_version, curr_ama_version) == USER_EXIT):
+        if (interactive):
+            if (ask_update_old_version(ama_version, newer_ama_version) == USER_EXIT):
                 return USER_EXIT
 
     return NO_ERROR
