@@ -60,6 +60,12 @@ class SizeCalculation(object):
             self.logger.log(error_msg, True ,'Error')
             self.output_lsscsi = ""
             self.lsscsi_list = []
+        try:
+             self.output_lsblk = json.loads(os.popen("lsblk --json").read())
+        except:
+            error_msg = "Failed to execute the command lsblk --json because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(error_msg, True ,'Error')
+            self.output_lsblk = {}
         self.devicesToInclude = [] #partitions to be included
         self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
         self.includedLunList = para_parser.includeLunList
@@ -108,6 +114,7 @@ class SizeCalculation(object):
             [1:0:0:15]   disk    Msft     Virtual Disk     1.0   /dev/sda
             [1:0:0:18]   disk    Msft     Virtual Disk     1.0   /dev/sdc
         '''
+
         if(len(self.lsscsi_list) != 0):
             for item in self.lsscsi_list:
                 idxOfColon = item.rindex(':',0,item.index(']'))# to get the index of last ':'
@@ -128,11 +135,36 @@ class SizeCalculation(object):
                 self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,self.device_name))   
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
            
-            for disk in self.disksToBeIncluded:
-                for device in devices_to_bill:
-                    if disk in device:
-                        self.devicesToInclude.append(device)
-
+            '''
+            Sample output for lsblk --json command
+            {
+            "blockdevices": [
+            {"name": "sdb", "maj:min": "8:16", "rm": "0", "size": "32G", "ro": "0", "type": "disk", "mountpoint": null,
+            "children": [
+                {"name": "sdb1", "maj:min": "8:17", "rm": "0", "size": "976.6M", "ro": "0", "type": "part", "mountpoint": null}
+            ]
+            },
+            {"name": "sdc", "maj:min": "8:32", "rm": "0", "size": "128G", "ro": "0", "type": "disk", "mountpoint": null,
+            "children": [
+            {"name": "data--vg01-data--lv01", "maj:min": "253:0", "rm": "0", "size": "16G", "ro": "0", "type": "lvm", "mountpoint": null}
+            ]
+            },
+            ....
+            ]
+            }
+            '''
+        self.logger.log("lsblk o/p {0}".format(self.output_lsblk))
+        if "blockdevices" in self.output_lsblk.keys():
+            for device in self.output_lsblk["blockdevices"]:
+                if "name" in device.keys():
+                    device["name"] = '/dev/' + device["name"]
+                    if device["name"] in self.disksToBeIncluded:
+                        if("children" in device.keys()):
+                                for child in device["children"]:
+                                    if "mountpoint" in child.keys() and child["mountpoint"] != None :
+                                        child["name"] = '/dev/' + child["name"]
+                                        self.devicesToInclude.append(child["name"])
+            
         self.logger.log("devices_to_bill: {0}".format(str(self.devicesToInclude)),True)                   
         self.logger.log("exiting device_list_for_billing",True)
         return devices_to_bill
@@ -212,6 +244,9 @@ class SizeCalculation(object):
             self.logger.log("ResourceDisk is excluded in billing as it represents the Actual Temporary disk")
             
             device_list = self.device_list_for_billing() #new logic: calculate the disk size for billing
+
+            if(self.errorFlag == -1):
+                self.logger.log("Billing is done without Excluding the diks")
 
             while index < output_length:
                 if(len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) < 6 ): #when a row is divided in 2 lines
