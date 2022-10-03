@@ -29,6 +29,7 @@ import datetime
 import subprocess
 import inspect
 import io
+import filecmp
 
 from .AbstractPatching import AbstractPatching
 from Common import *
@@ -147,6 +148,48 @@ class redhatPatching(AbstractPatching):
 
             if dracut_repack_needed:
                 self.command_executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+
+        self.update_crypt_parse_file()
+
+    def update_crypt_parse_file(self, proc_comm=None):
+        if proc_comm is None:
+            proc_comm = ProcessCommunicator()
+        crypt_parse_filename = 'parse-crypt-ade.sh'
+        ade_dracut_modules_dir = '/lib/dracut/modules.d/91adeOnline'
+        crypt_parse_file_dst = os.path.join(ade_dracut_modules_dir, crypt_parse_filename)
+        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        ademoduledir = os.path.join(scriptdir, '../oscrypto/91adeOnline')
+        crypt_parse_filename = 'parse-crypt-ade.sh'
+        crypt_parse_file = os.path.join(ademoduledir, crypt_parse_filename)
+        ade_dracut_modules_dir = '/lib/dracut/modules.d/91adeOnline'
+        crypt_parse_file_dst = os.path.join(ade_dracut_modules_dir, crypt_parse_filename)
+
+        if not os.path.exists(ade_dracut_modules_dir):
+            self.logger.log("ADE online module not present. No need to update crypt parse script.")
+            return
+
+        if filecmp.cmp(crypt_parse_file, crypt_parse_file_dst, shallow=True):
+            self.logger.log("ADE parse crypt script already updated.")
+            return
+        
+        return_code = self.command_executor.ExecuteInBash('cat /etc/default/grub | grep -c rd.luks.ade.bootuuid', communicator=proc_comm)
+        if return_code != 0:
+            self.logger.log("ADE parameters not present in default grub. No need to update crypt parse script.")
+            return
+
+        if int(proc_comm.stdout.strip()) > 1:
+            self.logger.log("Duplicate ADE parameter detected in deafult grub. Num occurences: " + proc_comm.stdout)
+            try:
+                self.logger.log("Updating parse crypt file.")
+                shutil.copyfile(crypt_parse_file,crypt_parse_file_dst)
+            except:
+                pass
+            self.logger.log("Regenerate initrd after parse crypt update.")
+            self.pack_initial_root_fs()
+            return
+
+        self.logger.log("ADE parse crypt in expected state.")
+        return
 
     @staticmethod
     def is_old_patching_system():
