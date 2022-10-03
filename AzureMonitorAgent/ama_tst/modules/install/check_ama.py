@@ -10,7 +10,7 @@ AMA_URL = 'https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-mon
 
 def get_latest_ama_version(curr_version):
     try:           
-        r = requests.get('https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions')
+        r = requests.get(AMA_URL)
         tbody = r.text.split("<tbody>")[1].split("</tbody>")[0]
         tbody = "<tbody>" + tbody + "</tbody>"
         with xml.dom.minidom.parseString(tbody) as dom:
