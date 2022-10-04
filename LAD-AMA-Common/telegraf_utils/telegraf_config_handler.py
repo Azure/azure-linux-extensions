@@ -221,7 +221,6 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             non_ops_fields = ""
             non_rate_aggregate = False
             ops = ""
-            min_agg_period = ""
             rate_aggregate = False
             for field in telegraf_json[omiclass][plugin]:
                 fields += "\"" + field + "\", "
@@ -249,14 +248,6 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                         non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
                     else:
                         non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
-
-                # #Aggregation perdiod needs to be double of interval/polling period for metrics for rate aggegation to work properly
-                # This is only for metrics going to MDSD. for VMI metrics aggregation, 
-                # the requirement is to have ALL the metrics at 60 seconds and that is handled later by sourcing the VMI metrics that need to be aggregated at 30 seconds
-                if int(min_interval[:-1]) > 30:
-                    min_agg_period = str(int(min_interval[:-1])*2)  #if the min interval is greater than 30, use the double value
-                else:
-                    min_agg_period = "60"   #else use 60 as mininum so that we can maintain 1 event per minute
 
                 #Add respective rename processor plugin based on the displayname
                 if is_lad:
@@ -297,7 +288,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 if rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
                     aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
-                    aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
+                    aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
                     aggregator_str += " "*2 + "stats = [" + ops + "]\n"
@@ -305,7 +296,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 if non_rate_aggregate:
                     aggregator_str += "[[aggregators.basicstats]]\n"
                     aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
-                    aggregator_str += " "*2 + "period = \"" + min_agg_period + "s\"\n"
+                    aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
                     aggregator_str += " "*2 + "drop_original = true\n"
                     aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
                     aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
