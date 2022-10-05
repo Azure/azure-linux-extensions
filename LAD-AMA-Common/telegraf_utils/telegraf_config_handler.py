@@ -330,14 +330,11 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             if plugin == "cpu":
                 input_str += " "*2 + "report_active = true\n"
             
-            if is_vmi_rate_counter:  
-                # Rate interval needs to be atleast twice the regular sourcing interval for aggregation to work. 
-                # Since we want all the VMI metrics to be sent at the same interval as selected by the customer, To overcome the twice the min internval limitation, 
-                # We are sourcing the VMI metrics that need to be aggregated at half the selected frequency 
-                rated_min_interval = str(int(min_interval[:-1]) // 2) + "s" 
-                input_str += " "*2 + "interval = " + "\"" + rated_min_interval + "\"\n\n"
-            else:
-                input_str += " "*2 + "interval = " + "\"" + min_interval + "\"\n\n"
+            # Rate interval needs to be atleast twice the regular sourcing interval for aggregation to work. 
+            # Since we want all the VMI metrics to be sent at the same interval as selected by the customer, To overcome the twice the min internval limitation, 
+            # We are sourcing the VMI metrics that need to be aggregated at half the selected frequency 
+            rated_min_interval = str(int(min_interval[:-1]) // 2) + "s" 
+            input_str += " "*2 + "interval = " + "\"" + rated_min_interval + "\"\n\n"
 
             config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
 
