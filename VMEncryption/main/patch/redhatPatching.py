@@ -141,7 +141,8 @@ class redhatPatching(AbstractPatching):
                 shutil.rmtree("/lib/dracut/modules.d/91ade/")
                 dracut_repack_needed = True
 
-            if os.path.exists("/dev/mapper/osencrypt"):
+            if os.path.exists("/dev/mapper/osencrypt") and not os.path.exists("/lib/dracut/modules.d/91adeOnline/"):
+                # Do not add 91ade module if 91adeOnline module is present
                 #TODO: only do this if needed (if code and existing module are different)
                 redhatPatching.add_91_ade_dracut_module(self.command_executor)
                 dracut_repack_needed = True
