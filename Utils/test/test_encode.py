@@ -35,5 +35,12 @@ class TestRunCommandGetOutput(unittest.TestCase):
         expected_character = expected_character_byte.decode("utf-8")
         self.assertEqual(expected_character, output_string[0])
 
+    def test_stdin(self):
+        cmd = ['bash', '-c', 'read ; echo $REPLY']
+        cmd_input = b'\xc3\xbc' # ü character
+        return_code, output_string = eu.run_send_stdin(cmd, cmd_input)
+        self.assertEqual(0, return_code)
+        self.assertEqual(cmd_input.decode('utf-8'), output_string[0])
+
 if __name__ == '__main__':
     unittest.main()

@@ -192,8 +192,8 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
             logger.error('CalledProcessError.  Error Code is ' + str(e.returncode))
             logger.error('CalledProcessError.  Command string was ' + str(cmd))
             logger.error(
-                'CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
-        return e.returncode, e.output.decode('latin-1')
+                'CalledProcessError.  Command result was ' + (e.output[:-1]).decode('utf-8'))
+        return e.returncode, e.output.decode('utf-8')
     except EnvironmentError as e:
         if chk_err and log_cmd:
             logger.error(
@@ -238,8 +238,8 @@ def run_send_stdin(cmd, cmd_input, chk_err=True, log_cmd=True):
         logger.error('CalledProcessError.  Error Code is ' + str(me.returncode))
         logger.error('CalledProcessError.  Command was ' + str(cmd))
         logger.error(
-            'CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
-    return me.returncode, output[0].decode('latin-1')
+            'CalledProcessError.  Command result was ' + output[0].decode('utf-8'))
+    return me.returncode, output[0].decode('utf-8')
 
 
 def get_line_starting_with(prefix, filepath):
