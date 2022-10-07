@@ -113,6 +113,7 @@ class centosPatching(redhatPatching):
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 
+    """
     def update_prereq(self):
         if (self.distro_info[1].startswith('7.')):
             dracut_repack_needed = False
@@ -140,3 +141,4 @@ class centosPatching(redhatPatching):
 
             if dracut_repack_needed:
                 self.command_executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+    """
