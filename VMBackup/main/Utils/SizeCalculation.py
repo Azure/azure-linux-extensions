@@ -86,6 +86,28 @@ class SizeCalculation(object):
                 disk_loop_devices_file_systems.append(file_system_info[0])
         return disk_loop_devices_file_systems
   
+    def disk_list_for_billing(self):
+        if(len(self.lsscsi_list) != 0):
+            for item in self.lsscsi_list:
+                idxOfColon = item.rindex(':',0,item.index(']'))# to get the index of last ':'
+                idxOfColon += 1
+                lunNumber = int(item[idxOfColon:item.index(']')])
+                # item_split is the list of elements present in the one row of the cmd sudo lsscsi
+                self.item_split = item.split()
+                #storing the corresponding device name from the list
+                self.device_name = self.item_split[len(self.item_split)-1]
+
+                for device in self.root_devices :
+                    if self.device_name in device :
+                        lunNumber = -1
+                        # Changing the Lun# of OS Disk to -1
+
+                if lunNumber in self.includedLunList :
+                    self.disksToBeIncluded.append(self.device_name)
+                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,self.device_name))   
+            self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
+        return self.disksToBeIncluded
+
     def device_list_for_billing(self):
         self.logger.log("In device_list_for_billing",True)
         devices_to_bill = [] #list to store device names to be billed
@@ -115,27 +137,8 @@ class SizeCalculation(object):
             [1:0:0:18]   disk    Msft     Virtual Disk     1.0   /dev/sdc
         '''
 
-        if(len(self.lsscsi_list) != 0):
-            for item in self.lsscsi_list:
-                idxOfColon = item.rindex(':',0,item.index(']'))# to get the index of last ':'
-                idxOfColon += 1
-                lunNumber = int(item[idxOfColon:item.index(']')])
-                # item_split is the list of elements present in the one row of the cmd sudo lsscsi
-                self.item_split = item.split()
-                #storing the corresponding device name from the list
-                self.device_name = self.item_split[len(self.item_split)-1]
-
-                for device in self.root_devices :
-                    if self.device_name in device :
-                        lunNumber = -1
-                        # Changing the Lun# of OS Disk to -1
-
-                if lunNumber in self.includedLunList :
-                    self.disksToBeIncluded.append(self.device_name)
-                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,self.device_name))   
-            self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
-           
-            '''
+        self.disksToBeIncluded = self.disk_list_for_billing()           
+        '''
             Sample output for lsblk --json command
             {
             "blockdevices": [
@@ -152,7 +155,7 @@ class SizeCalculation(object):
             ....
             ]
             }
-            '''
+        '''
         self.logger.log("lsblk o/p {0}".format(self.output_lsblk))
         if "blockdevices" in self.output_lsblk.keys():
             for device in self.output_lsblk["blockdevices"]:
@@ -244,9 +247,6 @@ class SizeCalculation(object):
             self.logger.log("ResourceDisk is excluded in billing as it represents the Actual Temporary disk")
             
             device_list = self.device_list_for_billing() #new logic: calculate the disk size for billing
-
-            if(self.errorFlag == -1):
-                self.logger.log("Billing is done without Excluding the diks")
 
             while index < output_length:
                 if(len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) < 6 ): #when a row is divided in 2 lines
