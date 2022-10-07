@@ -26,6 +26,21 @@ class TestEncode(unittest.TestCase):
         known_non_ascii_character = b"%c" % encoded_contents[2353]
         self.assertEqual(known_non_ascii_character, b'\x9d')
 
+class TestRunCommandGetOutput(unittest.TestCase):
+    def test_output(self):
+        cmd = ["cat", "non_latin_characters.txt"]
+        return_code, output_string = eu.run_command_get_output(cmd)
+        self.assertEqual(0, return_code)
+        expected_character_byte = b'\xc3\xbc'
+        expected_character = expected_character_byte.decode("utf-8")
+        self.assertEqual(expected_character, output_string[0])
+
+    def test_stdin(self):
+        cmd = ['bash', '-c', 'read ; echo $REPLY']
+        cmd_input = b'\xc3\xbc' # ü character
+        return_code, output_string = eu.run_send_stdin(cmd, cmd_input)
+        self.assertEqual(0, return_code)
+        self.assertEqual(cmd_input.decode('utf-8'), output_string[0])
 
 if __name__ == '__main__':
     unittest.main()
