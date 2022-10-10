@@ -16,9 +16,6 @@ try:
 except:
     DEVNULL = open(os.devnull)
 
-SSL_CMD = "echo | openssl s_client -connect {0}:443 -brief"
-MSFT_DOC_URL = "docs.microsoft.com"
-
 general_info = dict()
 
 def geninfo_lookup(key):
@@ -80,6 +77,7 @@ def find_vm_distro():
 
 
 def find_package_manager():
+    global general_info
     """
     Checks which package manager is on the system
     """
@@ -123,7 +121,7 @@ def get_package_version(pkg):
     elif (pkg_mngr == 'rpm'):
         return get_rpm_pkg_version(pkg)
     else:
-        return None
+        return (None, None)
     
 # Package Info
 def get_dpkg_pkg_version(pkg):
@@ -134,17 +132,16 @@ def get_dpkg_pkg_version(pkg):
         for line in dpkg_lines:
             if (line.startswith('Package: ') and not line.endswith(pkg)):
                 # wrong package
-                return None
+                return (None, None)
             if (line.startswith('Status: ') and not line.endswith('installed')):
                 # not properly installed
-                return None
+                return (None, None)
             if (line.startswith('Version: ')):
                 version = (line.split())[-1]
-                general_info['{0}_VERSION'.format(pkg.upper())] = version
-                return version
-        return None
-    except subprocess.CalledProcessError:
-        return None
+                return (version, None)
+        return (None, None)
+    except subprocess.CalledProcessError as e:
+        return (None, e.output)
 
 def get_rpm_pkg_version(pkg):
     try:
@@ -152,26 +149,23 @@ def get_rpm_pkg_version(pkg):
                                             stderr=subprocess.STDOUT)
         if ("package {0} is not installed".format(pkg) in rpm_info):
             # didn't find package
-            return None
+            return (None, None)
         rpm_lines = rpm_info.split('\n')
         for line in rpm_lines:
-            # parse line
-            # note: parsing is weird bc rpm puts various information into two columns
             parsed_line = line.split()
             if (parsed_line[0] == 'Name'):
-                # ['Name', ':', name, 'Relocations', ':', relocations]
+                # ['Name', ':', name]
                 name = parsed_line[2]
                 if (name != pkg):
                     # wrong package
-                    return None
+                    return (None, None)
             if (parsed_line[0] == 'Version'):
-                # ['Version', ':', version, 'Vendor', ':', 'MSFT']
+                # ['Version', ':', version]
                 version = parsed_line[2]
-                general_info['{0}_VERSION'.format(pkg.upper())] = version
-                return version
-        return None
-    except subprocess.CalledProcessError:
-        return None
+                return (version, None)
+        return (None, None)
+    except subprocess.CalledProcessError as e:
+        return (None, e.output)
 
 def find_ama_version():
     """

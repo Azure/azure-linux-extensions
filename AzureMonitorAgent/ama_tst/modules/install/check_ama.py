@@ -61,8 +61,9 @@ def ask_update_old_version(ama_version, curr_ama_version):
         return NO_ERROR
 
 def check_ama(interactive):
-    ama_version = get_package_version('azuremonitoragent')
-    if (ama_version == None):
+    (ama_version, e) = get_package_version('azuremonitoragent')
+    if (not e == None):
+        error_info.append((e,))
         return ERR_AMA_INSTALL
 
     ama_version = ama_version.split('-')[0]

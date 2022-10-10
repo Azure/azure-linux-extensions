@@ -30,7 +30,7 @@ error_messages = {
     ERR_SUDO_PERMS : "Couldn't access {0} due to inadequate permissions. Please run the troubleshooter "\
           "as root in order to allow access.",
     ERR_FOUND : "Please go through the output above to find the errors caught by the troubleshooter.",
-    ERR_BITS : "Couldn't get if CPU is not 32-bit or 64-bit.",
+    ERR_BITS : "Couldn't get AMA if CPU is not 64-bit.",
     ERR_OS_VER : "This version of {0} ({1}) is not supported. Please download {2}. To see all "\
           "supported Operating Systems, please go to:\n"\
           "\n   https://docs.microsoft.com/en-us/azure/azure-monitor/agents/agents-overview#linux\n",
@@ -45,8 +45,8 @@ error_messages = {
     ERR_PKG_MANAGER : "This system does not have a supported package manager. Please install 'dpkg' or 'rpm' "\
           "and run this troubleshooter again.",
     ERR_MULTIPLE_AMA : "There is more than one instance of AMA installed, please remove the extra AMA packages.",
-    ERR_AMA_INSTALL : "AMA package isn't installed correctly.",
-    ERR_SUBMODULE_INSTALL : "Submodule(s) {0} not installed correctly.",
+    ERR_AMA_INSTALL : "AMA package isn't installed correctly.\n\nError Details: \n{0}",
+    ERR_SUBCOMPONENT_INSTALL : "Subcomponents(s) {0} not installed correctly.",
     ERR_LOG_DAEMON : "No logging daemon found. Please install rsyslog or syslog-ng.",
     ERR_SYSLOG_USER : "Syslog user is not created successfully.",
     ERR_OLD_AMA_VER : "You are currently running AMA Version {0}. This troubleshooter only "\
@@ -98,7 +98,6 @@ def print_errors(err_code):
             else:
                 final_err_string = "ERROR FOUND: {0}".format(temp_err_string)
             err_summary.append(final_err_string)
-
     if (warning):
         print("WARNING(S) FOUND.")
         return NO_ERROR

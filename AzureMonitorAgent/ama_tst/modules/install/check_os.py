@@ -93,9 +93,8 @@ def check_vm_supported(vm_dist, vm_ver):
 
 def check_os():
     if platform.machine() == 'x86_64':
-        # 32 bit or 64 bit
         cpu_bits = find_vm_bits()
-        if (cpu_bits == None or (cpu_bits not in ['32-bit', '64-bit'])):
+        if (not cpu_bits == '64-bit'):
             return ERR_BITS
 
     # get OS version

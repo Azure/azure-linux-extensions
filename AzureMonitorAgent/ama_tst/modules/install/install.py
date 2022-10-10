@@ -62,8 +62,8 @@ def check_installation(interactive, err_codes=True, prev_success=NO_ERROR):
     else:
         success = print_errors(checked_pkg_manager)
     
-    # check Package + submodule installation states
-    print("Checking if packages and submodules are installed correctly...")
+    # check package + subcomponents installation states
+    print("Checking if packages and subcomponents are installed correctly...")
     checked_packages = check_packages()
     if (is_error(checked_packages)):
         return print_errors(checked_packages)
