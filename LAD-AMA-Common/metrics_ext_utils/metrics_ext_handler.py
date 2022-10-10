@@ -369,7 +369,7 @@ def start_metrics(is_lad):
 
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
-        binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
+        binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbHost 127.0.0.1 -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
         p = proc.poll()
