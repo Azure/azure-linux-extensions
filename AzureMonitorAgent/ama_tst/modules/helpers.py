@@ -68,12 +68,14 @@ def find_vm_distro():
                         vm_dist = line.split('=')[1]
                         vm_dist = vm_dist.split('-')[0]
                         vm_dist = vm_dist.replace('\"', '').replace('\n', '')
+                        vm_dist = vm_dist.lower()
                     elif line.startswith('VERSION_ID='):
                         vm_ver = line.split('=')[1]
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
-        except:  # indeterminate OS
-            return None, None
-    return vm_dist.lower(), vm_ver.lower()
+                        vm_ver = vm_ver.lower()
+        except (FileNotFoundError, AttributeError) as e:  # indeterminate OS
+            return (None, None, e)
+    return (vm_dist, vm_ver, None)
 
 
 def find_package_manager():
@@ -174,9 +176,9 @@ def find_ama_version():
     try:
         config_dirs = filter((lambda x : x.startswith("Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-")), os.listdir("/var/lib/waagent"))
         ama_vers = list(map((lambda x : (x.split('-'))[-1]), config_dirs))
-    except:
-        return None
-    return ama_vers
+    except FileNotFoundError as e:
+        return (None, e)
+    return (ama_vers, None)
 
 
 def check_ama_installed(ama_vers):

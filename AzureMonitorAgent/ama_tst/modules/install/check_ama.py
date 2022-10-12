@@ -76,6 +76,7 @@ def check_ama(interactive):
         if (e == None):
             return NO_ERROR
         else:
+            error_info.append((e,))
             return ERR_GETTING_AMA_VER
         
     else:

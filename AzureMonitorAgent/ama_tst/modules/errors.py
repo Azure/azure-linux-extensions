@@ -39,7 +39,8 @@ error_messages = {
           "\n   https://docs.microsoft.com/en-us/azure/azure-monitor/agents/agents-overview#linux\n",
     ERR_FINDING_OS : "Coudln't determine Operating System. To see all supported Operating "\
           "Systems, please go to:\n"\
-          "\n   https://docs.microsoft.com/en-us/azure/azure-monitor/agents/agents-overview#linux\n",
+          "\n   https://docs.microsoft.com/en-us/azure/azure-monitor/agents/agents-overview#linux\n" \
+          "\n\nError Details: \n{0}",
     ERR_FREE_SPACE : "There isn't enough space in directory {0} to install AMA - there needs to be at least 500MB free, "\
           "but {0} has {1}MB free. Please free up some space and try installing again.",
     ERR_PKG_MANAGER : "This system does not have a supported package manager. Please install 'dpkg' or 'rpm' "\
@@ -53,7 +54,7 @@ error_messages = {
           "supports versions 1.9 and newer. Please upgrade to the newest version. You can find "\
           "more information at the link below:\n"\
           "\n    https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-manage\n",
-    ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA."
+    ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA.\n\nError Details: \n{0}"
 }
 
 

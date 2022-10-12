@@ -98,8 +98,9 @@ def check_os():
             return ERR_BITS
 
     # get OS version
-    vm_dist, vm_ver = find_vm_distro()
-    if (vm_dist == None and vm_ver == None):
+    (vm_dist, vm_ver, e) = find_vm_distro()
+    if (vm_dist == None or vm_ver == None):
+        error_info.append((e,))
         return ERR_FINDING_OS
     
     # check if OS version is supported

@@ -8,8 +8,9 @@ from helpers     import get_package_version, find_ama_version
 
 def check_packages():
     # check azuremonitoragent rpm/dpkg
-    ama_vers = find_ama_version()
+    (ama_vers, e) = find_ama_version()
     if (ama_vers == None):
+        error_info.append((e,))
         return ERR_AMA_INSTALL
     if (len(ama_vers) > 1):
         return ERR_MULTIPLE_AMA
