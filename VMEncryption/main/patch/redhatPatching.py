@@ -29,6 +29,7 @@ import datetime
 import subprocess
 import inspect
 import io
+import filecmp
 
 from .AbstractPatching import AbstractPatching
 from Common import *
@@ -82,6 +83,10 @@ class redhatPatching(AbstractPatching):
         if type(self).__name__.startswith('redhat'):
             # Should not be called when actual instance is of subclass like oracle
             self.support_online_encryption = self.validate_online_encryption_support()
+        self.grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
+            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
+        ]
 
     def install_cryptsetup(self):
         if self.distro_info[1].startswith("6."):
@@ -136,13 +141,56 @@ class redhatPatching(AbstractPatching):
                 shutil.rmtree("/lib/dracut/modules.d/91ade/")
                 dracut_repack_needed = True
 
-            if os.path.exists("/dev/mapper/osencrypt"):
+            if os.path.exists("/dev/mapper/osencrypt") and not os.path.exists("/lib/dracut/modules.d/91adeOnline/"):
+                # Do not add 91ade module if 91adeOnline module is present
                 #TODO: only do this if needed (if code and existing module are different)
                 redhatPatching.add_91_ade_dracut_module(self.command_executor)
                 dracut_repack_needed = True
 
             if dracut_repack_needed:
                 self.command_executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
+
+        self.update_crypt_parse_file()
+
+    def update_crypt_parse_file(self, proc_comm=None):
+        if proc_comm is None:
+            proc_comm = ProcessCommunicator()
+        crypt_parse_filename = 'parse-crypt-ade.sh'
+        ade_dracut_modules_dir = '/lib/dracut/modules.d/91adeOnline'
+        crypt_parse_file_dst = os.path.join(ade_dracut_modules_dir, crypt_parse_filename)
+        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        ademoduledir = os.path.join(scriptdir, '../oscrypto/91adeOnline')
+        crypt_parse_filename = 'parse-crypt-ade.sh'
+        crypt_parse_file = os.path.join(ademoduledir, crypt_parse_filename)
+        ade_dracut_modules_dir = '/lib/dracut/modules.d/91adeOnline'
+        crypt_parse_file_dst = os.path.join(ade_dracut_modules_dir, crypt_parse_filename)
+
+        if not os.path.exists(ade_dracut_modules_dir):
+            self.logger.log("ADE online module not present. No need to update crypt parse script.")
+            return
+
+        if filecmp.cmp(crypt_parse_file, crypt_parse_file_dst, shallow=True):
+            self.logger.log("ADE parse crypt script already updated.")
+            return
+        
+        return_code = self.command_executor.ExecuteInBash('cat /etc/default/grub | grep -c rd.luks.ade.bootuuid', communicator=proc_comm)
+        if return_code != 0:
+            self.logger.log("ADE parameters not present in default grub. No need to update crypt parse script.")
+            return
+
+        if int(proc_comm.stdout.strip()) > 1:
+            self.logger.log("Duplicate ADE parameter detected in deafult grub. Num occurences: " + proc_comm.stdout)
+            try:
+                self.logger.log("Updating parse crypt file.")
+                shutil.copyfile(crypt_parse_file,crypt_parse_file_dst)
+            except:
+                pass
+            self.logger.log("Regenerate initrd after parse crypt update.")
+            self.pack_initial_root_fs()
+            return
+
+        self.logger.log("ADE parse crypt in expected state.")
+        return
 
     @staticmethod
     def is_old_patching_system():
@@ -214,16 +262,10 @@ class redhatPatching(AbstractPatching):
         command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
 
     def add_kernelopts(self, args_to_add):
-        grub_cfg_paths = [
-            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
-            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv")
-        ]
-
-        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
+        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), self.grub_cfg_paths)
 
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            for arg in args_to_add:
-                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
+            self.command_executor.ExecuteInBash('grub2-mkconfig -o {0}'.format(grub_cfg_path), True)
 
     def pack_initial_root_fs(self):
         self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)

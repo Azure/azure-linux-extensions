@@ -12,8 +12,8 @@ else
         echo 'ACTION!="add|change", GOTO="luks_ade_end"'
     } > /etc/udev/rules.d/70-luks-ade.rules.new
 
-    PARTUUID=$(getargs rd.luks.ade.partuuid -d rd_LUKS_PARTUUID)
-    BOOTUUID=$(getargs rd.luks.ade.bootuuid -d rd_LUKS_BOOTUUID)
+    PARTUUID=$(getarg rd.luks.ade.partuuid -d rd_LUKS_PARTUUID)
+    BOOTUUID=$(getarg rd.luks.ade.bootuuid -d rd_LUKS_BOOTUUID)
 
     {
         printf -- 'ENV{ID_PART_ENTRY_UUID}=="*%s*", ' "$PARTUUID"

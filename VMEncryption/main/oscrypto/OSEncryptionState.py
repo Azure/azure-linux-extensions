@@ -212,11 +212,17 @@ class OSEncryptionState(object):
         But we can't tell at this stage easily which one to use if both are present. so we will just update both.
         Moreover, in case somebody runs grub2-mkconfig on the machine we don't want the changes to get nuked out, we will update grub defaults file too.
         """
-
-        self.context.distro_patcher.add_kernelopts(args_to_add)
+        """
+        UPDATE: grubby now adds kernel parameter to grub default file to when --update-kernel ALL is used.
+        This has caused duplication of ADE parametrs in /etc/default/grub. 
+        It leads to no boot when grub2-mkconfig is run after ADE is enabled.
+        We wil be using grub2-mkconfig to be consistent.
+        """
 
         self._append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" {0} "\n'.format(" ".join(args_to_add)),
                                       '/etc/default/grub')
+
+        self.context.distro_patcher.add_kernelopts(args_to_add)
 
     def _get_block_device_size(self, dev):
         if not os.path.exists(dev):

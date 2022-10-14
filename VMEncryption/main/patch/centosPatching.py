@@ -72,6 +72,11 @@ class centosPatching(redhatPatching):
         
         self.min_version_online_encryption = '8.1'
         self.support_online_encryption = self.validate_online_encryption_support()
+        self.grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
+            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv"), # Keep for now for older images
+            ("/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/centos/grubenv")
+        ]
 
     def install_cryptsetup(self):
         if self.distro_info[1].startswith("6."):
@@ -108,43 +113,3 @@ class centosPatching(redhatPatching):
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 
-    def update_prereq(self):
-        if (self.distro_info[1].startswith('7.')):
-            dracut_repack_needed = False
-
-            if os.path.exists("/lib/dracut/modules.d/91lvm/"):
-                # If 90lvm already exists 91lvm will cause problems, so remove it.
-                if os.path.exists("/lib/dracut/modules.d/90lvm/"):
-                    shutil.rmtree("/lib/dracut/modules.d/91lvm/")
-                else:
-                    os.rename("/lib/dracut/modules.d/91lvm/","/lib/dracut/modules.d/90lvm/")
-                dracut_repack_needed = True
-
-            if redhatPatching.is_old_patching_system():
-                redhatPatching.remove_old_patching_system(self.logger, self.command_executor)
-                dracut_repack_needed = True
-
-            if os.path.exists("/lib/dracut/modules.d/91ade/"):
-                shutil.rmtree("/lib/dracut/modules.d/91ade/")
-                dracut_repack_needed = True
-
-            if os.path.exists("/dev/mapper/osencrypt"):
-                #TODO: only do this if needed (if code and existing module are different)
-                redhatPatching.add_91_ade_dracut_module(self.command_executor)
-                dracut_repack_needed = True
-
-            if dracut_repack_needed:
-                self.command_executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
-
-    def add_kernelopts(self, args_to_add):
-        grub_cfg_paths = [
-            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv"),
-            ("/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/grubenv"), # Keep for now for older images
-            ("/boot/efi/EFI/centos/grub.cfg", "/boot/efi/EFI/centos/grubenv")
-        ]
-
-        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), grub_cfg_paths)
-
-        for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            for arg in args_to_add:
-                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
