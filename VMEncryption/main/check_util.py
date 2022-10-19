@@ -28,6 +28,7 @@ from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
 import IMDSUtil
+
 try:
     from urllib.parse import urlparse #python3+
 except ImportError:
@@ -329,13 +330,26 @@ class CheckUtil(object):
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
         return detected
 
-    def preInitializationCheck(self,logger):
+    def preInitializationCheck(self,logger,imdsStoredResults):
         '''This funciton is checking the VM compatibility to apply ADE'''
         logger.log('Pre initialization check Start.')
-        iMDSUtil = IMDSUtil(logger)
-        securityType = None
         try:
-            securityType = iMDSUtil.get_security_type_IMDS()
+            iMDSUtil = IMDSUtil.IMDSUtil(logger)
+            securityType = None
+            if imdsStoredResults.config_file_exists() and imdsStoredResults.get_security_type() != None:
+                securityType = imdsStoredResults.get_security_type()
+                logger.log("reading from imds stored results, security type is {0}.".format(security_type))
+            else:
+                securityType = iMDSUtil.get_security_type_IMDS()
+                #imds does not store security type for Standard or Basic type.
+                if(security_type=='' or security_type == None):
+                    security_type="Standard"
+                logger.log("reading from imds, security type is {0}.".format(security_type))
+                imdsStoredResults.security_type = securityType
+                imdsStoredResults.commit()
+            supported_Security_Types = CommonVariables.SupportedSecurityType
+            if not securityType.lower() in [x.lower() for x in supported_Security_Types] :
+                raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(securityType, supported_Security_Types))
         except Exception as ex:
             message = "Pre-initialization check: Exception thrown during IMDS call. \
                        exception:{0}, \n stack-trace: {1}".format(str(ex),traceback.format_exc())

@@ -125,6 +125,16 @@ class CommonVariables:
     VolumeTypeAll = 'All'
     SupportedVolumeTypes = [VolumeTypeOS, VolumeTypeData, VolumeTypeAll]
     SupportedVolumeTypesVMSS = [VolumeTypeData]
+    
+    """
+    Values for Imds results 
+    """
+    SecurityTypeKey = 'SecurityType'
+    Standard = 'Standard'
+    TrustedLaunch = 'TrustedLaunch'
+    ConfidentialVM = 'ConfidentialVM'
+    SupportedSecurityType = [Standard,TrustedLaunch,ConfidentialVM]
+    
     """
     command types
     """

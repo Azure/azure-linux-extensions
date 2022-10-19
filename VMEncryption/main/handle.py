@@ -41,7 +41,7 @@ from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import EncryptionConfig
-from VMEncryption.main import IMDSUtil
+from IMDSStoredResults import IMDSStoredResults
 from patch import GetDistroPatcher
 from BekUtil import BekUtil, BekMissingException
 from check_util import CheckUtil
@@ -666,8 +666,9 @@ def enable():
         public_settings = get_public_settings()
         logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
         cutil = CheckUtil(logger)
+        imdsStoredResults=IMDSStoredResults(logger,encryption_environment=encryption_environment)
         try:
-            cutil.preInitializationCheck(logger)
+            cutil.preInitializationCheck(logger,imdsStoredResults=imdsStoredResults)
         except Exception as ex:
              hutil.do_exit(exit_code=CommonVariables.unknown_error,
                     operation='preInitializationCheck',

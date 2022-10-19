@@ -75,8 +75,8 @@ class IMDSUtil(object):
 
     def getUri(self,api_version,subdirectory):
         '''This function creates IMDS Uri'''
-        uri = self.iMDSUrl
-        os.path.join(uri,subdirectory)
+        uri = "http://{0}".format(CommonVariables.static_IMDS_IP)
+        uri = os.path.join(uri,subdirectory)
         uri = "{0}?api-version={1}".format(uri,api_version)
         return uri
 
