@@ -413,10 +413,11 @@ class HandlerUtility:
                 file_pointer.close()
             else:
                 mi = MachineIdentity()
-                machine_id = mi.stored_identity()[1:-1]
-                file_pointer = open(machine_id_file, "w")
-                file_pointer.write(machine_id)
-                file_pointer.close()
+                if(mi.stored_identity() != None):
+                    machine_id = mi.stored_identity()[1:-1]
+                    file_pointer = open(machine_id_file, "w")
+                    file_pointer.write(machine_id)
+                    file_pointer.close()
         except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, 'Error')
