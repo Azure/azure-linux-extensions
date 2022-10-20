@@ -67,11 +67,11 @@ class IMDSUtil(object):
                     raise Exception("No response from IMDS GET request.")
             except Exception as ex:
                 retry_count += 1
-                self.logger.log("Encountered exception from IMDS GET request to IMDS (attempt #{0}: \n{1}".format(str(retry_count),str(ex)))
+                self.logger.log("Encountered exception from IMDS GET request to IMDS (attempt #{0}) \n{1}".format(str(retry_count),str(ex)))
                 if retry_count<retry_count_max:
                     time.sleep(10) #sleep for 10 second before retyring
                 else:
-                    raise ex
+                    raise Exception("IMDS request is failed to retrive VM's security profile, retry:{0} ref: https://aka.ms/imds".format(retry_count_max))
 
     def getUri(self,api_version,subdirectory):
         '''This function creates IMDS Uri'''

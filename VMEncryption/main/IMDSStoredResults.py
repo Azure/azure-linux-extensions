@@ -43,6 +43,20 @@ class IMDSStoredResults(object):
         securityType = self.encryption_config.get_config(CommonVariables.SecurityTypeKey)
         return securityType if securityType else None
 
+    def get_cfg_val(self, s):
+        # return a string type that is compatible with the version of config parser that is in use
+        if s is None:
+            return ""
+
+        if (sys.version_info > (3, 0)):
+            return s  # python 3+ , preserve unicode
+        else:
+            if isinstance(s, unicode):
+                # python2 ConfigParser does not properly support unicode, convert to ascii
+                return s.encode('ascii', 'ignore')
+            else:
+                return s
+                
     def commit(self):
         key_value_pairs = []
         u_sect_key = CommonVariables.SecurityTypeKey

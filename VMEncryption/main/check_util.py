@@ -330,32 +330,31 @@ class CheckUtil(object):
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
         return detected
 
-    def preInitializationCheck(self,logger,imdsStoredResults):
+    def preInitializationCheck(self,logger,imdsStoredResults,iMDSUtil):
         '''This funciton is checking the VM compatibility to apply ADE'''
         logger.log('Pre initialization check Start.')
         try:
-            iMDSUtil = IMDSUtil.IMDSUtil(logger)
             securityType = None
             if imdsStoredResults.config_file_exists() and imdsStoredResults.get_security_type() != None:
                 securityType = imdsStoredResults.get_security_type()
-                logger.log("reading from imds stored results, security type is {0}.".format(security_type))
+                logger.log("reading from imds stored results, security type is {0}.".format(securityType))
             else:
                 securityType = iMDSUtil.get_security_type_IMDS()
                 #imds does not store security type for Standard or Basic type.
-                if(security_type=='' or security_type == None):
-                    security_type="Standard"
-                logger.log("reading from imds, security type is {0}.".format(security_type))
-                imdsStoredResults.security_type = securityType
-                imdsStoredResults.commit()
+                if(securityType=='' or securityType == None):
+                    securityType= CommonVariables.Standard
+                logger.log("reading from imds, security type is {0}.".format(securityType))
             supported_Security_Types = CommonVariables.SupportedSecurityType
             if not securityType.lower() in [x.lower() for x in supported_Security_Types] :
                 raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(securityType, supported_Security_Types))
+            imdsStoredResults.security_type = securityType
+            imdsStoredResults.commit()
         except Exception as ex:
             message = "Pre-initialization check: Exception thrown during IMDS call. \
                        exception:{0}, \n stack-trace: {1}".format(str(ex),traceback.format_exc())
             logger.log(msg=message,level=CommonVariables.ErrorLevel)
             raise Exception(message)
-        if securityType == "ConfidentialVM":
+        if securityType ==  CommonVariables.ConfidentialVM:
             message = "Pre-initialization check: ADE flow is blocked for confidential VM."
             logger.log(msg=message,level=CommonVariables.ErrorLevel)
             raise Exception(message) 
