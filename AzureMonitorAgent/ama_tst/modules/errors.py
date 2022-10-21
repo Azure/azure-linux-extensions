@@ -54,7 +54,17 @@ error_messages = {
           "supports versions 1.9 and newer. Please upgrade to the newest version. You can find "\
           "more information at the link below:\n"\
           "\n    https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-manage\n",
-    ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA.\n\nError Details: \n{0}"
+    ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA.\n\nError Details: \n{0}",
+    
+    ERR_AMA_PARAMETERS : "Couldn't read and parse /etc/default/azuremonitoragent.\n\nError Details:\n{0}",
+    ERR_NO_DCR : "Couldn't parse DCR information on this VM.\n\nError Details:{0}",
+    ERR_INFO_MISSING: "NO DCR workspace id or region is found. Please check "\
+            "/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks.*.json",
+    ERR_ENDPT : "Machine couldn't connect to {0}: openssl command failed. "\
+          "Please run the command below for more information on the failure:\n"\
+          "\n  $ {1}\n",
+    ERR_SUBCOMPONENT_STATUS : "Subcomponent {0} has not been started. Status details: {1}",
+    ERR_CHECK_STATUS : "Couldn't get the status of subcomponents.\n\nError Details:{0}"
 }
 
 
