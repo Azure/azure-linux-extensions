@@ -24,9 +24,9 @@ def check_parameters():
 def check_workspace():
     global general_info
     dir_path = '/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks'
-    dcr_workspace = []
-    dcr_region = []
-    me_region = []
+    dcr_workspace = set()
+    dcr_region = set()
+    me_region = set()
     general_info['URL_SUFFIX'] = '.com'
     try:
         for file in os.listdir(dir_path):
@@ -37,23 +37,23 @@ def check_workspace():
                 for channel in channels:
                     if channel['protocol'] == 'ods':
                         # parse dcr workspace id
-                        enpoint_url = channel['endpoint']
-                        worspace_id = enpoint_url.split('https://')[1].split('.ods')[0]
-                        dcr_workspace.append(worspace_id)
+                        endpoint_url = channel['endpoint']
+                        worspace_id = endpoint_url.split('https://')[1].split('.ods')[0]
+                        dcr_workspace.add(worspace_id)
                         # parse dcr region
                         token_endpoint_uri = channel['tokenEndpointUri']
                         region = token_endpoint_uri.split('Location=')[1].split('&')[0]
-                        dcr_region.append(region)
+                        dcr_region.add(region)
                         # parse url suffix
-                        if enpoint_url.contains('.us'):
+                        if '.us' in endpoint_url:
                             general_info['URL_SUFFIX'] = '.us'
-                        if enpoint_url.contains('.cn'):
+                        if '.cn' in endpoint_url:
                             general_info['URL_SUFFIX'] = '.cn'                            
                     if channel['protocol'] == 'me':
                         # parse ME region
-                        enpoint_url = channel['endpoint']
-                        region = enpoint_url.split('https://')[1].split('.monitoring')[0]
-                        me_region.append(region)
+                        endpoint_url = channel['endpoint']
+                        region = endpoint_url.split('https://')[1].split('.monitoring')[0]
+                        me_region.add(region)
     except (FileNotFoundError, AttributeError) as e:
         error_info.append((e,))
         return ERR_NO_DCR
@@ -129,4 +129,5 @@ def check_connection(interactive, err_codes=True, prev_success=NO_ERROR):
     else:
         success = print_errors(checked_subcomponents)
         
+    # check if
     return success

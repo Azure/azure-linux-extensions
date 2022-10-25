@@ -61,10 +61,10 @@ error_messages = {
     ERR_INFO_MISSING: "NO DCR workspace id or region is found. Please check "\
             "/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks.*.json",
     ERR_ENDPT : "Machine couldn't connect to {0}: openssl command failed. "\
-          "Please run the command below for more information on the failure:\n"\
-          "\n  $ {1}\n",
+          "\n\nError Details:\n $ {1} \n\n{2}",
     ERR_SUBCOMPONENT_STATUS : "Subcomponent {0} has not been started. Status details: {1}",
-    ERR_CHECK_STATUS : "Couldn't get the status of subcomponents.\n\nError Details:{0}"
+    ERR_CHECK_STATUS : "Couldn't get the status of subcomponents.\n\nError Details:{0}",
+    ERR_RESOLVE_IP : "The endpoint {0} cannot be resolved.\n\nError Details:\n{1}"
 }
 
 
