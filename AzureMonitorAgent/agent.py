@@ -1146,22 +1146,8 @@ def find_package_manager(operation):
     for rpm_dist in rpm_set:
         if dist.startswith(rpm_dist):
             PackageManager = "rpm"
-            # Same as above; need to force.
+            # Same as above.
             PackageManagerOptions = "--force"
-
-            # If FIPS is enabled and RPM version is 4.14 or higher, we need to apply the below workaround
-            try:
-                fips_code, _ = run_command_and_log('grep -i "fips=1" /proc/cmdline 1>/dev/null 2>&1', check_error=False, log_cmd=False)
-                if fips_code == 0:
-                    rpm_code, rpm_output = run_command_and_log('rpm --version', check_error=False, log_cmd=False)
-                    if rpm_code == 0:
-                        rpm_version = (rpm_output.split(" ")[-1]).split(".")
-                        if int(rpm_version[0]) >= 4 and int(rpm_version[1]) >= 14:
-                            hutil_log_info("FIPS is enabled and RPM version is at least 4.14; applying --nodigest flag to allow for successful package install")
-                            PackageManagerOptions = "--force --nodigest --nofiledigest"
-            except Exception as e:
-                hutil_log_error("Unable to check for RPM 4.14 + FIPS scenario, skipping digest workaround: {0}".format(e))
-
             BundleFileName = BundleFileNameRpm
             break
 
