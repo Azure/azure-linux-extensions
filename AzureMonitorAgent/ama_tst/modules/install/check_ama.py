@@ -5,6 +5,7 @@ import xml.dom.minidom
 from error_codes import *
 from errors      import error_info, get_input
 from helpers     import get_package_version
+from connect.check_endpts import check_internet_connect
 
 AMA_URL = 'https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions'
 
@@ -76,8 +77,13 @@ def check_ama(interactive):
         if (e == None):
             return NO_ERROR
         else:
-            error_info.append((e,))
-            return ERR_GETTING_AMA_VER
+            checked_internet = check_internet_connect()
+            if checked_internet == NO_ERROR:
+                print("WARNING: can't connect to {0}: {1}\n Skipping this check...".format(AMA_URL, e))
+                print("--------------------------------------------------------------------------------")
+            # issue with general internet connectivity
+            else:
+                return checked_internet
         
     else:
         # if not most recent version, ask if want to update

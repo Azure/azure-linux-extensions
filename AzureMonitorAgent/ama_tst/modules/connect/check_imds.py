@@ -3,19 +3,23 @@ import json
 
 from click import command
 
-from error_codes import *
-from errors      import error_info
-from helpers     import geninfo_lookup, general_info
+from error_codes    import *
+from errors         import error_info
+from helpers        import geninfo_lookup, general_info
+from logcollector   import is_arc_installed
 
 METADATA_CMD = 'curl -s -H Metadata:true --noproxy "*" "http://{0}/metadata/instance/compute?api-version=2020-06-01"'
 AZURE_IP = "169.254.169.254"
 ARC_IP = "127.0.0.1:40342"
 
 AZURE_TOKEN_CMD = "curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s"
-
+ARC_TOKEN_CMD = 'curl -s -D - -H Metadata:true "http://127.0.0.1:40342/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https%3A%2F%2Fmanagement.azure.com"'
 
 def check_metadata():
-    command = METADATA_CMD.format(AZURE_IP)
+    if is_arc_installed():
+        command = METADATA_CMD.format(ARC_IP)
+    else: 
+        command = METADATA_CMD.format(AZURE_IP)
     try:
         output = subprocess.check_output(command, shell=True,\
                      stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
@@ -32,8 +36,17 @@ def check_metadata():
 
 
 def check_token():
-    command = AZURE_TOKEN_CMD
+    if is_arc_installed():
+        command = ARC_TOKEN_CMD
+    else: 
+        command = AZURE_TOKEN_CMD
     try:
+        # check AMA use UAI
+        managed_identity = geninfo_lookup('MANAGED_IDENTITY')
+        if not managed_identity == None:
+            managed_identity = managed_identity.replace('mi_res_id#"', 'mi_res_id=')
+            command = command.replace('token?', 'token?{0}&'.format(managed_identity))
+        
         output = subprocess.check_output(command, shell=True,\
                      stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
         output_json = json.loads(output)
