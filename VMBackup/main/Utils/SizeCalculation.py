@@ -53,16 +53,17 @@ class SizeCalculation(object):
         self.root_devices = []
         self.root_mount_points = ['/' , '/boot/efi']
         try:
-            self.lsscsi_list = (os.popen(self.command).read()).splitlines()
+            self.output_lsscsi = (os.popen(self.command).read())
+            self.lsscsi_list = self.output_lsscsi.splitlines()
         except Exception as e:
             error_msg = "Failed to execute the command lsscsi because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.output_lsscsi = ""
             self.lsscsi_list = []
         try:
-             self.output_lsblk = json.loads(os.popen("lsblk --json --output name,mountpoint").read())
+             self.output_lsblk = json.loads(os.popen("lsblk --json").read())
         except:
-            error_msg = "Failed to execute the command lsblk --json --output name,mountpoint because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command lsblk --json because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.output_lsblk = {}
         self.devicesToInclude = [] #partitions to be included
@@ -74,6 +75,7 @@ class SizeCalculation(object):
     def get_loop_devices(self):
         global disk_util
         disk_util = DiskUtil.get_instance(patching = self.patching,logger = self.logger)
+        self.logger.log("disk_util: {0}".format(str(disk_util)),True)
         if len(self.file_systems_info) == 0 :
             self.file_systems_info = disk_util.get_mount_file_systems()
         self.logger.log("file_systems list : ",True)
@@ -93,16 +95,16 @@ class SizeCalculation(object):
                 # item_split is the list of elements present in the one row of the cmd sudo lsscsi
                 self.item_split = item.split()
                 #storing the corresponding device name from the list
-                device_name = self.item_split[len(self.item_split)-1]
+                self.device_name = self.item_split[len(self.item_split)-1]
 
                 for device in self.root_devices :
-                    if device_name in device :
+                    if self.device_name in device :
                         lunNumber = -1
                         # Changing the Lun# of OS Disk to -1
 
                 if lunNumber in self.includedLunList :
-                    self.disksToBeIncluded.append(device_name)
-                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name))   
+                    self.disksToBeIncluded.append(self.device_name)
+                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,self.device_name))   
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         return self.disksToBeIncluded
 
@@ -140,18 +142,17 @@ class SizeCalculation(object):
             Sample output for lsblk --json command
             {
             "blockdevices": [
-            {"name": "sda", "mountpoint": null,
-                "children": [
-                    {"name": "sda1", "mountpoint": null}
-                   ]
+            {"name": "sdb", "maj:min": "8:16", "rm": "0", "size": "32G", "ro": "0", "type": "disk", "mountpoint": null,
+            "children": [
+                {"name": "sdb1", "maj:min": "8:17", "rm": "0", "size": "976.6M", "ro": "0", "type": "part", "mountpoint": null}
+            ]
             },
-            {"name": "sdb", "mountpoint": null},
-            {"name": "sdc", "mountpoint": null,
-                "children": [
-                    {"name": "sdc1", "mountpoint": null}
-                   ]
+            {"name": "sdc", "maj:min": "8:32", "rm": "0", "size": "128G", "ro": "0", "type": "disk", "mountpoint": null,
+            "children": [
+            {"name": "data--vg01-data--lv01", "maj:min": "253:0", "rm": "0", "size": "16G", "ro": "0", "type": "lvm", "mountpoint": null}
+            ]
             },
-            ...
+            ....
             ]
             }
         '''
