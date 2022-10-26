@@ -6,6 +6,7 @@ from error_codes       import *
 from errors            import error_info, is_error, print_errors
 from helpers           import general_info
 from .check_endpts     import check_internet_connect, check_ama_endpts
+from .check_imds       import check_imds_api
 
 def check_parameters():
     global general_info
@@ -129,5 +130,11 @@ def check_connection(interactive, err_codes=True, prev_success=NO_ERROR):
     else:
         success = print_errors(checked_subcomponents)
         
-    # check if
+    # check if IMDS metadata/token API can be reached
+    print("Checking if IMDS metadata/token API can be reached...")
+    checked_imds_api = check_imds_api()
+    if (is_error(checked_imds_api)):
+        return print_errors(checked_imds_api)
+    else:
+        success = print_errors(checked_imds_api)
     return success

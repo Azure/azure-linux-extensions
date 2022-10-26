@@ -1,0 +1,59 @@
+import subprocess
+import json
+
+from click import command
+
+from error_codes import *
+from errors      import error_info
+from helpers     import geninfo_lookup, general_info
+
+METADATA_CMD = 'curl -s -H Metadata:true --noproxy "*" "http://{0}/metadata/instance/compute?api-version=2020-06-01"'
+AZURE_IP = "169.254.169.254"
+ARC_IP = "127.0.0.1:40342"
+
+AZURE_TOKEN_CMD = "curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s"
+
+
+def check_metadata():
+    command = METADATA_CMD.format(AZURE_IP)
+    try:
+        output = subprocess.check_output(command, shell=True,\
+                     stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
+        output_json = json.loads(output)
+        attributes = ['azEnvironment', 'resourceId', 'location']
+        for attr in attributes:
+            if not attr in output_json:
+                error_info.append((command, output))
+                return ERR_IMDS_METADATA
+    except Exception as e:
+        error_info.append((command, e))
+        return ERR_IMDS_METADATA
+    return NO_ERROR
+
+
+def check_token():
+    command = AZURE_TOKEN_CMD
+    try:
+        output = subprocess.check_output(command, shell=True,\
+                     stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
+        output_json = json.loads(output)
+        if not 'access_token' in output_json:
+            error_info.append((command, output))
+            return ERR_ACCESS_TOKEN
+    except Exception as e:
+        error_info.append((command, e))
+        return ERR_ACCESS_TOKEN
+    return NO_ERROR
+     
+     
+def check_imds_api():
+    # check metadata
+    checked_metadata = check_metadata()
+    if not checked_metadata == NO_ERROR:
+        return checked_metadata
+    
+    # check access token
+    checked_token = check_token()
+    if not checked_token == NO_ERROR:
+        return checked_token
+    return NO_ERROR
