@@ -130,7 +130,7 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
     file_report_msg = None
     try:
         if total_used_size == -1 :
-            sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , logger = backup_logger , para_parser = para_parser)
+            sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , hutil = hutil, logger = backup_logger , para_parser = para_parser)
             total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
             number_of_blobs = len(para_parser.includeLunList)
             maximum_possible_size = number_of_blobs * 1099511627776
@@ -236,24 +236,20 @@ def daemon():
     hutil.do_parse_context('Executing', configSeqNo)
 
     try:
-        backup_logger.log('starting daemon', True)
+        backup_logger.log('starting daemon initially', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
         # handle the restoring scenario.
         mi = MachineIdentity()
         stored_identity = mi.stored_identity()
-        try:
-            if(stored_identity is None):
+        if(stored_identity is None):
+            mi.save_identity()
+        else:
+            current_identity = mi.current_identity()
+            if(current_identity != stored_identity):
+                current_seq_no = -1
+                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
+                hutil.set_last_seq(current_seq_no)
                 mi.save_identity()
-            else:
-                current_identity = mi.current_identity()
-                if(current_identity != stored_identity):
-                    current_seq_no = -1
-                    backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                    hutil.set_last_seq(current_seq_no)
-                    mi.save_identity()
-        except Exception as e:
-            errMsg = "Unable to open file, error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, True, 'Error')
     except Exception as e:
         errMsg = 'Failed to validate sequence number with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
@@ -304,7 +300,7 @@ def daemon():
 
     try:
         # we need to freeze the file system first
-        backup_logger.log('starting daemon', True)
+        backup_logger.log('starting daemon for freezing the file system', True)
         """
         protectedSettings is the privateConfig passed from Powershell.
         WATCHOUT that, the _context_config are using the most freshest timestamp.
@@ -339,7 +335,7 @@ def daemon():
 
         commandToExecute = para_parser.commandToExecute
         #validate all the required parameter here
-        backup_logger.log(commandToExecute,True)
+        backup_logger.log('The command '+ commandToExecute+ ' is being validated',True)
         if(CommonVariables.iaas_install_command in commandToExecute.lower()):
             backup_logger.log('install succeed.',True)
             run_status = 'success'
@@ -354,7 +350,7 @@ def daemon():
                 error_msg = 'required field empty or not correct'
                 backup_logger.log(error_msg, True, 'Error')
             else:
-                backup_logger.log('commandToExecute is ' + commandToExecute, True)
+                backup_logger.log('commandToExecute for backup is ' + commandToExecute, True)
                 """
                 make sure the log is not doing when the file system is freezed.
                 """
@@ -369,7 +365,7 @@ def daemon():
                     backup_logger.commit_to_blob(para_parser.logsBlobUri)
                 else:
                     backup_logger.log("the logs blob uri is not there, so do not upload log.")
-                backup_logger.log('commandToExecute is ' + commandToExecute, True)
+                backup_logger.log('commandToExecute after commiting the blob is ' + commandToExecute, True)
                 
                 workload_patch = WorkloadPatch.WorkloadPatch(backup_logger)
                 #new flow only if workload name is present in workload.conf
