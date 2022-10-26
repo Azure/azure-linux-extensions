@@ -26,17 +26,21 @@ class MachineIdentity:
         self.store_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
 
     def current_identity(self):
-        file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
-        xmlText = file.read()
-        dom = xml.dom.minidom.parseString(xmlText)
-        deployment = dom.getElementsByTagName("Role")
-        identity=deployment[0].getAttribute("guid")
+        identity = None
+        if os.path.exists("/var/lib/waagent/HostingEnvironmentConfig.xml"):
+            file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
+            xmlText = file.read()
+            dom = xml.dom.minidom.parseString(xmlText)
+            deployment = dom.getElementsByTagName("Role")
+            identity=deployment[0].getAttribute("guid")
+            file.close()
         return identity
 
     def save_identity(self):
         file = open(self.store_identity_file,'w')
         machine_identity = self.current_identity()
-        file.write(machine_identity)
+        if( machine_identity != None ):
+            file.write(machine_identity)
         file.close()
 
     def stored_identity(self):
