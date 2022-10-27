@@ -11,7 +11,11 @@ AZURE_IP = "169.254.169.254"
 ARC_IP = "127.0.0.1:40342"
 
 AZURE_TOKEN_CMD = "curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s"
-ARC_TOKEN_CMD = 'curl -s -D - -H Metadata:true "http://127.0.0.1:40342/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https%3A%2F%2Fmanagement.azure.com"'
+ARC_TOKEN_CMD = 'ChallengeTokenPath=$(curl -s -D - -H Metadata:true "http://127.0.0.1:40342/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https%3A%2F%2Fmanagement.azure.com"'\
+                    '| grep Www-Authenticate | cut -d "=" -f 2 | tr -d "[:cntrl:]") ; ' \
+                    'ChallengeToken=$(cat $ChallengeTokenPath) ; ' \
+                    'curl -s -H Metadata:true -H "Authorization: Basic 1$ChallengeToken" "http://127.0.0.1:40342/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https%3A%2F%2Fmanagement.azure.com"'
+
 
 def check_metadata():
     if is_arc_installed():
@@ -42,7 +46,7 @@ def check_token():
         # check AMA use UAI
         managed_identity = geninfo_lookup('MANAGED_IDENTITY')
         if not managed_identity == None:
-            managed_identity = managed_identity.replace('mi_res_id#"', 'mi_res_id=')
+            managed_identity = managed_identity.replace('mi_res_id#', 'mi_res_id=')
             command = command.replace('token?', 'token?{0}&'.format(managed_identity))
         
         output = subprocess.check_output(command, shell=True,\

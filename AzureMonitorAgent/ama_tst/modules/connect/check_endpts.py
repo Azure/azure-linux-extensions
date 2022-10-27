@@ -114,7 +114,7 @@ def check_ama_endpts():
         if not geninfo_lookup('SSL_CERT_DIR') == None:
             command = command + " -CApath " + geninfo_lookup('SSL_CERT_DIR')
         if not geninfo_lookup('SSL_CERT_FILE') == None:
-            command = command + " -CAfile " + geninfo_lookup('SSL_CERT_DIR')
+            command = command + " -CAfile " + geninfo_lookup('SSL_CERT_FILE')
         (connected, verified, e) = check_endpt_ssl(command, endpoint)
         if not connected or not verified:
             error_info.append((endpoint, command.format(endpoint), e))
