@@ -1,8 +1,6 @@
 import subprocess
 import json
 
-from click import command
-
 from error_codes    import *
 from errors         import error_info
 from helpers        import geninfo_lookup, general_info

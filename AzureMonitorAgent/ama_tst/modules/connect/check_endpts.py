@@ -49,7 +49,7 @@ def check_internet_connect():
 
 def resolve_ip(endpoint):
     try:
-        result = subprocess.run(['nslookup', endpoint], capture_output=True, timeout=30)
+        result = subprocess.run(['nslookup', endpoint], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
         if not result.returncode == 0:
             return False, result.stdout.decode()
         else:
@@ -60,9 +60,8 @@ def resolve_ip(endpoint):
 
 def check_endpt_curl(endpoint):
     try:
-        endpoint = "https://{0}/ping".format(endpoint)
-        result = subprocess.run(['curl', '-s', '-S', '-k', endpoint], capture_output=True, timeout=30)
-        output = result.stdout.decode()
+        output = subprocess.check_output(CURL_CMD.format(endpoint), shell=True,\
+                     stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
         if output == "Healthy":
             return (True, None)
         else:
