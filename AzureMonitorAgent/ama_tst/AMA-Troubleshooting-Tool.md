@@ -18,7 +18,7 @@ The Azure Monitor Linux Agent Troubleshooter currently can collect logs on a VM 
 The AMA Linux Troubleshooter can be downloaded and run by following the steps below.
 
 1. Copy the troubleshooter bundle onto your machine: `wget https://github.com/Azure/azure-linux-extensions/raw/master/AzureMonitorAgent/ama_tst/ama_tst.tgz`
-2. Unpack the bundle: `tar -xzvf ama_tst.tar.gz`
+2. Unpack the bundle: `tar -xzvf ama_tst.tgz`
 3. Run the troubleshooter: `sudo sh ama_troubleshooter.sh`
 
 ## Requirements
