@@ -24,7 +24,7 @@ def check_metadata():
         command = METADATA_CMD.format(AZURE_IP)
     try:
         output = subprocess.check_output(command, shell=True,\
-                     stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
+                     stderr=subprocess.STDOUT, universal_newlines=True)
         output_json = json.loads(output)
         attributes = ['azEnvironment', 'resourceId', 'location']
         for attr in attributes:
@@ -50,7 +50,7 @@ def check_token():
             command = command.replace('token?', 'token?{0}&'.format(managed_identity))
         
         output = subprocess.check_output(command, shell=True,\
-                     stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
+                     stderr=subprocess.STDOUT, universal_newlines=True)
         output_json = json.loads(output)
         if not 'access_token' in output_json:
             error_info.append((command, output))

@@ -17,7 +17,7 @@ ME_REGION_URL = "{0}.monitoring.azure.com"
 def check_endpt_ssl(ssl_cmd, endpoint):
     try:
         ssl_output = subprocess.check_output(ssl_cmd.format(endpoint), shell=True,\
-                     stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
+                     stderr=subprocess.STDOUT, universal_newlines=True)
         ssl_output_lines = ssl_output.split('\n')
         
         (connected, verified) = (False, False)
@@ -49,9 +49,9 @@ def check_internet_connect():
 
 def resolve_ip(endpoint):
     try:
-        result = subprocess.run(['nslookup', endpoint], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
-        if not result.returncode == 0:
-            return False, result.stdout.decode()
+        result = subprocess.call(['nslookup', endpoint], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if not result == 0:
+            return False, "nslookup {0}".format(endpoint)
         else:
             return (True, None)
     except Exception as e:
@@ -61,7 +61,7 @@ def resolve_ip(endpoint):
 def check_endpt_curl(endpoint):
     try:
         output = subprocess.check_output(CURL_CMD.format(endpoint), shell=True,\
-                     stderr=subprocess.STDOUT, universal_newlines=True, timeout=30)
+                     stderr=subprocess.STDOUT, universal_newlines=True)
         if output == "Healthy":
             return (True, None)
         else:

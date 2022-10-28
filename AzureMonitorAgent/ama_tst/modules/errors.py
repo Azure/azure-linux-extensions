@@ -64,7 +64,7 @@ error_messages = {
           "\n\nError Details:\n $ {1} \n\n{2}",
     ERR_SUBCOMPONENT_STATUS : "Subcomponent {0} has not been started. Status details: {1}",
     ERR_CHECK_STATUS : "Couldn't get the status of subcomponents.\n\nError Details:{0}",
-    ERR_RESOLVE_IP : "The endpoint {0} cannot be resolved.\n\nError Details:\n{1}",
+    ERR_RESOLVE_IP : "The endpoint {0} cannot be resolved. Please run the command below for more information on the failure:\n\n $ {1}",
     ERR_IMDS_METADATA : "Couldn't access Azure Instance Metadata when executing command\n $ {0}\n\nError Details:\n{1}",
     ERR_ACCESS_TOKEN : "Couldn't use managed identities to acquire an access token when executing command\n $ {0}\n\nError Details:\n{1}"
 }

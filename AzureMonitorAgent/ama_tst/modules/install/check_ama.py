@@ -1,6 +1,10 @@
 import re
-import requests
 import xml.dom.minidom
+import urllib
+try:
+    import requests
+except ImportError:
+    pass
 
 from error_codes import *
 from errors      import error_info, get_input
@@ -10,22 +14,28 @@ from connect.check_endpts import check_internet_connect
 AMA_URL = 'https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions'
 
 def get_latest_ama_version(curr_version):
+    # python2 and python3 compatible
     try:           
-        r = requests.get(AMA_URL)
-        tbody = r.text.split("<tbody>")[1].split("</tbody>")[0]
+        r = urllib.urlopen(AMA_URL).read()
+    except AttributeError:
+        r = requests.get(AMA_URL).text
+        
+    try:
+        tbody = r.split("<tbody>")[1].split("</tbody>")[0]
         tbody = "<tbody>" + tbody + "</tbody>"
-        with xml.dom.minidom.parseString(tbody) as dom:
-            rows = dom.getElementsByTagName("tr")
-            for row in rows:
-                cell = row.getElementsByTagName("td")[3]
-                version = cell.firstChild.nodeValue
-                version = re.sub('[A-Za-z ]+', '', version)
-                if (version == ''):
-                    continue
-                if (comp_versions_ge(curr_version, version)):
-                    return (None, None)
-                else:
-                    return (version, None)
+        
+        dom = xml.dom.minidom.parseString(tbody)
+        rows = dom.getElementsByTagName("tr")
+        for row in rows:
+            cell = row.getElementsByTagName("td")[3]
+            version = cell.firstChild.nodeValue
+            version = re.sub('[A-Za-z ]+', '', version)
+            if (version == ''):
+                continue
+            if (comp_versions_ge(curr_version, version)):
+                return (None, None)
+            else:
+                return (version, None)
     except Exception as e:
         return (None, e)
     return (None, None)
