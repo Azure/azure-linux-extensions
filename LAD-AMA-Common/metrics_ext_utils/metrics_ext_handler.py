@@ -673,11 +673,7 @@ def setup_me(is_lad, HUtilObj=None):
     else:
         me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + "_" +location
 
-    custom_conf_path = me_config_dir + me_monitoring_account +"_MonitoringAccount_Configuration.json"
-
-    # Arm64 ME looks for lower case config file. Adding this until ME can update their code to look for config file with right casing.
-    if platform.machine() == "aarch64":
-        custom_conf_path = me_config_dir + me_monitoring_account.lower() +"_MonitoringAccount_Configuration.json"
+    custom_conf_path = me_config_dir + me_monitoring_account.lower() +"_MonitoringAccount_Configuration.json"
 
     with open(custom_conf_path, "w") as f:
         f.write(custom_conf)
