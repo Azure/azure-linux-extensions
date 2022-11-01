@@ -18,7 +18,7 @@ err_summary = []
 
 
 # # set of all errors which are actually warnings
-warnings = set([WARN_INTERNET_CONN, WARN_INTERNET])
+warnings = set([WARN_INTERNET_CONN, WARN_INTERNET, WARN_OPENSSL_PROXY])
 
 # dictionary correlating error codes to error messages
 error_messages = {
@@ -60,13 +60,16 @@ error_messages = {
     ERR_NO_DCR : "Couldn't parse DCR information on this VM.\n\nError Details:{0}",
     ERR_INFO_MISSING: "NO DCR workspace id or region is found. Please check "\
             "/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks.*.json",
-    ERR_ENDPT : "Machine couldn't connect to {0}: openssl command failed. "\
+    ERR_ENDPT : "Machine couldn't connect to {0}: curl/openssl command failed. "\
           "\n\nError Details:\n $ {1} \n\n{2}",
     ERR_SUBCOMPONENT_STATUS : "Subcomponent {0} has not been started. Status details: {1}",
     ERR_CHECK_STATUS : "Couldn't get the status of subcomponents.\n\nError Details:{0}",
     ERR_RESOLVE_IP : "The endpoint {0} cannot be resolved. Please run the command below for more information on the failure:\n\n $ {1}",
     ERR_IMDS_METADATA : "Couldn't access Azure Instance Metadata when executing command\n $ {0}\n\nError Details:\n{1}",
-    ERR_ACCESS_TOKEN : "Couldn't use managed identities to acquire an access token when executing command\n $ {0}\n\nError Details:\n{1}"
+    ERR_ACCESS_TOKEN : "Couldn't use managed identities to acquire an access token when executing command\n $ {0}\n\nError Details:\n{1}",
+    ERR_ENDPT_PROXY : "Machine couldn't connect to {0} with proxy: curl/openssl command failed. Please check your proxy configuration."\
+          "\n\nError Details:\n $ {1} \n\n{2}",
+    WARN_OPENSSL_PROXY : "Skip SSL handshake checks because AMA is configured with authenticated proxy."
 }
 
 

@@ -59,15 +59,30 @@ def resolve_ip(endpoint):
 
 
 def check_endpt_curl(endpoint):
+    command = CURL_CMD.format(endpoint)
     try:
-        output = subprocess.check_output(CURL_CMD.format(endpoint), shell=True,\
+        # check proxy
+        proxy = geninfo_lookup('MDSD_PROXY_ADDRESS')
+        username = geninfo_lookup('MDSD_PROXY_USERNAME')
+        if not proxy == None:
+            command = command + ' -x {0}'.format(proxy)
+        if not username == None:
+            password = geninfo_lookup('MDSD_PROXY_PASSWORD')
+            command = command + ' -U {0}:{1}'.format(username, password)
+        output = subprocess.check_output(command, shell=True,\
                      stderr=subprocess.STDOUT, universal_newlines=True)
         if output == "Healthy":
-            return (True, None)
+            return NO_ERROR
         else:
-            return (False, output)
+            if proxy == None:
+                error_info.append((endpoint, command, output))
+                return ERR_ENDPT
+            else:
+                error_info.append((endpoint, command, output))
+                return ERR_ENDPT_PROXY
     except Exception as e:
-        return (False, e)
+        error_info.append((endpoint, command, e))
+        return ERR_ENDPT
     
     
 def check_ama_endpts():    
@@ -83,10 +98,9 @@ def check_ama_endpts():
      
     # check AMCS ping results   
     for endpoint in endpoints:
-        curl_result, e = check_endpt_curl(GLOBAL_HANDLER_URL)
-        if curl_result == False:
-            error_info.append((endpoint, CURL_CMD.format(endpoint), e))
-            return ERR_ENDPT
+        checked_curl = check_endpt_curl(endpoint)
+        if not checked_curl == NO_ERROR:
+            return checked_curl
         
     for id in workspace_ids:
         endpoints.append(ODS_URL.format(id))
@@ -111,6 +125,14 @@ def check_ama_endpts():
         
         # check ssl handshake
         command = SSL_CMD
+        
+        # skip openssl check with authenticated proxy
+        if not geninfo_lookup('MDSD_PROXY_USERNAME') == None:
+            return WARN_OPENSSL_PROXY
+        proxy = geninfo_lookup('MDSD_PROXY_ADDRESS')
+        if not proxy == None:
+            proxy = proxy.replace('http://', '')
+            command = command + ' -proxy {0}'.format(proxy)
         if not geninfo_lookup('SSL_CERT_DIR') == None:
             command = command + " -CApath " + geninfo_lookup('SSL_CERT_DIR')
         if not geninfo_lookup('SSL_CERT_FILE') == None:
