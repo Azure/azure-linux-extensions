@@ -137,7 +137,6 @@ def main():
         if imds_metadata is None:
             msg = "Python helper failed in fetching IMDS metadata"
             raise Exception(msg)
-        
         is_vm_compliant = detect_encryption_status(imds_metadata)
 
     except Exception as e:
