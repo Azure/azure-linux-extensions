@@ -9,6 +9,9 @@ supported_ade_image_list = SupportedSkus.supported_ade_image_list
 # List of VM Sizes unsupported by ADE and HBE (Basic and A series VMs)
 unsupported_vm_size_list = ["basic", "standard_a0", "standard_a1"]
 
+# JSON property value for Confidential VM security type in IMDS metadata
+cvm_metadata_value = "confidentialvm"
+
 # Prefix for VM using Classic Compute provider, Kubernetes or Databricks
 classic_compute_prefix = "classiccompute"
 microsoft_databrick_image_publisher = "azuredatabricks"
@@ -24,6 +27,17 @@ def verify_vm_os_sku_completeness(imds_metadata):
         return False
 
     return True    
+
+def is_confidential_vm(imds_metadata):
+    cvm_status = imds_metadata['compute']['securityProfile']['securityType']
+    is_confidential_vm = False    
+    
+    if cvm_status is not None:
+        cvm_status = str(cvm_status).lower()
+        if cvm_metadata_value in cvm_status:
+            is_confidential_vm = True
+        
+    return is_confidential_vm
 
 def is_basic_vm(imds_metadata):    
     vm_size = imds_metadata['compute']['vmSize']

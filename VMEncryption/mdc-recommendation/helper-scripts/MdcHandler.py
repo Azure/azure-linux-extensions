@@ -72,31 +72,37 @@ def check_ade_encryption(imds_metadata):
     return False
 
 def detect_encryption_status(imds_metadata):
-    is_vm_hbe_encrypted = check_hbe_encryption(imds_metadata)
-    is_vm_ade_encrypted = check_ade_encryption(imds_metadata)
     is_vm_compliant = False
+    confidential_vm_status = VerifyVMSupport.is_confidential_vm(imds_metadata)
 
-    if (is_vm_hbe_encrypted is True):
-        is_vm_compliant = True
-        policy_reasons['code'] = "Compliant"
-        policy_reasons['phrase'] = "VM is encryption compliant with Host Based Encryption."
-
-    elif(is_vm_ade_encrypted is True):
-        is_vm_compliant = True
-        policy_reasons['code'] = "Compliant"
-        policy_reasons['phrase'] = "VM is encryption compliant with Azure Disk Encryption."
+    if (confidential_vm_status is True):
+        is_vm_compliant = False
+        policy_reasons['code'] = "ConfidentialVMNotSupported"
+        policy_reasons['phrase'] = "Confidential VMs are not supported by this recommendation."
     else:
-        vm_support_dict = VerifyVMSupport.check_vm_supportability(imds_metadata)
+        is_vm_hbe_encrypted = check_hbe_encryption(imds_metadata)
+        is_vm_ade_encrypted = check_ade_encryption(imds_metadata)        
 
-        if vm_support_dict['is_vm_not_supported'] is True:
-            is_vm_compliant = False
-            policy_reasons['code'] = vm_support_dict['code']
-            policy_reasons['phrase'] = vm_support_dict['phrase']
+        if (is_vm_hbe_encrypted is True):
+            is_vm_compliant = True
+            policy_reasons['code'] = "Compliant"
+            policy_reasons['phrase'] = "VM is encryption compliant with Host Based Encryption."            
+        elif(is_vm_ade_encrypted is True):
+            is_vm_compliant = True
+            policy_reasons['code'] = "Compliant"
+            policy_reasons['phrase'] = "VM is encryption compliant with Azure Disk Encryption."
         else:
-            is_vm_compliant = False
-            if (policy_reasons['code'] == "" and policy_reasons['phrase'] == ""):
-                policy_reasons['code'] = "MissingADEandHBE"
-                policy_reasons['phrase'] = "VM is not encrypted. VM should be encrypted with Host Based Encryption or Azure Disk Encryption"
+            vm_support_dict = VerifyVMSupport.check_vm_supportability(imds_metadata)
+
+            if vm_support_dict['is_vm_not_supported'] is True:
+                is_vm_compliant = False
+                policy_reasons['code'] = vm_support_dict['code']
+                policy_reasons['phrase'] = vm_support_dict['phrase']
+            else:
+                is_vm_compliant = False
+                if (policy_reasons['code'] == "" and policy_reasons['phrase'] == ""):
+                    policy_reasons['code'] = "MissingADEandHBE"
+                    policy_reasons['phrase'] = "VM is not encrypted. VM should be encrypted with Host Based Encryption or Azure Disk Encryption."
 
     return is_vm_compliant
 
@@ -131,7 +137,7 @@ def main():
         if imds_metadata is None:
             msg = "Python helper failed in fetching IMDS metadata"
             raise Exception(msg)
-
+        
         is_vm_compliant = detect_encryption_status(imds_metadata)
 
     except Exception as e:
