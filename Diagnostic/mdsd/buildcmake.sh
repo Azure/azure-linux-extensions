@@ -199,9 +199,9 @@ ParseGlibcVer()
 #    (especially SUSE 11, which is already done that way).
 BuildOpenSsl()
 {
-    opensslDir=openssl-1.0.2* # Grab the only (which must be latest) OpenSSL 1.0.2 release
+    opensslDir=openssl-1.1.1* # Grab the only (which must be latest) OpenSSL 1.0.2 release
     tgzFile=$opensslDir.tar.gz
-    wget ftp://ftp.openssl.org/source/$tgzFile || exit 1
+    wget -N ftp://ftp.openssl.org/source/$tgzFile || exit 1
     InstallOpenSSL=1
     if [ -e /usr/local/lib/libcrypto.a -a -e /usr/local/lib/libssl.a ]; then
         OpenSSLVersion=$(strings /usr/local/lib/libssl.a | egrep "^OpenSSL " | awk '{ print $2 }')
@@ -212,7 +212,7 @@ BuildOpenSsl()
     fi
     if [ "$InstallOpenSSL" == "1" ]; then
         tar xfz $tgzFile
-        cd $opensslDir
+        cd $opensslDir/
          # Need to make the lib*.a linkable to .so as well (for AI SDK lib*.so) by adding -fPIC.
         export CC="gcc -fPIC"
         ./config --prefix=/usr/local --openssldir=/usr/lib/ssl zlib
