@@ -1,9 +1,6 @@
 import time
 import datetime
 import traceback
-"""import shlex
-import subprocess
-from subprocess import * """
 import json
 
 try:
@@ -16,7 +13,9 @@ except ImportError:
     import httplib as httpclient #python2
 
 # define IMDS uri and header
-imds_uri = 'http://169.254.169.254/metadata/instance?api-version=2021-11-01'
+# IMDS api-version=2021-11-01 is the minimum required version where HBE property 'compute.securityProfile.encryptionAtHost' was added.
+# IMDS api-version=2021-12-13 is the minimum required version where CVM property 'compute.securityProfile.securityType' was added.
+imds_uri = 'http://169.254.169.254/metadata/instance?api-version=2021-12-13'
 imds_header = {
     "Metadata":"true"
 }
