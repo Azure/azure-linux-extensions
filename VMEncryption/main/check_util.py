@@ -27,7 +27,6 @@ from Common import CommonVariables
 from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
-import IMDSUtil
 
 try:
     from urllib.parse import urlparse #python3+
@@ -331,7 +330,7 @@ class CheckUtil(object):
         return detected
 
     def preInitializationCheck(self,logger,imdsStoredResults,iMDSUtil):
-        '''This funciton is checking the VM compatibility to apply ADE'''
+        '''This funciton is checking the VM compatibility for ADE'''
         logger.log('Pre initialization check Start.')
         try:
             securityType = None
@@ -339,22 +338,22 @@ class CheckUtil(object):
                 securityType = imdsStoredResults.get_security_type()
                 logger.log("reading from imds stored results, security type is {0}.".format(securityType))
             else:
-                securityType = iMDSUtil.get_security_type_IMDS()
+                securityType = iMDSUtil.get_vm_security_type()
                 #imds does not store security type for Standard or Basic type.
                 if(securityType=='' or securityType == None):
-                    securityType= CommonVariables.Standard
+                    securityType= CommonVariables.SecurityType.Standard.value
                 logger.log("reading from imds, security type is {0}.".format(securityType))
-            supported_Security_Types = CommonVariables.SupportedSecurityType
-            if not securityType.lower() in [x.lower() for x in supported_Security_Types] :
-                raise Exception("Unknown Volume Type: {0}, has to be one of {1}".format(securityType, supported_Security_Types))
-            imdsStoredResults.security_type = securityType
+            supported_Security_Types = [x for x in CommonVariables.SecurityType if x.value.lower() == securityType.lower()]
+            if len(supported_Security_Types)==0 :
+                raise Exception("Unknown VM security type: {0}, has to be one of {1}".format(securityType, [x.value for x in CommonVariables.SecurityType]))
+            imdsStoredResults.security_type = supported_Security_Types[0].value
             imdsStoredResults.commit()
         except Exception as ex:
             message = "Pre-initialization check: Exception thrown during IMDS call. \
                        exception:{0}, \n stack-trace: {1}".format(str(ex),traceback.format_exc())
             logger.log(msg=message,level=CommonVariables.ErrorLevel)
             raise Exception(message)
-        if securityType ==  CommonVariables.ConfidentialVM:
+        if securityType.lower() ==  CommonVariables.SecurityType.ConfidentialVM.name.lower():
             message = "Pre-initialization check: ADE flow is blocked for confidential VM."
             logger.log(msg=message,level=CommonVariables.ErrorLevel)
             raise Exception(message) 

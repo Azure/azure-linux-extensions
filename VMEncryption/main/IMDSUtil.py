@@ -1,9 +1,32 @@
-import imp
+#!/usr/bin/env python
+#
+# Azure Disk Encryption For Linux extension
+#
+# Copyright 2016 Microsoft Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import json
 import time
-from Common import CommonVariables
+import datetime
+import traceback
+import os.path
+import sys
 
+from Common import CommonVariables
+from ConfigUtil import ConfigUtil
+from ConfigUtil import ConfigKeyValuePair
 try:
     import http.client as httpclient #python3+
 except ImportError:
@@ -12,7 +35,7 @@ except ImportError:
 import xml.etree.ElementTree as ET
 
 class IMDSUtil(object):
-    '''this class is used to get security type information from IMDS'''
+    '''this class is used for reading VM information from IMDS'''
     def __init__(self, logger):
         self.logger = logger
     
@@ -41,6 +64,7 @@ class IMDSUtil(object):
 
     
     def _get_security_type_IMDS_helper(self,http_util):
+        '''helper function to read VM's security type from IMDS'''
         retry_count_max = 3
         retry_count = 0
         imds_endpoint_uri = self.getUri(CommonVariables.IMDS_API_Version,CommonVariables.IMDS_SecurityProfile_subDir)   
@@ -75,12 +99,10 @@ class IMDSUtil(object):
 
     def getUri(self,api_version,subdirectory):
         '''This function creates IMDS Uri'''
-        uri = "http://{0}".format(CommonVariables.static_IMDS_IP)
-        uri = os.path.join(uri,subdirectory)
-        uri = "{0}?api-version={1}".format(uri,api_version)
+        uri = "http://{0}/{1}?api-version={2}".format(CommonVariables.static_IMDS_IP,subdirectory,api_version)
         return uri
 
-    def get_security_type_IMDS(self):
+    def get_vm_security_type(self):
         '''This function returns security type of VM.'''
         '''['','TrustedLaunch','ConfidentialVM']'''
         http_util = self.get_http_util()
@@ -89,4 +111,63 @@ class IMDSUtil(object):
             raise Exception("VM security profile does not have securityType.")
         return security_profile['securityType']
 
+class IMDSStoredResults(object):
+    '''This class is used to store IMDS result in imds encryption config file'''
+    def __init__(self, encryption_environment, logger):
+        '''init call'''
+        self.encryption_environment = encryption_environment
+        self.security_type = None
+        self.encryption_config = ConfigUtil(encryption_environment.imds_stored_results_file_path,
+                                            'imds_stored_results',
+                                            logger)
+        self.logger = logger
+
+    def config_file_exists(self):
+        '''checking if encryption config file exist'''
+        return self.encryption_config.config_file_exists()
+
+    def get_security_type(self):
+        '''read VM security type from file'''
+        securityType = self.encryption_config.get_config(CommonVariables.SecurityTypeKey)
+        return securityType if securityType else None
+
+    def get_cfg_val(self, s):
+        ''' return a string type that is compatible with the version of config parser that is in use'''
+        if s is None:
+            return ""
+
+        if (sys.version_info > (3, 0)):
+            return s  # python 3+ , preserve unicode
+        else:
+            if isinstance(s, unicode):
+                # python2 ConfigParser does not properly support unicode, convert to ascii
+                return s.encode('ascii', 'ignore')
+            else:
+                return s
+                
+    def commit(self):
+        '''commit VM security type information in file.'''
+        key_value_pairs = []
+        sec_key = CommonVariables.SecurityTypeKey
+        sec_val = self.get_cfg_val(self.security_type)
+        # construct kvp collection
+        command = ConfigKeyValuePair(sec_key, sec_val)
+        key_value_pairs.append(command)
+        # save settings in the configuration file
+        self.encryption_config.save_configs(key_value_pairs)
+
+    def clear_config(self, clear_parameter_file=False):
+        '''clear configuration file'''
+        try:
+            if os.path.exists(self.encryption_environment.imds_stored_results_file_path):
+                self.logger.log(msg="archiving the imds stored results file: {0}".format(self.encryption_environment.imds_stored_results_file_path))
+                time_stamp = datetime.datetime.utcnow()
+                new_name = "{0}_{1}".format(self.encryption_environment.imds_stored_results_file_path, time_stamp.isoformat())
+                os.rename(self.encryption_environment.imds_stored_results_file_path, new_name)
+            else:
+                self.logger.log(msg=("the imds results file not exist: {0}".format(self.encryption_environment.imds_stored_results_file_path)), level=CommonVariables.WarningLevel)
+            return True
+        except OSError as e:
+            self.logger.log("Failed to archive imds stored results with error: {0}, stack trace: {1}".format(printable(e), traceback.format_exc()))
+            return False
 

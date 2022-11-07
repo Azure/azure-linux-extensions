@@ -41,8 +41,7 @@ from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import EncryptionConfig
-from IMDSStoredResults import IMDSStoredResults
-from IMDSUtil import IMDSUtil
+from IMDSUtil import IMDSUtil,IMDSStoredResults
 from patch import GetDistroPatcher
 from BekUtil import BekUtil, BekMissingException
 from check_util import CheckUtil
@@ -666,11 +665,11 @@ def enable():
         logger.log('Enabling extension')
         public_settings = get_public_settings()
         logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
-        cutil = CheckUtil(logger)
+        checkUtil = CheckUtil(logger)
         imdsStoredResults=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
         iMDSUtil = IMDSUtil(logger)
         try:
-            cutil.preInitializationCheck(logger,imdsStoredResults=imdsStoredResults,iMDSUtil=iMDSUtil)
+            checkUtil.preInitializationCheck(logger,imdsStoredResults=imdsStoredResults,iMDSUtil=iMDSUtil)
         except Exception as ex:
              hutil.do_exit(exit_code=CommonVariables.unknown_error,
                     operation='preInitializationCheck',
@@ -727,7 +726,7 @@ def enable():
         # run fatal prechecks, report error if exceptions are caught
         try:
             if not is_migrate_operation:
-                cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
+                checkUtil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
@@ -745,7 +744,7 @@ def enable():
 
         # run prechecks and log any failures detected
         try:
-            if cutil.is_non_fatal_precheck_failure():
+            if checkUtil.is_non_fatal_precheck_failure():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
                 logger.log("PRECHECK: Prechecks successful")
