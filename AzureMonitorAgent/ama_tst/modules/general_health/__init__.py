@@ -1,0 +1,1 @@
+# General health checkings script for AMA

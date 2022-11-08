@@ -18,7 +18,7 @@ err_summary = []
 
 
 # # set of all errors which are actually warnings
-warnings = set([WARN_INTERNET_CONN, WARN_INTERNET])
+warnings = set([WARN_INTERNET_CONN, WARN_INTERNET, WARN_MDSD_ERR_FILE, WARN_RESTART_LOOP])
 
 # dictionary correlating error codes to error messages
 error_messages = {
@@ -54,7 +54,9 @@ error_messages = {
           "supports versions 1.9 and newer. Please upgrade to the newest version. You can find "\
           "more information at the link below:\n"\
           "\n    https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-manage\n",
-    ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA.\n\nError Details: \n{0}"
+    ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA.\n\nError Details: \n{0}",
+    WARN_MDSD_ERR_FILE : "Found errors in log file {0}, display last few lines of error messages:\n {1}",
+    WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}"
 }
 
 
