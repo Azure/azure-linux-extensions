@@ -68,6 +68,7 @@ class SizeCalculation(object):
         self.devicesToInclude = [] #partitions to be included
         self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
         self.includedLunList = para_parser.includeLunList
+        self.device_mount_points = []
         self.logger.log("includedLunList {0}".format(self.includedLunList))
         self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
         
@@ -166,8 +167,10 @@ class SizeCalculation(object):
                                     if "mountpoint" in child.keys() and child["mountpoint"] != None :
                                         child["name"] = '/dev/' + child["name"]
                                         self.devicesToInclude.append(child["name"])
+                                        self.device_mount_points.append(child["mountpoint"])
             
-        self.logger.log("devices_to_bill: {0}".format(str(self.devicesToInclude)),True)                   
+        self.logger.log("devices_to_bill: {0}".format(str(self.devicesToInclude)),True) 
+        self.logger.log("The mountpoints of devices to bill: {0}".format(str(self.device_mount_points)), True)
         self.logger.log("exiting device_list_for_billing",True)
         return devices_to_bill
 
@@ -320,7 +323,7 @@ class SizeCalculation(object):
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
                     else:
-                        if device in self.devicesToInclude :
+                        if mountpoint in self.device_mount_points :
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             total_used = total_used + int(used) #return in KB
                         else:
