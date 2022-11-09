@@ -241,19 +241,15 @@ def daemon():
         # handle the restoring scenario.
         mi = MachineIdentity()
         stored_identity = mi.stored_identity()
-        try:
-            if(stored_identity is None):
+        if(stored_identity is None):
+            mi.save_identity()
+        else:
+            current_identity = mi.current_identity()
+            if(current_identity != stored_identity):
+                current_seq_no = -1
+                backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
+                hutil.set_last_seq(current_seq_no)
                 mi.save_identity()
-            else:
-                current_identity = mi.current_identity()
-                if(current_identity != stored_identity):
-                    current_seq_no = -1
-                    backup_logger.log("machine identity not same, set current_seq_no to " + str(current_seq_no) + " " + str(stored_identity) + " " + str(current_identity), True)
-                    hutil.set_last_seq(current_seq_no)
-                    mi.save_identity()
-        except Exception as e:
-            errMsg = "Unable to open file, error: %s, stack trace: %s" % (str(e), traceback.format_exc())
-            backup_logger.log(errMsg, True, 'Error')
     except Exception as e:
         errMsg = 'Failed to validate sequence number with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
         backup_logger.log(errMsg, True, 'Error')
