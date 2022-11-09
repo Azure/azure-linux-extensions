@@ -50,7 +50,7 @@ class MachineIdentity:
                 self.file.write(machine_identity)
         finally:
             if self.file != None:
-                if self.file.closed ==False:
+                if self.file.closed == False:
                     self.file.close()
 
     def stored_identity(self):
