@@ -1,4 +1,4 @@
-import re
+import os
 
 from error_codes  import *
 from errors       import error_info, is_error, print_errors
@@ -30,6 +30,17 @@ def check_err_file():
         return WARN_MDSD_ERR_FILE
     return NO_ERROR
 
+def ask_restart_ama():
+    ama_dir = filter((lambda x : x.startswith("Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-")), os.listdir("/var/lib/waagent"))
+    ama_dir = list(ama_dir)
+    if len(ama_dir) > 1:
+        return ERR_MULTIPLE_AMA
+    print("If you need to restart Azure Monitor Agent on this machine, please execute the following commands:\n")
+    print("$ cd /var/lib/waagent/{0}".format(ama_dir[0]))
+    print("$ ./shim.sh -disable")
+    print("$ ./shim.sh -enable")
+    return NO_ERROR
+
 # check if the agent is in a healthy state
 def check_general_health(interactive, err_codes=True, prev_success=NO_ERROR):
     print("CHECKING IF THE AGENT IS HEALTHY...")
@@ -41,13 +52,19 @@ def check_general_health(interactive, err_codes=True, prev_success=NO_ERROR):
         return print_errors(checked_restart_status)
     else:
         success = print_errors(checked_restart_status)
-        
+    
     print("Checking mdsd.err file")
     checked_err_file = check_err_file()
     if (is_error(checked_err_file)):
         return print_errors(checked_err_file)
     else:
         success = print_errors(checked_err_file)
-        
+    
+    asked_restart_ama = ask_restart_ama()
+    if (is_error(asked_restart_ama)):
+        return print_errors(asked_restart_ama)
+    else:
+        success = print_errors(asked_restart_ama)
+    
     print("============================================")
     return success
