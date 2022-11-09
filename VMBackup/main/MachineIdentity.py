@@ -27,42 +27,42 @@ class MachineIdentity:
 
     def current_identity(self):
         identity = None
-        self.file = None
+        file = None
         try:
             if os.path.exists("/var/lib/waagent/HostingEnvironmentConfig.xml"):
-                self.file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
-                xmlText = self.file.read()
+                file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
+                xmlText = file.read()
                 dom = xml.dom.minidom.parseString(xmlText)
                 deployment = dom.getElementsByTagName("Role")
                 identity=deployment[0].getAttribute("guid")
         finally:
-            if self.file != None:
-                if self.file.closed == False:
-                    self.file.close()
+            if file != None:
+                if file.closed == False:
+                    file.close()
         return identity
 
     def save_identity(self):
-        self.file = None
+        file = None
         try:
-            self.file = open(self.store_identity_file,'w')
+            file = open(self.store_identity_file,'w')
             machine_identity = self.current_identity()
             if( machine_identity != None ):
-                self.file.write(machine_identity)
+                file.write(machine_identity)
         finally:
-            if self.file != None:
-                if self.file.closed == False:
-                    self.file.close()
+            if file != None:
+                if file.closed == False:
+                    file.close()
 
     def stored_identity(self):
         identity_stored = None
-        self.file = None
+        file = None
         try:
             if(os.path.exists(self.store_identity_file)):
-                self.file = open(self.store_identity_file,'r')
-                identity_stored = self.file.read()
+                file = open(self.store_identity_file,'r')
+                identity_stored = file.read()
         finally:
-            if self.file != None:
-                if self.file.closed == False:
-                    self.file.close()
+            if file != None:
+                if file.closed == False:
+                    file.close()
         return identity_stored
 
