@@ -16,9 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
 import CommonParameters
-
 
 class CommonVariables:
     utils_path_name = 'Utils'
@@ -131,11 +129,11 @@ class CommonVariables:
     Values for Imds results 
     """
     SecurityTypeKey = 'SecurityType'
-    class SecurityType(Enum):
-        Standard='Standard'
-        TrustedLaunch='TrustedLaunch'
-        ConfidentialVM='ConfidentialVM'
-    
+    Standard='Standard'
+    TrustedLaunch='TrustedLaunch'
+    ConfidentialVM='ConfidentialVM'
+    supported_Security_Types=[Standard,TrustedLaunch,ConfidentialVM]    
+
     """
     command types
     """

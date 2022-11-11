@@ -341,19 +341,19 @@ class CheckUtil(object):
                 securityType = iMDSUtil.get_vm_security_type()
                 #imds does not store security type for Standard or Basic type.
                 if(securityType=='' or securityType == None):
-                    securityType= CommonVariables.SecurityType.Standard.value
+                    securityType= CommonVariables.Standard
                 logger.log("reading from imds, security type is {0}.".format(securityType))
-            supported_Security_Types = [x for x in CommonVariables.SecurityType if x.value.lower() == securityType.lower()]
+            supported_Security_Types = [x for x in CommonVariables.supported_Security_Types if x.lower() == securityType.lower()]
             if len(supported_Security_Types)==0 :
-                raise Exception("Unknown VM security type: {0}, has to be one of {1}".format(securityType, [x.value for x in CommonVariables.SecurityType]))
-            imdsStoredResults.security_type = supported_Security_Types[0].value
+                raise Exception("Unknown VM security type: {0}, has to be one of {1}".format(securityType,CommonVariables.supported_Security_Types))
+            imdsStoredResults.security_type = supported_Security_Types[0]
             imdsStoredResults.commit()
         except Exception as ex:
             message = "Pre-initialization check: Exception thrown during IMDS call. \
                        exception:{0}, \n stack-trace: {1}".format(str(ex),traceback.format_exc())
             logger.log(msg=message,level=CommonVariables.ErrorLevel)
             raise Exception(message)
-        if securityType.lower() ==  CommonVariables.SecurityType.ConfidentialVM.name.lower():
+        if securityType.lower() ==  CommonVariables.ConfidentialVM.lower():
             message = "Pre-initialization check: ADE flow is blocked for confidential VM."
             logger.log(msg=message,level=CommonVariables.ErrorLevel)
             raise Exception(message) 
