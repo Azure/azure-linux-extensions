@@ -46,7 +46,7 @@ def run_troubleshooter():
         print("================================================================================\n"\
             # TODO: come up with scenarios
               "1: Installation failures. \n"\
-              "2: Agent doesn't start, can't connect to Log Analytic Services.\n"\
+              "2: Agent doesn't start or cannot connect to Log Analytics service.\n"\
               "================================================================================\n"\
               "L: Collect the logs for AMA.\n"\
               "Q: Press 'Q' to quit.\n"\

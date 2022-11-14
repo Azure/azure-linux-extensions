@@ -4,7 +4,7 @@ import subprocess
 
 from error_codes       import *
 from errors            import error_info, is_error, print_errors
-from helpers           import general_info
+from helpers           import general_info, geninfo_lookup
 from .check_endpts     import check_internet_connect, check_ama_endpts
 from .check_imds       import check_imds_api
 
@@ -65,8 +65,11 @@ def check_workspace():
     return NO_ERROR
 
 def check_subcomponents(): 
-    services = ['azuremonitoragent', 'metrics-sourcer', 'azuremonitor-agentlauncher',
-                     'azuremonitor-coreagent','metrics-extension']
+    services = ['azuremonitoragent', 'azuremonitor-agentlauncher', 'azuremonitor-coreagent']
+    if len(geninfo_lookup('ME_REGION')) > 0:
+        services.append('metrics-sourcer')
+        services.append('metrics-extension')
+        
     for service in services:
         try:
             status = subprocess.check_output(['systemctl', 'status', service],\
@@ -115,7 +118,7 @@ def check_connection(interactive, err_codes=True, prev_success=NO_ERROR):
 
 
     # check if AMA endpoints connected
-    print("Checking if AMA endpoints are connected...")
+    print("Checking if machine can connect to Azure Monitor control-plane and data ingestion endpoints...")
     checked_ama_endpts = check_ama_endpts()
     if (is_error(checked_ama_endpts)):
         return print_errors(checked_ama_endpts)
@@ -130,8 +133,7 @@ def check_connection(interactive, err_codes=True, prev_success=NO_ERROR):
     else:
         success = print_errors(checked_subcomponents)
         
-    # check if IMDS metadata/token API can be reached
-    print("Checking if IMDS metadata/token API can be reached...")
+    print("Checking if IMDS metadata and MSI tokens are available...")
     checked_imds_api = check_imds_api()
     if (is_error(checked_imds_api)):
         return print_errors(checked_imds_api)

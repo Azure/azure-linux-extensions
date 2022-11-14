@@ -24,34 +24,37 @@ def get_latest_ama_version(curr_version):
         tbody = r.split("<tbody>")[1].split("</tbody>")[0]
         tbody = "<tbody>" + tbody + "</tbody>"
         
-        dom = xml.dom.minidom.parseString(tbody)
-        rows = dom.getElementsByTagName("tr")
-        for row in rows:
-            cell = row.getElementsByTagName("td")[3]
-            version = cell.firstChild.nodeValue
-            version = re.sub('[A-Za-z ]+', '', version)
-            if (version == ''):
-                continue
-            if (comp_versions_ge(curr_version, version)):
-                return (None, None)
-            else:
-                return (version, None)
+        with xml.dom.minidom.parseString(tbody) as dom:
+            rows = dom.getElementsByTagName("tr")
+            for row in rows:
+                cell = row.getElementsByTagName("td")[3]
+                version = cell.firstChild.nodeValue
+                version = re.sub('[A-Za-z ]+', '', version)
+                if (version == ''):
+                    continue
+                if (comp_versions_ge(curr_version, version)):
+                    return (None, None)
+                else:
+                    return (version, None)
     except Exception as e:
         return (None, e)
     return (None, None)
 
-# compare two versions, see if the first is newer than / the same as the second
+# 
 def comp_versions_ge(version1, version2):
-        versions1 = [int(v) for v in version1.split(".")]
-        versions2 = [int(v) for v in version2.split(".")]
-        for i in range(max(len(versions1), len(versions2))):
-            v1 = versions1[i] if i < len(versions1) else 0
-            v2 = versions2[i] if i < len(versions2) else 0
-            if v1 > v2:
-                return True
-            elif v1 < v2:
-                return False
-        return True
+    """
+    compare two versions, see if the first is newer than / the same as the second
+    """
+    versions1 = [int(v) for v in version1.split(".")]
+    versions2 = [int(v) for v in version2.split(".")]
+    for i in range(max(len(versions1), len(versions2))):
+        v1 = versions1[i] if i < len(versions1) else 0
+        v2 = versions2[i] if i < len(versions2) else 0
+        if v1 > v2:
+            return True
+        elif v1 < v2:
+            return False
+    return True
 
 def ask_update_old_version(ama_version, curr_ama_version):
     print("--------------------------------------------------------------------------------")
@@ -88,7 +91,7 @@ def check_ama(interactive):
             return NO_ERROR
         else:
             checked_internet = check_internet_connect()
-            if checked_internet == NO_ERROR:
+            if checked_internet != NO_ERROR:
                 print("WARNING: can't connect to {0}: {1}\n Skipping this check...".format(AMA_URL, e))
                 print("--------------------------------------------------------------------------------")
             # issue with general internet connectivity

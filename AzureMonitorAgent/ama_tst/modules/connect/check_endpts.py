@@ -13,8 +13,11 @@ ODS_URL = "{0}.ods.opinsights.azure.com"
 ME_URL = "management.azure.com"
 ME_REGION_URL = "{0}.monitoring.azure.com"
 
-# openssl connect to specific endpoint
+
 def check_endpt_ssl(ssl_cmd, endpoint):
+    """
+    openssl connect to specific endpoint
+    """
     try:
         ssl_output = subprocess.check_output(ssl_cmd.format(endpoint), shell=True,\
                      stderr=subprocess.STDOUT, universal_newlines=True)
@@ -34,8 +37,10 @@ def check_endpt_ssl(ssl_cmd, endpoint):
         return (False, False, e)
 
 
-# check general internet connectivity
 def check_internet_connect():
+    """
+    check general internet connectivity
+    """
     (connected_docs, verified_docs, e) = check_endpt_ssl(SSL_CMD, "docs.microsoft.com")
     if (connected_docs and verified_docs):
         return NO_ERROR
@@ -95,12 +100,6 @@ def check_ama_endpts():
         return ERR_INFO_MISSING
     for region in regions:
         endpoints.append(REGION_HANDLER_URL.format(region))
-     
-    # check AMCS ping results   
-    for endpoint in endpoints:
-        checked_curl = check_endpt_curl(endpoint)
-        if not checked_curl == NO_ERROR:
-            return checked_curl
         
     for id in workspace_ids:
         endpoints.append(ODS_URL.format(id))
@@ -141,4 +140,10 @@ def check_ama_endpts():
         if not connected or not verified:
             error_info.append((endpoint, command.format(endpoint), e))
             return ERR_ENDPT
+        
+        # check AMCS ping results
+        if "handler.control.monitor" in endpoint:
+            checked_curl = check_endpt_curl(endpoint)
+            if checked_curl != NO_ERROR:
+                return checked_curl
     return NO_ERROR

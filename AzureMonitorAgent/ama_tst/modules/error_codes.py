@@ -1,7 +1,4 @@
 # # General Errors
-from curses import ERR
-
-
 NO_ERROR = 0
 USER_EXIT = 1
 ERR_SUDO_PERMS = 100

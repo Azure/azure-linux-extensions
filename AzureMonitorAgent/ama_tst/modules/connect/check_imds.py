@@ -3,7 +3,7 @@ import json
 
 from error_codes    import *
 from errors         import error_info
-from helpers        import geninfo_lookup, general_info
+from helpers        import geninfo_lookup
 from logcollector   import is_arc_installed
 
 METADATA_CMD = 'curl -s -H Metadata:true --noproxy "*" "http://{0}/metadata/instance/compute?api-version=2020-06-01"'
@@ -14,12 +14,14 @@ AZURE_TOKEN_CMD = "curl 'http://169.254.169.254/metadata/identity/oauth2/token?a
 ARC_TOKEN_CMD = 'ChallengeTokenPath=$(curl -s -D - -H Metadata:true "http://127.0.0.1:40342/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https%3A%2F%2Fmanagement.azure.com"'\
                     '| grep Www-Authenticate | cut -d "=" -f 2 | tr -d "[:cntrl:]") ; ' \
                     'ChallengeToken=$(cat $ChallengeTokenPath) ; ' \
-                    'curl -s -H Metadata:true -H "Authorization: Basic 1$ChallengeToken" "http://127.0.0.1:40342/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https%3A%2F%2Fmanagement.azure.com"'
+                    'curl -s -H Metadata:true -H "Authorization: Basic $ChallengeToken" "http://127.0.0.1:40342/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https%3A%2F%2Fmanagement.azure.com"'
 
 
 def check_metadata():
+    type = "Azure"
     if is_arc_installed():
         command = METADATA_CMD.format(ARC_IP)
+        type = "Hybrid"
     else: 
         command = METADATA_CMD.format(AZURE_IP)
     try:
@@ -29,10 +31,10 @@ def check_metadata():
         attributes = ['azEnvironment', 'resourceId', 'location']
         for attr in attributes:
             if not attr in output_json:
-                error_info.append((command, output))
+                error_info.append((type, command, output))
                 return ERR_IMDS_METADATA
     except Exception as e:
-        error_info.append((command, e))
+        error_info.append((type, command, e))
         return ERR_IMDS_METADATA
     return NO_ERROR
 
