@@ -1,0 +1,1 @@
+# Install check helper script for AMA
