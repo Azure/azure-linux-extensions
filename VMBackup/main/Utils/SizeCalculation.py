@@ -61,7 +61,7 @@ class SizeCalculation(object):
             self.lsscsi_list = []
         try:
              self.output_lsblk = json.loads(os.popen("lsblk --json --output name,mountpoint").read())
-        except:
+        except Exception as e:
             error_msg = "Failed to execute the command lsblk --json --output name,mountpoint because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.output_lsblk = {}
