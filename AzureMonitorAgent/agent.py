@@ -763,12 +763,12 @@ def set_proxy(address, username, password):
     # Update Coreagent
     run_command_and_log("mkdir -p /etc/systemd/system/azuremonitor-coreagent.service.d")
     run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
-    run_command_and_log("echo 'Environment=\"http_proxy={0}\"' > /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
+    run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
     
     # Update ME
     run_command_and_log("mkdir -p /etc/systemd/system/metrics-extension.service.d")
     run_command_and_log("echo '[Service]' > /etc/systemd/system/metrics-extension.service.d/proxy.conf")
-    run_command_and_log("echo 'Environment=\"http_proxy={0}\"' > /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
+    run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
         
     run_command_and_log("systemctl daemon-reload")
     
