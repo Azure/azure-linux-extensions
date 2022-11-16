@@ -23,6 +23,7 @@ import datetime
 import traceback
 import os.path
 import sys
+import math
 
 from Common import CommonVariables
 from ConfigUtil import ConfigUtil
@@ -54,7 +55,7 @@ class IMDSUtil(object):
         try:
             xml_root = ET.fromstring(content_xml)
         except:
-            self.logger.log("Exception occured while parsing error xml.")
+            self.logger.log("Exception occured while parsing error xml.\n XML content: {0}".format(content_xml))
             return "Unknown"
         detail_element = xml_root.find('Details')
         if detail_element is not None and (detail_element.text is not None and len(detail_element.text) > 0):
@@ -93,6 +94,8 @@ class IMDSUtil(object):
                 retry_count += 1
                 self.logger.log("Encountered exception from IMDS GET request to IMDS (attempt #{0}) \n{1}".format(str(retry_count),str(ex)))
                 if retry_count<retry_count_max:
+                    sleeping_time = math.pow(2,retry_count)
+                    self.logger.log("sleeping for {0}s.".format(sleeping_time))
                     time.sleep(10) #sleep for 10 second before retyring
                 else:
                     raise Exception("IMDS request is failed to retrive VM's security profile, retry:{0} ref: https://aka.ms/imds".format(retry_count_max))

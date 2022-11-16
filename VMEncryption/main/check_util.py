@@ -330,7 +330,7 @@ class CheckUtil(object):
         return detected
 
     def preInitializationCheck(self,logger,imdsStoredResults,iMDSUtil):
-        '''This funciton is checking the VM compatibility for ADE'''
+        '''This function is checking the VM compatibility for ADE'''
         logger.log('Pre initialization check Start.')
         try:
             securityType = None
