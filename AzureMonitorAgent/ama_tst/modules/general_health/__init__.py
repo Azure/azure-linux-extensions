@@ -1,1 +1,1 @@
-# General health checkings script for AMA
+# General health check helper script for AMA

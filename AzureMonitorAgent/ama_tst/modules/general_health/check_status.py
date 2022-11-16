@@ -4,10 +4,11 @@ import re
 from error_codes import *
 from errors      import error_info
 
-# check if the subcomponents restart in a given time interval
 def check_restart_status():
+    """
+    check if the subcomponents restart in a given time interval
+    """
     subcomponents = {'azuremonitoragent': 'azuremonitoragent', 
-                     'metrics-sourcer': 'telegraf',
                      'azuremonitor-agentlauncher': 'agentlauncher',
                      'azuremonitor-coreagent': 'amacoreagent',
                      'metrics-extension': 'MetricsExtension'}

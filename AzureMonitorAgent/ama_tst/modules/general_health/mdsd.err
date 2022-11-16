@@ -1,5 +1,0 @@
-2022-11-02T23:25:33.3571910Z: [DAEMON] Parent process 1967 exit. child process id=2008
-2022-11-02T23:25:33.3660940Z: [DAEMON] START mdsd daemon ver(1.22.2) pid(2008) uid(104) gid (110)
-
-2022-11-02T23:25:52.9460010Z: Unrecognized late event token: 1
-2022-11-02T23:25:52.9461910Z: Exception while uploading to ODS: Subscriber reported a ReadUntil time less than its current ReadUntil time.

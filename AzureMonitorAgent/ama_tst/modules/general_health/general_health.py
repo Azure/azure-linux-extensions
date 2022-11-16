@@ -6,8 +6,10 @@ from .check_status import check_restart_status
 
 ERR_FILE_PATH = "/var/opt/microsoft/azuremonitoragent/log/mdsd.err"
 
-# output mdsd.err contents if the file is not empty
 def check_err_file():
+    """
+    output mdsd.err contents if the file is not empty
+    """
     tail_size = -50
     pattern = ' [DAEMON] '
     err_logs = []
@@ -30,6 +32,7 @@ def check_err_file():
         return WARN_MDSD_ERR_FILE
     return NO_ERROR
 
+
 def ask_restart_ama():
     ama_dir = filter((lambda x : x.startswith("Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-")), os.listdir("/var/lib/waagent"))
     ama_dir = list(ama_dir)
@@ -41,7 +44,6 @@ def ask_restart_ama():
     print("$ ./shim.sh -enable")
     return NO_ERROR
 
-# check if the agent is in a healthy state
 def check_general_health(interactive, err_codes=True, prev_success=NO_ERROR):
     print("CHECKING IF THE AGENT IS HEALTHY...")
     success = prev_success
