@@ -1,18 +1,29 @@
 import re
-import requests
 import xml.dom.minidom
+import urllib
+try:
+    import requests
+except ImportError:
+    pass
 
 from error_codes import *
 from errors      import error_info, get_input
 from helpers     import get_package_version
+from connect.check_endpts import check_internet_connect
 
 AMA_URL = 'https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-extension-versions'
 
 def get_latest_ama_version(curr_version):
+    # python2 and python3 compatible
     try:           
-        r = requests.get(AMA_URL)
-        tbody = r.text.split("<tbody>")[1].split("</tbody>")[0]
+        r = urllib.urlopen(AMA_URL).read()
+    except AttributeError:
+        r = requests.get(AMA_URL).text
+        
+    try:
+        tbody = r.split("<tbody>")[1].split("</tbody>")[0]
         tbody = "<tbody>" + tbody + "</tbody>"
+        
         with xml.dom.minidom.parseString(tbody) as dom:
             rows = dom.getElementsByTagName("tr")
             for row in rows:
@@ -29,18 +40,21 @@ def get_latest_ama_version(curr_version):
         return (None, e)
     return (None, None)
 
-# compare two versions, see if the first is newer than / the same as the second
+# 
 def comp_versions_ge(version1, version2):
-        versions1 = [int(v) for v in version1.split(".")]
-        versions2 = [int(v) for v in version2.split(".")]
-        for i in range(max(len(versions1), len(versions2))):
-            v1 = versions1[i] if i < len(versions1) else 0
-            v2 = versions2[i] if i < len(versions2) else 0
-            if v1 > v2:
-                return True
-            elif v1 < v2:
-                return False
-        return True
+    """
+    compare two versions, see if the first is newer than / the same as the second
+    """
+    versions1 = [int(v) for v in version1.split(".")]
+    versions2 = [int(v) for v in version2.split(".")]
+    for i in range(max(len(versions1), len(versions2))):
+        v1 = versions1[i] if i < len(versions1) else 0
+        v2 = versions2[i] if i < len(versions2) else 0
+        if v1 > v2:
+            return True
+        elif v1 < v2:
+            return False
+    return True
 
 def ask_update_old_version(ama_version, curr_ama_version):
     print("--------------------------------------------------------------------------------")
@@ -76,8 +90,13 @@ def check_ama(interactive):
         if (e == None):
             return NO_ERROR
         else:
-            error_info.append((e,))
-            return ERR_GETTING_AMA_VER
+            checked_internet = check_internet_connect()
+            if checked_internet != NO_ERROR:
+                print("WARNING: can't connect to {0}: {1}\n Skipping this check...".format(AMA_URL, e))
+                print("--------------------------------------------------------------------------------")
+            # issue with general internet connectivity
+            else:
+                return checked_internet
         
     else:
         # if not most recent version, ask if want to update

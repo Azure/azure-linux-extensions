@@ -28,8 +28,10 @@ supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
                     'debian' : ['11'] # Debian
 }
     
-# print out warning if running the wrong version of OS
 def format_alternate_versions(supported_dist, versions):
+    """
+    print out warning if running the wrong version of OS
+    """
     last = versions.pop()
     if (versions == []):
         s = "{0}".format(last)

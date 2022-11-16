@@ -403,6 +403,7 @@ class HandlerUtility:
     def get_machine_id(self):
         machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
         machine_id = ""
+        file_pointer = None
         try:
             if not os.path.exists(os.path.dirname(machine_id_file)):
                 os.makedirs(os.path.dirname(machine_id_file))
@@ -411,15 +412,21 @@ class HandlerUtility:
                 file_pointer = open(machine_id_file, "r")
                 machine_id = file_pointer.readline()
                 file_pointer.close()
+             
             else:
                 mi = MachineIdentity()
-                machine_id = mi.stored_identity()[1:-1]
-                file_pointer = open(machine_id_file, "w")
-                file_pointer.write(machine_id)
-                file_pointer.close()
+                if(mi.stored_identity() != None):
+                    machine_id = mi.stored_identity()[1:-1]
+                    file_pointer = open(machine_id_file, "w")
+                    file_pointer.write(machine_id)
+                    file_pointer.close()
         except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, 'Error')
+        finally :
+            if file_pointer != None :
+                if file_pointer.closed == False :
+                    file_pointer.close()
  
         self.log("Unique Machine Id  : {0}".format(machine_id))
         return machine_id

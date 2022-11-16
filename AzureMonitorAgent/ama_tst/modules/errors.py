@@ -17,8 +17,8 @@ err_summary = []
 
 
 
-# # set of all errors which are actually warnings
-warnings = set([WARN_INTERNET_CONN, WARN_INTERNET, WARN_MDSD_ERR_FILE, WARN_RESTART_LOOP])
+# set of all errors which are actually warnings
+warnings = set([WARN_INTERNET_CONN, WARN_INTERNET, WARN_OPENSSL_PROXY, WARN_MDSD_ERR_FILE, WARN_RESTART_LOOP])
 
 # dictionary correlating error codes to error messages
 error_messages = {
@@ -55,6 +55,20 @@ error_messages = {
           "more information at the link below:\n"\
           "\n    https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-manage\n",
     ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA.\n\nError Details: \n{0}",
+    ERR_AMA_PARAMETERS : "Couldn't read and parse AMA configuration in /etc/default/azuremonitoragent.\n\nError Details:\n{0}",
+    ERR_NO_DCR : "Couldn't parse DCR information on this VM. Please check your DCR configuration.\n\nError Details:{0}",
+    ERR_INFO_MISSING: "NO DCR workspace id or region is found. Please check if DCR is configured correctly and match the information in"\
+            "/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks.*.json",
+    ERR_ENDPT : "Machine couldn't connect to {0}: curl/openssl command failed. "\
+          "\n\nError Details:\n $ {1} \n\n{2}",
+    ERR_SUBCOMPONENT_STATUS : "Subcomponent {0} has not been started. Status details: {1}",
+    ERR_CHECK_STATUS : "Couldn't get the status of subcomponents.\n\nError Details:{0}",
+    ERR_RESOLVE_IP : "The endpoint {0} cannot be resolved. Please run the command below for more information on the failure:\n\n $ {1}",
+    ERR_IMDS_METADATA : "Couldn't access {0} Instance Metadata Service when executing command\n $ {1}\n\nError Details:\n{2}",
+    ERR_ACCESS_TOKEN : "Couldn't use managed identities to acquire an access token when executing command\n $ {0}\n\nError Details:\n{1}",
+    ERR_ENDPT_PROXY : "Machine couldn't connect to {0} with proxy: curl/openssl command failed. Please check your proxy configuration."\
+          "\n\nError Details:\n $ {1} \n\n{2}",
+    WARN_OPENSSL_PROXY : "Skip SSL handshake checks because AMA is configured with authenticated proxy.",
     WARN_MDSD_ERR_FILE : "Found errors in log file {0}, display last few lines of error messages:\n {1}",
     WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}"
 }

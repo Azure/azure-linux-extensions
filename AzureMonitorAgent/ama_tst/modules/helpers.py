@@ -88,14 +88,14 @@ def find_package_manager():
     # check if debian system
     if (os.path.isfile("/etc/debian_version")):
         try:
-            subprocess.check_call("command -v dpkg", shell=True, stdout=DEVNULL)
+            subprocess.check_output("command -v dpkg", shell=True)
             pkg_manager = "dpkg"
         except subprocess.CalledProcessError:
             pass
     # check if redhat system
     elif (os.path.isfile("/etc/redhat_version")):
         try:
-            subprocess.check_call("command -v rpm", shell=True, stdout=DEVNULL)
+            subprocess.check_output("command -v rpm", shell=True)
             pkg_manager = "rpm"
         except subprocess.CalledProcessError:
             pass
@@ -103,11 +103,11 @@ def find_package_manager():
     # likely SUSE or modified VM, just check dpkg and rpm
     if (pkg_manager == ""):
         try:
-            subprocess.check_call("command -v dpkg", shell=True, stdout=DEVNULL)
+            subprocess.check_output("command -v dpkg", shell=True)
             pkg_manager = "dpkg"
         except subprocess.CalledProcessError:
             try:
-                subprocess.check_call("command -v rpm", shell=True, stdout=DEVNULL)
+                subprocess.check_output("command -v rpm", shell=True)
                 pkg_manager = "rpm"
             except subprocess.CalledProcessError:
                 pass
