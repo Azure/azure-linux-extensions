@@ -754,25 +754,29 @@ def set_proxy(address, username, password):
     # Set proxy http_proxy env var in dependent services
     """
     
-    http_proxy = address
-    address = address.replace("http://","")
-    
-    if username:
-        http_proxy = "http://" + username + ":" + password + "@" + address
+    try:
+        http_proxy = address
+        address = address.replace("http://","")
+
+        if username:
+            http_proxy = "http://" + username + ":" + password + "@" + address
+
+        # Update Coreagent
+        run_command_and_log("mkdir -p /etc/systemd/system/azuremonitor-coreagent.service.d")
+        run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
+        run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
+        os.system('chmod {1} {0}'.format("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf", 400))
+
+        # Update ME
+        run_command_and_log("mkdir -p /etc/systemd/system/metrics-extension.service.d")
+        run_command_and_log("echo '[Service]' > /etc/systemd/system/metrics-extension.service.d/proxy.conf")
+        run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
+        os.system('chmod {1} {0}'.format("/etc/systemd/system/metrics-extension.service.d/proxy.conf", 400))
+
+        run_command_and_log("systemctl daemon-reload")
         
-    # Update Coreagent
-    run_command_and_log("mkdir -p /etc/systemd/system/azuremonitor-coreagent.service.d")
-    run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
-    run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
-    os.system('chmod {1} {0}'.format("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf", 400))
-    
-    # Update ME
-    run_command_and_log("mkdir -p /etc/systemd/system/metrics-extension.service.d")
-    run_command_and_log("echo '[Service]' > /etc/systemd/system/metrics-extension.service.d/proxy.conf")
-    run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
-    os.system('chmod {1} {0}'.format("/etc/systemd/system/metrics-extension.service.d/proxy.conf", 400))
-    
-    run_command_and_log("systemctl daemon-reload")
+    except:
+        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and mkdir -p /etc/systemd/system/metrics-extension.service.d" )
     
 def get_managed_identity():
     """
