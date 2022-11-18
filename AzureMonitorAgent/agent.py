@@ -676,8 +676,11 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
             if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
                 default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                 default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
+                set_proxy(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], default_configs["MDSD_PROXY_PASSWORD"])
             else:
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+         else:
+            set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
 
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
@@ -746,6 +749,35 @@ def restart_launcher():
         check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
+def set_proxy(address, username, password):
+    """
+    # Set proxy http_proxy env var in dependent services
+    """
+    
+    try:
+        http_proxy = address
+        address = address.replace("http://","")
+
+        if username:
+            http_proxy = "http://" + username + ":" + password + "@" + address
+
+        # Update Coreagent
+        run_command_and_log("mkdir -p /etc/systemd/system/azuremonitor-coreagent.service.d")
+        run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
+        run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
+        os.system('chmod {1} {0}'.format("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf", 400))
+
+        # Update ME
+        run_command_and_log("mkdir -p /etc/systemd/system/metrics-extension.service.d")
+        run_command_and_log("echo '[Service]' > /etc/systemd/system/metrics-extension.service.d/proxy.conf")
+        run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
+        os.system('chmod {1} {0}'.format("/etc/systemd/system/metrics-extension.service.d/proxy.conf", 400))
+
+        run_command_and_log("systemctl daemon-reload")
+        
+    except:
+        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and mkdir -p /etc/systemd/system/metrics-extension.service.d" )
+    
 def get_managed_identity():
     """
     # Determine Managed Identity (MI) settings
