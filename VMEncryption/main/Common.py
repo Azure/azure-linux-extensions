@@ -128,11 +128,11 @@ class CommonVariables:
     """
     Values for Imds results 
     """
-    SecurityTypeKey = 'SecurityType'
+    SecurityTypeKey = 'securityType'
     Standard='Standard'
     TrustedLaunch='TrustedLaunch'
     ConfidentialVM='ConfidentialVM'
-    supported_Security_Types=[Standard,TrustedLaunch,ConfidentialVM]    
+    supported_security_types=[Standard,TrustedLaunch,ConfidentialVM]    
 
     """
     command types

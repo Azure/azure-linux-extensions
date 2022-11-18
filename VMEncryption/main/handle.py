@@ -18,7 +18,7 @@
 
 import filecmp
 import json
-from logging import exception
+
 import os
 import os.path
 import re
@@ -30,7 +30,7 @@ import traceback
 import uuid
 import shutil
 from distutils.version import LooseVersion
-from warnings import catch_warnings
+
 
 from Utils import HandlerUtil
 from Common import CommonVariables, CryptItem
@@ -665,16 +665,16 @@ def enable():
         logger.log('Enabling extension')
         public_settings = get_public_settings()
         logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
-        checkUtil = CheckUtil(logger)
-        imdsStoredResults=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
-        iMDSUtil = IMDSUtil(logger)
+        check_Util = CheckUtil(logger)
+        imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
+        imds_Util = IMDSUtil(logger)
         try:
-            checkUtil.preInitializationCheck(logger,imdsStoredResults=imdsStoredResults,iMDSUtil=iMDSUtil)
+            check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util)
         except Exception as ex:
-             hutil.do_exit(exit_code=CommonVariables.unknown_error,
-                    operation='preInitializationCheck',
+             hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                    operation='pre_Initialization_Check',
                     status=CommonVariables.extension_error_status,
-                    code=str(CommonVariables.unknown_error),
+                    code=str(CommonVariables.configuration_error),
                     message=str(ex)) 
 
         # Mount already encrypted disks before running fatal prechecks
@@ -726,7 +726,7 @@ def enable():
         # run fatal prechecks, report error if exceptions are caught
         try:
             if not is_migrate_operation:
-                checkUtil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
+                check_Util.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
@@ -744,7 +744,7 @@ def enable():
 
         # run prechecks and log any failures detected
         try:
-            if checkUtil.is_non_fatal_precheck_failure():
+            if check_Util.is_non_fatal_precheck_failure():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
                 logger.log("PRECHECK: Prechecks successful")

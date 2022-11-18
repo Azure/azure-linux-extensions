@@ -110,9 +110,9 @@ class IMDSUtil(object):
         '''['','TrustedLaunch','ConfidentialVM']'''
         http_util = self.get_http_util()
         security_profile = json.loads(self._get_security_type_IMDS_helper(http_util=http_util))
-        if not 'securityType' in security_profile:
+        if not CommonVariables.SecurityTypeKey in security_profile:
             raise Exception("VM security profile does not have securityType.")
-        return security_profile['securityType']
+        return security_profile[CommonVariables.SecurityTypeKey]
 
 class IMDSStoredResults(object):
     '''This class is used to store IMDS result in imds encryption config file'''
