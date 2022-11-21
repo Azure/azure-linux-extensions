@@ -66,11 +66,22 @@ class SizeCalculation(object):
             self.logger.log(error_msg, True ,'Error')
             self.output_lsblk = {}
         self.devicesToInclude = [] #partitions to be included
-        self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
-        self.includedLunList = para_parser.includeLunList
-        self.device_mount_points = []
+        self.isAnyDiskExcluded = False
+        try:
+            if(para_parser.includedDisks != None and para_parser.includedDisks != ''):
+                self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
+                self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
+        except Exception as e:
+             error_msg = "Failed to serialize includedDisks because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+             self.logger.log(error_msg, True ,'Error')    
+        try:
+            if( para_parser.includeLunList != None and para_parser.includeLunList != ''):
+                self.includedLunList = para_parser.includeLunList
+        except Exception as e:
+             error_msg = "Failed to get the list of includedLun's because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+             self.logger.log(error_msg, True ,'Error')
         self.logger.log("includedLunList {0}".format(self.includedLunList))
-        self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
+                
         
     def get_loop_devices(self):
         global disk_util
@@ -167,10 +178,8 @@ class SizeCalculation(object):
                                     if "mountpoint" in child.keys() and child["mountpoint"] != None :
                                         child["name"] = '/dev/' + child["name"]
                                         self.devicesToInclude.append(child["name"])
-                                        self.device_mount_points.append(child["mountpoint"])
             
-        self.logger.log("devices_to_bill: {0}".format(str(self.devicesToInclude)),True) 
-        self.logger.log("The mountpoints of devices to bill: {0}".format(str(self.device_mount_points)), True)
+        self.logger.log("devices_to_bill: {0}".format(str(self.devicesToInclude)),True)                   
         self.logger.log("exiting device_list_for_billing",True)
         return devices_to_bill
 
@@ -323,7 +332,7 @@ class SizeCalculation(object):
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
                     else:
-                        if mountpoint in self.device_mount_points :
+                        if device in self.devicesToInclude :
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             total_used = total_used + int(used) #return in KB
                         else:
