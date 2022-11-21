@@ -8,8 +8,10 @@ from .check_pkgs  import check_packages, check_syslog
 from .check_ama   import check_ama
 from helpers      import find_package_manager
 
-# check space in MB for each main directory
 def check_space():
+    """
+    check space in MB for each main directory
+    """
     dirnames = ["/etc", "/opt", "/var"]
     for dirname in dirnames:
         space = os.statvfs(dirname)
@@ -33,8 +35,10 @@ def check_syslog_user():
                 return NO_ERROR
     return ERR_SYSLOG_USER
 
-# check all packages are installed
 def check_installation(interactive, err_codes=True, prev_success=NO_ERROR):
+    """
+    check all packages are installed
+    """
     print("CHECKING INSTALLATION...")
     success = prev_success
     

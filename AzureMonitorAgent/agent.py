@@ -676,8 +676,11 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
             if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
                 default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                 default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
+                set_proxy(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], default_configs["MDSD_PROXY_PASSWORD"])
             else:
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+         else:
+            set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
 
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
@@ -746,6 +749,35 @@ def restart_launcher():
         check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
+def set_proxy(address, username, password):
+    """
+    # Set proxy http_proxy env var in dependent services
+    """
+    
+    try:
+        http_proxy = address
+        address = address.replace("http://","")
+
+        if username:
+            http_proxy = "http://" + username + ":" + password + "@" + address
+
+        # Update Coreagent
+        run_command_and_log("mkdir -p /etc/systemd/system/azuremonitor-coreagent.service.d")
+        run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
+        run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
+        os.system('chmod {1} {0}'.format("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf", 400))
+
+        # Update ME
+        run_command_and_log("mkdir -p /etc/systemd/system/metrics-extension.service.d")
+        run_command_and_log("echo '[Service]' > /etc/systemd/system/metrics-extension.service.d/proxy.conf")
+        run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
+        os.system('chmod {1} {0}'.format("/etc/systemd/system/metrics-extension.service.d/proxy.conf", 400))
+
+        run_command_and_log("systemctl daemon-reload")
+        
+    except:
+        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and mkdir -p /etc/systemd/system/metrics-extension.service.d" )
+    
 def get_managed_identity():
     """
     # Determine Managed Identity (MI) settings
@@ -1146,22 +1178,8 @@ def find_package_manager(operation):
     for rpm_dist in rpm_set:
         if dist.startswith(rpm_dist):
             PackageManager = "rpm"
-            # Same as above; need to force.
+            # Same as above.
             PackageManagerOptions = "--force"
-
-            # If FIPS is enabled and RPM version is 4.14 or higher, we need to apply the below workaround
-            try:
-                fips_code, _ = run_command_and_log('grep -i "fips=1" /proc/cmdline 1>/dev/null 2>&1', check_error=False, log_cmd=False)
-                if fips_code == 0:
-                    rpm_code, rpm_output = run_command_and_log('rpm --version', check_error=False, log_cmd=False)
-                    if rpm_code == 0:
-                        rpm_version = (rpm_output.split(" ")[-1]).split(".")
-                        if int(rpm_version[0]) >= 4 and int(rpm_version[1]) >= 14:
-                            hutil_log_info("FIPS is enabled and RPM version is at least 4.14; applying --nodigest flag to allow for successful package install")
-                            PackageManagerOptions = "--force --nodigest --nofiledigest"
-            except Exception as e:
-                hutil_log_error("Unable to check for RPM 4.14 + FIPS scenario, skipping digest workaround: {0}".format(e))
-
             BundleFileName = BundleFileNameRpm
             break
 
