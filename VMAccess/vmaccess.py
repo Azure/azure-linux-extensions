@@ -348,6 +348,13 @@ def _allow_password_auth():
     _set_sshd_config(config, "PasswordAuthentication", "yes")
     ext_utils.replace_file_with_contents_atomic(SshdConfigPath, "\n".join(config))
 
+    if isinstance(MyDistro, dist_utils.UbuntuDistro): #handle ubuntu 22.04 (sshd_config.d directory)
+        cloudInitConfigPath = "/etc/ssh/sshd_config.d/50-cloud-init.conf"
+        config = ext_utils.get_file_contents(cloudInitConfigPath)
+        if config is not None: #other versions of ubuntu don't contain this file
+            config = config.split("\n")
+            _set_sshd_config(config, "PasswordAuthentication", "yes")
+            ext_utils.replace_file_with_contents_atomic(cloudInitConfigPath, "\n".join(config))
 
 def _set_sshd_config(config, name, val):
     notfound = True
@@ -360,9 +367,7 @@ def _set_sshd_config(config, name, val):
             # Match block must be put in the end of sshd config
             break
     if notfound:
-        if i is None:
-            i = 0
-        config.insert(i, "{0} {1}".format(name, val))
+        config = "{0} {1}".format(name, val) + config 
     return config
 
 
