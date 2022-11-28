@@ -525,3 +525,4 @@ class FedoraDistro(RedhatDistro):
 
     def delete_account(self, user):
         ext_utils.run(['/sbin/usermod', user, '-G', ''])
+        
