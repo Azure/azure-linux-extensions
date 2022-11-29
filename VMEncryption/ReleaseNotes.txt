@@ -1,3 +1,8 @@
+1.2.0.96
+- Update ade parse script to handle duplicate parameters
+- Use grub2-mkconfig to add kernel parameters
+- Fix RHEL 7.9 no boot after update
+
 1.2.0.95
 - Add support for Mariner
 - Fix centOS no boot issue
