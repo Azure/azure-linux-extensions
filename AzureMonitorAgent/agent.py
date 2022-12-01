@@ -679,7 +679,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 set_proxy(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], default_configs["MDSD_PROXY_PASSWORD"])
             else:
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
-         else:
+        else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
 
     # add managed identity settings if they were provided
