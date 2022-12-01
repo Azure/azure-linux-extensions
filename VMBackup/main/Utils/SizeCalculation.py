@@ -68,21 +68,12 @@ class SizeCalculation(object):
         self.devicesToInclude = [] #partitions to be included
         self.device_mount_points = []
         self.isAnyDiskExcluded = False
-        try:
-            if(para_parser.includedDisks != None and para_parser.includedDisks != ''):
-                self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
-                self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
-        except Exception as e:
-             error_msg = "Failed to serialize includedDisks because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
-             self.logger.log(error_msg, True ,'Error')    
-        try:
-            if( para_parser.includeLunList != None and para_parser.includeLunList != ''):
-                self.includedLunList = para_parser.includeLunList
-        except Exception as e:
-             error_msg = "Failed to get the list of includedLun's because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
-             self.logger.log(error_msg, True ,'Error')
+        if(para_parser.includedDisks != None and para_parser.includedDisks != '' and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] != None ):
+            self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
+            self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
+        if( para_parser.includeLunList != None and para_parser.includeLunList != ''):
+            self.includedLunList = para_parser.includeLunList
         self.logger.log("includedLunList {0}".format(self.includedLunList))
-
         
     def get_loop_devices(self):
         global disk_util
