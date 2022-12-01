@@ -2021,7 +2021,7 @@ def daemon_encrypt():
                                                            distro_patcher=DistroPatcher,
                                                            logger=logger,
                                                            encryption_environment=encryption_environment)
-        elif distro_name == 'Ubuntu' and distro_version in ['20.04']:
+        elif distro_name == 'Ubuntu' and distro_version in ['20.04', '22.04']:
             from oscrypto.ubuntu_2004 import Ubuntu2004EncryptionStateMachine
             os_encryption = Ubuntu2004EncryptionStateMachine(hutil=hutil,
                                                              distro_patcher=DistroPatcher,

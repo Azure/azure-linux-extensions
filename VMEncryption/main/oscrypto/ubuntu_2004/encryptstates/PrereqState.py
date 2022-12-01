@@ -46,7 +46,7 @@ class PrereqState(OSEncryptionState):
         distro_info = self.context.distro_patcher.distro_info
         self.context.logger.log("Distro info: {0}".format(distro_info))
 
-        if distro_info[0].lower() == 'ubuntu' and distro_info[1] in ['20.04']:
+        if distro_info[0].lower() == 'ubuntu' and distro_info[1] in ['20.04', '22.04']:
             self.context.logger.log("Enabling OS volume encryption on {0} {1}".format(distro_info[0],
                                                                                       distro_info[1]))
         else:
