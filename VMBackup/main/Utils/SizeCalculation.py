@@ -60,17 +60,24 @@ class SizeCalculation(object):
             self.output_lsscsi = ""
             self.lsscsi_list = []
         try:
-             self.output_lsblk = json.loads(os.popen("lsblk --json --output name,mountpoint").read())
+            self.output_lsblk = os.popen("lsblk -n --list --output NAME,MOUNTPOINT").read().strip().split("\n")
         except Exception as e:
-            error_msg = "Failed to execute the command lsblk --json --output name,mountpoint because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command lsblk -n --list --output NAME,MOUNTPOINT because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
-            self.output_lsblk = {}
+            self.output_lsblk = []
         self.devicesToInclude = [] #partitions to be included
-        self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
-        self.includedLunList = para_parser.includeLunList
         self.device_mount_points = []
+        self.isAnyDiskExcluded = False
+        self.LunListEmpty = False
+        if(para_parser.includedDisks != None and para_parser.includedDisks != '' and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] != None ):
+            self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
+            self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
+        if( para_parser.includeLunList != None and para_parser.includeLunList != ''):
+            self.includedLunList = para_parser.includeLunList
         self.logger.log("includedLunList {0}".format(self.includedLunList))
-        self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
+        if(self.includedLunList == None or len(self.includedLunList) == 0):
+            self.LunListEmpty = True
+            self.logger.log("As the LunList is empty including all disks") 
         
     def get_loop_devices(self):
         global disk_util
@@ -137,38 +144,47 @@ class SizeCalculation(object):
         '''
 
         self.disksToBeIncluded = self.disk_list_for_billing()           
-        '''
-            Sample output for lsblk --json command
-            {
-            "blockdevices": [
-            {"name": "sda", "mountpoint": null,
-                "children": [
-                    {"name": "sda1", "mountpoint": null}
-                   ]
-            },
-            {"name": "sdb", "mountpoint": null},
-            {"name": "sdc", "mountpoint": null,
-                "children": [
-                    {"name": "sdc1", "mountpoint": null}
-                   ]
-            },
-            ...
-            ]
-            }
-        '''
         self.logger.log("lsblk o/p {0}".format(self.output_lsblk))
-        if "blockdevices" in self.output_lsblk.keys():
-            for device in self.output_lsblk["blockdevices"]:
-                if "name" in device.keys():
-                    device["name"] = '/dev/' + device["name"]
-                    if device["name"] in self.disksToBeIncluded:
-                        if("children" in device.keys()):
-                                for child in device["children"]:
-                                    if "mountpoint" in child.keys() and child["mountpoint"] != None :
-                                        child["name"] = '/dev/' + child["name"]
-                                        self.devicesToInclude.append(child["name"])
-                                        self.device_mount_points.append(child["mountpoint"])
-            
+        self.logger.log("type of lsblk {0}".format(type(self.output_lsblk)))
+        ''' 
+                NAME          MOUNTPOINT
+                sda
+                sda1          /boot/efi
+                sda2          /boot
+                sda3
+                sda4
+                rootvg-tmplv  /tmp
+                rootvg-usrlv  /usr
+                rootvg-optlv  /opt
+                rootvg-homelv /home
+                rootvg-varlv  /var
+                rootvg-rootlv /
+                sdb
+                sdb1          /mnt/resource
+                sdc
+                sdc1          /mnt/sdc1
+                sdc2          /mnt/sdc2
+                sdc3
+                sde
+                sde1          /mnt/sde1
+                sdf
+                sdg
+        '''
+        for item in self.output_lsblk:
+            item_split = item.split()
+            if(len(item_split)==2):
+                device = item_split[0]
+                mount_point = item_split[1]
+            else:
+                mount_point = ""
+                device = ""
+            if device != '' and mount_point != '':
+                device = '/dev/' + device
+                for disk in self.disksToBeIncluded :
+                    if  disk in device and disk != device:
+                        self.devicesToInclude.append(device)
+                        self.device_mount_points.append(mount_point)
+                        break 
         self.logger.log("devices_to_bill: {0}".format(str(self.devicesToInclude)),True) 
         self.logger.log("The mountpoints of devices to bill: {0}".format(str(self.device_mount_points)), True)
         self.logger.log("exiting device_list_for_billing",True)
@@ -317,15 +333,32 @@ class SizeCalculation(object):
                     total_used_network_shares = total_used_network_shares + int(used)
 
                 else:
+                    #Only when OS disk is included
                     if(self.isOnlyOSDiskBackupEnabled == True):
                         if(mountpoint == '/'):
                             total_used = total_used + int(used)
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
+                    #Handling a case where LunList is empty for UnmanagedVM's
+                    elif(self.LunListEmpty == True and device != resource_disk_device):
+                        self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                        total_used = total_used + int(used) #return in KB
+                    #LunList is empty but the device is an actual temporary disk so excluding it
+                    elif(self.LunListEmpty == True and device == resource_disk_device):
+                        self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype :{3}".format(device,used,mountpoint,fstype),True)
+                        excluded_disks_used = excluded_disks_used + int(used)
+                    #Including only the disks which are asked to include (Here LunList can't be empty this case is handled at the CRP end)
                     else:
-                        if mountpoint in self.device_mount_points :
+                        if mountpoint in self.device_mount_points and device != resource_disk_device:
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             total_used = total_used + int(used) #return in KB
+                        elif device != resource_disk_device and -1 in self.includedLunList:
+                            if mountpoint in self.root_mount_points :
+                                self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                                total_used = total_used + int(used) #return in KB
+                            else:
+                                self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                                excluded_disks_used = excluded_disks_used + int(used)
                         else:
                             self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             excluded_disks_used = excluded_disks_used + int(used)
