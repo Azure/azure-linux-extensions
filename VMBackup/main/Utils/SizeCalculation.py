@@ -62,7 +62,7 @@ class SizeCalculation(object):
         try:
             self.output_lsblk = os.popen("lsblk -n --list --output name,mountpoint").read().strip().split("\n")
         except Exception as e:
-            error_msg = "Failed to execute the command lsblk -n --list --output NAME,MOUNTPOINT because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command lsblk -n --list --output name,mountpoint because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.output_lsblk = []
         self.devicesToInclude = [] #partitions to be included
