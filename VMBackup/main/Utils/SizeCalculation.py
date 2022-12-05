@@ -60,7 +60,7 @@ class SizeCalculation(object):
             self.output_lsscsi = ""
             self.lsscsi_list = []
         try:
-            self.output_lsblk = os.popen("lsblk -n --list --output NAME,MOUNTPOINT").read().strip().split("\n")
+            self.output_lsblk = os.popen("lsblk -n --list --output name,mountpoint").read().strip().split("\n")
         except Exception as e:
             error_msg = "Failed to execute the command lsblk -n --list --output NAME,MOUNTPOINT because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
@@ -181,7 +181,7 @@ class SizeCalculation(object):
             if device != '' and mount_point != '':
                 device = '/dev/' + device
                 for disk in self.disksToBeIncluded :
-                    if  disk in device and disk != device:
+                    if disk in device and device not in self.devicesToInclude:
                         self.devicesToInclude.append(device)
                         self.device_mount_points.append(mount_point)
                         break 
