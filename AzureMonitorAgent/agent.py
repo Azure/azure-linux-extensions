@@ -679,7 +679,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 set_proxy(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], default_configs["MDSD_PROXY_PASSWORD"])
             else:
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
-         else:
+        else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
 
     # add managed identity settings if they were provided
@@ -765,12 +765,14 @@ def set_proxy(address, username, password):
         run_command_and_log("mkdir -p /etc/systemd/system/azuremonitor-coreagent.service.d")
         run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
         run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
+        run_command_and_log("echo 'Environment=\"https_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
         os.system('chmod {1} {0}'.format("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf", 400))
 
         # Update ME
         run_command_and_log("mkdir -p /etc/systemd/system/metrics-extension.service.d")
         run_command_and_log("echo '[Service]' > /etc/systemd/system/metrics-extension.service.d/proxy.conf")
         run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
+        run_command_and_log("echo 'Environment=\"https_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
         os.system('chmod {1} {0}'.format("/etc/systemd/system/metrics-extension.service.d/proxy.conf", 400))
 
         run_command_and_log("systemctl daemon-reload")
