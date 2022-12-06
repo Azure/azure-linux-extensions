@@ -119,6 +119,7 @@ UnsupportedOperatingSystem = 51
 IndeterminateOperatingSystem = 51
 MissingorInvalidParameterErrorCode = 53
 DPKGOrRPMLockedErrorCode = 56
+MissingDependency = 52
 
 # Settings
 GenevaConfigKey = "genevaConfiguration"
@@ -191,8 +192,7 @@ def main():
         # Exit code 1 indicates a general problem that doesn't have a more
         # specific error code; it often indicates a missing dependency
         if exit_code == 1 and operation == 'Install':
-            message = 'Install failed with exit code 1. Please check that ' \
-                      'dependencies are installed. For details, check logs ' \
+            message = 'Install failed with exit code 1. For error details, check logs ' \
                       'in /var/log/azure/Microsoft.Azure.Monitor' \
                       '.AzureMonitorLinuxAgent'
         elif exit_code is DPKGOrRPMLockedErrorCode and operation == 'Install':
@@ -223,7 +223,7 @@ def check_disk_space_availability():
         if get_free_space_mb("/var") < 500 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500 :
             # 52 is the exit code for missing dependency i.e. disk space
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-            return 52
+            return MissingDependency
         else:
             return 0
     except:
@@ -1424,19 +1424,16 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     else:
         hutil_log_info('Output: \n{0}'.format(output))
 
-    # also write output to STDERR since WA agent uploads that to Azlinux Kusto DB
-    # take only the last 100 characters as extension cuts off after that
-    try:
-        if exit_code != 0:
-            sys.stderr.write(output[-500:])
-
-        if "Permission denied" in output:
-            # Enable failures
-            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-            exit_code = 52
-
-    except:
-        hutil_log_info('Failed to write output to STDERR')
+    if "cannot open Packages database" in output:
+        # Install failures
+        # External issue. Package manager db is either corrupt or needs cleanup
+        # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+        exit_code = MissingDependency
+        output += "Package manager database is in a bad state. Please recover package manager, db cache and try install again later."
+    elif "Permission denied" in output:
+        # Enable failures
+        # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+        exit_code = MissingDependency
 
     return exit_code, output
 
@@ -1504,9 +1501,6 @@ def retry_if_dpkg_or_rpm_locked(exit_code, output):
     """
     retry_verbosely = False
     dpkg_or_rpm_locked = is_dpkg_or_rpm_locked(exit_code, output)
-    apt_get_exit_code, apt_get_output = run_get_output('which apt-get',
-                                                       chk_err = False,
-                                                       log_cmd = False)
     if dpkg_or_rpm_locked:
         return True, 'Retrying command because package manager is locked.', \
                retry_verbosely
