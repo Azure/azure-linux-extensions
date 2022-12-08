@@ -1,8 +1,9 @@
 CC := gcc
 SRCDIR := src
 LIBDIR := lib
-BINDIR := binNew
+BINDIRNEW := binNew
 BINDIROLD := bin
+BINDIR := BINDIRNEW
 INCDIR := include
 BUILDDIR := build
 TARGET := $(BINDIR)/safefreeze
