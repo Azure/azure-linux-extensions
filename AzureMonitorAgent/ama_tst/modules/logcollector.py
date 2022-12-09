@@ -128,7 +128,7 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
         outfile.write("--------------------------------------------------------------------------------\n")
 
         # detected OS + version
-        vm_dist, vm_ver = helpers.find_vm_distro()
+        vm_dist, vm_ver, _ = helpers.find_vm_distro()
         if (vm_dist and vm_ver):
             outfile.write("Linux OS detected: {0}\n".format(vm_dist))
             outfile.write("Linux OS version detected: {0}\n".format(vm_ver))
