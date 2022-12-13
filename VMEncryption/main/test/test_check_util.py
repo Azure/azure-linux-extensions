@@ -2,6 +2,7 @@ import unittest
 import os
 
 from check_util import CheckUtil
+from IMDSUtil import IMDSStoredResults
 from Common import CommonVariables
 from io import StringIO
 from .console_logger import ConsoleLogger
@@ -12,6 +13,7 @@ try:
 except ImportError:
     builtins_open = "__builtin__.open"
     import mock # python2
+
 
 class TestCheckUtil(unittest.TestCase):
     """ unit tests for functions in the check_util module """
@@ -523,3 +525,76 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         self.assertRaises(Exception, self.cutil.check_kv_name, { kv_id, kv_url_2, "" })
         self.assertRaises(Exception, self.cutil.check_kv_name, { None, kv_url, "" })
         self.assertRaises(Exception, self.cutil.check_kv_name, { kv_id, None, "" })
+
+
+    def test_pre_initialization_check_Valid_Inputs(self):
+        from Common import CommonVariables
+        mockimdsStoredResults = mock.Mock()
+        mockimdsUtil = mock.Mock()
+        mockimdsStoredResults.config_file_exists.return_value=False
+        #valid inputs
+        mockimdsUtil.get_vm_security_type.return_value=CommonVariables.ConfidentialVM
+        with self.assertRaises(Exception):
+           self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+        self.assertEqual(mockimdsStoredResults.security_type,CommonVariables.ConfidentialVM)
+        mockimdsUtil.get_vm_security_type.return_value=""
+        self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+        self.assertEqual(mockimdsStoredResults.security_type,CommonVariables.Standard)
+        mockimdsUtil.get_vm_security_type.return_value="TrustedLaunch"
+        self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+        self.assertEqual(mockimdsStoredResults.security_type,CommonVariables.TrustedLaunch)
+    
+    def test_pre_initialization_checkIn_Valid_Inputs(self):
+        from Common import CommonVariables
+        mockimdsStoredResults = mock.Mock()
+        mockimdsUtil = mock.Mock()
+        mockimdsStoredResults.config_file_exists.return_value=False
+        #non valid inputs
+        mockimdsUtil.get_vm_security_type.return_value="ConfidentialVM1"
+        with self.assertRaises(Exception):
+           self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+        mockimdsUtil.get_vm_security_type.return_value="ad"
+        with self.assertRaises(Exception):
+            self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+        mockimdsUtil.get_vm_security_type.return_value="TrustedLaunch2"
+        with self.assertRaises(Exception):
+            self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)      
+
+    def test_pre_initialization_checkIn_Valid_Inputs_Registry_Check(self):
+        from Common import CommonVariables
+        import os
+        mockencryption_environment = mock.Mock()
+        mockimdsUtil = mock.Mock()
+        current_path = os.getcwd()
+        mockencryption_environment.imds_stored_results_file_path = os.path.join(current_path,'imds_stored_results')
+        imdsStoredResults = IMDSStoredResults(logger=self.logger,encryption_environment=mockencryption_environment)
+        #non valid inputs
+        mockimdsUtil.get_vm_security_type.return_value="ConfidentialVM1"
+        with self.assertRaises(Exception):
+           self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil)
+        self.assertEqual(imdsStoredResults.config_file_exists(),False)
+        self.assertEqual(imdsStoredResults.security_type,None)
+
+    def test_pre_initialization_check_Registry(self):
+        from Common import CommonVariables
+        import os
+        mockencryption_environment = mock.Mock()
+        mockimdsUtil = mock.Mock()
+        current_path = os.getcwd()
+        mockencryption_environment.imds_stored_results_file_path = os.path.join(current_path,'imds_stored_results')
+        imdsStoredResults = IMDSStoredResults(logger=self.logger,encryption_environment=mockencryption_environment)
+        #check if file exist, remove it.
+        if(imdsStoredResults.config_file_exists()):
+            os.remove(mockencryption_environment.imds_stored_results_file_path)
+        #confidential VM
+        mockimdsUtil.get_vm_security_type.return_value=CommonVariables.ConfidentialVM
+        with self.assertRaises(Exception):
+            self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil)
+        self.assertEqual(imdsStoredResults.get_security_type(),CommonVariables.ConfidentialVM)
+        #2nd call to pre initialization, reading data from stored file
+        mockimdsUtil.get_vm_security_type.return_value=CommonVariables.Standard
+        with self.assertRaises(Exception):
+            self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil)
+        self.assertEqual(imdsStoredResults.get_security_type(),CommonVariables.ConfidentialVM)
+        #remove file
+        os.remove(mockencryption_environment.imds_stored_results_file_path)

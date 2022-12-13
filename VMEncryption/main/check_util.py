@@ -22,10 +22,12 @@ import os
 import os.path
 import re
 import json
+import traceback
 from Common import CommonVariables
 from MetadataUtil import MetadataUtil
 from CommandExecutor import CommandExecutor
 from distutils.version import LooseVersion
+
 try:
     from urllib.parse import urlparse #python3+
 except ImportError:
@@ -326,3 +328,33 @@ class CheckUtil(object):
             detected = True
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
         return detected
+
+    def pre_Initialization_Check(self,imdsStoredResults,iMDSUtil):
+        '''This function is checking the VM compatibility for ADE'''
+        self.logger.log('Pre initialization check Start.')
+        try:
+            security_type = None
+            if imdsStoredResults.config_file_exists() and imdsStoredResults.get_security_type() != None:
+                security_type = imdsStoredResults.get_security_type()
+                self.logger.log("reading from imds stored results, security type is {0}.".format(security_type))
+            else:
+                security_type = iMDSUtil.get_vm_security_type()
+                #imds does not store security type for Standard or Basic type.
+                if(security_type=='' or security_type == None):
+                    security_type= CommonVariables.Standard
+                self.logger.log("reading from imds, security type is {0}.".format(security_type))
+            supported_security_types = security_type.lower() in [x.lower() for x in CommonVariables.supported_security_types]
+            if not supported_security_types:
+                raise Exception("Unknown VM security type: {0}, has to be one of {1}".format(security_type,CommonVariables.supported_security_types))
+            imdsStoredResults.security_type = security_type
+            imdsStoredResults.commit()
+        except Exception as ex:
+            message = "Pre-initialization check: Exception thrown during IMDS call. \
+                       exception:{0}, \n stack-trace: {1}".format(str(ex),traceback.format_exc())
+            self.logger.log(msg=message,level=CommonVariables.ErrorLevel)
+            raise Exception(message)
+        if security_type.lower() ==  CommonVariables.ConfidentialVM.lower():
+            message = "Pre-initialization check: ADE flow is blocked for confidential VM."
+            self.logger.log(msg=message,level=CommonVariables.ErrorLevel)
+            raise Exception(message) 
+        self.logger.log('Pre initialization check End.')

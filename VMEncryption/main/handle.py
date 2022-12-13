@@ -18,6 +18,7 @@
 
 import filecmp
 import json
+
 import os
 import os.path
 import re
@@ -30,6 +31,7 @@ import uuid
 import shutil
 from distutils.version import LooseVersion
 
+
 from Utils import HandlerUtil
 from Common import CommonVariables, CryptItem
 from ExtensionParameter import ExtensionParameter
@@ -39,6 +41,7 @@ from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
 from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import EncryptionConfig
+from IMDSUtil import IMDSUtil,IMDSStoredResults
 from patch import GetDistroPatcher
 from BekUtil import BekUtil, BekMissingException
 from check_util import CheckUtil
@@ -660,10 +663,20 @@ def enable():
     try:
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
-
         public_settings = get_public_settings()
         logger.log('Public settings:\n{0}'.format(json.dumps(public_settings, sort_keys=True, indent=4)))
-        cutil = CheckUtil(logger)
+        check_Util = CheckUtil(logger)
+        imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
+        imds_Util = IMDSUtil(logger)
+        try:
+            check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util)
+        except Exception as ex:
+             hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                    operation='pre_Initialization_Check',
+                    status=CommonVariables.extension_error_status,
+                    code=str(CommonVariables.configuration_error),
+                    message=str(ex)) 
+
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
@@ -713,7 +726,7 @@ def enable():
         # run fatal prechecks, report error if exceptions are caught
         try:
             if not is_migrate_operation:
-                cutil.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
+                check_Util.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
@@ -731,7 +744,7 @@ def enable():
 
         # run prechecks and log any failures detected
         try:
-            if cutil.is_non_fatal_precheck_failure():
+            if check_Util.is_non_fatal_precheck_failure():
                 logger.log("PRECHECK: Precheck failure, incompatible environment suspected")
             else:
                 logger.log("PRECHECK: Prechecks successful")

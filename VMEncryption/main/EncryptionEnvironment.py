@@ -31,6 +31,7 @@ class EncryptionEnvironment(object):
         self.resume_daemon_status_file_path = os.path.join(self.encryption_config_path, 'resume_daemon_status-')
         self.encryption_config_file_path = os.path.join(self.encryption_config_path, 'azure_crypt_config.ini')
         self.extension_parameter_file_path = os.path.join(self.encryption_config_path, 'azure_crypt_params.ini')
+        self.imds_stored_results_file_path = os.path.join(self.encryption_config_path, 'imds_stored_results.ini')
         self.azure_crypt_mount_config_path = os.path.join(self.encryption_config_path, 'azure_crypt_mount')
         self.azure_crypt_request_queue_path = os.path.join(self.encryption_config_path, 'azure_crypt_request_queue.ini')
         self.azure_decrypt_request_queue_path = os.path.join(self.encryption_config_path, 'azure_decrypt_request_queue.ini')

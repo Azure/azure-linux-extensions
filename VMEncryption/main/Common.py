@@ -18,7 +18,6 @@
 
 import CommonParameters
 
-
 class CommonVariables:
     utils_path_name = 'Utils'
     extension_name = CommonParameters.inst.get_extension_name()
@@ -47,6 +46,17 @@ class CommonVariables:
     encryption_settings_file_name_pattern = 'settings_{0}.json'
     encryption_settings_counter_file = 'counter.txt'
     encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
+
+    """
+    IMDS IP:
+    """
+    static_IMDS_IP = '169.254.169.254'
+    IMDS_API_Version='2021-12-13'
+    IMDS_msg_headers = {
+        "Content-Type":"application/json",
+        "Metadata":True
+    }
+    IMDS_SecurityProfile_subDir="metadata/instance/compute/securityProfile"
 
     """
     Find more on Azure wire service IP address here: "https://docs.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16"
@@ -114,6 +124,16 @@ class CommonVariables:
     VolumeTypeAll = 'All'
     SupportedVolumeTypes = [VolumeTypeOS, VolumeTypeData, VolumeTypeAll]
     SupportedVolumeTypesVMSS = [VolumeTypeData]
+    
+    """
+    Values for Imds results 
+    """
+    SecurityTypeKey = 'securityType'
+    Standard='Standard'
+    TrustedLaunch='TrustedLaunch'
+    ConfidentialVM='ConfidentialVM'
+    supported_security_types=[Standard,TrustedLaunch,ConfidentialVM]    
+
     """
     command types
     """
