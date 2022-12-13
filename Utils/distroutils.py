@@ -36,6 +36,11 @@ def get_my_distro(config):
         if re.search("freebsd", os_name, re.IGNORECASE):
             # FreeBSD
             return FreeBSDDistro(config)
+        if re.search("sles", os_name, re.IGNORECASE):
+            # SuSE
+            return SuSEDistro(config)
+        if re.search("ubuntu", os_name, re.IGNORECASE):
+            return UbuntuDistro(config)
     return GenericDistro(config)
 
 
@@ -244,6 +249,17 @@ class GenericDistro(object):
             pass
         return
 
+class UbuntuDistro(GenericDistro):
+    def __init__(self, config):
+        """
+        Generic Attributes go here.  These are based on 'majority rules'.
+        This __init__() may be called or overriden by the child.
+        """
+        super(UbuntuDistro, self).__init__(config)
+        self.selinux = False
+        self.ssh_service_name = 'sshd'
+        self.sudoers_dir_base = '/usr/local/etc'
+        self.distro_name = 'Ubuntu'
 
 class FreeBSDDistro(GenericDistro):
     """
@@ -512,3 +528,10 @@ class FedoraDistro(RedhatDistro):
 
     def delete_account(self, user):
         ext_utils.run(['/sbin/usermod', user, '-G', ''])
+
+
+class SuSEDistro(GenericDistro):
+    def __init__(self, config):
+        super(SuSEDistro, self).__init__(config)
+        self.ssh_service_name = 'sshd'
+        self.distro_name = "SuSE"
