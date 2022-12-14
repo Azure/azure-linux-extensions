@@ -80,7 +80,7 @@ class SizeCalculation(object):
             self.LunListEmpty = True
             self.logger.log("As the LunList is empty including all disks")
         try:
-            self.pvs_output = os.popen("sudo pvsb").read().strip().split("\n")
+            self.pvs_output = os.popen("sudo pvs").read().strip().split("\n")
             self.pvs_output = self.pvs_output[1:]
         except Exception as e:
             error_msg = "Failed to execute the command sudo pvs because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
