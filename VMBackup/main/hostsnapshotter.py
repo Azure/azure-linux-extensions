@@ -160,6 +160,7 @@ class HostSnapshotter(object):
         try:
             if(responseBody != None):
                 json_reponseBody = json.loads(responseBody)
+                epochTime = datetime.datetime(1970, 1, 1, 0, 0, 0)
                 for snapshot_info in json_reponseBody['snapshotInfo']:
                     self.logger.log("From Host- IsSuccessful:{0}, SnapshotUri:{1}, ErrorMessage:{2}, StatusCode:{3}".format(snapshot_info['isSuccessful'], snapshot_info['snapshotUri'], snapshot_info['errorMessage'], snapshot_info['statusCode']))
                     
@@ -172,7 +173,6 @@ class HostSnapshotter(object):
                         except:
                             creationTimeObj = datetime.datetime.strptime(creationTimeString, "%Y-%m-%dT%H:%M:%SZ")
                         self.logger.log("Converting the creationTime string received in UTC format to UTC Ticks")
-                        epochTime = datetime.datetime(1970, 1, 1, 0, 0, 0)
                         timestamp = (creationTimeObj - epochTime).total_seconds()
                         creationTimeUTCTicks = str(int(timestamp * 1000)) 
                         ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeUTCTicks , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'])
