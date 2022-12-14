@@ -118,8 +118,10 @@ class SizeCalculation(object):
 
                 if lunNumber in self.includedLunList :
                     self.disksToBeIncluded.append(device_name)
-                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name))   
+                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name)) 
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
+        else:
+            self.logger.log("There is some problem in executing the command sudo lsscsi, So the lsscsi list is empty and the Billing will not be done ")
         return self.disksToBeIncluded
 
     def get_logicalVolumes_for_billing(self):
