@@ -171,9 +171,11 @@ class HostSnapshotter(object):
                             creationTimeObj = datetime.datetime.strptime(creationTimeString, "%Y-%m-%dT%H:%M:%S.%fZ")
                         except:
                             creationTimeObj = datetime.datetime.strptime(creationTimeString, "%Y-%m-%dT%H:%M:%SZ")
-                        creationTimeObj = creationTimeObj.replace(tzinfo=datetime.timezone.utc)
-                        creationTimeObj = str(round(creationTimeObj.timestamp()*1000))
-                        ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeObj , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'])
+                        self.logger.log("Converting the creationTime string received in UTC format to UTC Ticks")
+                        epochTime = datetime.datetime(1970, 1, 1, 0, 0, 0)
+                        timestamp = (creationTimeObj - epochTime).total_seconds()
+                        creationTimeUTCTicks = str(int(timestamp * 1000)) 
+                        ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeUTCTicks , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'])
                         self.logger.log("ddSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id))
                     else:
                         self.logger.log("ddSnapshotIdentifier absent/None in Host Response")
