@@ -134,7 +134,7 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
             total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
             number_of_blobs = len(para_parser.includeLunList)
             maximum_possible_size = number_of_blobs * 1099511627776
-            if(total_used_size>maximum_possible_size):
+            if(total_used_size>maximum_possible_size and number_of_blobs != 0):
                 total_used_size = maximum_possible_size
             backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_used_size,maximum_possible_size),True)
         if(para_parser is not None):
