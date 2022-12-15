@@ -118,10 +118,10 @@ class SizeCalculation(object):
 
                 if lunNumber in self.includedLunList :
                     self.disksToBeIncluded.append(device_name)
-                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name)) 
+                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name))   
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         else:
-            self.logger.log("There is some problem in executing the command sudo lsscsi, So the lsscsi list is empty and the Billing will not be done ")
+            self.logger.log("There is some glitch in executing the command sudo lsscsi, So the lsscsi list is empty and the Billing will not be done ")
         return self.disksToBeIncluded
 
     def get_logicalVolumes_for_billing(self):
@@ -293,6 +293,7 @@ class SizeCalculation(object):
             unknown_fs_types = []
             excluded_disks_used = 0
             totalSpaceUsed = 0
+            device_list = []
       
             if len(self.file_systems_info) == 0 :
                 self.file_systems_info = disk_util.get_mount_file_systems()
@@ -304,8 +305,10 @@ class SizeCalculation(object):
             self.logger.log("resource_disk_device: {0}".format(resource_disk_device),True)
             resource_disk_device = "/dev/{0}".format(resource_disk_device)
             self.logger.log("ResourceDisk is excluded in billing as it represents the Actual Temporary disk")
-            
-            device_list = self.device_list_for_billing() #new logic: calculate the disk size for billing
+
+            self.LunListEmpty = True
+            if(self.LunListEmpty != True):
+                device_list = self.device_list_for_billing() #new logic: calculate the disk size for billing
 
             while index < output_length:
                 if(len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) < 6 ): #when a row is divided in 2 lines
