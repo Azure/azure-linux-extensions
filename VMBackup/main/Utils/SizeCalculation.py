@@ -306,7 +306,6 @@ class SizeCalculation(object):
             resource_disk_device = "/dev/{0}".format(resource_disk_device)
             self.logger.log("ResourceDisk is excluded in billing as it represents the Actual Temporary disk")
 
-            self.LunListEmpty = True
             if(self.LunListEmpty != True):
                 device_list = self.device_list_for_billing() #new logic: calculate the disk size for billing
 
