@@ -47,24 +47,16 @@ class SizeCalculation(object):
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             self.isOnlyOSDiskBackupEnabled = False
-        # The command lsscsi is used for mapping the LUN numbers to the disk_names
-        self.command = "sudo lsscsi"
+
         self.disksToBeIncluded = []
         self.root_devices = []
         self.root_mount_points = ['/' , '/boot/efi']
-        try:
-            self.lsscsi_list = (os.popen(self.command).read()).splitlines()
-        except Exception as e:
-            error_msg = "Failed to execute the command lsscsi because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
-            self.logger.log(error_msg, True ,'Error')
-            self.output_lsscsi = ""
-            self.lsscsi_list = []
-        try:
-            self.output_lsblk = os.popen("lsblk -n --list --output name,mountpoint").read().strip().split("\n")
-        except Exception as e:
-            error_msg = "Failed to execute the command lsblk -n --list --output name,mountpoint because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
-            self.logger.log(error_msg, True ,'Error')
-            self.output_lsblk = []
+
+        # The command lsscsi is used for mapping the LUN numbers to the disk_names
+        self.get_lsscsi_list() #populates self.lsscsi_list 
+        self.get_lsblk_list() #populates self.lsblk_list
+        self.get_pvs_list()#populates pvs list
+
         self.devicesToInclude = [] #partitions to be included
         self.device_mount_points = []
         self.isAnyDiskExcluded = False
@@ -79,6 +71,25 @@ class SizeCalculation(object):
         if(self.includedLunList == None or len(self.includedLunList) == 0):
             self.LunListEmpty = True
             self.logger.log("As the LunList is empty including all disks")
+    
+    def get_lsscsi_list(self):
+        command = "sudo lsscsi"
+        try:
+            self.lsscsi_list = (os.popen(command).read()).splitlines()
+        except Exception as e:
+            error_msg = "Failed to execute the command lsscsi because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(error_msg, True ,'Error')
+            self.lsscsi_list = []
+
+    def get_lsblk_list(self):
+        try:
+            self.output_lsblk = os.popen("lsblk -n --list --output name,mountpoint").read().strip().split("\n")
+        except Exception as e:
+            error_msg = "Failed to execute the command lsblk -n --list --output name,mountpoint because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            self.logger.log(error_msg, True ,'Error')
+            self.output_lsblk = []
+
+    def get_pvs_list(self):
         try:
             self.pvs_output = os.popen("sudo pvs").read().strip().split("\n")
             self.pvs_output = self.pvs_output[1:]
@@ -86,7 +97,7 @@ class SizeCalculation(object):
             error_msg = "Failed to execute the command sudo pvs because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.pvs_output = []
-        
+
     def get_loop_devices(self):
         global disk_util
         disk_util = DiskUtil.get_instance(patching = self.patching,logger = self.logger)
