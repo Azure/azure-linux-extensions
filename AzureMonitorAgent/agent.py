@@ -322,7 +322,7 @@ def install():
                                          retry_check = retry_if_dpkg_or_rpm_locked,
                                          final_check = final_check_if_dpkg_or_rpm_locked)
 
-    if exit_code != 0:
+    if exit_code != 0 and platform.machine() != 'aarch64':
         return exit_code, output
 
     # Copy the AMACoreAgent and agentlauncher binaries
