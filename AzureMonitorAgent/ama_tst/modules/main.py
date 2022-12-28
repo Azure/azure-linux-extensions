@@ -140,6 +140,13 @@ def run_troubleshooter():
         "  - Pricing Tier assigned to the Workspace\n"\
         "  - Linux Distribution on the VM\n"\
         "  - Azure Monitor Agent Version")
+
+    print("================================================================================")
+    print("Restarting AMA can solve some of the problems. If you need to restart Azure Monitor Agent on this machine, "\
+          "please execute the following commands as the root user:")
+    print("  $ cd /var/lib/waagent/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-<agent version number>/")
+    print("  $ ./shim.sh -disable")
+    print("  $ ./shim.sh -enable")
     return
     
 
