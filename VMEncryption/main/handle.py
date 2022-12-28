@@ -43,7 +43,8 @@ from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import EncryptionConfig
 from IMDSUtil import IMDSUtil,IMDSStoredResults
 from patch import GetDistroPatcher
-from BekUtil import BekUtil, BekMissingException
+from BekUtil import BekUtil
+from IntefaceBekUtilImpl import BekMissingException
 from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
@@ -102,7 +103,7 @@ def disable_encryption():
         if encryption_status["os"] != "NotEncrypted":
             raise Exception("Disabling encryption is not supported when OS volume is encrypted")
 
-        bek_util = BekUtil(disk_util, logger)
+        bek_util = BekUtil(disk_util, logger,encryption_environment)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         crypt_mount_config_util.consolidate_azure_crypt_mount(bek_passphrase_file)
@@ -175,7 +176,7 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_ma
 
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-    bek_util = BekUtil(disk_util, logger)
+    bek_util = BekUtil(disk_util, logger,encryption_environment)
     current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
 
@@ -292,7 +293,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-        bek_util = BekUtil(disk_util, logger)
+        bek_util = BekUtil(disk_util, logger,encryption_environment)
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if not existing_passphrase_file:
             hutil.save_seq()
@@ -669,7 +670,7 @@ def enable():
         imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
         imds_Util = IMDSUtil(logger)
         try:
-            check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util)
+            check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util,public_settings=public_settings)
         except Exception as ex:
              hutil.do_exit(exit_code=CommonVariables.configuration_error,
                     operation='pre_Initialization_Check',
@@ -680,7 +681,7 @@ def enable():
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-        bek_util = BekUtil(disk_util, logger)
+        bek_util = BekUtil(disk_util, logger,encryption_environment)
         existing_passphrase_file = None
         existing_volume_type = None
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -872,7 +873,7 @@ def enable_encryption():
     trying to mount the crypted items.
     """
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
-    bek_util = BekUtil(disk_util, logger)
+    bek_util = BekUtil(disk_util, logger,encryption_environment)
 
     existing_passphrase_file = None
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -1910,7 +1911,7 @@ def daemon_encrypt():
     try to find the attached bek volume, and use the file to mount the crypted volumes,
     and if the passphrase file is found, then we will re-use it for the future.
     """
-    bek_util = BekUtil(disk_util, logger)
+    bek_util = BekUtil(disk_util, logger,encryption_environment)
     if encryption_config.config_file_exists():
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
 
