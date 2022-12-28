@@ -69,7 +69,7 @@ error_messages = {
     ERR_ENDPT_PROXY : "Machine couldn't connect to {0} with proxy: curl/openssl command failed. Please check your proxy configuration."\
           "\n\nError Details:\n $ {1} \n\n{2}",
     WARN_OPENSSL_PROXY : "Skip SSL handshake checks because AMA is configured with authenticated proxy.",
-    WARN_MDSD_ERR_FILE : "Found errors in log file {0}, display last few lines of error messages:\n {1}",
+    WARN_MDSD_ERR_FILE : "Found errors in log file {0}, displaying last few lines of error messages:\n {1}",
     WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}"
 }
 

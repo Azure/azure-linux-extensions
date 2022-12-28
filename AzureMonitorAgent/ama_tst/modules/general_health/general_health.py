@@ -14,7 +14,7 @@ def check_err_file():
     pattern = ' [DAEMON] '
     err_logs = []
     with open(ERR_FILE_PATH) as f:
-        lines = f.readlines()
+        lines = f.readlines(100)
         lines = lines[tail_size:]
         for line in lines:
             line = line.rstrip('\n')
@@ -49,7 +49,7 @@ def check_general_health(interactive, err_codes=True, prev_success=NO_ERROR):
     success = prev_success
 
     print("Checking status of subcomponents")
-    checked_restart_status = check_restart_status()
+    checked_restart_status = check_restart_status(interactive)
     if (is_error(checked_restart_status)):
         return print_errors(checked_restart_status)
     else:
