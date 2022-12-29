@@ -17,8 +17,8 @@ err_summary = []
 
 
 
-# # set of all errors which are actually warnings
-warnings = set([WARN_INTERNET_CONN, WARN_INTERNET, WARN_OPENSSL_PROXY])
+# set of all errors which are actually warnings
+warnings = set([WARN_INTERNET_CONN, WARN_INTERNET, WARN_OPENSSL_PROXY, WARN_MDSD_ERR_FILE, WARN_RESTART_LOOP])
 
 # dictionary correlating error codes to error messages
 error_messages = {
@@ -55,7 +55,6 @@ error_messages = {
           "more information at the link below:\n"\
           "\n    https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-manage\n",
     ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA.\n\nError Details: \n{0}",
-    
     ERR_AMA_PARAMETERS : "Couldn't read and parse AMA configuration in /etc/default/azuremonitoragent.\n\nError Details:\n{0}",
     ERR_NO_DCR : "Couldn't parse DCR information on this VM. Please check your DCR configuration.\n\nError Details:{0}",
     ERR_INFO_MISSING: "NO DCR workspace id or region is found. Please check if DCR is configured correctly and match the information in"\
@@ -69,7 +68,9 @@ error_messages = {
     ERR_ACCESS_TOKEN : "Couldn't use managed identities to acquire an access token when executing command\n $ {0}\n\nError Details:\n{1}",
     ERR_ENDPT_PROXY : "Machine couldn't connect to {0} with proxy: curl/openssl command failed. Please check your proxy configuration."\
           "\n\nError Details:\n $ {1} \n\n{2}",
-    WARN_OPENSSL_PROXY : "Skip SSL handshake checks because AMA is configured with authenticated proxy."
+    WARN_OPENSSL_PROXY : "Skip SSL handshake checks because AMA is configured with authenticated proxy.",
+    WARN_MDSD_ERR_FILE : "Found errors in log file {0}, displaying last few lines of error messages:\n {1}",
+    WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}"
 }
 
 

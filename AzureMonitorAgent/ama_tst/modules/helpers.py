@@ -25,7 +25,9 @@ def geninfo_lookup(key):
         return None
     return val
 
-def get_input(question, check_ans, no_fit):
+def get_input(question, check_ans=None, no_fit=None):
+    if check_ans == None and no_fit == None:
+        return input(question)
     answer = input(" {0}: ".format(question))
     while (not check_ans(answer.lower())):
         print("Unclear input. {0}".format(no_fit))
