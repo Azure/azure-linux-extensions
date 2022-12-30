@@ -187,9 +187,8 @@ def check_ama_installed(ama_vers):
     """
     Checks to verify AMA is installed and only has one version installed at a time
     """
-    ama_installed_vers = ama_vers
-    ama_exists = (len(ama_installed_vers) > 0)
-    ama_unique = (len(ama_installed_vers) == 1)
+    ama_exists = ((ama_vers != None) and (len(ama_vers) > 0))
+    ama_unique = (ama_exists and (len(ama_vers) == 1))
     return (ama_exists, ama_unique)
 
 def run_cmd_output(cmd):
