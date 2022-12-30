@@ -5,6 +5,7 @@ from logcollector   import run_logcollector
 from error_codes    import *
 from errors         import get_input, print_errors, err_summary
 from install.install import check_installation
+from general_health.general_health  import check_general_health
 from connect.connect import check_connection
 
 # check to make sure the user is running as root
@@ -47,17 +48,20 @@ def run_troubleshooter():
             # TODO: come up with scenarios
               "1: Installation failures. \n"\
               "2: Agent doesn't start or cannot connect to Log Analytics service.\n"\
+              "3: Agent in unhealthy state. \n"\
               "================================================================================\n"\
               "L: Collect the logs for AMA.\n"\
               "Q: Press 'Q' to quit.\n"\
               "================================================================================")
         switcher = {
             '1': check_installation,
-            '2': check_connection
+            '2': check_connection,
+            '3': check_general_health
         }
+    
         issue = get_input("Please select an option",\
-                        (lambda x : x.lower() in ['1','2','q','quit','l']),\
-                        "Please enter an integer corresponding with your issue (1-2) to\n"\
+                        (lambda x : x.lower() in ['1','2','3','q','quit','l']),\
+                        "Please enter an integer corresponding with your issue (1-3) to\n"\
                         "continue, 'L' to run the log collector, or 'Q' to quit.")
         # quit troubleshooter
         if (issue.lower() in ['q','quit']):
@@ -113,7 +117,7 @@ def run_troubleshooter():
             print("Please review the errors found above.")
 
         # if user ran single scenario, ask if they want to run again
-        if (issue in ['1', '2']):
+        if (issue in ['1', '2', '3']):
             run_again = get_input("Do you want to run another scenario? (y/n)",\
                                   (lambda x : x.lower() in ['y','yes','n','no']),\
                                   "Please type either 'y'/'yes' or 'n'/'no' to proceed.")
@@ -136,6 +140,13 @@ def run_troubleshooter():
         "  - Pricing Tier assigned to the Workspace\n"\
         "  - Linux Distribution on the VM\n"\
         "  - Azure Monitor Agent Version")
+
+    print("================================================================================")
+    print("Restarting AMA can solve some of the problems. If you need to restart Azure Monitor Agent on this machine, "\
+          "please execute the following commands as the root user:")
+    print("  $ cd /var/lib/waagent/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-<agent version number>/")
+    print("  $ ./shim.sh -disable")
+    print("  $ ./shim.sh -enable")
     return
     
 
