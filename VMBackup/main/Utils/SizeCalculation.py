@@ -132,7 +132,9 @@ class SizeCalculation(object):
                 self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name))   
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         else:
-            self.logger.log("There is some glitch in executing the command sudo lsscsi, So the lsscsi list is empty and the Billing will not be done ")
+            if(self.isAnyDiskExcluded == True):
+                self.size_calc_failed = True
+                self.logger.log("There is some glitch in executing the command sudo lsscsi, So the lsscsi list is empty and the Billing will not be done ")
         return self.disksToBeIncluded
 
     def get_logicalVolumes_for_billing(self):
@@ -245,7 +247,7 @@ class SizeCalculation(object):
 
     def get_total_used_size(self):
         try:
-            size_calc_failed = False
+            self.size_calc_failed = False
 
             onlyLocalFilesystems = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalFilesystems, "False") 
             # df command gives the information of all the devices which have mount points
@@ -328,7 +330,7 @@ class SizeCalculation(object):
                     else:
                         self.logger.log("Output of df command is not in desired format",True)
                         total_used = 0
-                        size_calc_failed = True
+                        self.size_calc_failed = True
                         break
                 device, size, used, available, percent, mountpoint =Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])
                 fstype = ''
@@ -403,7 +405,15 @@ class SizeCalculation(object):
                         excluded_disks_used = excluded_disks_used + int(used)
                     #Including only the disks which are asked to include (Here LunList can't be empty this case is handled at the CRP end)
                     else:
-                        if mountpoint in self.device_mount_points and device != resource_disk_device:
+                        if self.isAnyDiskExcluded == False and device != resource_disk_device:
+                            #No disk has been excluded So can include every disk
+                            self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            total_used = total_used + int(used) #return in KB
+                        elif self.isAnyDiskExcluded == False and device == resource_disk_device:
+                            #excluding resource disk even in the case where all disks are included as it is the actual temporary disk
+                            self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            excluded_disks_used = excluded_disks_used + int(used)
+                        elif mountpoint in self.device_mount_points and device != resource_disk_device:
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             total_used = total_used + int(used) #return in KB
                         elif device != resource_disk_device and -1 in self.includedLunList:
@@ -458,10 +468,10 @@ class SizeCalculation(object):
             if total_sd_size != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
             self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
-
-            return total_used * 1024, size_calc_failed #Converting into Bytes
+            self.logger.log("SizeCalcFailedFlag {0}".format(self.size_calc_failed))
+            return total_used * 1024,self.size_calc_failed #Converting into Bytes
         except Exception as e:
             errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True)
-            size_calc_failed = True
-            return 0,size_calc_failed
+            self.size_calc_failed = True
+            return 0,self.size_calc_failed
