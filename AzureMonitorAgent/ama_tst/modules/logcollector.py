@@ -164,7 +164,7 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
         outfile.write("--------------------------------------------------------------------------------\n")
 
         # AMA install status
-        ama_vers = helpers.find_ama_version()
+        (ama_vers, _) = helpers.find_ama_version()
         (ama_installed, ama_unique) = helpers.check_ama_installed(ama_vers)
         outfile.write("AMA Install Status: {0}\n".format("installed" if ama_installed else "not installed"))
         if (ama_installed):
