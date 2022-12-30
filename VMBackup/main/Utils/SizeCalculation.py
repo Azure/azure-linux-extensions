@@ -132,10 +132,8 @@ class SizeCalculation(object):
                 self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name))   
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         else:
-            if(self.isAnyDiskExcluded == True):
-                self.size_calc_failed = True
-                self.logger.log("There is some glitch in executing the command sudo lsscsi, So the lsscsi list is empty and the Billing will not be done ")
-        return self.disksToBeIncluded
+            self.size_calc_failed = True
+            self.logger.log("There is some glitch in executing the command 'sudo lsscsi' and therefore size calculation is marked as failed. ")
 
     def get_logicalVolumes_for_billing(self):
         try:
@@ -195,7 +193,7 @@ class SizeCalculation(object):
             [1:0:0:18]   disk    Msft     Virtual Disk     1.0   /dev/sdc
         '''
 
-        self.disksToBeIncluded = self.disk_list_for_billing() 
+        self.disk_list_for_billing() 
         self.get_logicalVolumes_for_billing()
         self.logger.log("lsblk o/p {0}".format(self.output_lsblk))
         self.logger.log("lvm {0}".format(self.logicalVolume_to_bill))
@@ -226,7 +224,6 @@ class SizeCalculation(object):
 	'''
         for item in self.output_lsblk: 
             item_split = item.split()
-            dev_present = 0
             if(len(item_split)==2):
                 device = item_split[0]
                 mount_point = item_split[1]
@@ -319,7 +316,7 @@ class SizeCalculation(object):
             resource_disk_device = "/dev/{0}".format(resource_disk_device)
             self.logger.log("ResourceDisk is excluded in billing as it represents the Actual Temporary disk")
 
-            if(self.LunListEmpty != True):
+            if(self.LunListEmpty != True and self.isAnyDiskExcluded == True):
                 device_list = self.device_list_for_billing() #new logic: calculate the disk size for billing
 
             while index < output_length:
