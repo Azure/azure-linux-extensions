@@ -133,7 +133,7 @@ class SizeCalculation(object):
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         else:
             self.size_calc_failed = True
-            self.logger.log("There is some glitch in executing the command 'sudo lsscsi' and therefore size calculation is marked as failed. ")
+            self.logger.log("There is some glitch in executing the command 'sudo lsscsi' and therefore size calculation is marked as failed.")
 
     def get_logicalVolumes_for_billing(self):
         try:
