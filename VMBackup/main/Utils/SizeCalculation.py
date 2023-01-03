@@ -222,6 +222,10 @@ class SizeCalculation(object):
                 sdf
                 sdg
 	'''
+        if(len(self.output_lsblk) == 0):
+            self.size_calc_failed = True
+            self.logger.log("There is some glitch in executing the command 'lsblk -n --list --output name,mountpoint' and therefore size calculation is marked as failed.")
+        
         for item in self.output_lsblk: 
             item_split = item.split()
             if(len(item_split)==2):
@@ -398,17 +402,17 @@ class SizeCalculation(object):
                         total_used = total_used + int(used) #return in KB
                     #LunList is empty but the device is an actual temporary disk so excluding it
                     elif(self.LunListEmpty == True and device == resource_disk_device):
-                        self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype :{3}".format(device,used,mountpoint,fstype),True)
+                        self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype :{3}".format(device,used,mountpoint,fstype),True)
                         excluded_disks_used = excluded_disks_used + int(used)
                     #Including only the disks which are asked to include (Here LunList can't be empty this case is handled at the CRP end)
                     else:
                         if self.isAnyDiskExcluded == False and device != resource_disk_device:
-                            #No disk has been excluded So can include every disk
+                            #No disk has been excluded So can include every non resource disk
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             total_used = total_used + int(used) #return in KB
                         elif self.isAnyDiskExcluded == False and device == resource_disk_device:
                             #excluding resource disk even in the case where all disks are included as it is the actual temporary disk
-                            self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             excluded_disks_used = excluded_disks_used + int(used)
                         elif mountpoint in self.device_mount_points and device != resource_disk_device:
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
@@ -424,7 +428,7 @@ class SizeCalculation(object):
                                     self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                     total_used = total_used + int(used) #return in KB
                                 else:
-                                    self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                                    self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                     excluded_disks_used = excluded_disks_used + int(used)
                         else:
                             # check for logicalVolumes even if os disk is not included
@@ -433,7 +437,7 @@ class SizeCalculation(object):
                                 self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                 total_used = total_used + int(used) #return in KB
                             else:
-                                self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                                self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                 excluded_disks_used = excluded_disks_used + int(used)
                     if not (isKnownFs or fstype == '' or fstype == None):
                         total_used_unknown_fs = total_used_unknown_fs + int(used)
