@@ -22,17 +22,17 @@ import sys
 import os
 
 class BekUtilFileImpl(IntefaceBekUtilImpl):
-    def __init__(self,logger,diskutil) -> None:
+    def __init__(self,diskutil,logger) -> None:
         super().__init__()
         self.keyfilePath = "/var/lib/azure_disk_encryption_config/"
         self.logger = logger
-        self.diskutil=diskutil
+        self.disk_util=diskutil
         self.fileNotFount = "Keyfile path is not valid, path: {0}".format(self.keyfilePath)
     
     def store_bek_passphrase(self, encryption_config, passphrase):
         bek_filename = encryption_config.get_bek_filename()
         try:
-            self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
+            self.disk_util.make_sure_path_exists(self.keyfilePath)
 
             # ensure base64 encoded passphrase string is identically encoded in
             # python2 and python3 environments for consistency in output format
@@ -40,11 +40,11 @@ class BekUtilFileImpl(IntefaceBekUtilImpl):
                 if isinstance(passphrase, str):
                     passphrase = passphrase.decode('utf-8')
 
-            with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "wb") as f:
+            with open(os.path.join(self.keyfilePath, bek_filename), "wb") as f:
                 f.write(passphrase)
-            for bek_file in os.listdir(self.bek_filesystem_mount_point):
+            for bek_file in os.listdir(self.keyfilePath):
                 if bek_filename in bek_file and bek_filename != bek_file:
-                    with open(os.path.join(self.bek_filesystem_mount_point, bek_file), "wb") as f:
+                    with open(os.path.join(self.keyfilePath, bek_file), "wb") as f:
                         f.write(passphrase)
 
         except Exception as e:
@@ -63,12 +63,12 @@ class BekUtilFileImpl(IntefaceBekUtilImpl):
         try:
             self.disk_util.make_sure_path_exists(self.keyfilePath)
 
-            if os.path.exists(os.path.join(self.bek_filesystem_mount_point, bek_filename)):
-                return os.path.join(self.bek_filesystem_mount_point, bek_filename)
+            if os.path.exists(os.path.join(self.keyfilePath, bek_filename)):
+                return os.path.join(self.keyfilePath, bek_filename)
 
-            for filename in os.listdir(self.bek_filesystem_mount_point):
+            for filename in os.listdir(self.keyfilePath):
                 if bek_filename in filename:
-                    return os.path.join(self.bek_filesystem_mount_point, filename)
+                    return os.path.join(self.keyfilePath, filename)
 
         except Exception as e:
             # use traceback to convert exception to string on both python2 and python3+

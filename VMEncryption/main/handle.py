@@ -669,6 +669,7 @@ def enable():
         check_Util = CheckUtil(logger)
         imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
         imds_Util = IMDSUtil(logger)
+        security_Type = None
         try:
             check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util,public_settings=public_settings)
         except Exception as ex:
@@ -677,6 +678,8 @@ def enable():
                     status=CommonVariables.extension_error_status,
                     code=str(CommonVariables.configuration_error),
                     message=str(ex)) 
+        #reading security type from IMDS stored results. 
+        security_Type = imds_Stored_Results.get_security_type()
 
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
@@ -723,7 +726,7 @@ def enable():
         logger.log('OS Disk Status: {0}'.format(encryption_status['os']))
 
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-
+            
         # run fatal prechecks, report error if exceptions are caught
         try:
             if not is_migrate_operation:
@@ -758,8 +761,24 @@ def enable():
                 perform_migration(encryption_config, crypt_mount_config_util)
                 return  # Control should not reach here but added return just to be safe
             logger.log("handle.py found enable encryption operation")
-
-            handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
+            is_continue_encryption = True
+            if security_Type == CommonVariables.ConfidentialVM:
+                is_continue_encryption = False
+                if encryption_status['os'] != 'Encrypted':
+                    logger.log ("ADE encryption supported to CVM only if OS is CVM encrypted.")
+                if existing_volume_type != CommonVariables.VolumeTypeOS and \
+                    encryption_operation == CommonVariables.EnableEncryptionFormatAll:
+                    is_continue_encryption = True
+            if is_continue_encryption:        
+                handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
+            else:
+                msg = 'Encryption operation {2} is not supported to {0}, volume type: {1}'.format(security_Type,existing_volume_type,encryption_operation)
+                logger.log(msg)
+                hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                          operation='Enable',
+                          status=CommonVariables.extension_error_status,
+                          code=(CommonVariables.configuration_error),
+                          message=msg)
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")

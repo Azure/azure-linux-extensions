@@ -351,6 +351,8 @@ class ResourceDiskUtil(object):
         crypt_item.mapper_name = self.RD_MAPPER_NAME
         crypt_item.uses_cleartext_key = False
         crypt_item.mount_point = self.RD_MOUNT_POINT
+        if self.passphrase_filename != None:
+            crypt_item.keyfile_path = self.passphrase_filename
         self.crypt_mount_config_util.remove_crypt_item(crypt_item)  # Remove old item in case it was already there
         self.add_to_fstab()
         backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")

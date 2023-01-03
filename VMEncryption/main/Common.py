@@ -94,6 +94,7 @@ class CommonVariables:
     default_mount_name = 'encrypted_disk'
     dev_mapper_root = '/dev/mapper/'
     osmapper_name = 'osencrypt'
+    cvmosmapper_name = 'cloudimg-rootfs'
     azure_symlinks_dir = '/dev/disk/azure'
     cloud_symlinks_dir = '/dev/disk/cloud'
     disk_by_id_root = '/dev/disk/by-id'

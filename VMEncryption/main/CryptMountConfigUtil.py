@@ -278,9 +278,11 @@ class CryptMountConfigUtil(object):
                 self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
 
                 for line in proc_comm.stdout.splitlines():
-                    if CommonVariables.osmapper_name in line:
-                        majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
-                        src_device = filter(lambda d: d.majmin == majmin, self.disk_util.get_device_items(None))[0]
+                    if CommonVariables.osmapper_name in line \
+                        or CommonVariables.cvmosmapper_name in line:
+                        self.logger.log("crypt target line: {0}".format(line))
+                        majmin = list(filter(lambda p: re.match(r'\d+:\d+', p), line.split()))[0]
+                        src_device = list(filter(lambda d: d.majmin == majmin, self.disk_util.get_device_items(None)))[0]
                         crypt_item.dev_path = '/dev/' + src_device.name
                         break
 
@@ -339,7 +341,9 @@ class CryptMountConfigUtil(object):
             else:
                 scsi_controller, lun_number = scsi_lun_numbers[0]
                 key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
-
+        if crypt_item.keyfile_path != None:
+            key_file = crypt_item.keyfile_path
+            
         crypttab_line = "\n{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
         if crypt_item.luks_header_path and str(crypt_item.luks_header_path) != "None":
             crypttab_line += ",header=" + crypt_item.luks_header_path
