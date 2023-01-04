@@ -83,7 +83,7 @@ class SizeCalculation(object):
 
     def get_lsblk_list(self):
         try:
-            self.output_lsblk = os.popen("lsblk -n --list --output name,mountpoint").read().strip().split("\n")
+            self.output_lsblk = os.popen("lsblk -n --list --output name,mountpoint").read().strip().splitlines()
         except Exception as e:
             error_msg = "Failed to execute the command lsblk -n --list --output name,mountpoint because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
@@ -396,13 +396,13 @@ class SizeCalculation(object):
                             total_used = total_used + int(used)
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
-                    #Handling a case where LunList is empty for UnmanagedVM's
-                    elif(self.LunListEmpty == True and device != resource_disk_device):
+                    #Handling a case where LunList is empty for UnmanagedVM's and failures if occurred( as we will billing for all the non resource disks)
+                    elif( (self.size_calc_failed == True or self.LunListEmpty == True) and device != resource_disk_device):
                         self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                         total_used = total_used + int(used) #return in KB
                     #LunList is empty but the device is an actual temporary disk so excluding it
-                    elif(self.LunListEmpty == True and device == resource_disk_device):
-                        self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype :{3}".format(device,used,mountpoint,fstype),True)
+                    elif( (self.size_calc_failed == True or self.LunListEmpty == True) and device == resource_disk_device):
+                        self.logger.log("Device {0} is not included for billing as it is a resource disk, used space in KB : {1} mount point : {2} fstype :{3}".format(device,used,mountpoint,fstype),True)
                         excluded_disks_used = excluded_disks_used + int(used)
                     #Including only the disks which are asked to include (Here LunList can't be empty this case is handled at the CRP end)
                     else:
@@ -412,7 +412,7 @@ class SizeCalculation(object):
                             total_used = total_used + int(used) #return in KB
                         elif self.isAnyDiskExcluded == False and device == resource_disk_device:
                             #excluding resource disk even in the case where all disks are included as it is the actual temporary disk
-                            self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            self.logger.log("Device {0} is not included for billing as it is a resource disk, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             excluded_disks_used = excluded_disks_used + int(used)
                         elif mountpoint in self.device_mount_points and device != resource_disk_device:
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
@@ -469,7 +469,7 @@ class SizeCalculation(object):
             if total_sd_size != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
             self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
-            self.logger.log("SizeCalcFailedFlag {0}".format(self.size_calc_failed))
+            self.logger.log("SizeComputationFailedFlag {0}".format(self.size_calc_failed))
             return total_used * 1024,self.size_calc_failed #Converting into Bytes
         except Exception as e:
             errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
