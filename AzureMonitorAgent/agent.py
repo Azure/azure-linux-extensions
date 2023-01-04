@@ -322,18 +322,19 @@ def install():
                                          retry_check = retry_if_dpkg_or_rpm_locked,
                                          final_check = final_check_if_dpkg_or_rpm_locked)
 
-    if exit_code != 0 and platform.machine() != 'aarch64':
-        return exit_code, output
-
-    # Copy the AMACoreAgent and agentlauncher binaries
-    copy_amacoreagent_binaries()
-
     # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
     # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
     if vm_dist.replace(' ','').lower().startswith('redhat') and vm_ver == '8.6' and platform.machine() == 'aarch64':
         exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_or_rpm_locked,
                                          final_check = final_check_if_dpkg_or_rpm_locked)
+
+    if exit_code != 0:
+        return exit_code, output
+
+    # Copy the AMACoreAgent and agentlauncher binaries
+    # TBD: this method needs to be revisited for aarch64
+    copy_amacoreagent_binaries()
 
     # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
     if is_systemd() and platform.machine() == 'aarch64':
