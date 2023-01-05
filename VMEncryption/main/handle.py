@@ -957,7 +957,8 @@ def enable_encryption():
             start_daemon('EnableEncryption')
         else:
             encryption_config = EncryptionConfig(encryption_environment, logger)
-
+            imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
+            security_type = imds_Stored_Results.get_security_type()
             hutil.save_seq()
 
             encryption_config.volume_type = extension_parameter.VolumeType
@@ -991,7 +992,10 @@ def enable_encryption():
 
                     bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
-                if extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
+                #in case of CVM encrypt resource disk irrespective of encryptformatall switch
+                #TODO: make sure if encryptformatall is not enabled, don't format resource disk.  
+                if security_type ==CommonVariables.ConfidentialVM or \
+                    extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
                     current_volume_type = extension_parameter.VolumeType.lower()
                     if current_volume_type == CommonVariables.VolumeTypeData.lower() or current_volume_type == CommonVariables.VolumeTypeAll.lower():
                         try:
@@ -1911,6 +1915,11 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
 
 def daemon_encrypt():
+    #TODO: TEMP disk encryption, remove this portion of code to unblock Data disk encryption. 
+    imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
+    security_type = imds_Stored_Results.get_security_type()
+    if security_type == CommonVariables.ConfidentialVM:
+        return
     # Ensure the same configuration is executed only once
     # If the previous enable failed, we do not have retry logic here.
     # TODO Remount all
