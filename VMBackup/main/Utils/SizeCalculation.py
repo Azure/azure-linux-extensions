@@ -83,7 +83,7 @@ class SizeCalculation(object):
 
     def get_lsblk_list(self):
         try:
-            self.output_lsblk = os.popen("lsblk -n --list --output name,mountpoint").read().strip().split("\n")
+            self.output_lsblk = os.popen("lsblk -n --list --output name,mountpoint").read().strip().splitlines()
         except Exception as e:
             error_msg = "Failed to execute the command lsblk -n --list --output name,mountpoint because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
@@ -132,8 +132,8 @@ class SizeCalculation(object):
                 self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name))   
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         else:
-            self.logger.log("There is some glitch in executing the command sudo lsscsi, So the lsscsi list is empty and the Billing will not be done ")
-        return self.disksToBeIncluded
+            self.size_calc_failed = True
+            self.logger.log("There is some glitch in executing the command 'sudo lsscsi' and therefore size calculation is marked as failed.")
 
     def get_logicalVolumes_for_billing(self):
         try:
@@ -193,7 +193,7 @@ class SizeCalculation(object):
             [1:0:0:18]   disk    Msft     Virtual Disk     1.0   /dev/sdc
         '''
 
-        self.disksToBeIncluded = self.disk_list_for_billing() 
+        self.disk_list_for_billing() 
         self.get_logicalVolumes_for_billing()
         self.logger.log("lsblk o/p {0}".format(self.output_lsblk))
         self.logger.log("lvm {0}".format(self.logicalVolume_to_bill))
@@ -222,9 +222,12 @@ class SizeCalculation(object):
                 sdf
                 sdg
 	'''
+        if(len(self.output_lsblk) == 0):
+            self.size_calc_failed = True
+            self.logger.log("There is some glitch in executing the command 'lsblk -n --list --output name,mountpoint' and therefore size calculation is marked as failed.")
+        
         for item in self.output_lsblk: 
             item_split = item.split()
-            dev_present = 0
             if(len(item_split)==2):
                 device = item_split[0]
                 mount_point = item_split[1]
@@ -245,7 +248,7 @@ class SizeCalculation(object):
 
     def get_total_used_size(self):
         try:
-            size_calc_failed = False
+            self.size_calc_failed = False
 
             onlyLocalFilesystems = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalFilesystems, "False") 
             # df command gives the information of all the devices which have mount points
@@ -317,7 +320,7 @@ class SizeCalculation(object):
             resource_disk_device = "/dev/{0}".format(resource_disk_device)
             self.logger.log("ResourceDisk is excluded in billing as it represents the Actual Temporary disk")
 
-            if(self.LunListEmpty != True):
+            if(self.LunListEmpty != True and self.isAnyDiskExcluded == True):
                 device_list = self.device_list_for_billing() #new logic: calculate the disk size for billing
 
             while index < output_length:
@@ -328,7 +331,7 @@ class SizeCalculation(object):
                     else:
                         self.logger.log("Output of df command is not in desired format",True)
                         total_used = 0
-                        size_calc_failed = True
+                        self.size_calc_failed = True
                         break
                 device, size, used, available, percent, mountpoint =Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])
                 fstype = ''
@@ -393,17 +396,25 @@ class SizeCalculation(object):
                             total_used = total_used + int(used)
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
-                    #Handling a case where LunList is empty for UnmanagedVM's
-                    elif(self.LunListEmpty == True and device != resource_disk_device):
+                    #Handling a case where LunList is empty for UnmanagedVM's and failures if occurred( as we will billing for all the non resource disks)
+                    elif( (self.size_calc_failed == True or self.LunListEmpty == True) and device != resource_disk_device):
                         self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                         total_used = total_used + int(used) #return in KB
                     #LunList is empty but the device is an actual temporary disk so excluding it
-                    elif(self.LunListEmpty == True and device == resource_disk_device):
-                        self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype :{3}".format(device,used,mountpoint,fstype),True)
+                    elif( (self.size_calc_failed == True or self.LunListEmpty == True) and device == resource_disk_device):
+                        self.logger.log("Device {0} is not included for billing as it is a resource disk, used space in KB : {1} mount point : {2} fstype :{3}".format(device,used,mountpoint,fstype),True)
                         excluded_disks_used = excluded_disks_used + int(used)
                     #Including only the disks which are asked to include (Here LunList can't be empty this case is handled at the CRP end)
                     else:
-                        if mountpoint in self.device_mount_points and device != resource_disk_device:
+                        if self.isAnyDiskExcluded == False and device != resource_disk_device:
+                            #No disk has been excluded So can include every non resource disk
+                            self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            total_used = total_used + int(used) #return in KB
+                        elif self.isAnyDiskExcluded == False and device == resource_disk_device:
+                            #excluding resource disk even in the case where all disks are included as it is the actual temporary disk
+                            self.logger.log("Device {0} is not included for billing as it is a resource disk, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                            excluded_disks_used = excluded_disks_used + int(used)
+                        elif mountpoint in self.device_mount_points and device != resource_disk_device:
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             total_used = total_used + int(used) #return in KB
                         elif device != resource_disk_device and -1 in self.includedLunList:
@@ -417,7 +428,7 @@ class SizeCalculation(object):
                                     self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                     total_used = total_used + int(used) #return in KB
                                 else:
-                                    self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                                    self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                     excluded_disks_used = excluded_disks_used + int(used)
                         else:
                             # check for logicalVolumes even if os disk is not included
@@ -426,7 +437,7 @@ class SizeCalculation(object):
                                 self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                 total_used = total_used + int(used) #return in KB
                             else:
-                                self.logger.log("Device {0} is not included for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                                self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                 excluded_disks_used = excluded_disks_used + int(used)
                     if not (isKnownFs or fstype == '' or fstype == None):
                         total_used_unknown_fs = total_used_unknown_fs + int(used)
@@ -458,10 +469,10 @@ class SizeCalculation(object):
             if total_sd_size != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
             self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
-
-            return total_used * 1024, size_calc_failed #Converting into Bytes
+            self.logger.log("SizeComputationFailedFlag {0}".format(self.size_calc_failed))
+            return total_used * 1024,self.size_calc_failed #Converting into Bytes
         except Exception as e:
             errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg,True)
-            size_calc_failed = True
-            return 0,size_calc_failed
+            self.size_calc_failed = True
+            return 0,self.size_calc_failed
