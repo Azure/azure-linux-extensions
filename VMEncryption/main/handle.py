@@ -570,13 +570,16 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
 
 
 def main():
-    global hutil, DistroPatcher, logger, encryption_environment
+    global hutil, DistroPatcher, logger, encryption_environment, security_Type
     HandlerUtil.waagent.Log("{0} started to handle.".format(CommonVariables.extension_name))
 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     logger = BackupLogger(hutil)
     DistroPatcher = GetDistroPatcher(logger)
     hutil.patching = DistroPatcher
+    #reading the stored IMDS results. 
+    imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
+    security_Type = imds_Stored_Results.get_security_type()
 
     encryption_environment = EncryptionEnvironment(patching=DistroPatcher, logger=logger)
 
@@ -669,7 +672,6 @@ def enable():
         check_Util = CheckUtil(logger)
         imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
         imds_Util = IMDSUtil(logger)
-        security_Type = None
         try:
             check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util,public_settings=public_settings)
         except Exception as ex:
@@ -762,12 +764,13 @@ def enable():
                 return  # Control should not reach here but added return just to be safe
             logger.log("handle.py found enable encryption operation")
             is_continue_encryption = True
+            volume_type = None
             if security_Type == CommonVariables.ConfidentialVM:
                 is_continue_encryption = False
                 if encryption_status['os'] != 'Encrypted':
                     logger.log ("ADE encryption supported to CVM only if OS is CVM encrypted.")
-                if existing_volume_type != CommonVariables.VolumeTypeOS and \
-                    encryption_operation == CommonVariables.EnableEncryptionFormatAll:
+                volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+                if volume_type != CommonVariables.VolumeTypeOS:
                     is_continue_encryption = True
             if is_continue_encryption:        
                 handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
@@ -957,8 +960,6 @@ def enable_encryption():
             start_daemon('EnableEncryption')
         else:
             encryption_config = EncryptionConfig(encryption_environment, logger)
-            imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
-            security_type = imds_Stored_Results.get_security_type()
             hutil.save_seq()
 
             encryption_config.volume_type = extension_parameter.VolumeType
@@ -994,7 +995,7 @@ def enable_encryption():
 
                 #in case of CVM encrypt resource disk irrespective of encryptformatall switch
                 #TODO: make sure if encryptformatall is not enabled, don't format resource disk.  
-                if security_type ==CommonVariables.ConfidentialVM or \
+                if security_Type ==CommonVariables.ConfidentialVM or \
                     extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
                     current_volume_type = extension_parameter.VolumeType.lower()
                     if current_volume_type == CommonVariables.VolumeTypeData.lower() or current_volume_type == CommonVariables.VolumeTypeAll.lower():
@@ -1916,9 +1917,14 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
 def daemon_encrypt():
     #TODO: TEMP disk encryption, remove this portion of code to unblock Data disk encryption. 
-    imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
-    security_type = imds_Stored_Results.get_security_type()
-    if security_type == CommonVariables.ConfidentialVM:
+    logger.log("security type is {0}".format(security_Type))
+    if security_Type == CommonVariables.ConfidentialVM:
+        msg = "Currently for CVM, Data disk encryption is not supported."
+        logger.log(msg)
+        hutil.do_exit(operation="EnableEncryption",
+                                status=CommonVariables.extension_success_status,
+                                status_code=str(CommonVariables.success),
+                                message=msg)
         return
     # Ensure the same configuration is executed only once
     # If the previous enable failed, we do not have retry logic here.
@@ -2381,9 +2387,12 @@ def start_daemon(operation):
     devnull = open(os.devnull, 'wb')
     subprocess.Popen(args, stdout=devnull, stderr=devnull)
 
+    #TODO: disk are not stamped with current config, currently we do only temp disk encryption.
+    #this portion of code must be reviewed during data disk encryption for CVM. 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     if encryption_config.config_file_exists():
-        if are_disks_stamped_with_current_config(encryption_config):
+        if are_disks_stamped_with_current_config(encryption_config) or \
+            security_Type == CommonVariables.ConfidentialVM:
             hutil.do_exit(exit_code=0,
                           operation=operation,
                           status=CommonVariables.extension_success_status,
