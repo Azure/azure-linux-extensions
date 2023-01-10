@@ -37,5 +37,10 @@ fi
 
 echo "Starting AMA Troubleshooting Tool v.$TST_VERSION..."
 echo ""
-PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND}
+if [ -z $1 ]
+then
+    PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND}
+else
+    PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND} $1
+fi
 exit $?
