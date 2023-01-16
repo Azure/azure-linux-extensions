@@ -577,11 +577,12 @@ def main():
     logger = BackupLogger(hutil)
     DistroPatcher = GetDistroPatcher(logger)
     hutil.patching = DistroPatcher
-    #reading the stored IMDS results. 
-    imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
-    security_Type = imds_Stored_Results.get_security_type()
-
     encryption_environment = EncryptionEnvironment(patching=DistroPatcher, logger=logger)
+    #reading the stored IMDS results. 
+    security_Type = None
+    imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
+    if imds_Stored_Results.config_file_exists():
+        security_Type = imds_Stored_Results.get_security_type()
 
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     hutil.disk_util = disk_util
@@ -1921,10 +1922,10 @@ def daemon_encrypt():
     if security_Type == CommonVariables.ConfidentialVM:
         msg = "Currently for CVM, Data disk encryption is not supported."
         logger.log(msg)
-        hutil.do_exit(operation="EnableEncryption",
-                                status=CommonVariables.extension_success_status,
-                                status_code=str(CommonVariables.success),
-                                message=msg)
+        hutil.do_status_report(operation="EnableEncryption",
+                       status=CommonVariables.extension_success_status,
+                       status_code=str(CommonVariables.success),
+                       message=msg)
         return
     # Ensure the same configuration is executed only once
     # If the previous enable failed, we do not have retry logic here.

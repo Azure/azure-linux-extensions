@@ -21,10 +21,10 @@ import base64
 import os.path
 import traceback
 import sys
-from IntefaceBekUtilImpl import IntefaceBekUtilImpl,BekMissingException
+from AbstractBekUtilImpl import AbstractBekUtilImpl,BekMissingException
 
 
-class BekUtilVolumeImpl(IntefaceBekUtilImpl):
+class BekUtilVolumeImpl(AbstractBekUtilImpl):
     """
     Utility functions related to the BEK VOLUME and BEK files
     """
@@ -42,20 +42,9 @@ class BekUtilVolumeImpl(IntefaceBekUtilImpl):
         try:
             self.disk_util.make_sure_path_exists(self.bek_filesystem_mount_point)
             self.mount_bek_volume()
-
-            # ensure base64 encoded passphrase string is identically encoded in
-            # python2 and python3 environments for consistency in output format
-            if sys.version_info[0] < 3:
-                if isinstance(passphrase, str):
-                    passphrase = passphrase.decode('utf-8')
-
-            with open(os.path.join(self.bek_filesystem_mount_point, bek_filename), "wb") as f:
-                f.write(passphrase)
-            for bek_file in os.listdir(self.bek_filesystem_mount_point):
-                if bek_filename in bek_file and bek_filename != bek_file:
-                    with open(os.path.join(self.bek_filesystem_mount_point, bek_file), "wb") as f:
-                        f.write(passphrase)
-
+            self.store_passphrase(key_File_Path=self.bek_filesystem_mount_point,
+                                  bek_filename=bek_filename,
+                                  passphrase=passphrase)
         except Exception as e:
             message = "Failed to store BEK in BEK VOLUME with error: {0}".format(traceback.format_exc())
             self.logger.log(message)

@@ -16,8 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import sys
 from Common import TestHooks
 import base64
+from abc import ABC, abstractmethod
 
 class BekMissingException(Exception):
     """
@@ -29,7 +31,7 @@ class BekMissingException(Exception):
     def __str__(self):
        return(repr(self.value))
 
-class IntefaceBekUtilImpl(object):
+class AbstractBekUtilImpl(ABC):
     '''
     This is an interface used for funcitonality implementation for BEK util class
     '''
@@ -49,19 +51,33 @@ class IntefaceBekUtilImpl(object):
                 bytes = _random_source.read(127)
                 passphrase_generated = base64.b64encode(bytes)
             return passphrase_generated    
+    
+    def store_passphrase(self,key_File_Path,bek_filename,passphrase):
+        # ensure base64 encoded passphrase string is identically encoded in
+        # python2 and python3 environments for consistency in output format
+        if sys.version_info[0] < 3:
+            if isinstance(passphrase, str):
+                passphrase = passphrase.decode('utf-8')
+        with open(os.path.join(key_File_Path, bek_filename), "wb") as f:
+            f.write(passphrase)
+        for bek_file in os.listdir(key_File_Path):
+            if bek_filename in bek_file and bek_filename != bek_file:
+                with open(os.path.join(key_File_Path, bek_file), "wb") as f:
+                    f.write(passphrase)
 
+    @abstractmethod
     def store_bek_passphrase(self, encryption_config, passphrase):
         pass
-
+    @abstractmethod
     def get_bek_passphrase_file(self, encryption_config):
         pass
-
+    
     def mount_bek_volume(self):
         pass
 
     def is_bek_volume_mounted_and_formatted(self):
         pass
-    
+
     def is_bek_disk_attached_and_partitioned(self):
         pass
 

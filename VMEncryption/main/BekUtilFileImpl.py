@@ -17,36 +17,28 @@
 # limitations under the License.
 
 import traceback
-from IntefaceBekUtilImpl import IntefaceBekUtilImpl
+from AbstractBekUtilImpl import AbstractBekUtilImpl
 import sys
 import os
 
-class BekUtilFileImpl(IntefaceBekUtilImpl):
+class BekUtilFileImpl(AbstractBekUtilImpl):
+    """
+    Utility class to store passphrase in a keyfilepath.
+    """
     def __init__(self,diskutil,logger) -> None:
         super().__init__()
         self.keyfilePath = "/var/lib/azure_disk_encryption_config/"
         self.logger = logger
         self.disk_util=diskutil
-        self.fileNotFount = "Keyfile path is not valid, path: {0}".format(self.keyfilePath)
+        self.keyPathNotFound = "Keyfile path is not valid, path: {0}".format(self.keyfilePath)
     
     def store_bek_passphrase(self, encryption_config, passphrase):
         bek_filename = encryption_config.get_bek_filename()
         try:
             self.disk_util.make_sure_path_exists(self.keyfilePath)
-
-            # ensure base64 encoded passphrase string is identically encoded in
-            # python2 and python3 environments for consistency in output format
-            if sys.version_info[0] < 3:
-                if isinstance(passphrase, str):
-                    passphrase = passphrase.decode('utf-8')
-
-            with open(os.path.join(self.keyfilePath, bek_filename), "wb") as f:
-                f.write(passphrase)
-            for bek_file in os.listdir(self.keyfilePath):
-                if bek_filename in bek_file and bek_filename != bek_file:
-                    with open(os.path.join(self.keyfilePath, bek_file), "wb") as f:
-                        f.write(passphrase)
-
+            self.store_passphrase(key_File_Path=self.keyfilePath,
+                                  bek_filename=bek_filename,
+                                  passphrase=passphrase)            
         except Exception as e:
             message = "Failed to store BEK in BEK VOLUME with error: {0}".format(traceback.format_exc())
             self.logger.log(message)
@@ -76,4 +68,3 @@ class BekUtilFileImpl(IntefaceBekUtilImpl):
             self.logger.log(message)
 
         return None
-

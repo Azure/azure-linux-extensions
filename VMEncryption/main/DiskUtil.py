@@ -1172,3 +1172,14 @@ class DiskUtil(object):
                 header_size = None
 
             return header_size
+            
+    def get_osmapper_name(self):
+        osmapper_name = CommonVariables.osmapper_name
+        try:
+            rootfs_device = list(filter(lambda d:d.mount_point=='/',self.get_device_items(None)))
+            if len(rootfs_device)!=0 and rootfs_device[0].type == 'crypt':
+                osmapper_name = rootfs_device[0].name
+        except ex as Exception:
+            self.logger.log("getting exception on finding osmapper.")
+            raise
+        return osmapper_name

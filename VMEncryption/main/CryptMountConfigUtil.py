@@ -215,7 +215,8 @@ class CryptMountConfigUtil(object):
 
         crypt_items = []
         rootfs_crypt_item_found = False
-
+        osmapper_name = self.disk_util.get_osmapper_name()
+        self.logger.log("OS mapper name {0}".format(osmapper_name))
         if self.should_use_azure_crypt_mount():
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                 for line in f.readlines():
@@ -224,7 +225,7 @@ class CryptMountConfigUtil(object):
 
                     crypt_item = self.parse_azure_crypt_mount_line(line)
 
-                    if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name:
+                    if crypt_item.mount_point == "/" or crypt_item.mapper_name == osmapper_name:
                         rootfs_crypt_item_found = True
 
                     crypt_items.append(crypt_item)
@@ -252,7 +253,7 @@ class CryptMountConfigUtil(object):
                         if crypt_item is None:
                             continue
 
-                        if crypt_item.mapper_name == CommonVariables.osmapper_name:
+                        if crypt_item.mapper_name == osmapper_name:
                             rootfs_crypt_item_found = True
 
                         for device_path, mount_path, fs in fstab_items:
@@ -267,10 +268,10 @@ class CryptMountConfigUtil(object):
             # If the OS partition looks encrypted but we didn't find an OS partition in the crypt_mount_file
             # So we will create a CryptItem on the fly and add it to the output
             crypt_item = CryptItem()
-            crypt_item.mapper_name = CommonVariables.osmapper_name
+            crypt_item.mapper_name = osmapper_name
 
             proc_comm = ProcessCommunicator()
-            grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(CommonVariables.osmapper_name), communicator=proc_comm)
+            grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(osmapper_name), communicator=proc_comm)
             if grep_result == 0:
                 crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
             else:
@@ -278,8 +279,7 @@ class CryptMountConfigUtil(object):
                 self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
 
                 for line in proc_comm.stdout.splitlines():
-                    if CommonVariables.osmapper_name in line \
-                        or CommonVariables.cvmosmapper_name in line:
+                    if osmapper_name in line: 
                         self.logger.log("crypt target line: {0}".format(line))
                         majmin = list(filter(lambda p: re.match(r'\d+:\d+', p), line.split()))[0]
                         src_device = list(filter(lambda d: d.majmin == majmin, self.disk_util.get_device_items(None)))[0]
