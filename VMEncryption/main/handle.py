@@ -44,7 +44,7 @@ from EncryptionConfig import EncryptionConfig
 from IMDSUtil import IMDSUtil,IMDSStoredResults
 from patch import GetDistroPatcher
 from BekUtil import BekUtil
-from IntefaceBekUtilImpl import BekMissingException
+from AbstractBekUtilImpl import BekMissingException
 from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
