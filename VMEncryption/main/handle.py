@@ -535,7 +535,11 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
     if encryption_config.config_file_exists():
         volume_type = encryption_config.get_volume_type().lower()
         if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
-            resource_disk_util.automount()
+            if security_Type != CommonVariables.ConfidentialVM:
+                resource_disk_util.automount()
+            else:
+                logger.log("Format resource disk if unusable. security type {0}".format(security_Type))
+                resource_disk_util.automount(True)
             logger.log("mounted resource disk")
     else:
         # Probably a re-image scenario: Just do a best effort

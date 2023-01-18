@@ -359,18 +359,20 @@ class ResourceDiskUtil(object):
         self.crypt_mount_config_util.add_crypt_item_to_crypttab(crypt_item, backup_folder=backup_folder)
         #self.add_to_fstab()
 
-    def automount(self):
+    def automount(self,encrypt_format_device=False):
         """
         Mount the resource disk (encrypted or not)
         or
         encrypt the resource disk and mount it if enable was called with EFA
+        or if encrypt format device is set to True.
         If False is returned, the resource disk is not mounted.
         """
         # try to remount if the disk was previously encrypted and is still valid
         if self.try_remount():
             return True
         # unencrypted or unusable
-        elif self._is_encrypt_format_all():
+        elif self._is_encrypt_format_all() or \
+             encrypt_format_device:
             return self.encrypt_format_mount()
         else:
             self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
