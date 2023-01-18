@@ -6,6 +6,7 @@ After=network.target
 ExecStart=%ME_BIN% -TokenSource MSI -Input influxdb_udp -InfluxDbHost 127.0.0.1 -InfluxDbUdpPort %ME_INFLUX_PORT% -DataDirectory %ME_DATA_DIRECTORY% -LocalControlChannel -MonitoringAccount %ME_MONITORING_ACCOUNT% -LogLevel Error
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
+Slice=azure.slice
 RestartForceExitStatus=SIGPIPE
 KillMode=control-group
 
