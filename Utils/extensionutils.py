@@ -315,7 +315,7 @@ class WALAEvent(object):
             os.mkdir(event_folder)
             os.chmod(event_folder, 0o700)
         if len(os.listdir(event_folder)) > 1000:
-            raise Exception("WriteToFolder:Too many file under " + event_folder + " exit")
+            logger.log("Warning: Too many files under " + event_folder)
 
         filename = os.path.join(event_folder, str(int(time.time() * 1000000)))
         with open(filename + ".tmp", 'wb+') as h_file:
