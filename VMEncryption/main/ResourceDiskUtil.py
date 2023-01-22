@@ -27,8 +27,6 @@ from Common import CommonVariables, CryptItem
 
 class ResourceDiskUtil(object):
     """ Resource Disk Encryption Utilities """
-
-    RD_MOUNT_POINT = '/mnt/resource'
     _RD_BASE_DEV_PATH_CACHE = ""
     DEV_DM_PREFIX = '/dev/dm-'
     # todo: consolidate this and other key file path references
@@ -36,7 +34,7 @@ class ResourceDiskUtil(object):
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
-    def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info):
+    def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info, retain_mountpoint):
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
         self.disk_util = disk_util
@@ -44,6 +42,11 @@ class ResourceDiskUtil(object):
         self.passphrase_filename = passphrase_filename  # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
         self.public_settings = public_settings
         self.distro_info = distro_info
+        self.RD_MOUNT_POINT = '/mnt/resource'
+        if retain_mountpoint == True:
+            device, mountpoint, fs, opts = self._get_rd_fstab_details() 
+            self.RD_MOUNT_POINT = mountpoint
+        self.logger.log("resource disk mount point is {0}".format(self.RD_MOUNT_POINT))
 
     def _get_rd_base_dev_path(self):
         if self._RD_BASE_DEV_PATH_CACHE:
@@ -262,6 +265,21 @@ class ResourceDiskUtil(object):
         else:
             # nothing to unmount
             return True
+
+    def _get_rd_fstab_details(self):
+        fstab_location = "/etc/fstab"
+        rd_dev_path = self._get_rd_dev_path()
+        if os.path.exists(fstab_location):
+            with open('/etc/fstab', 'r') as f:
+                lines = f.readlines()
+            for i in range(len(lines)):
+                line = lines[i]                 
+                device, mountpoint, fs, opts = self.crypt_mount_config_util.parse_fstab_line(line)
+                if device == rd_dev_path or device == "/dev/mapper/resourceencrypt":
+                    self.logger.log("resource disk fstab details- {0}, {1}, {2}, {3}".format(device,mountpoint,fs,opts))
+                    return device,mountpoint,fs,opts
+        return None,None,None,None
+
 
     def try_remount(self):
         """ mount the resource disk if not already mounted"""

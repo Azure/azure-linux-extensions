@@ -531,7 +531,10 @@ def toggle_se_linux_for_centos7(disable):
 def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphrase_file, encryption_config):
 
     # mount encrypted resource disk
-    resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info)
+    retain_mountpoint = False
+    if security_Type == CommonVariables.ConfidentialVM:
+        retain_mountpoint = True
+    resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info,retain_mountpoint)
     if encryption_config.config_file_exists():
         volume_type = encryption_config.get_volume_type().lower()
         if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
@@ -1016,7 +1019,10 @@ def enable_encryption():
                                           message=message)
                         passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
                         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-                        resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info)
+                        retain_mountpoint = False
+                        if security_Type == CommonVariables.ConfidentialVM:
+                            retain_mountpoint = True
+                        resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info,retain_mountpoint)
                         rd_encrypted = resource_disk_util.encrypt_resource_disk()
                         if not rd_encrypted:
                             hutil.save_seq()
