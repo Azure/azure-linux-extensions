@@ -11,6 +11,7 @@ DPKG_CMD = "dpkg -s azuremonitoragent"
 RPM_CMD = "rpm -qi azuremonitoragent"
 PS_CMD = "ps -ef | grep {0} | grep -v grep"
 OPENSSL_CMD = "echo | openssl s_client -connect {0}:443 -brief"
+SYSTEMCTL_CMD = "systemctl status {0} --no-pager"
 
 
 # File copying functions
@@ -193,6 +194,15 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write("Output of command: {0}\n".format(ps_process_cmd))
             outfile.write("========================================\n")
             outfile.write(helpers.run_cmd_output(ps_process_cmd))
+            outfile.write("--------------------------------------------------------------------------------\n")
+        outfile.write("--------------------------------------------------------------------------------\n")
+
+        # rsyslog / syslog-ng status via systemctl
+        for syslogd in ["rsyslog", "syslog-ng"]:
+            systemctl_cmd = SYSTEMCTL_CMD.format(syslogd)
+            outfile.write("Output of command: {0}\n".format(systemctl_cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(systemctl_cmd))
             outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
 
