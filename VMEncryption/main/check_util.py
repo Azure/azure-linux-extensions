@@ -99,12 +99,37 @@ class CheckUtil(object):
             raise Exception('\n' + message + '\nActual: ' + test_kek_url + '\nExpected: ' + expected + "\n")
         return
 
+    def check_mhsm_url(self, test_mhsm_url, message):
+        """basic sanity check of the MHSM url"""
+        expected = "https://keyvault-name}.{vault-endpoint}"
+        pattern = re.compile(r'https://(.)+\\.(managedhsm)\\.(.)+(:443)?\\/keys/[^\\/]+\\/[0-9a-zA-Z]+$', re.IGNORECASE)
+        if not (test_mhsm_url and pattern.match(test_mhsm_url)):
+            raise Exception('\n' + message + '\nActual: ' + test_mhsm_url + '\nExpected: ' + expected + "\n")
+        return
+
     def check_kv_id(self, test_kv_id, message):
         """basic sanity check of the key vault id"""
         expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}"
         pattern = re.compile(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/vaults/([a-zA-Z0-9\-\_]+)(/)?$',re.IGNORECASE)
         if not (test_kv_id and pattern.match(test_kv_id)):
             raise Exception('\n' + message + '\nActual: ' + test_kv_id + '\nExpected: ' + expected + "\n")
+        return
+
+    def check_mhsm_id(self, test_mhsm_id, message):
+        """basic sanity check of the mhsm resource id"""
+        if not test_mhsm_id or test_mhsm_id.isspace():
+            raise Exception(message + "Null or empty ManagedHSM Resource ID:")
+
+        resIdSegments = test_mhsm_id.split("/")
+        if (len(resIdSegments) != 9 
+            or resIdSegments[1].lower() != 'subscriptions'
+            or resIdSegments[3].lower() != 'resourcegroups'
+            or resIdSegments[5].lower() != 'providers'
+            or resIdSegments[6].lower() != 'microsoft.keyvault'
+            or resIdSegments[7].lower() != 'managedhsm'):
+            raise Exception(message + "Expecting ManagedHSMResourceId to be in format '/subscriptions/<subId>/resourceGroups/<resGroup>/providers/Microsoft.KeyVault/managedHsm/<hsmname>', but was: " + test_mhsm_id)
+
+        self.logger.log("ValidateMHSMResourceId: successfully validated {0}".format(test_mhsm_id))
         return
 
     def get_kv_id_name(self, kv_id):
@@ -141,6 +166,12 @@ class CheckUtil(object):
         """ensure KEK KV ID vault name matches KEK URL vault name"""
         if not (kek_kv_id and kek_url and self.get_kv_id_name(kek_kv_id) and self.get_kek_url_name(kek_url) and self.get_kv_id_name(kek_kv_id).lower() == self.get_kek_url_name(kek_url).lower()):
             raise Exception('\n' +message + '\nKEK Key Vault ID: ' + kek_kv_id + '\nKEK URL: ' + kek_url + '\n')
+        return
+
+    def check_mhsm_name(self, mhsm_id, mhsm_url, message):
+        """ensure ManagedHSM ID vault name matches ManagedHSM URL vault name"""
+        if not (mhsm_id and mhsm_url and self.get_kv_id_name(mhsm_id) and self.get_kek_url_name(mhsm_url) and self.get_kv_id_name(mhsm_id).lower() == self.get_kek_url_name(mhsm_url).lower()):
+            raise Exception('\n' +message + '\nManagedHSM ID: ' + mhsm_id + '\nManagedHSM URL: ' + mhsm_url + '\n')
         return
 
     def validate_key_vault_params(self, public_settings):

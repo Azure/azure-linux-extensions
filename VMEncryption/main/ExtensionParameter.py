@@ -56,6 +56,7 @@ class ExtensionParameter(object):
         self.KeyVaultURL = public_settings.get(CommonVariables.KeyVaultURLKey)
         self.KeyVaultResourceId = public_settings.get(CommonVariables.KeyVaultResourceIdKey)
         self.KekVaultResourceId = public_settings.get(CommonVariables.KekVaultResourceIdKey)
+        self.KeyStoreType = public_settings.get(CommonVariables.KeyStoreTypeKey)
 
         keyEncryptionAlgorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
         if keyEncryptionAlgorithm is not None and keyEncryptionAlgorithm !="":
@@ -110,6 +111,9 @@ class ExtensionParameter(object):
     def get_bek_filename(self):
         return self.DiskEncryptionKeyFileName
 
+    def get_keystore_type(self):
+        return self.KeyStoreType
+
     def commit(self):
         key_value_pairs = []
 
@@ -136,6 +140,9 @@ class ExtensionParameter(object):
 
         DiskFormatQuery = ConfigKeyValuePair(CommonVariables.DiskFormatQuerykey, self.DiskFormatQuery)
         key_value_pairs.append(DiskFormatQuery)
+
+        KeyStoreType = ConfigKeyValuePair(CommonVariables.KeyStoreTypeKey, self.KeyStoreType)
+        key_value_pairs.append(KeyStoreType)
 
         self.params_config.save_configs(key_value_pairs)
 
@@ -198,6 +205,11 @@ class ExtensionParameter(object):
         if (self.KeyEncryptionAlgorithm or self.get_kek_algorithm()) and \
            (self.KeyEncryptionAlgorithm != self.get_kek_algorithm()):
             self.logger.log('Current config KeyEncryptionAlgorithm {0} differs from effective config KeyEncryptionAlgorithm {1}'.format(self.KeyEncryptionAlgorithm, self.get_kek_algorithm()))
+            return True
+
+        if (self.KeyStoreType or self.get_keystore_type()) and \
+           (self.KeyStoreType != self.get_keystore_type()):
+            self.logger.log('Current config KeyStoreType {0} differs from effective config KeyStoreType {1}'.format(self.KeyStoreType, self.get_keystore_type()))
             return True
 
         bek_passphrase_file_name = self.bek_util.get_bek_passphrase_file(self.encryption_config)

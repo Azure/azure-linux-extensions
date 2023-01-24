@@ -193,7 +193,8 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_ma
         kek_algorithm=extension_parameter.KeyEncryptionAlgorithm,
         extra_device_items=items_to_encrypt,
         disk_util=disk_util,
-        crypt_mount_config_util=crypt_mount_config_util)
+        crypt_mount_config_util=crypt_mount_config_util,
+        key_store_type=extension_parameter.KeyStoreType)
 
     settings.post_to_wireserver(data)
 
