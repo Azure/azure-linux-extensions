@@ -114,6 +114,12 @@ class CommonVariables:
     MigrateValue = 'Migrate'
 
     """
+    value for KeyStoreTypeKey could be MHSM
+    """
+    KeyStoreTypeKey = 'KeyStoreType'
+    KeyStoreTypeManagedHSM = 'ManagedHSM'
+
+    """
     value for VolumeType could be Data
     """
     VolumeTypeKey = 'VolumeType'
