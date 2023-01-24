@@ -107,12 +107,12 @@ class ExtensionParameter(object):
 
     def get_disk_format_query(self):
         return self.params_config.get_config(CommonVariables.DiskFormatQuerykey)
+       
+    def get_keystore_type(self):
+        return self.params_config.get_config(CommonVariables.KeyStoreTypeKey)
 
     def get_bek_filename(self):
         return self.DiskEncryptionKeyFileName
-
-    def get_keystore_type(self):
-        return self.KeyStoreType
 
     def commit(self):
         key_value_pairs = []
