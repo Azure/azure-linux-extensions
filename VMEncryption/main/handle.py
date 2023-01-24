@@ -533,6 +533,7 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
     # mount encrypted resource disk
     retain_mountpoint = False
     if security_Type == CommonVariables.ConfidentialVM:
+        logger.log("retaining the mountpoint.")
         retain_mountpoint = True
     resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info,retain_mountpoint)
     if encryption_config.config_file_exists():
@@ -688,9 +689,10 @@ def enable():
                     status=CommonVariables.extension_error_status,
                     code=str(CommonVariables.configuration_error),
                     message=str(ex)) 
-        #reading security type from IMDS stored results. 
+        #reading security type from IMDS stored results. update to global variable.
+        global security_Type
         security_Type = imds_Stored_Results.get_security_type()
-
+        logger.log('security type stored result {0}'.format(security_Type))
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
@@ -1021,6 +1023,7 @@ def enable_encryption():
                         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
                         retain_mountpoint = False
                         if security_Type == CommonVariables.ConfidentialVM:
+                            logger.log("retaining the mountpoint")
                             retain_mountpoint = True
                         resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info,retain_mountpoint)
                         rd_encrypted = resource_disk_util.encrypt_resource_disk()
