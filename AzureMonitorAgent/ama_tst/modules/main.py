@@ -116,11 +116,16 @@ def run_troubleshooter():
     if (not check_sudo()):
         return
     
-    print(sys.argv)
+    # run all checks from command line
     if len(sys.argv) > 1 and sys.argv[1] == '-A':
         success = check_all(False)
         print_results(success)
         print_next_steps()
+        return
+    
+    # run log collector from command line
+    if len(sys.argv) > 1 and sys.argv[1] == '-L':
+        collect_logs()
         return
             
     # check if want to run again

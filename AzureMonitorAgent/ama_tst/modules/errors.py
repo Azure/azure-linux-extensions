@@ -77,7 +77,7 @@ error_messages = {
           "information.",
     ERR_LOGROTATE : "Logrotate isn't rotating log {0}: its current size is {1}, and it should have "\
           "been rotated at {2}. Please see {3} for more information.",
-    ERR_FILE_ACCESS : "Couldn't access / run {0} due to the following reason: {1}.",
+    ERR_FILE_ACCESS : "Couldn't access or run {0} due to the following reason: {1}.",
     
 }
 

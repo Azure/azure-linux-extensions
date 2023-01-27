@@ -5,6 +5,9 @@ import subprocess
 from errors         import error_info
 from error_codes    import *
 
+CONFIG_DIR = '/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks'
+METRICS_FILE = "/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json"
+
 # backwards compatible input() function for Python 2 vs 3
 try:
     input = raw_input
@@ -203,20 +206,18 @@ def run_cmd_output(cmd):
         return (e.output)
 
 
-#TODO: parse /etc/opt/microsoft/azuremonitoragent/config-cache/configchunks.*.json for workspace ID and VM region
 def find_dcr_workspace():
     global general_info
     
     if 'DCR_WORKSPACE_ID' in general_info and 'DCR_REGION' in general_info:
         return (general_info['DCR_WORKSPACE_ID'], general_info['DCR_REGION'], None)
-    dir_path = '/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks'
     dcr_workspace = set()
     dcr_region = set()
     me_region = set()
     general_info['URL_SUFFIX'] = '.com'
     try:
-        for file in os.listdir(dir_path):
-            file_path = dir_path + "/" + file
+        for file in os.listdir(CONFIG_DIR):
+            file_path = CONFIG_DIR + "/" + file
             with open(file_path) as f:
                 result = json.load(f)
                 channels = result['channels']
@@ -224,8 +225,8 @@ def find_dcr_workspace():
                     if channel['protocol'] == 'ods':
                         # parse dcr workspace id
                         endpoint_url = channel['endpoint']
-                        worspace_id = endpoint_url.split('https://')[1].split('.ods')[0]
-                        dcr_workspace.add(worspace_id)
+                        workspace_id = endpoint_url.split('https://')[1].split('.ods')[0]
+                        dcr_workspace.add(workspace_id)
                         # parse dcr region
                         token_endpoint_uri = channel['tokenEndpointUri']
                         region = token_endpoint_uri.split('Location=')[1].split('&')[0]
@@ -257,8 +258,7 @@ def is_metrics_configured():
     if 'metrics' in general_info:
         return general_info['metrics']
     
-    metrics_file = "/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json"
-    with open(metrics_file) as f:
+    with open(METRICS_FILE) as f:
         output = f.read(2)
         if output != '[]':
             general_info['metrics'] = True
