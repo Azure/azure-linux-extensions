@@ -1,7 +1,5 @@
 # Troubleshooting Tool for Azure Monitor Linux Agent
-The following document provides quick information on how to install the Troubleshooting Tool, as well as some common error codes.
-
-**Note that the Troubleshooting Tool can only collect logs currently, but scenarios will be added in the future.**
+The following document provides quick information on the AMA Troubleshooting Tool, including how to use it and its checks.
 
 # Table of Contents
 - [Troubleshooter Basics](#troubleshooter-basics)
