@@ -417,13 +417,18 @@ def enable():
         ("azuremonitoragentmgr", False)
     ])
 
+    # Set traceFlags in publicSettings to enable mdsd tracing. For example, the EventIngest flag can be enabled via "traceFlags": "0x2"
+    flags = ""
+    if public_settings is not None and "traceFlags" in public_settings:
+        flags = "-T {} ".format(public_settings.get("traceFlags"))
+
     # Use an Ordered Dictionary to ensure MDSD_OPTIONS (and other dependent variables) are written after their dependencies
     default_configs = OrderedDict([
         ("MDSD_CONFIG_DIR", "/etc/opt/microsoft/azuremonitoragent"),
         ("MDSD_LOG_DIR", "/var/opt/microsoft/azuremonitoragent/log"),
         ("MDSD_ROLE_PREFIX", "/run/azuremonitoragent/default"),
         ("MDSD_SPOOL_DIRECTORY", "/var/opt/microsoft/azuremonitoragent"),
-        ("MDSD_OPTIONS", "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\""),
+        ("MDSD_OPTIONS", "\"{}-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"".format(flags)),
         ("MDSD_USE_LOCAL_PERSISTENCY", "true"),
         ("MDSD_TCMALLOC_RELEASE_FREQ_SEC", "1"),
         ("MONITORING_USE_GENEVA_CONFIG_SERVICE", "false"),
