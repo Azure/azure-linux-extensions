@@ -52,14 +52,14 @@ The AMA Linux Troubleshooter requires Python 2.6+ installed on the machine, but 
 	* Using newest version of AMA
 	* Syslog user generated successfully
 2. Agent doesn't start, can't connect to Log Analytics
-  * AMA parameters set up
-  * AMA DCR created successfully
-  * Connectivity to endpoints
-  * Submodules started
-  * IMDS/HIMDS metadata and MSI tokens available
+  	* AMA parameters set up
+  	* AMA DCR created successfully
+  	* Connectivity to endpoints
+  	* Submodules started
+  	* IMDS/HIMDS metadata and MSI tokens available
 3. Agent is unhealthy, heartbeat doesn't work properly
-  * Submodule status
-  * Parse error files
+  	* Submodule status
+  	* Parse error files
 4. (PLANNED) Agent performance counter collection doesn't work properly
 5. (PLANNED) Agent has high CPU / memory usage
 6. (PLANNED) Agent syslog collection doesn't work properly
