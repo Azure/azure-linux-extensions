@@ -12,6 +12,7 @@ RPM_CMD = "rpm -qi azuremonitoragent"
 PS_CMD = "ps -ef | grep {0} | grep -v grep"
 OPENSSL_CMD = "echo | openssl s_client -connect {0}:443 -brief"
 SYSTEMCTL_CMD = "systemctl status {0} --no-pager"
+JOURNALCTL_CMD = "journalctl -u {0} --no-pager --since \"30 days ago\" > {1}"
 
 
 # File copying functions
@@ -84,6 +85,8 @@ def collect_logs(output_dirpath, pkg_manager):
     # collect rsyslog information (if present)
     copy_file("/etc/rsyslog.conf", os.path.join(output_dirpath,"rsyslog"))
     copy_dircontents("/etc/rsyslog.d", os.path.join(output_dirpath,"rsyslog","rsyslog.d"))
+    if (os.path.isfile("/etc/rsyslog.conf")):
+        helpers.run_cmd_output(JOURNALCTL_CMD.format("rsyslog", os.path.join(output_dirpath,"rsyslog","journalctl_output.log")))
     # collect syslog-ng information (if present)
     copy_dircontents("/etc/syslog-ng", os.path.join(output_dirpath,"syslog-ng"))
 
