@@ -13,6 +13,10 @@ PS_CMD = "ps -ef | grep {0} | grep -v grep"
 OPENSSL_CMD = "echo | openssl s_client -connect {0}:443 -brief"
 SYSTEMCTL_CMD = "systemctl status {0} --no-pager"
 JOURNALCTL_CMD = "journalctl -u {0} --no-pager --since \"30 days ago\" > {1}"
+PS_CMD_CPU = "ps aux --sort=-pcpu | head -10"
+PS_CMD_RSS = "ps aux --sort -rss | head -10"
+PS_CMD_VSZ = "ps aux --sort -vsz | head -10"
+
 
 
 # File copying functions
@@ -178,6 +182,13 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
                 outfile.write("AMA Version: {0}\n".format(ama_vers[0]))
         outfile.write("--------------------------------------------------------------------------------\n")
 
+        # connection to endpoints
+        wkspc_id, wkspc_region, e = helpers.find_dcr_workspace()
+        if e == None:
+            outfile.write("Workspace ID: {0}\n".format(str(wkspc_id)))
+            outfile.write("Workspace region: {0}\n".format(str(wkspc_region)))
+            outfile.write("--------------------------------------------------------------------------------\n")
+               
         # AMA package info (dpkg/rpm)
         if (pkg_manager == "dpkg"):
             outfile.write("Output of command: {0}\n".format(DPKG_CMD))
@@ -209,19 +220,13 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
 
-        # connection to endpoints
-        wkspc_id = helpers.find_wkspc_id()
-        vm_region = helpers.find_vm_region()
-        if (wkspc_id and vm_region):
-            for endpt in ["global.handler.control.monitor.azure.com", \
-                          "{0}.handler.control.monitor.azure.com".format(vm_region), \
-                          "{0}.ods.opinsights.com".format(wkspc_id)]:
-                openssl_endpt_cmd = OPENSSL_CMD.format(endpt)
-                outfile.write("Output of command: {0}\n".format(openssl_endpt_cmd))
-                outfile.write("========================================\n")
-                outfile.write(helpers.run_cmd_output(openssl_endpt_cmd))
-                outfile.write("--------------------------------------------------------------------------------\n")
+        # ps aux output
+        for cmd in [PS_CMD_CPU, PS_CMD_RSS, PS_CMD_VSZ]:
+            outfile.write("Output of command: {0}\n".format(cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(cmd))
             outfile.write("--------------------------------------------------------------------------------\n")
+        outfile.write("--------------------------------------------------------------------------------\n")
 
 
 

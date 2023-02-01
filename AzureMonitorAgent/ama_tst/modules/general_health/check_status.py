@@ -3,7 +3,7 @@ import re
 
 from error_codes import *
 from errors      import error_info
-from helpers     import run_cmd_output, get_input
+from helpers     import run_cmd_output, get_input, is_metrics_configured
 
 def check_restart_status(interactive):
     """
@@ -11,9 +11,10 @@ def check_restart_status(interactive):
     """
     subcomponents = {'azuremonitoragent': 'azuremonitoragent', 
                      'azuremonitor-agentlauncher': 'agentlauncher',
-                     'azuremonitor-coreagent': 'amacoreagent',
-                     'metrics-extension': 'MetricsExtension',
-                     'metrics-sourcer': 'Telegraf'}
+                     'azuremonitor-coreagent': 'amacoreagent'}
+    if is_metrics_configured():
+        subcomponents['metrics-extension'] = 'MetricsExtension'
+        subcomponents['metrics-sourcer'] = 'Telegraf'
     restart_logs = ""
     start = "yesterday"
     end = "now"

@@ -2,9 +2,9 @@ import os
 
 from error_codes import *
 from errors      import error_info
-from helpers     import get_package_version, find_ama_version
+from helpers     import get_package_version, find_ama_version, is_metrics_configured
 
-
+METRICS_FIILE = "/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json"
 
 def check_packages():
     # check azuremonitoragent rpm/dpkg
@@ -16,7 +16,13 @@ def check_packages():
         return ERR_MULTIPLE_AMA
     
     # find subcomponent binaries
-    subcomponents = ['mdsd', 'telegraf', 'agentlauncher', 'amacoreagent', 'MetricsExtension', 'fluent-bit']
+    subcomponents = ['mdsd', 'agentlauncher', 'amacoreagent', 'fluent-bit']
+    
+    if not os.path.isfile(METRICS_FIILE):
+        return ERR_COUNTER_FILE_MISSING
+    if is_metrics_configured():
+        subcomponents.append('MetricsExtension')
+        subcomponents.append('telegraf')
     missed_subcomponent = []
     for subcomponent in subcomponents:
         bin_file = '/opt/microsoft/azuremonitoragent/bin/{0}'.format(subcomponent)
