@@ -55,6 +55,7 @@ error_messages = {
           "more information at the link below:\n"\
           "\n    https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-manage\n",
     ERR_GETTING_AMA_VER : "Couldn't get most current released version of AMA.\n\nError Details: \n{0}",
+    ERR_COUNTER_FILE_MISSING : "metricCounters.json file is not found. Please check your perf counters configuration.",
     ERR_AMA_PARAMETERS : "Couldn't read and parse AMA configuration in /etc/default/azuremonitoragent.\n\nError Details:\n{0}",
     ERR_NO_DCR : "Couldn't parse DCR information on this VM. Please check your DCR configuration.\n\nError Details:{0}",
     ERR_INFO_MISSING: "NO DCR workspace id or region is found. Please check if DCR is configured correctly and match the information in"\
@@ -70,7 +71,14 @@ error_messages = {
           "\n\nError Details:\n $ {1} \n\n{2}",
     WARN_OPENSSL_PROXY : "Skip SSL handshake checks because AMA is configured with authenticated proxy.",
     WARN_MDSD_ERR_FILE : "Found errors in log file {0}, displaying last few lines of error messages:\n {1}",
-    WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}"
+    WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}",
+    ERR_FILE_MISSING : "{0} {1} doesn't exist.",
+    ERR_LOGROTATE_SIZE : "Logrotate size limit for log {0} has invalid formatting. Please see {1} for more "\
+          "information.",
+    ERR_LOGROTATE : "Logrotate isn't rotating log {0}: its current size is {1}, and it should have "\
+          "been rotated at {2}. Please see {3} for more information.",
+    ERR_FILE_ACCESS : "Couldn't access or run {0} due to the following reason: {1}.",
+    
 }
 
 

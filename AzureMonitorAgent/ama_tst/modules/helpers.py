@@ -1,8 +1,12 @@
 import os
+import json
 import platform
 import subprocess
 from errors         import error_info
 from error_codes    import *
+
+CONFIG_DIR = '/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks'
+METRICS_FILE = "/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json"
 
 # backwards compatible input() function for Python 2 vs 3
 try:
@@ -202,10 +206,64 @@ def run_cmd_output(cmd):
         return (e.output)
 
 
-#TODO: parse /etc/opt/microsoft/azuremonitoragent/config-cache/configchunks.*.json for workspace ID and VM region
-def find_wkspc_id():
-    return None
+def find_dcr_workspace():
+    global general_info
+    
+    if 'DCR_WORKSPACE_ID' in general_info and 'DCR_REGION' in general_info:
+        return (general_info['DCR_WORKSPACE_ID'], general_info['DCR_REGION'], None)
+    dcr_workspace = set()
+    dcr_region = set()
+    me_region = set()
+    general_info['URL_SUFFIX'] = '.com'
+    try:
+        for file in os.listdir(CONFIG_DIR):
+            file_path = CONFIG_DIR + "/" + file
+            with open(file_path) as f:
+                result = json.load(f)
+                channels = result['channels']
+                for channel in channels:
+                    if channel['protocol'] == 'ods':
+                        # parse dcr workspace id
+                        endpoint_url = channel['endpoint']
+                        workspace_id = endpoint_url.split('https://')[1].split('.ods')[0]
+                        dcr_workspace.add(workspace_id)
+                        # parse dcr region
+                        token_endpoint_uri = channel['tokenEndpointUri']
+                        region = token_endpoint_uri.split('Location=')[1].split('&')[0]
+                        dcr_region.add(region)
+                        # parse url suffix
+                        if '.us' in endpoint_url:
+                            general_info['URL_SUFFIX'] = '.us'
+                        if '.cn' in endpoint_url:
+                            general_info['URL_SUFFIX'] = '.cn'                            
+                    if channel['protocol'] == 'me':
+                        # parse ME region
+                        endpoint_url = channel['endpoint']
+                        region = endpoint_url.split('https://')[1].split('.monitoring')[0]
+                        me_region.add(region)
+    except (FileNotFoundError, AttributeError, KeyError) as e:
+        return (None, None, e)
+
+    general_info['DCR_WORKSPACE_ID'] = dcr_workspace
+    general_info['DCR_REGION'] = dcr_region
+    general_info['ME_REGION'] = me_region
+    return (dcr_workspace, dcr_region, None)
 
 
 def find_vm_region():
     return None
+
+def is_metrics_configured():
+    global general_info
+    if 'metrics' in general_info:
+        return general_info['metrics']
+    
+    with open(METRICS_FILE) as f:
+        output = f.read(2)
+        if output != '[]':
+            general_info['metrics'] = True
+        else:
+            general_info['metrics'] = False
+    return general_info['metrics']
+    
+    
