@@ -5,6 +5,8 @@ import shutil
 import subprocess
 
 import helpers
+from error_codes        import *
+from connect.check_imds import check_metadata
 
 
 DPKG_CMD = "dpkg -s azuremonitoragent"
@@ -48,15 +50,6 @@ def copy_dircontents(src, dst):
         print("Directory {0} doesn't exist, skipping".format(src))
     return
 
-
-
-def is_arc_installed():
-    """
-    Check if this is an Arc machine
-    """
-    # Using systemctl to check this since Arc only supports VMs that have systemd
-    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
-    return check_arc == 0
 
 
 
@@ -169,7 +162,19 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
                 for line in os_info:
                     outfile.write(line)
             outfile.write("--------------------------------------------------------------------------------\n")
+
+        # VM Metadata
+        attributes = ['azEnvironment', 'resourceId', 'location']
+        outfile.write("VM Metadata from IMDS:")
+        for attr in attributes:
+            attr_result = helpers.geninfo_lookup(attr)
+            if (not attr_result) and (check_metadata() == NO_ERROR):
+                attr_result = helpers.geninfo_lookup(attr)
+            if (attr_result != None):
+                outfile.write("{0}: {1}")
         outfile.write("--------------------------------------------------------------------------------\n")
+        outfile.write("--------------------------------------------------------------------------------\n")
+        
 
         # AMA install status
         (ama_vers, _) = helpers.find_ama_version()
@@ -236,7 +241,7 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
 
 def run_logcollector(output_location):
     # check if Arc is being used
-    is_arc_vm = is_arc_installed()
+    is_arc_vm = helpers.is_arc_installed()
 
     # create directory to hold copied logs
     vm_type = "azurearc" if is_arc_vm else "azurevm"
