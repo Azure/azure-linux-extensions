@@ -165,16 +165,16 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
 
         # VM Metadata
         attributes = ['azEnvironment', 'resourceId', 'location']
-        outfile.write("VM Metadata from IMDS:")
+        outfile.write("VM Metadata from IMDS:\n")
         for attr in attributes:
             attr_result = helpers.geninfo_lookup(attr)
             if (not attr_result) and (check_metadata() == NO_ERROR):
                 attr_result = helpers.geninfo_lookup(attr)
             if (attr_result != None):
-                outfile.write("{0}: {1}")
+                outfile.write("{0}: {1}\n".format(attr, attr_result))
         outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
-        
+
 
         # AMA install status
         (ama_vers, _) = helpers.find_ama_version()
