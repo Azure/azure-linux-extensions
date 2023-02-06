@@ -3,13 +3,14 @@
 COMMAND="./modules/main.py"
 PYTHON=""
 FUTURE_PATH=""
-TST_VERSION="1.2"  # update when changes are made to TST
+TST_VERSION="1.3"  # update when changes are made to TST
 ARG="$@"
 
 display_help() {
     echo "OPTIONS"
-    echo "  -A        Run All Troubleshooting Tool checks"
-    echo "  -L        Run Log Collector"
+    echo "  -A              Run All Troubleshooting Tool checks"
+    echo "  -L              Run Log Collector"
+    echo "  -v, --version   Print Troubleshooting Tool version"
 }
 
 find_python() {
@@ -42,9 +43,12 @@ else
     echo ""
 fi
 
-if [ $1 = "--help" ] || [ $1 = "-h" ]
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]
 then
     display_help
+elif [ "$1" = "--version" ] || [ "$1" = "-v" ]
+then
+    echo "AMA Troubleshooting Tool v.$TST_VERSION"
 else
     echo "Starting AMA Troubleshooting Tool v.$TST_VERSION..."
     echo ""
