@@ -38,6 +38,14 @@ def get_input(question, check_ans=None, no_fit=None):
         answer = input(" {0}: ".format(question))
     return answer
 
+def is_arc_installed():
+    """
+    Check if this is an Arc machine
+    """
+    # Using systemctl to check this since Arc only supports VMs that have systemd
+    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
+    return check_arc == 0
+
 def find_vm_bits():
     cpu_info = subprocess.check_output(['lscpu'], universal_newlines=True)
     cpu_opmodes = (cpu_info.split('\n'))[1]
@@ -249,9 +257,6 @@ def find_dcr_workspace():
     general_info['ME_REGION'] = me_region
     return (dcr_workspace, dcr_region, None)
 
-
-def find_vm_region():
-    return None
 
 def is_metrics_configured():
     global general_info

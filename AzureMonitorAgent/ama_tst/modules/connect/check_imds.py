@@ -3,8 +3,7 @@ import json
 
 from error_codes    import *
 from errors         import error_info
-from helpers        import geninfo_lookup
-from logcollector   import is_arc_installed
+from helpers        import general_info, geninfo_lookup, is_arc_installed
 
 METADATA_CMD = 'curl -s -H Metadata:true --noproxy "*" "http://{0}/metadata/instance/compute?api-version=2020-06-01"'
 AZURE_IP = "169.254.169.254"
@@ -18,6 +17,8 @@ ARC_TOKEN_CMD = 'ChallengeTokenPath=$(curl -s -D - -H Metadata:true "http://127.
 
 
 def check_metadata():
+    global general_info
+    
     type = "Azure"
     if is_arc_installed():
         command = METADATA_CMD.format(ARC_IP)
@@ -33,6 +34,9 @@ def check_metadata():
             if not attr in output_json:
                 error_info.append((type, command, output))
                 return ERR_IMDS_METADATA
+            else:
+                attr_result = output_json[attr]
+                general_info[attr] = attr_result
     except Exception as e:
         error_info.append((type, command, e))
         return ERR_IMDS_METADATA
