@@ -52,7 +52,6 @@ then
 else
     echo "Starting AMA Troubleshooting Tool v.$TST_VERSION..."
     echo ""
-    exit
     PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}
 fi
 exit $?
