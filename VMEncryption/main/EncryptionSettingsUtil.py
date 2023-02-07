@@ -186,24 +186,34 @@ class EncryptionSettingsUtil(object):
                     })
         return array
 
-    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util, crypt_mount_config_util, key_store_type):
+    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util, crypt_mount_config_util, key_store_type, keystoretype_flag_exists):
         """ returns encryption settings object in format required by wire server """
 
         cutil = CheckUtil(self.logger)
+
+        # Perform algorithm check regaurdless of ManagedHSM or Keyvault
+        if kek_algorithm not in CommonVariables.encryption_algorithms:
+                    if kek_algorithm:
+                        raise Exception("The KEK encryption algorithm requested was not recognized")
+                    else:
+                        kek_algorithm = CommonVariables.default_encryption_algorithm
+                        self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
 
         # ManagedHSM Checks
         if key_store_type.lower() == CommonVariables.KeyStoreTypeManagedHSM.lower():
             # validate mhsm parameters prior to creating the encryption settings object
             if not kv_url.strip() or not kv_id.strip():
-                raise Exception("KeyVaultUrl or KeyVaultResourceId are not empty. Please remove them for use with 'KeyStoreType':'ManagedHSM'.")
+                raise Exception("KeyvaultUrl or KeyvaultresourceId are not empty. 'KeyStoreType' parameter is not supported for keyvault currently, please remove Key Vault p")
             self.logger.log("get_settings_data: KeyVault Url is empty, validating KeyEncryptionKeyKVURL and KeyEncryptionKeyKVId for ManagedHSM")
-            cutil.check_mhsm_url(kek_url, "A ManagedHSM URL was specified, but it was invalid for ManagedHSM. ")
-            cutil.check_mhsm_id(kek_kv_id, "A ManagedHSM ID is required, but is missing or invalid. ")
+            cutil.check_mhsm_url(kek_url, "A ManagedHSM URL is specified, but it is invalid for ManagedHSM.")
+            cutil.check_mhsm_id(kek_kv_id, "A ManagedHSM ID is required, but is missing or invalid.")
             cutil.check_mhsm_name(kek_kv_id, kek_url, "A ManagedHSM ID and ManagedHSM URL were provided, but their ManagedHSM names did not match")
             self._DISK_ENCRYPTION_KEY_SOURCE = CommonVariables.KeyStoreTypeManagedHSM
         elif key_store_type:
             raise Exception("The expected flag name and value to enable ManagedHSM is 'KeyStoreType':'{0}'. " +
             "Please correct the flag name and value and retry enabling ManagedHSM".format(CommonVariables.KeyStoreTypeManagedHSM))
+        elif not key_store_type and keystoretype_flag_exists:
+            raise Exception("The flag to enable ManagedHSM is empty. Remove the flag for use with KeyVault, or correct the value to 'KeyStoreType':'{0}'".format(CommonVariables.KeyStoreTypeManagedHSM))
         # Keyvault Checks
         else:
             # validate key vault parameters prior to creating the encryption settings object
@@ -214,12 +224,6 @@ class EncryptionSettingsUtil(object):
                 cutil.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
                 cutil.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
                 cutil.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
-                if kek_algorithm not in CommonVariables.encryption_algorithms:
-                    if kek_algorithm:
-                        raise Exception("The KEK encryption algorithm requested was not recognized")
-                    else:
-                        kek_algorithm = CommonVariables.default_encryption_algorithm
-                        self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
             else:
                 if kek_kv_id:
                     raise Exception("The KEK KeyVault ID was specified but the KEK URL was missing")
