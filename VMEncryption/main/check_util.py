@@ -101,7 +101,7 @@ class CheckUtil(object):
 
     def check_mhsm_url(self, test_mhsm_url, message):
         """basic sanity check of the MHSM url"""
-        expected = "https://keyvault-name}.{vault-endpoint}"
+        expected = "https://managedhsm-name}.{mhsm-endpoint}"
         pattern = re.compile(r'https://(.)+\\.(managedhsm)\\.(.)+(:443)?\\/keys/[^\\/]+\\/[0-9a-zA-Z]+$', re.IGNORECASE)
         if not (test_mhsm_url and pattern.match(test_mhsm_url)):
             raise Exception('\n' + message + '\nActual: ' + test_mhsm_url + '\nExpected: ' + expected + "\n")
@@ -117,19 +117,10 @@ class CheckUtil(object):
 
     def check_mhsm_id(self, test_mhsm_id, message):
         """basic sanity check of the mhsm resource id"""
-        if not test_mhsm_id or test_mhsm_id.isspace():
-            raise Exception(message + "Null or empty ManagedHSM Resource ID:")
-
-        resIdSegments = test_mhsm_id.split("/")
-        if (len(resIdSegments) != 9 
-            or resIdSegments[1].lower() != 'subscriptions'
-            or resIdSegments[3].lower() != 'resourcegroups'
-            or resIdSegments[5].lower() != 'providers'
-            or resIdSegments[6].lower() != 'microsoft.keyvault'
-            or resIdSegments[7].lower() != 'managedhsm'):
-            raise Exception(message + "Expecting ManagedHSMResourceId to be in format '/subscriptions/<subId>/resourceGroups/<resGroup>/providers/Microsoft.KeyVault/managedHsm/<hsmname>', but was: " + test_mhsm_id)
-
-        self.logger.log("ValidateMHSMResourceId: successfully validated {0}".format(test_mhsm_id))
+        expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/managedHSM/{mhsmname}"
+        pattern = re.compile(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/managedHSM/([a-zA-Z0-9\-\_]+)(/)?$',re.IGNORECASE)
+        if not (test_mhsm_id and pattern.match(test_mhsm_id)):
+            raise Exception('\n' + message + '\nActual: ' + test_mhsm_id + '\nExpected: ' + expected + "\n")
         return
 
     def get_kv_id_name(self, kv_id):
