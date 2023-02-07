@@ -296,9 +296,9 @@ def install():
     wait longer.
     """
 
+    exit_if_vm_not_supported('Install')
     find_package_manager("Install")
     set_os_arch('Install')
-    exit_if_vm_not_supported('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
     # Check if SUSE 15 VMs have /sbin/insserv package (required for AMA 1.14.4+)
@@ -1190,7 +1190,6 @@ def find_package_manager(operation):
             break
 
     if PackageManager == "":
-        exit_if_vm_not_supported(operation)
         log_and_exit(operation, UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
 
 
@@ -1341,7 +1340,6 @@ def get_ssl_cert_info(operation):
             elif version.startswith('15'):
                 return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    exit_if_vm_not_supported(operation)
     log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
 
 
