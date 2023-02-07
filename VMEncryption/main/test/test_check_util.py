@@ -57,6 +57,22 @@ class TestCheckUtil(unittest.TestCase):
         self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroupssss/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
         self.assertRaises(Exception, self.cutil.check_kv_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
 
+    def test_is_mhsm_id(self):
+         # https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules
+        self.cutil.check_mhsm_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/adenszqtrrg/providers/Microsoft.KeyVault/managedHSM/adenszqtrkv", "")
+        self.cutil.check_mhsm_id("/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/adenszqtrrg/providers/microsoft.keyvault/managedHSM/adenszqtrkv", "")
+
+        # invalid cases
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "////", "")
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/", "")
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault////////", "")
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "/subscriptions/{subid}/resourceGroupssss/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}", "")
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "/subscriptions/{subid}/resourceGroupssss/{rgname}/providers/Microsoft.KeyVault/managedHSM/{vaultname}", "")
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/managedHSM/{vaultname}", "")
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.ManagedHSM/managedHSM/{vaultname}", "")
+        self.assertRaises(Exception, self.cutil.check_mhsm_id, "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.ManagedHSM/vaults/{vaultname}", "")
+
     def test_is_kv_url(self):
         dns_suffix_list = ["vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de"]
 
