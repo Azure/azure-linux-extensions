@@ -374,6 +374,7 @@ def uninstall():
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
 
+    exit_if_vm_not_supported('Uninstall')
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
         AMAUninstallCommand = "dpkg -P azuremonitoragent"
