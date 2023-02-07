@@ -1171,7 +1171,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1250,7 +1250,8 @@ def is_vm_supported_for_extension(operation):
                        'mariner' : ['2'], # Mariner 2.0
                        'rocky' : ['8'], # Rocky
                        'alma' : ['8'], # Alma
-                       'opensuse' : ['15'] # openSUSE
+                       'opensuse' : ['15'], # openSUSE
+                       'amzn' : ['2'] # Amazon Linux 2
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
@@ -1328,7 +1329,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma']:
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma', 'amzn']:
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 
