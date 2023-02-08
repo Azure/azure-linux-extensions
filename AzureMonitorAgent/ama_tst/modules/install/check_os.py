@@ -4,10 +4,10 @@ from error_codes import *
 from errors      import error_info
 from helpers     import find_vm_bits, find_vm_distro
 
-supported_dists_x86_64 = {'redhat' : ['7', '8'], # Rhel
-                    'rhel' : ['7', '8'], # Rhel
+supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
+                    'rhel' : ['7', '8', '9'], # Rhel
                     'centos' : ['7', '8'], # CentOS
-                    'red hat' : ['7', '8'], # Oracle, RHEL
+                    'red hat' : ['7', '8', '9'], # Oracle, RHEL
                     'oracle' : ['7', '8'], # Oracle
                     'debian' : ['9', '10', '11'], # Debian
                     'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
@@ -16,7 +16,8 @@ supported_dists_x86_64 = {'redhat' : ['7', '8'], # Rhel
                     'mariner' : ['2'], # Mariner 2.0
                     'rocky' : ['8'], # Rocky
                     'alma' : ['8'], # Alma
-                    'opensuse' : ['15'] # openSUSE
+                    'opensuse' : ['15'], # openSUSE
+                    'amzn' : ['2'] # Amazon Linux 2
 }
 
 supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
