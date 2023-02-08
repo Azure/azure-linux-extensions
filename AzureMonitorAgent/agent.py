@@ -322,15 +322,19 @@ def install():
                                          retry_check = retry_if_dpkg_or_rpm_locked,
                                          final_check = final_check_if_dpkg_or_rpm_locked)
 
-    # Copy the AMACoreAgent and agentlauncher binaries
-    copy_amacoreagent_binaries()
-
     # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
     # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
     if vm_dist.replace(' ','').lower().startswith('redhat') and vm_ver == '8.6' and platform.machine() == 'aarch64':
         exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
                                          retry_check = retry_if_dpkg_or_rpm_locked,
                                          final_check = final_check_if_dpkg_or_rpm_locked)
+
+    if exit_code != 0:
+        return exit_code, output
+
+    # Copy the AMACoreAgent and agentlauncher binaries
+    # TBD: this method needs to be revisited for aarch64
+    copy_amacoreagent_binaries()
 
     # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
     if is_systemd() and platform.machine() == 'aarch64':
@@ -413,13 +417,18 @@ def enable():
         ("azuremonitoragentmgr", False)
     ])
 
+    # Set traceFlags in publicSettings to enable mdsd tracing. For example, the EventIngest flag can be enabled via "traceFlags": "0x2"
+    flags = ""
+    if public_settings is not None and "traceFlags" in public_settings:
+        flags = "-T {} ".format(public_settings.get("traceFlags"))
+
     # Use an Ordered Dictionary to ensure MDSD_OPTIONS (and other dependent variables) are written after their dependencies
     default_configs = OrderedDict([
         ("MDSD_CONFIG_DIR", "/etc/opt/microsoft/azuremonitoragent"),
         ("MDSD_LOG_DIR", "/var/opt/microsoft/azuremonitoragent/log"),
         ("MDSD_ROLE_PREFIX", "/run/azuremonitoragent/default"),
         ("MDSD_SPOOL_DIRECTORY", "/var/opt/microsoft/azuremonitoragent"),
-        ("MDSD_OPTIONS", "\"-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\""),
+        ("MDSD_OPTIONS", "\"{}-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"".format(flags)),
         ("MDSD_USE_LOCAL_PERSISTENCY", "true"),
         ("MDSD_TCMALLOC_RELEASE_FREQ_SEC", "1"),
         ("MONITORING_USE_GENEVA_CONFIG_SERVICE", "false"),
@@ -485,12 +494,7 @@ def enable():
                 log_and_exit("Enable", GenericErrorCode, "Error while updating environment variables in {0}".format(config_file))
 
             os.remove(config_file)
-            os.rename(temp_config_file, config_file)
-
-            uid = pwd.getpwnam("syslog").pw_uid
-            gid = grp.getgrnam("syslog").gr_gid
-            os.chown(config_file, uid, gid)
-            os.system('chmod {1} {0}'.format(config_file, 400))
+            os.rename(temp_config_file, config_file)            
         else:
             log_and_exit("Enable", GenericErrorCode, "Could not find the file {0}".format(config_file))
     except Exception as e:

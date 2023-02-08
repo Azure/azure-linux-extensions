@@ -367,7 +367,9 @@ def _set_sshd_config(config, name, val):
             # Match block must be put in the end of sshd config
             break
     if notfound:
-        config = "{0} {1}".format(name, val) + config 
+        if i is None:
+            i = 0
+        config.insert(i, "{0} {1}".format(name, val))
     return config
 
 
