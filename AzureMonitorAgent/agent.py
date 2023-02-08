@@ -1238,10 +1238,10 @@ def is_vm_supported_for_extension(operation):
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists_x86_64 = {'redhat' : ['7', '8'], # Rhel
-                       'rhel' : ['7', '8'], # Rhel
+    supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
+                       'rhel' : ['7', '8', '9'], # Rhel
                        'centos' : ['7', '8'], # CentOS
-                       'red hat' : ['7', '8'], # Oracle, RHEL
+                       'red hat' : ['7', '8', '9'], # Oracle, RHEL
                        'oracle' : ['7', '8'], # Oracle
                        'debian' : ['9', '10', '11'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
