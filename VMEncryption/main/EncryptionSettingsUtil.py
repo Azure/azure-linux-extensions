@@ -209,12 +209,10 @@ class EncryptionSettingsUtil(object):
             cutil.check_mhsm_id(kek_kv_id, "A ManagedHSM ID is required, but is missing or invalid.")
             cutil.check_mhsm_name(kek_kv_id, kek_url, "A ManagedHSM ID and ManagedHSM URL were provided, but their ManagedHSM names did not match")
             self._DISK_ENCRYPTION_KEY_SOURCE = CommonVariables.KeyStoreTypeManagedHSM
-        elif key_store_type:
+        elif keystoretype_flag_exists:
             raise Exception("The expected flag name and value to enable ManagedHSM is 'KeyStoreType':'{0}'. " +
-            "Please correct the flag name and value and retry enabling ManagedHSM".format(CommonVariables.KeyStoreTypeManagedHSM))
-        elif not key_store_type and keystoretype_flag_exists:
-            raise Exception("The flag to enable ManagedHSM is empty. Remove the flag for use with KeyVault, or correct the value to 'KeyStoreType':'{0}'".format(CommonVariables.KeyStoreTypeManagedHSM))
-        # Keyvault Checks
+            "Please correct the flag name and value and retry enabling ManagedHSM, or remove the flag for KeyVault use.".format(CommonVariables.KeyStoreTypeManagedHSM))
+       # Keyvault Checks
         else:
             # validate key vault parameters prior to creating the encryption settings object
             cutil.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
