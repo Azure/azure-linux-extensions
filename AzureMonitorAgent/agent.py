@@ -296,9 +296,9 @@ def install():
     wait longer.
     """
 
+    exit_if_vm_not_supported('Install')
     find_package_manager("Install")
     set_os_arch('Install')
-    exit_if_vm_not_supported('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
     # Check if SUSE 15 VMs have /sbin/insserv package (required for AMA 1.14.4+)
@@ -374,6 +374,7 @@ def uninstall():
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
 
+    exit_if_vm_not_supported('Uninstall')
     find_package_manager("Uninstall")
     if PackageManager == "dpkg":
         AMAUninstallCommand = "dpkg -P azuremonitoragent"
@@ -1171,7 +1172,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma"])
+    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1238,10 +1239,10 @@ def is_vm_supported_for_extension(operation):
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists_x86_64 = {'redhat' : ['7', '8'], # Rhel
-                       'rhel' : ['7', '8'], # Rhel
+    supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
+                       'rhel' : ['7', '8', '9'], # Rhel
                        'centos' : ['7', '8'], # CentOS
-                       'red hat' : ['7', '8'], # Oracle, RHEL
+                       'red hat' : ['7', '8', '9'], # Oracle, RHEL
                        'oracle' : ['7', '8'], # Oracle
                        'debian' : ['9', '10', '11'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
@@ -1250,7 +1251,8 @@ def is_vm_supported_for_extension(operation):
                        'mariner' : ['2'], # Mariner 2.0
                        'rocky' : ['8'], # Rocky
                        'alma' : ['8'], # Alma
-                       'opensuse' : ['15'] # openSUSE
+                       'opensuse' : ['15'], # openSUSE
+                       'amzn' : ['2'] # Amazon Linux 2
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
@@ -1328,7 +1330,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma']:
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma', 'amzn']:
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 
