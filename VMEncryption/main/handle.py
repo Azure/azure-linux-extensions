@@ -669,7 +669,7 @@ def enable():
         imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
         imds_Util = IMDSUtil(logger)
         try:
-            check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util)
+            check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util,continueADEOnIMDSFailure=True)
         except Exception as ex:
              hutil.do_exit(exit_code=CommonVariables.configuration_error,
                     operation='pre_Initialization_Check',

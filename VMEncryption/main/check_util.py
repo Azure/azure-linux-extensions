@@ -329,7 +329,7 @@ class CheckUtil(object):
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
         return detected
 
-    def pre_Initialization_Check(self,imdsStoredResults,iMDSUtil):
+    def pre_Initialization_Check(self,imdsStoredResults,iMDSUtil,continueADEOnIMDSFailure=False):
         '''This function is checking the VM compatibility for ADE'''
         self.logger.log('Pre initialization check Start.')
         try:
@@ -345,16 +345,20 @@ class CheckUtil(object):
                 self.logger.log("reading from imds, security type is {0}.".format(security_type))
             supported_security_types = security_type.lower() in [x.lower() for x in CommonVariables.supported_security_types]
             if not supported_security_types:
-                raise Exception("Unknown VM security type: {0}, has to be one of {1}".format(security_type,CommonVariables.supported_security_types))
+                message = "Unknown VM security type: {0}, has to be one of {1}".format(security_type,CommonVariables.supported_security_types)
+                self.logger.log(msg=message,level=CommonVariables.ErrorLevel)                
+                raise Exception(message)
             imdsStoredResults.security_type = security_type
             imdsStoredResults.commit()
         except Exception as ex:
             message = "Pre-initialization check: Exception thrown during IMDS call. \
                        exception:{0}, \n stack-trace: {1}".format(str(ex),traceback.format_exc())
             self.logger.log(msg=message,level=CommonVariables.ErrorLevel)
-            raise Exception(message)
+            if continueADEOnIMDSFailure==False:
+                raise Exception(message)
+            self.logger.log(msg="IMDS call is unsuccessful to fetch security profile, continue with ADE encryption.") 
         if security_type.lower() ==  CommonVariables.ConfidentialVM.lower():
-            message = "Pre-initialization check: ADE flow is blocked for confidential VM."
+            message = "Pre-initialization check: ADE flow is blocked for confidential VMs"
             self.logger.log(msg=message,level=CommonVariables.ErrorLevel)
             raise Exception(message) 
         self.logger.log('Pre initialization check End.')
