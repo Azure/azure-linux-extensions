@@ -4,7 +4,7 @@ import subprocess
 
 from error_codes       import *
 from errors            import error_info, is_error, print_errors
-from helpers           import general_info, geninfo_lookup
+from helpers           import general_info, is_metrics_configured, find_dcr_workspace
 from .check_endpts     import check_internet_connect, check_ama_endpts
 from .check_imds       import check_imds_api
 
@@ -23,50 +23,15 @@ def check_parameters():
     return NO_ERROR
    
 def check_workspace():
-    global general_info
-    dir_path = '/etc/opt/microsoft/azuremonitoragent/config-cache/configchunks'
-    dcr_workspace = set()
-    dcr_region = set()
-    me_region = set()
-    general_info['URL_SUFFIX'] = '.com'
-    try:
-        for file in os.listdir(dir_path):
-            file_path = dir_path + "/" + file
-            with open(file_path) as f:
-                result = json.load(f)
-                channels = result['channels']
-                for channel in channels:
-                    if channel['protocol'] == 'ods':
-                        # parse dcr workspace id
-                        endpoint_url = channel['endpoint']
-                        worspace_id = endpoint_url.split('https://')[1].split('.ods')[0]
-                        dcr_workspace.add(worspace_id)
-                        # parse dcr region
-                        token_endpoint_uri = channel['tokenEndpointUri']
-                        region = token_endpoint_uri.split('Location=')[1].split('&')[0]
-                        dcr_region.add(region)
-                        # parse url suffix
-                        if '.us' in endpoint_url:
-                            general_info['URL_SUFFIX'] = '.us'
-                        if '.cn' in endpoint_url:
-                            general_info['URL_SUFFIX'] = '.cn'                            
-                    if channel['protocol'] == 'me':
-                        # parse ME region
-                        endpoint_url = channel['endpoint']
-                        region = endpoint_url.split('https://')[1].split('.monitoring')[0]
-                        me_region.add(region)
-    except (FileNotFoundError, AttributeError) as e:
+    wkspc_id, wkspc_region, e = find_dcr_workspace()
+    if e != None:
         error_info.append((e,))
-        return ERR_NO_DCR
-
-    general_info['DCR_WORKSPACE_ID'] = dcr_workspace
-    general_info['DCR_REGION'] = dcr_region
-    general_info['ME_REGION'] = me_region
+        return ERR_NO_DCR 
     return NO_ERROR
 
 def check_subcomponents(): 
     services = ['azuremonitoragent', 'azuremonitor-agentlauncher', 'azuremonitor-coreagent']
-    if len(geninfo_lookup('ME_REGION')) > 0:
+    if is_metrics_configured():
         services.append('metrics-sourcer')
         services.append('metrics-extension')
         

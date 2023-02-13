@@ -5,12 +5,20 @@ import shutil
 import subprocess
 
 import helpers
+from error_codes        import *
+from connect.check_imds import check_metadata
 
 
 DPKG_CMD = "dpkg -s azuremonitoragent"
 RPM_CMD = "rpm -qi azuremonitoragent"
 PS_CMD = "ps -ef | grep {0} | grep -v grep"
 OPENSSL_CMD = "echo | openssl s_client -connect {0}:443 -brief"
+SYSTEMCTL_CMD = "systemctl status {0} --no-pager"
+JOURNALCTL_CMD = "journalctl -u {0} --no-pager --since \"30 days ago\" > {1}"
+PS_CMD_CPU = "ps aux --sort=-pcpu | head -10"
+PS_CMD_RSS = "ps aux --sort -rss | head -10"
+PS_CMD_VSZ = "ps aux --sort -vsz | head -10"
+
 
 
 # File copying functions
@@ -44,15 +52,6 @@ def copy_dircontents(src, dst):
 
 
 
-def is_arc_installed():
-    """
-    Check if this is an Arc machine
-    """
-    # Using systemctl to check this since Arc only supports VMs that have systemd
-    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
-    return check_arc == 0
-
-
 
 # Log collecting functions
 
@@ -83,6 +82,8 @@ def collect_logs(output_dirpath, pkg_manager):
     # collect rsyslog information (if present)
     copy_file("/etc/rsyslog.conf", os.path.join(output_dirpath,"rsyslog"))
     copy_dircontents("/etc/rsyslog.d", os.path.join(output_dirpath,"rsyslog","rsyslog.d"))
+    if (os.path.isfile("/etc/rsyslog.conf")):
+        helpers.run_cmd_output(JOURNALCTL_CMD.format("rsyslog", os.path.join(output_dirpath,"rsyslog","journalctl_output.log")))
     # collect syslog-ng information (if present)
     copy_dircontents("/etc/syslog-ng", os.path.join(output_dirpath,"syslog-ng"))
 
@@ -161,10 +162,22 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
                 for line in os_info:
                     outfile.write(line)
             outfile.write("--------------------------------------------------------------------------------\n")
+
+        # VM Metadata
+        attributes = ['azEnvironment', 'resourceId', 'location']
+        outfile.write("VM Metadata from IMDS:\n")
+        for attr in attributes:
+            attr_result = helpers.geninfo_lookup(attr)
+            if (not attr_result) and (check_metadata() == NO_ERROR):
+                attr_result = helpers.geninfo_lookup(attr)
+            if (attr_result != None):
+                outfile.write("{0}: {1}\n".format(attr, attr_result))
+        outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
 
+
         # AMA install status
-        ama_vers = helpers.find_ama_version()
+        (ama_vers, _) = helpers.find_ama_version()
         (ama_installed, ama_unique) = helpers.check_ama_installed(ama_vers)
         outfile.write("AMA Install Status: {0}\n".format("installed" if ama_installed else "not installed"))
         if (ama_installed):
@@ -174,6 +187,13 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
                 outfile.write("AMA Version: {0}\n".format(ama_vers[0]))
         outfile.write("--------------------------------------------------------------------------------\n")
 
+        # connection to endpoints
+        wkspc_id, wkspc_region, e = helpers.find_dcr_workspace()
+        if e == None:
+            outfile.write("Workspace ID: {0}\n".format(str(wkspc_id)))
+            outfile.write("Workspace region: {0}\n".format(str(wkspc_region)))
+            outfile.write("--------------------------------------------------------------------------------\n")
+               
         # AMA package info (dpkg/rpm)
         if (pkg_manager == "dpkg"):
             outfile.write("Output of command: {0}\n".format(DPKG_CMD))
@@ -196,19 +216,22 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
 
-        # connection to endpoints
-        wkspc_id = helpers.find_wkspc_id()
-        vm_region = helpers.find_vm_region()
-        if (wkspc_id and vm_region):
-            for endpt in ["global.handler.control.monitor.azure.com", \
-                          "{0}.handler.control.monitor.azure.com".format(vm_region), \
-                          "{0}.ods.opinsights.com".format(wkspc_id)]:
-                openssl_endpt_cmd = OPENSSL_CMD.format(endpt)
-                outfile.write("Output of command: {0}\n".format(openssl_endpt_cmd))
-                outfile.write("========================================\n")
-                outfile.write(helpers.run_cmd_output(openssl_endpt_cmd))
-                outfile.write("--------------------------------------------------------------------------------\n")
+        # rsyslog / syslog-ng status via systemctl
+        for syslogd in ["rsyslog", "syslog-ng"]:
+            systemctl_cmd = SYSTEMCTL_CMD.format(syslogd)
+            outfile.write("Output of command: {0}\n".format(systemctl_cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(systemctl_cmd))
             outfile.write("--------------------------------------------------------------------------------\n")
+        outfile.write("--------------------------------------------------------------------------------\n")
+
+        # ps aux output
+        for cmd in [PS_CMD_CPU, PS_CMD_RSS, PS_CMD_VSZ]:
+            outfile.write("Output of command: {0}\n".format(cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(cmd))
+            outfile.write("--------------------------------------------------------------------------------\n")
+        outfile.write("--------------------------------------------------------------------------------\n")
 
 
 
@@ -218,7 +241,7 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
 
 def run_logcollector(output_location):
     # check if Arc is being used
-    is_arc_vm = is_arc_installed()
+    is_arc_vm = helpers.is_arc_installed()
 
     # create directory to hold copied logs
     vm_type = "azurearc" if is_arc_vm else "azurevm"

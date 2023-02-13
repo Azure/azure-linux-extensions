@@ -2575,7 +2575,7 @@ def RunSendStdin(cmd, input, chk_err=True, log_cmd=True, use_shell=True):
             Error('CalledProcessError.  Command string was ' + cmd)
             Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
             return 1, output[0].decode('latin-1')
-    if me.returncode is not 0 and chk_err is True and log_cmd:
+    if me.returncode != 0 and chk_err is True and log_cmd:
         Error('CalledProcessError.  Error Code is ' + str(me.returncode))
         Error('CalledProcessError.  Command string was ' + cmd)
         Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
