@@ -200,7 +200,7 @@ class EncryptionSettingsUtil(object):
                         self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
 
         # ManagedHSM Checks
-        if key_store_type.lower() == CommonVariables.KeyStoreTypeManagedHSM.lower():
+        if key_store_type and key_store_type.lower() == CommonVariables.KeyStoreTypeManagedHSM.lower():
             # validate mhsm parameters prior to creating the encryption settings object
             if not kv_url.strip() or not kv_id.strip():
                 raise Exception("KeyvaultUrl or KeyvaultresourceId are not empty. 'KeyStoreType' parameter is not supported for keyvault currently, please remove Key Vault p")
