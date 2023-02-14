@@ -19,7 +19,10 @@ import os
 import sys
 from Common import TestHooks
 import base64
-from abc import ABC, abstractmethod
+import abc
+from abc import abstractmethod
+# compatible with Python 2 *and* 3
+ABC = abc.ABCMeta('ABC', (object,), {'__slots__': ()}) 
 
 class BekMissingException(Exception):
     """
