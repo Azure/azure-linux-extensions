@@ -202,8 +202,8 @@ class EncryptionSettingsUtil(object):
         # ManagedHSM Checks
         if key_store_type and key_store_type.lower() == CommonVariables.KeyStoreTypeManagedHSM.lower():
             # validate mhsm parameters prior to creating the encryption settings object
-            if not kv_url.strip() or not kv_id.strip():
-                raise Exception("KeyvaultUrl or KeyvaultresourceId are not empty. 'KeyStoreType' parameter is not supported for keyvault currently, please remove Key Vault p")
+            if kv_url or kv_id:
+                raise Exception("KeyvaultUrl or KeyvaultresourceId are not empty, and 'KeyStoreType' parameter is set to ManagedHSM. Please remove KeyvaultUrl KeyvaultresourceId for ManagedHSM.")
             self.logger.log("get_settings_data: KeyVault Url is empty, validating KeyEncryptionKeyKVURL and KeyEncryptionKeyKVId for ManagedHSM")
             cutil.check_mhsm_url(kek_url, "A ManagedHSM URL is specified, but it is invalid for ManagedHSM.")
             cutil.check_mhsm_id(kek_kv_id, "A ManagedHSM ID is required, but is missing or invalid.")

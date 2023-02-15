@@ -101,10 +101,10 @@ class CheckUtil(object):
 
     def check_mhsm_url(self, test_mhsm_url, message):
         """basic sanity check of the MHSM url"""
-        expected = "https://managedhsm-name}.{mhsm-endpoint}"
-        pattern = re.compile(r'https://(.)+\\.(managedhsm)\\.(.)+(:443)?\\/keys/[^\\/]+\\/[0-9a-zA-Z]+$', re.IGNORECASE)
-        if not (test_mhsm_url and pattern.match(test_mhsm_url)):
-            raise Exception('\n' + message + '\nActual: ' + test_mhsm_url + '\nExpected: ' + expected + "\n")
+        # expected = "https://managedhsm-name}.{mhsm-endpoint}"
+        # pattern = re.compile(r'https://(.)+\\.(managedhsm)\\.(.)+(:443)?\\/keys/[^\\/]+\\/[0-9a-zA-Z]+$', re.IGNORECASE)
+        # if not (test_mhsm_url and pattern.match(test_mhsm_url)):
+        #     raise Exception('\n' + message + '\nActual: ' + test_mhsm_url + '\nExpected: ' + expected + "\n")
         return
 
     def check_kv_id(self, test_kv_id, message):
@@ -161,8 +161,8 @@ class CheckUtil(object):
 
     def check_mhsm_name(self, mhsm_id, mhsm_url, message):
         """ensure ManagedHSM ID vault name matches ManagedHSM URL vault name"""
-        if not (mhsm_id and mhsm_url and self.get_kv_id_name(mhsm_id) and self.get_kek_url_name(mhsm_url) and self.get_kv_id_name(mhsm_id).lower() == self.get_kek_url_name(mhsm_url).lower()):
-            raise Exception('\n' +message + '\nManagedHSM ID: ' + mhsm_id + '\nManagedHSM URL: ' + mhsm_url + '\n')
+        # if not (mhsm_id and mhsm_url and self.get_kv_id_name(mhsm_id) and self.get_kek_url_name(mhsm_url) and self.get_kv_id_name(mhsm_id).lower() == self.get_kek_url_name(mhsm_url).lower()):
+        #     raise Exception('\n' +message + '\nManagedHSM ID: ' + mhsm_id + '\nManagedHSM URL: ' + mhsm_url + '\n')
         return
 
     def validate_key_vault_params(self, public_settings):
@@ -176,24 +176,30 @@ class CheckUtil(object):
         kv_id = public_settings.get(CommonVariables.KeyVaultResourceIdKey)
         kek_kv_id = public_settings.get(CommonVariables.KekVaultResourceIdKey)
         kek_algorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
+       
+        has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
 
-        self.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
-        self.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
-        self.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
-        if kek_url:
-            self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
-            self.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
-            self.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
-            if kek_algorithm:
-                if kek_algorithm.upper() not in CommonVariables.encryption_algorithms:
-                    raise Exception("The KEK encryption algorithm requested was not recognized")
+        if not has_keystore_flag:
+            self.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
+            self.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
+            self.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
+            if kek_url:
+                self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
+                self.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
+                self.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
+                if kek_algorithm:
+                    if kek_algorithm.upper() not in CommonVariables.encryption_algorithms:
+                        raise Exception("The KEK encryption algorithm requested was not recognized")
+                else:
+                    kek_algorithm = CommonVariables.default_encryption_algorithm
+                    self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
             else:
-                kek_algorithm = CommonVariables.default_encryption_algorithm
-                self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
+                if kek_kv_id:
+                    raise Exception(
+                        "The KEK KeyVault ID was specified but the KEK URL was missing")
         else:
-            if kek_kv_id:
-                raise Exception(
-                    "The KEK KeyVault ID was specified but the KEK URL was missing")
+            self.logger.log("validate_key_vault_params: KeyStoryType flag present, skipping validation of Key Vault parameters in precheck")
+            # After removal of keystoretype flag, this logic should be reworked to include thorough MHSM parameter checks as well
 
     def validate_volume_type(self, public_settings, DistroPatcher=None):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
