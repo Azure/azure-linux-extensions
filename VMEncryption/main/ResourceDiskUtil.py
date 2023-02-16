@@ -42,6 +42,11 @@ class ResourceDiskUtil(object):
         self.passphrase_filename = passphrase_filename  # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
         self.public_settings = public_settings
         self.distro_info = distro_info
+        self.dev_path_options = [
+            os.path.join(CommonVariables.azure_symlinks_dir, 'resource'),
+            os.path.join(CommonVariables.cloud_symlinks_dir, 'azure_resource'),
+            os.path.join(CommonVariables.azure_symlinks_dir, 'scsi0/lun1')
+        ]
         self.RD_MOUNT_POINT = '/mnt/resource'
         if retain_mountpoint == True:
             device, mountpoint, fs, opts = self._get_rd_fstab_details() 
@@ -52,13 +57,7 @@ class ResourceDiskUtil(object):
         if self._RD_BASE_DEV_PATH_CACHE:
             return self._RD_BASE_DEV_PATH_CACHE
 
-        dev_path_options = [
-            os.path.join(CommonVariables.azure_symlinks_dir, 'resource'),
-            os.path.join(CommonVariables.cloud_symlinks_dir, 'azure_resource'),
-            os.path.join(CommonVariables.azure_symlinks_dir, 'scsi0/lun1')
-        ]
-
-        for option in dev_path_options:
+        for option in self.dev_path_options:
             if os.path.exists(option):
                 self._RD_BASE_DEV_PATH_CACHE = option
                 self.logger.log("Setting RD_BASE_DEV_PATH to " + option)
@@ -268,14 +267,14 @@ class ResourceDiskUtil(object):
 
     def _get_rd_fstab_details(self):
         fstab_location = "/etc/fstab"
-        rd_dev_path = self._get_rd_dev_path()
+        rd_dev_paths = ["{0}-part1".format(path) for path in self.dev_path_options if os.path.exists(path)]
         if os.path.exists(fstab_location):
             with open('/etc/fstab', 'r') as f:
                 lines = f.readlines()
             for i in range(len(lines)):
                 line = lines[i]                 
                 device, mountpoint, fs, opts = self.crypt_mount_config_util.parse_fstab_line(line)
-                if device == rd_dev_path or device == "/dev/mapper/resourceencrypt":
+                if device in rd_dev_paths or device == "/dev/mapper/resourceencrypt":
                     self.logger.log("resource disk fstab details- {0}, {1}, {2}, {3}".format(device,mountpoint,fs,opts))
                     return device,mountpoint,fs,opts
         return None,None,None,None
