@@ -25,8 +25,7 @@ class BekUtilFileImpl(AbstractBekUtilImpl):
     """
     Utility class to store passphrase in a keyfilepath.
     """
-    def __init__(self,diskutil,logger) -> None:
-        super().__init__()
+    def __init__(self,diskutil,logger):
         self.keyfilePath = "/var/lib/azure_disk_encryption_config/"
         self.logger = logger
         self.disk_util=diskutil

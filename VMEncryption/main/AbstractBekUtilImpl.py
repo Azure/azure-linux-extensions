@@ -42,10 +42,7 @@ class AbstractBekUtilImpl(ABC):
     not_mounted_msg = "BEK is not mounted."
     partition_missing_msg = "BEK disk does not expected partition."
     bek_missing_msg = "BEK disk is not attached."
-
-    def __init__(self) -> None:
-        pass
-
+    
     def generate_passphrase(self):
         if TestHooks.use_hard_code_passphrase:
             return TestHooks.hard_code_passphrase

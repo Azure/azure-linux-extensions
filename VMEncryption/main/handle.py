@@ -776,16 +776,18 @@ def enable():
             is_continue_encryption = True
             volume_type = None
             if security_Type == CommonVariables.ConfidentialVM:
-                is_continue_encryption = False
                 if encryption_status['os'] != 'Encrypted':
-                    logger.log ("ADE encryption supported to CVM only if OS is CVM encrypted.")
+                    msg = "ADE encryption supported to CVM only if OS is encrypted."
+                    logger.log(level=CommonVariables.ErrorLevel,msg=msg)
+                    is_continue_encryption = False
                 volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
-                if volume_type != CommonVariables.VolumeTypeOS:
-                    is_continue_encryption = True
+                if is_continue_encryption and volume_type == CommonVariables.VolumeTypeOS:
+                    is_continue_encryption = False
             if is_continue_encryption:        
                 handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
             else:
-                msg = 'Encryption operation {2} is not supported to {0}, volume type: {1}'.format(security_Type,existing_volume_type,encryption_operation)
+                msg = 'Encryption operation {2} is not supported to {0}, volume type: {1}, OS encryption status: {2}'\
+                .format(security_Type,existing_volume_type,encryption_operation, encryption_status['os'])
                 logger.log(msg)
                 hutil.do_exit(exit_code=CommonVariables.configuration_error,
                           operation='Enable',

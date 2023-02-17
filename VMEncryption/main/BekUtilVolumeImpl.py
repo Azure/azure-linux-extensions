@@ -29,7 +29,6 @@ class BekUtilVolumeImpl(AbstractBekUtilImpl):
     Utility functions related to the BEK VOLUME and BEK files
     """
     def __init__(self, disk_util, logger):
-        super().__init__()
         self.disk_util = disk_util
         self.logger = logger
         self.bek_filesystem_mount_point = '/mnt/azure_bek_disk'
