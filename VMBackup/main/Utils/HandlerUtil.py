@@ -573,7 +573,7 @@ class HandlerUtility:
             HandlerUtility.serializable_telemetry_data.append(each_telemetry_data)
  
     def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None,total_size = 0,failure_flag = True ):
-        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        self.log("{0},{1},{2},{3},{4}".format(operation, status, status_code, message, failure_flag ))
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
@@ -605,7 +605,7 @@ class HandlerUtility:
                 consistencyTypeStr = CommonVariables.consistency_none
         HandlerUtility.add_to_telemetery_data("consistencyType", consistencyTypeStr)
 
-        extensionResponseObj = Utils.Status.ExtensionResponse(message, self.SnapshotConsistency, "")
+        extensionResponseObj = Utils.Status.ExtensionResponse(message, self.SnapshotConsistency, "", failure_flag)
         message = str(json.dumps(extensionResponseObj, cls = ComplexEncoder))
 
         self.convert_telemetery_data_to_bcm_serializable_format()
