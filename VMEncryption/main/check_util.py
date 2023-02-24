@@ -226,7 +226,7 @@ class CheckUtil(object):
                 return
             else: 
                 raise Exception("The expected flag name and value to enable ManagedHSM is 'KeyStoreType':'{0}'. " +
-                    "Please correct the flag name and value and retry enabling ManagedHSM, or remove the flag for KeyVault use.".format(CommonVariables.KeyStoreTypeManagedHSM)")
+                    "Please correct the flag name and value and retry enabling ManagedHSM, or remove the flag for KeyVault use.".format(CommonVariables.KeyStoreTypeManagedHSM))
 
     def validate_volume_type(self, public_settings, DistroPatcher=None):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
