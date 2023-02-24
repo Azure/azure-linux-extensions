@@ -114,6 +114,13 @@ class CommonVariables:
     MigrateValue = 'Migrate'
 
     """
+    value for KeyStoreTypeKey could be ManagedHSM
+    This is a value for ManagedHSM testing, and should be removed before public release
+    """
+    KeyStoreTypeKey = 'KeyStoreType'
+    KeyStoreTypeManagedHSM = 'ManagedHSM'
+
+    """
     value for VolumeType could be Data
     """
     VolumeTypeKey = 'VolumeType'

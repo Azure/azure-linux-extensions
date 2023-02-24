@@ -40,6 +40,10 @@ class EncryptionSettingsUtil(object):
     def __init__(self, logger):
         self.logger = logger
         self._DISK_ENCRYPTION_DATA_VERSION_V4 = "4.0"
+        self._DISK_ENCRYPTION_DATA_VERSION_V5 = "5.0"
+
+        # BAM: Do i want this initialized to KeyVault or None? Choosing None in case of bad parameters
+        self._DISK_ENCRYPTION_KEY_SOURCE = None
 
     def get_index(self):
         """get the integer value of the current index in the counter"""
@@ -182,30 +186,49 @@ class EncryptionSettingsUtil(object):
                     })
         return array
 
-    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util, crypt_mount_config_util):
+    def get_settings_data(self, protector_name, kv_url, kv_id, kek_url, kek_kv_id, kek_algorithm, extra_device_items, disk_util, crypt_mount_config_util, key_store_type, keystoretype_flag_exists):
         """ returns encryption settings object in format required by wire server """
 
-        # validate key vault parameters prior to creating the encryption settings object
         cutil = CheckUtil(self.logger)
-        cutil.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
-        cutil.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
-        cutil.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
-        if kek_url:
-            cutil.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
-            cutil.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
-            cutil.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
-            if kek_algorithm not in CommonVariables.encryption_algorithms:
-                if kek_algorithm:
-                    raise Exception("The KEK encryption algorithm requested was not recognized")
-                else:
-                    kek_algorithm = CommonVariables.default_encryption_algorithm
-                    self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
+
+        # Perform algorithm check regaurdless of ManagedHSM or Keyvault
+        if kek_algorithm not in CommonVariables.encryption_algorithms:
+                    if kek_algorithm:
+                        raise Exception("The KEK encryption algorithm requested was not recognized")
+                    else:
+                        kek_algorithm = CommonVariables.default_encryption_algorithm
+                        self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
+
+        # ManagedHSM Checks
+        if key_store_type and key_store_type.lower() == CommonVariables.KeyStoreTypeManagedHSM.lower():
+            # validate mhsm parameters prior to creating the encryption settings object
+            if kv_url or kv_id:
+                raise Exception("KeyvaultUrl or KeyvaultresourceId are not empty, and 'KeyStoreType' parameter is set to ManagedHSM. Please remove KeyvaultUrl KeyvaultresourceId for ManagedHSM.")
+            self.logger.log("get_settings_data: KeyVault Url is empty, validating KeyEncryptionKeyKVURL and KeyEncryptionKeyKVId for ManagedHSM")
+            cutil.check_mhsm_url(kek_url, "A ManagedHSM URL is specified, but it is invalid for ManagedHSM.")
+            cutil.check_mhsm_id(kek_kv_id, "A ManagedHSM ID is required, but is missing or invalid.")
+            cutil.check_mhsm_name(kek_kv_id, kek_url, "A ManagedHSM ID and ManagedHSM URL were provided, but their ManagedHSM names did not match")
+            self._DISK_ENCRYPTION_KEY_SOURCE = CommonVariables.KeyStoreTypeManagedHSM
+        elif keystoretype_flag_exists:
+            raise Exception("The expected flag name and value to enable ManagedHSM is 'KeyStoreType':'{0}'. " +
+            "Please correct the flag name and value and retry enabling ManagedHSM, or remove the flag for KeyVault use.".format(CommonVariables.KeyStoreTypeManagedHSM))
+       # Keyvault Checks
         else:
-            if kek_kv_id:
-                raise Exception("The KEK KeyVault ID was specified but the KEK URL was missing")
+            # validate key vault parameters prior to creating the encryption settings object
+            cutil.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
+            cutil.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
+            cutil.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
+            if kek_url:
+                cutil.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
+                cutil.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
+                cutil.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
+            else:
+                if kek_kv_id:
+                    raise Exception("The KEK KeyVault ID was specified but the KEK URL was missing")
 
         # create encryption settings object
         self.logger.log("Creating encryption settings object")
+        self.logger.log("The disk encryption key source used is: {0}".format(self._DISK_ENCRYPTION_KEY_SOURCE))
 
         # validate machine name string or use empty string
         machine_name = socket.gethostname()
@@ -277,8 +300,13 @@ class EncryptionSettingsUtil(object):
 
         protectors_name_only = [{"Name": protector["Name"], "Base64Key": "REDACTED"} for protector in protectors]
 
+        if self._DISK_ENCRYPTION_KEY_SOURCE == CommonVariables.KeyStoreTypeManagedHSM:
+            data_version = self._DISK_ENCRYPTION_DATA_VERSION_V5
+        else:
+            data_version = self._DISK_ENCRYPTION_DATA_VERSION_V4
+
         data = {
-            "DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
+            "DiskEncryptionDataVersion": data_version,
             "DiskEncryptionOperation": "EnableEncryption",
             "KeyVaultUrl": kv_url,
             "KeyVaultResourceId": kv_id,
@@ -432,7 +460,12 @@ class EncryptionSettingsUtil(object):
         data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
 
-        data = {"DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
+        if self._DISK_ENCRYPTION_KEY_SOURCE == CommonVariables.KeyStoreTypeManagedHSM:
+            data_version = self._DISK_ENCRYPTION_DATA_VERSION_V5
+        else:
+            data_version = self._DISK_ENCRYPTION_DATA_VERSION_V4
+
+        data = {"DiskEncryptionDataVersion": data_version,
                 "DiskEncryptionOperation": "DisableEncryption",
                 "Disks": data_disks_settings_data,
                 "KekAlgorithm": "",

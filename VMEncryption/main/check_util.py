@@ -99,6 +99,14 @@ class CheckUtil(object):
             raise Exception('\n' + message + '\nActual: ' + test_kek_url + '\nExpected: ' + expected + "\n")
         return
 
+    def check_mhsm_url(self, test_mhsm_url, message):
+        """basic sanity check of the MHSM url"""
+        expected = "https://{managedhsm-name}.{managedhsm}.{vault-endpoint}/keys/{object-name}/{object-version}"
+        pattern = re.compile(r'^https://([a-zA-Z0-9\-]+)[\.]+(managedhsm)+([a-zA-Z0-9\-\.]+)(:443)?/keys/([a-zA-Z0-9\-]+)/([a-zA-Z0-9]+)([/]?)$', re.IGNORECASE)
+        if not (test_mhsm_url and pattern.match(test_mhsm_url)):
+            raise Exception('\n' + message + '\nActual: ' + test_mhsm_url + '\nExpected: ' + expected + "\n")
+        return
+
     def check_kv_id(self, test_kv_id, message):
         """basic sanity check of the key vault id"""
         expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/vaults/{vaultname}"
@@ -107,10 +115,26 @@ class CheckUtil(object):
             raise Exception('\n' + message + '\nActual: ' + test_kv_id + '\nExpected: ' + expected + "\n")
         return
 
+    def check_mhsm_id(self, test_mhsm_id, message):
+        """basic sanity check of the mhsm resource id"""
+        expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/managedHSM/{mhsmname}"
+        pattern = re.compile(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/managedHSM/([a-zA-Z0-9\-\_]+)(/)?$',re.IGNORECASE)
+        if not (test_mhsm_id and pattern.match(test_mhsm_id)):
+            raise Exception('\n' + message + '\nActual: ' + test_mhsm_id + '\nExpected: ' + expected + "\n")
+        return
+
     def get_kv_id_name(self, kv_id):
         """extract key vault name from KV ID"""
         if kv_id:
             match = re.search(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/vaults/([a-zA-Z0-9\-\_]+)(/)?$', kv_id, re.IGNORECASE)
+            if match:
+                return match.group(3)
+        return
+    
+    def get_mhsm_id_name(self, mhsm_id):
+        """extract key vault name from KV ID"""
+        if mhsm_id:
+            match = re.search(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/managedHSM/([a-zA-Z0-9\-\_]+)(/)?$', mhsm_id, re.IGNORECASE)
             if match:
                 return match.group(3)
         return
@@ -130,6 +154,14 @@ class CheckUtil(object):
             if match:
                 return match.group(1)
         return
+    
+    def get_mhsm_url_name(self, mhsm_url):
+        """extract key vault name from kek url"""
+        if mhsm_url:
+            match = re.search(r'^https://([a-zA-Z0-9\-]+)[\.]+(managedhsm)+([a-zA-Z0-9\-\.]+)(:443)?/keys/([a-zA-Z0-9\-]+)/([a-zA-Z0-9]+)([/]?)$', mhsm_url, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        return
 
     def check_kv_name(self, kv_id, kv_url, message):
         """ensure KV ID vault name matches KV URL"""
@@ -143,6 +175,12 @@ class CheckUtil(object):
             raise Exception('\n' +message + '\nKEK Key Vault ID: ' + kek_kv_id + '\nKEK URL: ' + kek_url + '\n')
         return
 
+    def check_mhsm_name(self, mhsm_id, mhsm_url, message):
+        """ensure ManagedHSM ID vault name matches ManagedHSM URL vault name"""
+        if not (mhsm_id and mhsm_url and self.get_mhsm_id_name(mhsm_id) and self.get_mhsm_url_name(mhsm_url) and self.get_mhsm_id_name(mhsm_id).lower() == self.get_mhsm_url_name(mhsm_url).lower()):
+            raise Exception('\n' +message + '\nManagedHSM ID: ' + mhsm_id + '\nManagedHSM URL: ' + mhsm_url + '\n')
+        return
+
     def validate_key_vault_params(self, public_settings):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         if encryption_operation not in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
@@ -154,24 +192,41 @@ class CheckUtil(object):
         kv_id = public_settings.get(CommonVariables.KeyVaultResourceIdKey)
         kek_kv_id = public_settings.get(CommonVariables.KekVaultResourceIdKey)
         kek_algorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
+       
+        has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
 
-        self.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
-        self.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
-        self.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
-        if kek_url:
-            self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
-            self.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
-            self.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
-            if kek_algorithm:
-                if kek_algorithm.upper() not in CommonVariables.encryption_algorithms:
-                    raise Exception("The KEK encryption algorithm requested was not recognized")
+        if not has_keystore_flag:
+            self.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
+            self.check_kv_url(kv_url, "A KeyVault URL is required, but is missing or invalid")
+            self.check_kv_name(kv_id, kv_url, "A KeyVault ID and KeyVault URL were provided, but their key vault names did not match")
+            if kek_url:
+                self.check_kv_id(kek_kv_id, "A KEK URL was specified, but its KEK KeyVault ID was missing or invalid")
+                self.check_kek_url(kek_url, "A KEK URL was specified, but it was invalid")
+                self.check_kek_name(kek_kv_id, kek_url, "A KEK ID and KEK URL were provided, but their key vault names did not match")
+                if kek_algorithm:
+                    if kek_algorithm.upper() not in CommonVariables.encryption_algorithms:
+                        raise Exception("The KEK encryption algorithm requested was not recognized")
+                else:
+                    kek_algorithm = CommonVariables.default_encryption_algorithm
+                    self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
             else:
-                kek_algorithm = CommonVariables.default_encryption_algorithm
-                self.logger.log("No KEK algorithm specified, defaulting to {0}".format(kek_algorithm))
+                if kek_kv_id:
+                    raise Exception(
+                        "The KEK KeyVault ID was specified but the KEK URL was missing")
         else:
-            if kek_kv_id:
-                raise Exception(
-                    "The KEK KeyVault ID was specified but the KEK URL was missing")
+            self.logger.log("validate_key_vault_params: KeyStoryType flag present, validating ManagedHSM Parameters")
+            key_store_type = public_settings.get(CommonVariables.KeyStoreTypeKey)
+            if key_store_type and key_store_type.lower() == CommonVariables.KeyStoreTypeManagedHSM.lower():
+                if kv_url or kv_id:
+                    raise Exception("KeyvaultUrl or KeyvaultresourceId are not empty, and 'KeyStoreType' parameter is set to ManagedHSM. Please remove KeyvaultUrl KeyvaultresourceId for ManagedHSM.")
+                self.logger.log("validate_key_vault_params: Validating KeyEncryptionKeyKVURL and KeyEncryptionKeyKVId for ManagedHSM")
+                self.check_mhsm_url(kek_url, "A ManagedHSM URL is specified, but it is invalid for ManagedHSM.")
+                self.check_mhsm_id(kek_kv_id, "A ManagedHSM ID is required, but is missing or invalid.")
+                self.check_mhsm_name(kek_kv_id, kek_url, "A ManagedHSM ID and ManagedHSM URL were provided, but their ManagedHSM names did not match")
+                return
+            else: 
+                raise Exception("The expected flag name and value to enable ManagedHSM is 'KeyStoreType':'{0}'. " +
+                    "Please correct the flag name and value and retry enabling ManagedHSM, or remove the flag for KeyVault use.".format(CommonVariables.KeyStoreTypeManagedHSM)")
 
     def validate_volume_type(self, public_settings, DistroPatcher=None):
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
