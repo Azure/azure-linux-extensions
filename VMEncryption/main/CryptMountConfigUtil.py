@@ -332,6 +332,9 @@ class CryptMountConfigUtil(object):
         # figure out the keyfile. if cleartext use that, if not use keyfile from scsi and lun
         if crypt_item.uses_cleartext_key:
             key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
+        elif crypt_item.keyfile_path != None and crypt_item.keyfile_path!="":
+            #keyfile is already defined in crypt item then use that. 
+            key_file = crypt_item.keyfile_path
         else:
             # get the scsi and lun number for the dev_path of this crypt_item
             scsi_lun_numbers = self.disk_util.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(crypt_item.dev_path)])
@@ -340,9 +343,7 @@ class CryptMountConfigUtil(object):
                 key_file = os.path.join(CommonVariables.encryption_key_mount_point, self.encryption_environment.default_bek_filename)
             else:
                 scsi_controller, lun_number = scsi_lun_numbers[0]
-                key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
-        if crypt_item.keyfile_path != None:
-            key_file = crypt_item.keyfile_path
+                key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))                  
             
         crypttab_line = "\n{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
         if crypt_item.luks_header_path and str(crypt_item.luks_header_path) != "None":

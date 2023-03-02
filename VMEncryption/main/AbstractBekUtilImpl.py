@@ -26,6 +26,7 @@ ABC = abc.ABCMeta('ABC', (object,), {'__slots__': ()})
 
 class BekMissingException(Exception):
     """
+    BEK volume missing or not initialized. 
     add retry-logic to the network api call.
     """
     def __init__(self, value):
@@ -38,9 +39,9 @@ class AbstractBekUtilImpl(ABC):
     '''
     This is an interface used for funcitonality implementation for BEK util class
     '''
-    wrong_fs_msg = "BEK does not have vfat filesystem."
-    not_mounted_msg = "BEK is not mounted."
-    partition_missing_msg = "BEK disk does not expected partition."
+    wrong_fs_msg = "BEK disk does not have vfat filesystem."
+    not_mounted_msg = "BEK disk is not mounted."
+    partition_missing_msg = "BEK disk does not have expected partition."
     bek_missing_msg = "BEK disk is not attached."
     
     def generate_passphrase(self):
