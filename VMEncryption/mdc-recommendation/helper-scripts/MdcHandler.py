@@ -78,8 +78,7 @@ def detect_encryption_status(imds_metadata):
     if (confidential_vm_status is True):
         is_vm_compliant = True
         policy_reasons['code'] = "Compliant"
-        policy_reasons['phrase'] = "Confidential VMs are not supported by this recommendation."
-
+        policy_reasons['phrase'] = "Confidential VMs are not supported by this recommendation. The machine will be marked as compliant."
         ##TO DO: As a temporary fix to report Confidential VMs as compliant, the below block has been commented. The  machine will be marked as compliant.
         #is_vm_compliant = False
         #policy_reasons['code'] = "ConfidentialVMNotSupported"
@@ -102,8 +101,7 @@ def detect_encryption_status(imds_metadata):
             if vm_support_dict['is_vm_not_supported'] is True:
                 is_vm_compliant = True
                 policy_reasons['code'] = "Compliant"
-                policy_reasons['phrase'] = vm_support_dict['phrase']
-
+                policy_reasons['phrase'] = vm_support_dict['phrase'] + " The machine will be marked as compliant."
                 ##TO DO: As a temporary fix to report unsupported scenarios as compliant, the below block has been commented. The  machine will be marked as compliant.
                 #is_vm_compliant = False
                 #policy_reasons['code'] = vm_support_dict['code']
@@ -142,7 +140,7 @@ def main():
     try:
         exception_found = False
 
-        json_output_file_path = sys.argv[2]
+        json_output_file_path =  sys.argv[2]
         imds_metadata = ImdsHelper.get_imds_metadata()
         if imds_metadata is None:
             msg = "Python helper failed in fetching IMDS metadata"

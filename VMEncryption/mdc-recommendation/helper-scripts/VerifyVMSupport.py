@@ -141,21 +141,20 @@ def check_vm_supportability(imds_metadata):
         vm_support_dict['phrase'] = "VM OS details are missing in IMDS metadata for verification"
         return vm_support_dict
 
-    else:
-        if is_kubernetes_vm(imds_metadata):
-            is_vm_not_supported = True
-            reasons_code = "KubernetesVirtualMachine"
-            reasons_phrase_str += "Azure Kubernetes VM is not supported by Azure Disk Encryption and EncryptionAtHost."
+    if is_kubernetes_vm(imds_metadata):
+        is_vm_not_supported = True
+        reasons_code = "KubernetesVirtualMachine"
+        reasons_phrase_str += "Azure Kubernetes VM is not supported by Azure Disk Encryption and EncryptionAtHost."
 
-        if is_databricks_vm(imds_metadata):
-            is_vm_not_supported = True
-            reasons_code = "DatabrickVirtualMachine"
-            reasons_phrase_str += "Azure Databricks VM is not supported by Azure Disk Encryption and EncryptionAtHost."
+    if is_databricks_vm(imds_metadata):
+        is_vm_not_supported = True
+        reasons_code = "DatabrickVirtualMachine"
+        reasons_phrase_str += "Azure Databricks VM is not supported by Azure Disk Encryption and EncryptionAtHost."
 
-        if is_os_vmsize_unsupported(imds_metadata):
-            is_vm_not_supported = True
-            reasons_code = "UnsupportedOsVirtualMachine"
-            reasons_phrase_str += "VM OS Image Sku is not supported by Azure Disk Encryption. VM Size Sku is not supported by EncryptionAtHost."
+    if is_os_vmsize_unsupported(imds_metadata):
+        is_vm_not_supported = True
+        reasons_code = "UnsupportedOsVirtualMachine"
+        reasons_phrase_str += "VM OS Image Sku is not supported by Azure Disk Encryption. VM Size Sku is not supported by EncryptionAtHost."
 
     vm_support_dict['is_vm_not_supported'] = is_vm_not_supported
     vm_support_dict['code'] = reasons_code
