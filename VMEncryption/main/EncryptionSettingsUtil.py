@@ -41,8 +41,6 @@ class EncryptionSettingsUtil(object):
         self.logger = logger
         self._DISK_ENCRYPTION_DATA_VERSION_V4 = "4.0"
         self._DISK_ENCRYPTION_DATA_VERSION_V5 = "5.0"
-
-        # BAM: Do i want this initialized to KeyVault or None? Choosing None in case of bad parameters
         self._DISK_ENCRYPTION_KEY_SOURCE = None
 
     def get_index(self):
