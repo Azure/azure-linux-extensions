@@ -114,10 +114,10 @@ class CommonVariables:
     MigrateValue = 'Migrate'
 
     """
-    value for PrivatePreviewKeyStoreTypeKey could be ManagedHSM
+    value for KeyStoreTypeKey could be ManagedHSM
     This is a value for ManagedHSM testing, and should be removed before public release
     """
-    PrivatePreviewKeyStoreTypeKey = 'KeyStoreType'
+    KeyStoreTypeKey = 'KeyStoreType'
     KeyStoreTypeManagedHSM = 'ManagedHSM'
 
     """

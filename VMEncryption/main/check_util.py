@@ -193,7 +193,7 @@ class CheckUtil(object):
         kek_kv_id = public_settings.get(CommonVariables.KekVaultResourceIdKey)
         kek_algorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
        
-        has_keystore_flag = CommonVariables.PrivatePreviewKeyStoreTypeKey in public_settings
+        has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
 
         if not has_keystore_flag:
             self.check_kv_id(kv_id, "A KeyVault ID is required, but is missing or invalid")
@@ -215,7 +215,7 @@ class CheckUtil(object):
                         "The KEK KeyVault ID was specified but the KEK URL was missing")
         else:
             self.logger.log("validate_key_vault_params: KeyStoryType flag present, validating ManagedHSM Parameters")
-            key_store_type = public_settings.get(CommonVariables.PrivatePreviewKeyStoreTypeKey)
+            key_store_type = public_settings.get(CommonVariables.KeyStoreTypeKey)
             if key_store_type and key_store_type.lower() == CommonVariables.KeyStoreTypeManagedHSM.lower():
                 if kv_url or kv_id:
                     raise Exception("KeyvaultUrl or KeyvaultresourceId are not empty, and 'KeyStoreType' parameter is set to ManagedHSM. Please remove KeyvaultUrl KeyvaultresourceId for ManagedHSM.")

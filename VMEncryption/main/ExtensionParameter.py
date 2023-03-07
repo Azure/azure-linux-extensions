@@ -56,7 +56,7 @@ class ExtensionParameter(object):
         self.KeyVaultURL = public_settings.get(CommonVariables.KeyVaultURLKey)
         self.KeyVaultResourceId = public_settings.get(CommonVariables.KeyVaultResourceIdKey)
         self.KekVaultResourceId = public_settings.get(CommonVariables.KekVaultResourceIdKey)
-        self.KeyStoreType = public_settings.get(CommonVariables.PrivatePreviewKeyStoreTypeKey)
+        self.KeyStoreType = public_settings.get(CommonVariables.KeyStoreTypeKey)
 
         keyEncryptionAlgorithm = public_settings.get(CommonVariables.KeyEncryptionAlgorithmKey)
         if keyEncryptionAlgorithm is not None and keyEncryptionAlgorithm !="":
@@ -109,7 +109,7 @@ class ExtensionParameter(object):
         return self.params_config.get_config(CommonVariables.DiskFormatQuerykey)
        
     def get_keystore_type(self):
-        return self.params_config.get_config(CommonVariables.PrivatePreviewKeyStoreTypeKey)
+        return self.params_config.get_config(CommonVariables.KeyStoreTypeKey)
 
     def get_bek_filename(self):
         return self.DiskEncryptionKeyFileName
@@ -141,7 +141,7 @@ class ExtensionParameter(object):
         DiskFormatQuery = ConfigKeyValuePair(CommonVariables.DiskFormatQuerykey, self.DiskFormatQuery)
         key_value_pairs.append(DiskFormatQuery)
 
-        KeyStoreType = ConfigKeyValuePair(CommonVariables.PrivatePreviewKeyStoreTypeKey, self.KeyStoreType)
+        KeyStoreType = ConfigKeyValuePair(CommonVariables.KeyStoreTypeKey, self.KeyStoreType)
         key_value_pairs.append(KeyStoreType)
 
         self.params_config.save_configs(key_value_pairs)
