@@ -179,7 +179,7 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_ma
     current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
     public_settings = get_public_settings()
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
-    has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
+    has_keystore_flag = CommonVariables.PrivatePreviewKeyStoreTypeKey in public_settings
 
     # post new encryption settings via wire server protocol
     settings = EncryptionSettingsUtil(logger)
