@@ -70,7 +70,14 @@ error_messages = {
           "\n\nError Details:\n $ {1} \n\n{2}",
     WARN_OPENSSL_PROXY : "Skip SSL handshake checks because AMA is configured with authenticated proxy.",
     WARN_MDSD_ERR_FILE : "Found errors in log file {0}, displaying last few lines of error messages:\n {1}",
-    WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}"
+    WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}",
+        ERR_SYSLOG : "Couldn't find either 'rsyslog' or 'syslogng' on machine. Please download "\
+          "one of the two services and try again.",
+    ERR_SERVICE_STATUS : "{0} current status is the following: '{1}'. Please check the status of {0} "\
+          "using {2} for more information.",
+    ERR_FILE_MISSING : "{0} {1} doesn't exist.",
+    ERR_FILE_EMPTY : "File {0} is empty.",
+    ERR_CONF_FILE_PERMISSION : "{0} {1} is not accesible by syslog user. Please grant syslog user {2} permssion"
 }
 
 
