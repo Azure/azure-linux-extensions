@@ -54,12 +54,12 @@ class ConfigurationProvider(object):
         try:
             for line in ext_utils.get_file_contents(wala_config_file).split('\n'):
                 if not line.startswith("#") and "=" in line:
-                    parts = line.split()[0].split('=')
-                    value = parts[1].strip("\" ")
-                    if value != "None":
-                        self.values[parts[0]] = value
-                    else:
-                        self.values[parts[0]] = None
+                    parts = line.split('=', 1)
+                    if len(parts) < 2:
+                        continue
+                    key = parts[0].strip()
+                    value = parts[1].split('#')[0].strip("\" ").strip()
+                    self.values[key] = value if value != "None" else None
         # when get_file_contents returns none
         except AttributeError:
             logger.error("Unable to parse {0}".format(wala_config_file))
