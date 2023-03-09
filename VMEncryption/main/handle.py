@@ -787,7 +787,7 @@ def enable():
                 handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
             else:
                 msg = 'Encryption operation {2} is not supported to {0}, volume type: {1}, OS encryption status: {2}'\
-                .format(security_Type,existing_volume_type,encryption_operation, encryption_status['os'])
+                .format(security_Type,volume_type,encryption_operation, encryption_status['os'])
                 logger.log(msg)
                 hutil.do_exit(exit_code=CommonVariables.configuration_error,
                           operation='Enable',
