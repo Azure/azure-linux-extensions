@@ -102,11 +102,12 @@ class SnapshotConsistencyType():
     crashConsistent = 3
 
 class ExtensionResponse:
-    def __init__(self, messageStr, snapshotConsistency, jobMessage):
+    def __init__(self, messageStr, snapshotConsistency, jobMessage, failure_flag):
         self.messageStr = messageStr
         self.snapshotConsistency = snapshotConsistency
         self.jobMessage = jobMessage
+        self.failure_flag = failure_flag
 
     def convertToDictionary(self):
-        return dict(messageStr = self.messageStr, snapshotConsistency = self.snapshotConsistency, jobMessage = self.jobMessage)
+        return dict(messageStr = self.messageStr, snapshotConsistency = self.snapshotConsistency, jobMessage = self.jobMessage, isSizeComputationFailed = self.failure_flag)
 
