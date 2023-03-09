@@ -337,6 +337,12 @@ class SizeCalculation(object):
                 fstype = ''
                 isNetworkFs = False
                 isKnownFs = False
+
+                if int(used) < 0 :
+                    self.logger.log("The used space is negative, so marking the size computation as failed and returning zero")
+                    self.size_calc_failed = True
+                    return 0,self.size_calc_failed
+
                 for file_system_info in self.file_systems_info:
                     if device == file_system_info[0] and mountpoint == file_system_info[2]:
                         fstype = file_system_info[1]
@@ -351,11 +357,6 @@ class SizeCalculation(object):
                     if knownFs in fstype.lower():
                         isKnownFs = True
                         break
-
-                if int(used) < 0 :
-                    self.logger.log("The used space is negative, so marking the size computation as failed and returning zero")
-                    self.size_calc_failed = True
-                    return 0,self.size_calc_failed
                 
                 if device == resource_disk_device and self.isOnlyOSDiskBackupEnabled == False : # adding log to check difference in billing of temp disk
                     self.logger.log("Actual temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
