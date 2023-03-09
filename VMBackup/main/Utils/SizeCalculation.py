@@ -357,7 +357,7 @@ class SizeCalculation(object):
                     if knownFs in fstype.lower():
                         isKnownFs = True
                         break
-                
+
                 if device == resource_disk_device and self.isOnlyOSDiskBackupEnabled == False : # adding log to check difference in billing of temp disk
                     self.logger.log("Actual temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     actual_temp_disk_used= int(used)
