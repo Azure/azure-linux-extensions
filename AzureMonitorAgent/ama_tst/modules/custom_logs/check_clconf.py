@@ -6,20 +6,17 @@ from helpers     import general_info, geninfo_lookup, run_cmd_output
 
 CLCONF_PATH = "/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf"
 
-
-def check_customlog():
+def check_customlog_input():
     cl_input = geninfo_lookup('CL_INPUT')
     if ( cl_input == None or len(cl_input) == 0):
         return ERR_CL_INPUT
     for path in cl_input:
-        check_path = run_cmd_output('ls {0}'.format(path))
+        check_path = run_cmd_output('ls {0}'.format(path)).strip()
         if check_path.endswith('No such file or directory'):
             return ERR_CL_INPUT
 
     return NO_ERROR
         
-
-    
 
 def check_customlog_conf():
     global general_info
@@ -40,7 +37,7 @@ def check_customlog_conf():
                     general_info['CL_LOG'] =  cl_log_file
                     
                 if (cl_line.strip().startswith('Path')):
-                    cl_input_path = cl_line.strip().split('Path')[1]
+                    cl_input_path = cl_line.strip().split('Path')[1].strip()
                     general_info['CL_INPUT'].append(cl_input_path)
     except Exception as e:
         error_info.append((e,))

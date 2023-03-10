@@ -22,7 +22,8 @@ def check_conf_files():
     if (os.stat(syslog_dest).st_size == 0):
         error_info.append((syslog_dest,))
         return ERR_FILE_EMPTY
-    if (run_cmd_output(CONF_ACCESS_CMD.format(syslog_dest)) != "0"):
+
+    if (run_cmd_output(CONF_ACCESS_CMD.format(syslog_dest)).strip() != '0'):
         error_info.append(('file', syslog_dest, 'read'))
         return ERR_CONF_FILE_PERMISSION
     
@@ -32,10 +33,10 @@ def check_socket():
     if (not os.path.exists(AMA_SOCKET)):
         error_info.append(('socket', AMA_SOCKET))
         return ERR_FILE_MISSING
-    if (run_cmd_output(SOCKET_ACCESS_CMD.format('r', AMA_SOCKET)) != "0"):
+    if (run_cmd_output(SOCKET_ACCESS_CMD.format('r', AMA_SOCKET)).strip() != '0'):
         error_info.append(('socket', AMA_SOCKET, 'read'))
         return ERR_CONF_FILE_PERMISSION
-    if (run_cmd_output(SOCKET_ACCESS_CMD.format('w', AMA_SOCKET)) != "0"):
+    if (run_cmd_output(SOCKET_ACCESS_CMD.format('w', AMA_SOCKET)).strip() != '0'):
         error_info.append(('socket', AMA_SOCKET, 'write'))
         return ERR_CONF_FILE_PERMISSION
     return NO_ERROR

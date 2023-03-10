@@ -1,6 +1,6 @@
 from error_codes          import *
 from errors               import is_error, get_input, print_errors
-from .check_clconf        import check_customlog_conf
+from .check_clconf        import check_customlog_conf, check_customlog_input
 
 def check_custom_logs(interactive, prev_success=NO_ERROR):
     if (interactive):
@@ -23,11 +23,18 @@ def check_custom_logs(interactive, prev_success=NO_ERROR):
 
 
     # check td-agent.conf
-    print("Checking for custom log configuration files...")
-    checked_clconf = check_customlog_conf(interactive)
+    print("Checking for custom logs configuration files...")
+    checked_clconf = check_customlog_conf()
     if (is_error(checked_clconf)):
         return print_errors(checked_clconf)
     else:
         success = print_errors(checked_clconf)
 
+    # check custom logs input file path
+    print("Checking for custom logs input files...")
+    checked_customlog_input = check_customlog_input()
+    if (is_error(checked_customlog_input)):
+        return print_errors(checked_customlog_input)
+    else:
+        success = print_errors(checked_customlog_input)
     return success

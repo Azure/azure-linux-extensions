@@ -84,7 +84,10 @@ error_messages = {
           "using {2} for more information.",
     ERR_FILE_EMPTY : "File {0} is empty.",
     ERR_CONF_FILE_PERMISSION : "{0} {1} is not accesible by syslog user. Please grant syslog user {2} permssion",
-    
+    ERR_CL_CONF : "Custom logs configuration file /etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf "\
+                        "cannot be parsed.\n\nError Details:\n{0}",
+    ERR_CL_INPUT : "Custom logs input file path is either empty or invalid. Please check your input path in "\
+                        "/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf"
 }
 
 
