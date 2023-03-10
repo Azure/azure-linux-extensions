@@ -2,7 +2,7 @@ import subprocess
 
 from error_codes import *
 from errors      import error_info
-from helpers     import add_geninfo
+from helpers     import general_info
 
 RSYSLOG_CONF = "/etc/rsyslog.d/10-azuremonitoragent.conf"
 SYSLOG_NG_CONF = "/etc/syslog-ng/conf.d/azuremonitoragent.conf"
@@ -35,16 +35,17 @@ def check_sys_systemctl(service):
             return ERR_SERVICE_STATUS
 
 def check_services():
+    global general_info
     checked_rsyslog = check_sys_systemctl('rsyslog')
     # rsyslog successful
     if (checked_rsyslog == NO_ERROR):
-        add_geninfo('SYSLOG_DEST', RSYSLOG_CONF)
+        general_info['SYSLOG_DEST'] = RSYSLOG_CONF
         return NO_ERROR
 
     checked_syslog_ng = check_sys_systemctl('syslog-ng')
     # syslog-ng successful
     if (checked_syslog_ng == NO_ERROR):
-        add_geninfo('SYSLOG_DEST', SYSLOG_NG_CONF)
+        general_info['SYSLOG_DEST'] = SYSLOG_NG_CONF
         return NO_ERROR
 
     # ran into error trying to get syslog
