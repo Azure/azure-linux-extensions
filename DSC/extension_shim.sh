@@ -6,11 +6,11 @@ PYTHON=""
 
 # We are writing logs to error stream in extension_shim.sh as the logs written to output stream are being overriden by HandlerUtil.py. This has been done as part of OMIGOD hotfix
 # Default variables for OMI Package Upgrade
-REQUIRED_OMI_VERSION="1.6.9.1"
+REQUIRED_OMI_VERSION="1.6.12.1"
 INSTALLED_OMI_VERSION=""
 UPGRADED_OMI_VERSION=""
 OPENSSL_VERSION=""
-OMI_PACKAGE_PREFIX='packages/omi-1.6.9-1.ssl_'
+OMI_PACKAGE_PREFIX='packages/omi-1.6.12-1.ssl_'
 OMI_PACKAGE_PATH=""
 OMI_SERVICE_STATE=""
 

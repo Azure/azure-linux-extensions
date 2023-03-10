@@ -3,7 +3,15 @@
 COMMAND="./modules/main.py"
 PYTHON=""
 FUTURE_PATH=""
-TST_VERSION="1.1"  # update when changes are made to TST
+TST_VERSION="1.3"  # update when changes are made to TST
+ARG="$@"
+
+display_help() {
+    echo "OPTIONS"
+    echo "  -A              Run All Troubleshooting Tool checks"
+    echo "  -L              Run Log Collector"
+    echo "  -v, --version   Print Troubleshooting Tool version"
+}
 
 find_python() {
     local python_exec_command=$1
@@ -35,7 +43,15 @@ else
     echo ""
 fi
 
-echo "Starting AMA Troubleshooting Tool v.$TST_VERSION..."
-echo ""
-PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND}
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]
+then
+    display_help
+elif [ "$1" = "--version" ] || [ "$1" = "-v" ]
+then
+    echo "AMA Troubleshooting Tool v.$TST_VERSION"
+else
+    echo "Starting AMA Troubleshooting Tool v.$TST_VERSION..."
+    echo ""
+    PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}
+fi
 exit $?

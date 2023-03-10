@@ -1,5 +1,4 @@
 import os
-import subprocess
 
 from error_codes  import *
 from errors       import error_info, is_error, print_errors

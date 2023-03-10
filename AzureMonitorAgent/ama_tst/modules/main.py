@@ -1,12 +1,14 @@
 import os
+import sys
 
 from helpers        import get_input
 from logcollector   import run_logcollector
 from error_codes    import *
-from errors         import get_input, print_errors, err_summary
+from errors         import get_input, is_error, err_summary
 from install.install import check_installation
-from general_health.general_health  import check_general_health
 from connect.connect import check_connection
+from general_health.general_health  import check_general_health
+from high_cpu_mem.high_cpu_mem      import check_high_cpu_memory
 
 # check to make sure the user is running as root
 def check_sudo():
@@ -18,6 +20,41 @@ def check_sudo():
     else:
         return True
 
+def check_all(interactive):
+    all_success = NO_ERROR
+    # 1: Install
+    checked_install = check_installation(interactive)
+    if (is_error(checked_install)):
+        return checked_install
+    else:
+        all_success = checked_install
+    
+    print("================================================================================")
+    # 2: Connection
+    checked_connection = check_connection(interactive)
+    if (is_error(checked_connection)):
+        return checked_connection
+    else:
+        all_success = checked_connection
+
+    print("================================================================================")
+    # 3: General Health
+    checked_general_health = check_general_health(interactive)
+    if (is_error(checked_general_health)):
+        return checked_general_health
+    else:
+        all_success = checked_general_health
+        
+    print("================================================================================")
+    # 4: High CPU/Memory Usage
+    checked_highcpumem = check_high_cpu_memory(interactive)
+    if (is_error(checked_highcpumem)):
+        return checked_highcpumem
+    else:
+        all_success = checked_highcpumem
+
+    return all_success
+
 def collect_logs():
     # get output directory for logs
     print("Please input an existing, absolute filepath to a directory where the output for the zip file will be placed upon completion.")
@@ -28,8 +65,48 @@ def collect_logs():
     print("================================================================================")
     run_logcollector(output_location)
 
+def print_results(success):
+    print("================================================================================")
+    print("================================================================================")
+    # print out all errors/warnings
+    if (len(err_summary) > 0):
+        print("ALL ERRORS/WARNINGS ENCOUNTERED:")
+        for err in err_summary:
+            print("  {0}".format(err))
+            print("--------------------------------------------------------------------------------")
+        
+    # no errors found
+    if (success == NO_ERROR):
+        print("No errors were found.")
+    # user requested to exit
+    elif (success == USER_EXIT):
+        return
+    # error found
+    else:
+        print("Please review the errors found above.")
 
+''' 
+give information to user about next steps
+'''
+def print_next_steps():
+    print("================================================================================")
+    print("If you still have an issue, please run the troubleshooter again and collect the logs for AMA.\n"\
+        "In addition, please include the following information:\n"\
+        "  - Azure Subscription ID where the Log Analytics Workspace is located\n"\
+        "  - Workspace ID the agent has been onboarded to\n"\
+        "  - Workspace Name\n"\
+        "  - Region Workspace is located\n"\
+        "  - Pricing Tier assigned to the Workspace\n"\
+        "  - Linux Distribution on the VM\n"\
+        "  - Azure Monitor Agent Version")
 
+    print("================================================================================")
+    print("Restarting AMA can solve some of the problems. If you need to restart Azure Monitor Agent on this machine, "\
+          "please execute the following commands as the root user:")
+    print("  $ cd /var/lib/waagent/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-<agent version number>/")
+    print("  $ ./shim.sh -disable")
+    print("  $ ./shim.sh -enable")
+    
 ### MAIN FUNCTION BODY BELOW ###
 
 
@@ -39,6 +116,18 @@ def run_troubleshooter():
     if (not check_sudo()):
         return
     
+    # run all checks from command line
+    if len(sys.argv) > 1 and sys.argv[1] == '-A':
+        success = check_all(False)
+        print_results(success)
+        print_next_steps()
+        return
+    
+    # run log collector from command line
+    if len(sys.argv) > 1 and sys.argv[1] == '-L':
+        collect_logs()
+        return
+            
     # check if want to run again
     run_again = True
 
@@ -49,20 +138,24 @@ def run_troubleshooter():
               "1: Installation failures. \n"\
               "2: Agent doesn't start or cannot connect to Log Analytics service.\n"\
               "3: Agent in unhealthy state. \n"\
+              "4: Agent consuming high CPU/memory. \n"\
               "================================================================================\n"\
+              "A: Run through all scenarios.\n"\
               "L: Collect the logs for AMA.\n"\
               "Q: Press 'Q' to quit.\n"\
               "================================================================================")
         switcher = {
             '1': check_installation,
             '2': check_connection,
-            '3': check_general_health
+            '3': check_general_health,
+            '4': check_high_cpu_memory,
+            'A': check_all
         }
     
         issue = get_input("Please select an option",\
-                        (lambda x : x.lower() in ['1','2','3','q','quit','l']),\
-                        "Please enter an integer corresponding with your issue (1-3) to\n"\
-                        "continue, 'L' to run the log collector, or 'Q' to quit.")
+                        (lambda x : x.lower() in ['1','2','3','4','q','quit','l','a']),\
+                        "Please enter an integer corresponding with your issue (1-4) to\n"\
+                        "continue, 'A' to run through all scenarios, 'L' to run the log collector, or 'Q' to quit.")
         # quit troubleshooter
         if (issue.lower() in ['q','quit']):
             print("Exiting the troubleshooter...")
@@ -97,27 +190,10 @@ def run_troubleshooter():
         print("================================================================================")
         success = section(interactive=interactive_mode)
     
-        print("================================================================================")
-        print("================================================================================")
-        # print out all errors/warnings
-        if (len(err_summary) > 0):
-            print("ALL ERRORS/WARNINGS ENCOUNTERED:")
-            for err in err_summary:
-                print("  {0}".format(err))
-                print("--------------------------------------------------------------------------------")
-            
-        # no errors found
-        if (success == NO_ERROR):
-            print("No errors were found.")
-        # user requested to exit
-        elif (success == USER_EXIT):
-            return
-        # error found
-        else:
-            print("Please review the errors found above.")
+        print_results(success)
 
         # if user ran single scenario, ask if they want to run again
-        if (issue in ['1', '2', '3']):
+        if (issue in ['1', '2', '3', '4']):
             run_again = get_input("Do you want to run another scenario? (y/n)",\
                                   (lambda x : x.lower() in ['y','yes','n','no']),\
                                   "Please type either 'y'/'yes' or 'n'/'no' to proceed.")
@@ -129,24 +205,7 @@ def run_troubleshooter():
         else:
             run_again = False
             
-    # give information to user about next steps
-    print("================================================================================")
-    print("If you still have an issue, please run the troubleshooter again and collect the logs for AMA.\n"\
-        "In addition, please include the following information:\n"\
-        "  - Azure Subscription ID where the Log Analytics Workspace is located\n"\
-        "  - Workspace ID the agent has been onboarded to\n"\
-        "  - Workspace Name\n"\
-        "  - Region Workspace is located\n"\
-        "  - Pricing Tier assigned to the Workspace\n"\
-        "  - Linux Distribution on the VM\n"\
-        "  - Azure Monitor Agent Version")
-
-    print("================================================================================")
-    print("Restarting AMA can solve some of the problems. If you need to restart Azure Monitor Agent on this machine, "\
-          "please execute the following commands as the root user:")
-    print("  $ cd /var/lib/waagent/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-<agent version number>/")
-    print("  $ ./shim.sh -disable")
-    print("  $ ./shim.sh -enable")
+        print_next_steps()
     return
     
 
