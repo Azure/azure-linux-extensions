@@ -1011,15 +1011,18 @@ def enable_encryption():
                 public_settings = get_public_settings()
                 confidential_encryption_tempdisk = public_settings.get("PrivatePreview.ConfidentialEncryptionTempDisk")
                 encryptResourceDiskforCVM = False
+                encryptResourceDisk = False
                 if security_Type==CommonVariables.ConfidentialVM:
                     if confidential_encryption_tempdisk:
                         encryptResourceDiskforCVM = True
                     else: 
                         message = "Resource disk not encrypted. It is confidential VMs, but PrivatePreview.ConfidentialEncryptionTempDisk is not set"
                         logger.log(msg=message)
-                                
+                elif extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
+                    encryptResourceDisk = True
+
                 if encryptResourceDiskforCVM or \
-                    extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
+                    encryptResourceDisk:
                     current_volume_type = extension_parameter.VolumeType.lower()
                     if current_volume_type == CommonVariables.VolumeTypeData.lower() or current_volume_type == CommonVariables.VolumeTypeAll.lower():
                         try:

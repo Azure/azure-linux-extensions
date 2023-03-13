@@ -112,6 +112,7 @@ class CommonVariables:
     PassphraseKey = 'Passphrase'
     MigrateKey = 'MigrateFlag'
     MigrateValue = 'Migrate'
+    PassphraseLengthInBytes = 127
 
     """
     value for VolumeType could be Data

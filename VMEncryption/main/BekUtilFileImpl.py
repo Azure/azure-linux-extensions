@@ -25,10 +25,10 @@ class BekUtilFileImpl(AbstractBekUtilImpl):
     """
     Utility class to store passphrase in a keyfilepath.
     """
-    def __init__(self,diskutil,logger):
+    def __init__(self,disk_util,logger):
         self.keyfilePath = "/var/lib/azure_disk_encryption_config/"
         self.logger = logger
-        self.disk_util=diskutil
+        self.disk_util=disk_util
         self.keyPathNotFound = "Keyfile path is not valid, path: {0}".format(self.keyfilePath)
     
     def store_bek_passphrase(self, encryption_config, passphrase):
@@ -39,11 +39,11 @@ class BekUtilFileImpl(AbstractBekUtilImpl):
                                   bek_filename=bek_filename,
                                   passphrase=passphrase)            
         except Exception as e:
-            message = "Failed to store BEK in BEK VOLUME with error: {0}".format(traceback.format_exc())
+            message = "Failed to store BEK in KeyPath {1} with error: {0}".format(traceback.format_exc(),self.keyfilePath)
             self.logger.log(message)
             raise e
         else:
-            self.logger.log("Stored BEK in the BEK VOLUME successfully")
+            self.logger.log("Stored BEK in the KeyPath {0} successfully".format(self.keyfilePath))
             return
 
     def get_bek_passphrase_file(self, encryption_config):
@@ -63,7 +63,7 @@ class BekUtilFileImpl(AbstractBekUtilImpl):
 
         except Exception as e:
             # use traceback to convert exception to string on both python2 and python3+
-            message = "Failed to get BEK from BEK VOLUME with error: {0}".format(traceback.format_exc())
+            message = "Failed to get BEK from KeyPath {1} with error: {0}".format(traceback.format_exc(),self.keyfilePath)
             self.logger.log(message)
 
         return None

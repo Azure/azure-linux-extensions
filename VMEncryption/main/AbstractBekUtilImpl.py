@@ -17,7 +17,7 @@
 # limitations under the License.
 import os
 import sys
-from Common import TestHooks
+from Common import TestHooks,CommonVariables
 import base64
 import abc
 from abc import abstractmethod
@@ -49,7 +49,7 @@ class AbstractBekUtilImpl(ABC):
             return TestHooks.hard_code_passphrase
         else:
             with open("/dev/urandom", "rb") as _random_source:
-                bytes = _random_source.read(127)
+                bytes = _random_source.read(CommonVariables.PassphraseLengthInBytes)
                 passphrase_generated = base64.b64encode(bytes)
             return passphrase_generated    
     
