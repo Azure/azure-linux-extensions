@@ -87,16 +87,11 @@ class FreezeSnapshotter(object):
                     self.takeSnapshotFrom = snapshotMethodConfigValue
                 else:
                     self.takeSnapshotFrom = customSettings['takeSnapshotFrom']
-                
-                if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
-                    if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True and (para_parser.includeLunList == None or para_parser.includeLunList.count == 0)):
-                        self.logger.log('Some disks are excluded from backup and LUN list is not present. Setting the snapshot mode to onlyGuest.')
-                        self.takeSnapshotFrom = CommonVariables.onlyGuest
 
-                #Check if snapshot uri has special characters
-                if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
-                    self.logger.log('Some disk blob Uris have special characters.')
-                
+                self.isManaged = customSettings['isManagedVm']
+                if( "backupTaskId" in customSettings.keys()):
+                    self.taskId = customSettings["backupTaskId"]
+
                 waDiskLunList= []
 
                 if "waDiskLunList" in customSettings.keys() and customSettings['waDiskLunList'] != None :
@@ -109,29 +104,40 @@ class FreezeSnapshotter(object):
                             self.logger.log('WA disk is present on the VM. Setting the snapshot mode to onlyHost.')
                             self.takeSnapshotFrom = CommonVariables.onlyHost
                             break
-
-                if(para_parser.includedDisks != None and CommonVariables.isAnyWADiskIncluded in para_parser.includedDisks.keys()):
-                    if (para_parser.includedDisks[CommonVariables.isAnyWADiskIncluded] == True):
-                        self.logger.log('WA disk is included. Setting the snapshot mode to onlyHost.')
-                        self.takeSnapshotFrom = CommonVariables.onlyHost
-
-                if(para_parser.includedDisks != None and CommonVariables.isVmgsBlobIncluded in para_parser.includedDisks.keys()):
-                    if (para_parser.includedDisks[CommonVariables.isVmgsBlobIncluded] == True):
-                        self.logger.log('Vmgs Blob is included. Setting the snapshot mode to onlyHost.')
-                        self.takeSnapshotFrom = CommonVariables.onlyHost
-
-                if(para_parser.includedDisks != None and CommonVariables.isAnyDirectDriveDiskIncluded in para_parser.includedDisks.keys()):
-                    if (para_parser.includedDisks[CommonVariables.isAnyDirectDriveDiskIncluded] == True):
-                        self.logger.log('DirectDrive Disk is included. Setting the snapshot mode to onlyHost.')
-                        self.takeSnapshotFrom = CommonVariables.onlyHost
-
-                self.isManaged = customSettings['isManagedVm']
-                if( "backupTaskId" in customSettings.keys()):
-                    self.taskId = customSettings["backupTaskId"]
+            else:
+                self.logger.log('CustomSettings is null in extension input.')
         except Exception as e:
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             self.isManaged = True
+        
+        try:
+            if(para_parser.includedDisks != None and CommonVariables.isAnyWADiskIncluded in para_parser.includedDisks.keys()):
+                if (para_parser.includedDisks[CommonVariables.isAnyWADiskIncluded] == True):
+                    self.logger.log('WA disk is included. Setting the snapshot mode to onlyHost.')
+                    self.takeSnapshotFrom = CommonVariables.onlyHost
+
+            if(para_parser.includedDisks != None and CommonVariables.isVmgsBlobIncluded in para_parser.includedDisks.keys()):
+                if (para_parser.includedDisks[CommonVariables.isVmgsBlobIncluded] == True):
+                    self.logger.log('Vmgs Blob is included. Setting the snapshot mode to onlyHost.')
+                    self.takeSnapshotFrom = CommonVariables.onlyHost
+
+            if(para_parser.includedDisks != None and CommonVariables.isAnyDirectDriveDiskIncluded in para_parser.includedDisks.keys()):
+                if (para_parser.includedDisks[CommonVariables.isAnyDirectDriveDiskIncluded] == True):
+                    self.logger.log('DirectDrive Disk is included. Setting the snapshot mode to onlyHost.')
+                    self.takeSnapshotFrom = CommonVariables.onlyHost
+
+            if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
+                if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True and (para_parser.includeLunList == None or para_parser.includeLunList.count == 0)):
+                    self.logger.log('Some disks are excluded from backup and LUN list is not present. Setting the snapshot mode to onlyGuest.')
+                    self.takeSnapshotFrom = CommonVariables.onlyGuest
+
+            #Check if snapshot uri has special characters
+            if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):
+                self.logger.log('Some disk blob Uris have special characters.')
+        except Exception as e:
+            errMsg = 'Failed to process flags in includedDisks with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
 
         self.logger.log('[FreezeSnapshotter] isManaged flag : ' + str(self.isManaged))
 
