@@ -206,6 +206,7 @@ class EncryptionSettingsUtil(object):
             cutil.check_mhsm_url(kek_url, "A ManagedHSM URL is specified, but it is invalid for ManagedHSM.")
             cutil.check_mhsm_id(kek_kv_id, "A ManagedHSM ID is required, but is missing or invalid.")
             cutil.check_mhsm_name(kek_kv_id, kek_url, "A ManagedHSM ID and ManagedHSM URL were provided, but their ManagedHSM names did not match")
+            # for private preview data collection, set key source to MHSM
             self._DISK_ENCRYPTION_KEY_SOURCE = CommonVariables.KeyStoreTypeManagedHSM
         elif keystoretype_flag_exists:
             raise Exception("The expected flag name and value to enable ManagedHSM is 'KeyStoreType':'{0}'. " +
@@ -223,6 +224,8 @@ class EncryptionSettingsUtil(object):
             else:
                 if kek_kv_id:
                     raise Exception("The KEK KeyVault ID was specified but the KEK URL was missing")
+            # for private preview data collection, set key source to KeyVault
+            self._DISK_ENCRYPTION_KEY_SOURCE = CommonVariables.KeyStoreTypeKeyVault
 
         # create encryption settings object
         self.logger.log("Creating encryption settings object")

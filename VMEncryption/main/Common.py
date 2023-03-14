@@ -119,6 +119,7 @@ class CommonVariables:
     """
     KeyStoreTypeKey = 'KeyStoreType'
     KeyStoreTypeManagedHSM = 'ManagedHSM'
+    KeyStoreTypeKeyVault = 'KeyVault'
 
     """
     value for VolumeType could be Data

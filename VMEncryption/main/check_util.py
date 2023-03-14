@@ -102,7 +102,7 @@ class CheckUtil(object):
     def check_mhsm_url(self, test_mhsm_url, message):
         """basic sanity check of the MHSM url"""
         expected = "https://{managedhsm-name}.{managedhsm}.{vault-endpoint}/keys/{object-name}/{object-version}"
-        pattern = re.compile(r'^https://([a-zA-Z0-9\-]+)[\.]+(managedhsm)+([a-zA-Z0-9\-\.]+)(:443)?/keys/([a-zA-Z0-9\-]+)/([a-zA-Z0-9]+)([/]?)$', re.IGNORECASE)
+        pattern = re.compile(r'^https://([a-zA-Z0-9\-]+)[\.](managedhsm)+([a-zA-Z0-9\-\.]+)(:443)?/keys/([a-zA-Z0-9\-]+)/([a-zA-Z0-9]+)([/]?)$', re.IGNORECASE)
         if not (test_mhsm_url and pattern.match(test_mhsm_url)):
             raise Exception('\n' + message + '\nActual: ' + test_mhsm_url + '\nExpected: ' + expected + "\n")
         return
@@ -132,7 +132,7 @@ class CheckUtil(object):
         return
     
     def get_mhsm_id_name(self, mhsm_id):
-        """extract key vault name from KV ID"""
+        """extract MHSM name from MHSM ID"""
         if mhsm_id:
             match = re.search(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/managedHSM/([a-zA-Z0-9\-\_]+)(/)?$', mhsm_id, re.IGNORECASE)
             if match:
