@@ -18,14 +18,16 @@ class marinerPatching(redhatPatching):
         self.logger = logger
         self.min_version_online_encryption = '2.0'
         self.support_online_encryption = self.validate_online_encryption_support()
+        self.grub_cfg_paths = [
+            ("/boot/grub2/grub.cfg", "/boot/grub2/grubenv")
+        ]
 
     def pack_initial_root_fs(self):
         self.command_executor.ExecuteInBash('mkinitrd -f -v', True)
 
     def add_kernelopts(self, args_to_add):
-        grub_cfg_path = "/boot/grub2/grub.cfg"
-        for arg in args_to_add:
-            if "root=" in arg:
-                self.command_executor.ExecuteInBash("sed -i 's!root=$rootdevice!{0}!'  '{1}'".format(arg, grub_cfg_path))
-            else:
-                self.command_executor.ExecuteInBash("sed -i '/mariner_linux/ s/$/ {0}/'  '{1}'".format(arg, grub_cfg_path))
+        grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), self.grub_cfg_paths)
+
+        for grub_cfg_path, grub_env_path in grub_cfg_paths:
+            for arg in args_to_add:
+                self.command_executor.ExecuteInBash("grubby --args {0} --update-kernel ALL -c {1} --env={2}".format(arg, grub_cfg_path, grub_env_path))
