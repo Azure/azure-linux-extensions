@@ -190,7 +190,7 @@ class EncryptionSettingsUtil(object):
         cutil = CheckUtil(self.logger)
 
         # Perform algorithm check regaurdless of ManagedHSM or Keyvault
-        if kek_algorithm not in CommonVariables.encryption_algorithms:
+        if kek_url and kek_algorithm not in CommonVariables.encryption_algorithms:
                     if kek_algorithm:
                         raise Exception("The KEK encryption algorithm requested was not recognized")
                     else:
