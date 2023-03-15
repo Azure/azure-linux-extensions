@@ -304,6 +304,7 @@ class DiskUtil(object):
         is_mount_path_wrong = False
         try:
             p = Popen([str(mount_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.logger.log("Performed Popen() on the mount path " + str(mount_path), True)
         except Exception as e:
             errMsg = 'Exception in mount command, error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')

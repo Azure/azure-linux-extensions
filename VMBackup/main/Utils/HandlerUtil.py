@@ -234,6 +234,7 @@ class HandlerUtility:
         if not _context:
             self.log("maybe no new settings file found")
             sys.exit(0)
+        self.log("exiting do_parse_context")
         return _context
 
     def try_parse_context(self, seqNo):
@@ -341,8 +342,12 @@ class HandlerUtility:
                 config = ConfigParsers.ConfigParser()
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)  
+                    value = config.get('SnapshotThread',key)
+            else:
+                self.log("File does not exist at " + configfile)  
         except Exception as e:
+            errorMsg = "Unable to read "+ configfile +" with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Warning')
             pass
 
         return value
