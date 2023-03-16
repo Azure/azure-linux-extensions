@@ -461,12 +461,8 @@ class EncryptionSettingsUtil(object):
         data_disks_settings_data = [controller_id_and_lun_to_settings_data(scsi_controller, lun_number)
                                     for (scsi_controller, lun_number) in data_disk_controller_ids_and_luns]
 
-        if self._DISK_ENCRYPTION_KEY_SOURCE == CommonVariables.KeyStoreTypeManagedHSM:
-            data_version = self._DISK_ENCRYPTION_DATA_VERSION_V5
-        else:
-            data_version = self._DISK_ENCRYPTION_DATA_VERSION_V4
-
-        data = {"DiskEncryptionDataVersion": data_version,
+        # Send version 4.0 for disable in KeyVault and ManagedHSM Scenarios 
+        data = {"DiskEncryptionDataVersion": self._DISK_ENCRYPTION_DATA_VERSION_V4,
                 "DiskEncryptionOperation": "DisableEncryption",
                 "Disks": data_disks_settings_data,
                 "KekAlgorithm": "",
