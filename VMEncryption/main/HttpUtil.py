@@ -54,11 +54,11 @@ class HttpUtil(object):
     snapshot also called this. so we should not write the file/read the file in this method.
     """
 
-    def Call(self, method, http_uri, data, headers, use_https=True):
+    def Call(self, method, http_uri, data, headers, use_https=True, noProxy=False):
         try:
             uri_obj = urlparse(http_uri)
             #parse the uri str here
-            if self.proxyHost is None or self.proxyPort is None:
+            if self.proxyHost is None or self.proxyPort is None or noProxy==True:
                 if use_https:
                     self.connection = httpclient.HTTPSConnection(uri_obj.hostname, timeout=60)
                 else:

@@ -76,8 +76,8 @@ class IMDSUtil(object):
                          http_uri=imds_endpoint_uri,
                          headers=CommonVariables.IMDS_msg_headers,
                          data = "",
-                         use_https=False
-                )
+                         use_https=False,
+                         noProxy=True)
                 if result is not None:
                     self.logger.log("{0} {1}".format(result.status,result.getheaders()))
                     result_content = result.read()
