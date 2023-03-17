@@ -178,7 +178,9 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_ma
     crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
     bek_util = BekUtil(disk_util, logger,encryption_environment)
     current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
+    public_settings = get_public_settings()
+    extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
+    has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
 
     # post new encryption settings via wire server protocol
     settings = EncryptionSettingsUtil(logger)
@@ -194,7 +196,9 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_ma
         kek_algorithm=extension_parameter.KeyEncryptionAlgorithm,
         extra_device_items=items_to_encrypt,
         disk_util=disk_util,
-        crypt_mount_config_util=crypt_mount_config_util)
+        crypt_mount_config_util=crypt_mount_config_util,
+        key_store_type=extension_parameter.KeyStoreType,
+        keystoretype_flag_exists=has_keystore_flag)
 
     settings.post_to_wireserver(data)
 
