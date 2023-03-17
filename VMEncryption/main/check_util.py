@@ -329,7 +329,8 @@ class CheckUtil(object):
             self.logger.log("PRECHECK: Unsupported mount scheme detected")
         return detected
 
-    def pre_Initialization_Check(self,imdsStoredResults,iMDSUtil,continueADEOnIMDSFailure=False):
+
+    def pre_Initialization_Check(self,imdsStoredResults,iMDSUtil,public_settings,continueADEOnIMDSFailure=False):
         '''This function is checking the VM compatibility for ADE'''
         self.logger.log('Pre initialization check Start.')
         try:
@@ -356,9 +357,11 @@ class CheckUtil(object):
             self.logger.log(msg=message,level=CommonVariables.ErrorLevel)
             if continueADEOnIMDSFailure==False:
                 raise Exception(message)
-            self.logger.log(msg="IMDS call is unsuccessful to fetch security profile, continue with ADE encryption.") 
-        if security_type.lower() ==  CommonVariables.ConfidentialVM.lower():
-            message = "Pre-initialization check: ADE flow is blocked for confidential VMs"
+            self.logger.log(msg="IMDS call is unsuccessful to fetch security profile, continue with ADE encryption.")             
+        volume_type = public_settings.get(CommonVariables.VolumeTypeKey) 
+        if security_type.lower() ==  CommonVariables.ConfidentialVM.lower() \
+            and volume_type.lower() == CommonVariables.VolumeTypeOS.lower() :
+            message = "Pre-initialization check: ADE flow is blocked to volume-type:OS for confidential VMs."
             self.logger.log(msg=message,level=CommonVariables.ErrorLevel)
             raise Exception(message) 
         self.logger.log('Pre initialization check End.')

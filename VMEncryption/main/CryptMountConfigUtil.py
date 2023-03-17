@@ -215,7 +215,8 @@ class CryptMountConfigUtil(object):
 
         crypt_items = []
         rootfs_crypt_item_found = False
-
+        osmapper_name = self.disk_util.get_osmapper_name()
+        self.logger.log("OS mapper name {0}".format(osmapper_name))
         if self.should_use_azure_crypt_mount():
             with open(self.encryption_environment.azure_crypt_mount_config_path, 'r') as f:
                 for line in f.readlines():
@@ -224,7 +225,7 @@ class CryptMountConfigUtil(object):
 
                     crypt_item = self.parse_azure_crypt_mount_line(line)
 
-                    if crypt_item.mount_point == "/" or crypt_item.mapper_name == CommonVariables.osmapper_name:
+                    if crypt_item.mount_point == "/" or crypt_item.mapper_name == osmapper_name:
                         rootfs_crypt_item_found = True
 
                     crypt_items.append(crypt_item)
@@ -252,7 +253,7 @@ class CryptMountConfigUtil(object):
                         if crypt_item is None:
                             continue
 
-                        if crypt_item.mapper_name == CommonVariables.osmapper_name:
+                        if crypt_item.mapper_name == osmapper_name:
                             rootfs_crypt_item_found = True
 
                         for device_path, mount_path, fs in fstab_items:
@@ -267,10 +268,10 @@ class CryptMountConfigUtil(object):
             # If the OS partition looks encrypted but we didn't find an OS partition in the crypt_mount_file
             # So we will create a CryptItem on the fly and add it to the output
             crypt_item = CryptItem()
-            crypt_item.mapper_name = CommonVariables.osmapper_name
+            crypt_item.mapper_name = osmapper_name
 
             proc_comm = ProcessCommunicator()
-            grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(CommonVariables.osmapper_name), communicator=proc_comm)
+            grep_result = self.command_executor.ExecuteInBash("cryptsetup status {0} | grep device:".format(osmapper_name), communicator=proc_comm)
             if grep_result == 0:
                 crypt_item.dev_path = proc_comm.stdout.strip().split()[1]
             else:
@@ -278,9 +279,10 @@ class CryptMountConfigUtil(object):
                 self.command_executor.Execute("dmsetup table --target crypt", communicator=proc_comm)
 
                 for line in proc_comm.stdout.splitlines():
-                    if CommonVariables.osmapper_name in line:
-                        majmin = filter(lambda p: re.match(r'\d+:\d+', p), line.split())[0]
-                        src_device = filter(lambda d: d.majmin == majmin, self.disk_util.get_device_items(None))[0]
+                    if osmapper_name in line: 
+                        self.logger.log("crypt target line: {0}".format(line))
+                        majmin = list(filter(lambda p: re.match(r'\d+:\d+', p), line.split()))[0]
+                        src_device = list(filter(lambda d: d.majmin == majmin, self.disk_util.get_device_items(None)))[0]
                         crypt_item.dev_path = '/dev/' + src_device.name
                         break
 
@@ -330,6 +332,9 @@ class CryptMountConfigUtil(object):
         # figure out the keyfile. if cleartext use that, if not use keyfile from scsi and lun
         if crypt_item.uses_cleartext_key:
             key_file = self.encryption_environment.cleartext_key_base_path + crypt_item.mapper_name
+        elif crypt_item.keyfile_path != None and crypt_item.keyfile_path!="":
+            #keyfile is already defined in crypt item then use that. 
+            key_file = crypt_item.keyfile_path
         else:
             # get the scsi and lun number for the dev_path of this crypt_item
             scsi_lun_numbers = self.disk_util.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(crypt_item.dev_path)])
@@ -338,8 +343,8 @@ class CryptMountConfigUtil(object):
                 key_file = os.path.join(CommonVariables.encryption_key_mount_point, self.encryption_environment.default_bek_filename)
             else:
                 scsi_controller, lun_number = scsi_lun_numbers[0]
-                key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
-
+                key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))                  
+            
         crypttab_line = "\n{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
         if crypt_item.luks_header_path and str(crypt_item.luks_header_path) != "None":
             crypttab_line += ",header=" + crypt_item.luks_header_path

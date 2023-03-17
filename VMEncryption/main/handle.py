@@ -43,7 +43,8 @@ from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import EncryptionConfig
 from IMDSUtil import IMDSUtil,IMDSStoredResults
 from patch import GetDistroPatcher
-from BekUtil import BekUtil, BekMissingException
+from BekUtil import BekUtil
+from AbstractBekUtilImpl import BekMissingException
 from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
@@ -102,7 +103,7 @@ def disable_encryption():
         if encryption_status["os"] != "NotEncrypted":
             raise Exception("Disabling encryption is not supported when OS volume is encrypted")
 
-        bek_util = BekUtil(disk_util, logger)
+        bek_util = BekUtil(disk_util, logger,encryption_environment)
         encryption_config = EncryptionConfig(encryption_environment, logger)
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         crypt_mount_config_util.consolidate_azure_crypt_mount(bek_passphrase_file)
@@ -175,7 +176,7 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_ma
 
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-    bek_util = BekUtil(disk_util, logger)
+    bek_util = BekUtil(disk_util, logger,encryption_environment)
     current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
 
@@ -292,7 +293,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-        bek_util = BekUtil(disk_util, logger)
+        bek_util = BekUtil(disk_util, logger,encryption_environment)
         existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
         if not existing_passphrase_file:
             hutil.save_seq()
@@ -530,11 +531,19 @@ def toggle_se_linux_for_centos7(disable):
 def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphrase_file, encryption_config):
 
     # mount encrypted resource disk
-    resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info)
+    retain_mountpoint = False
+    if security_Type == CommonVariables.ConfidentialVM:
+        logger.log("retaining the mountpoint.")
+        retain_mountpoint = True
+    resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info,retain_mountpoint)
     if encryption_config.config_file_exists():
         volume_type = encryption_config.get_volume_type().lower()
         if volume_type == CommonVariables.VolumeTypeData.lower() or volume_type == CommonVariables.VolumeTypeAll.lower():
-            resource_disk_util.automount()
+            if security_Type != CommonVariables.ConfidentialVM:
+                resource_disk_util.automount()
+            else:
+                logger.log("Format resource disk if unusable. security type {0}".format(security_Type))
+                resource_disk_util.automount(True)
             logger.log("mounted resource disk")
     else:
         # Probably a re-image scenario: Just do a best effort
@@ -569,15 +578,19 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
 
 
 def main():
-    global hutil, DistroPatcher, logger, encryption_environment
+    global hutil, DistroPatcher, logger, encryption_environment, security_Type
     HandlerUtil.waagent.Log("{0} started to handle.".format(CommonVariables.extension_name))
 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
     logger = BackupLogger(hutil)
     DistroPatcher = GetDistroPatcher(logger)
     hutil.patching = DistroPatcher
-
     encryption_environment = EncryptionEnvironment(patching=DistroPatcher, logger=logger)
+    #reading the stored IMDS results. 
+    security_Type = None
+    imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
+    if imds_Stored_Results.config_file_exists():
+        security_Type = imds_Stored_Results.get_security_type()
 
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     hutil.disk_util = disk_util
@@ -669,18 +682,21 @@ def enable():
         imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
         imds_Util = IMDSUtil(logger)
         try:
-            check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util,continueADEOnIMDSFailure=True)
+            check_Util.pre_Initialization_Check(imdsStoredResults=imds_Stored_Results,iMDSUtil=imds_Util,public_settings=public_settings,continueADEOnIMDSFailure=True)
         except Exception as ex:
              hutil.do_exit(exit_code=CommonVariables.configuration_error,
                     operation='pre_Initialization_Check',
                     status=CommonVariables.extension_error_status,
                     code=str(CommonVariables.configuration_error),
                     message=str(ex)) 
-
+        #reading security type from IMDS stored results. update to global variable.
+        global security_Type
+        security_Type = imds_Stored_Results.get_security_type()
+        logger.log('security type stored result {0}'.format(security_Type))
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-        bek_util = BekUtil(disk_util, logger)
+        bek_util = BekUtil(disk_util, logger,encryption_environment)
         existing_passphrase_file = None
         existing_volume_type = None
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -722,7 +738,7 @@ def enable():
         logger.log('OS Disk Status: {0}'.format(encryption_status['os']))
 
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-
+            
         # run fatal prechecks, report error if exceptions are caught
         try:
             if not is_migrate_operation:
@@ -757,8 +773,27 @@ def enable():
                 perform_migration(encryption_config, crypt_mount_config_util)
                 return  # Control should not reach here but added return just to be safe
             logger.log("handle.py found enable encryption operation")
-
-            handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
+            is_continue_encryption = True
+            volume_type = None
+            if security_Type == CommonVariables.ConfidentialVM:
+                if encryption_status['os'] != 'Encrypted':
+                    msg = "ADE encryption supported to CVM only if OS is encrypted."
+                    logger.log(level=CommonVariables.ErrorLevel,msg=msg)
+                    is_continue_encryption = False
+                volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
+                if is_continue_encryption and volume_type == CommonVariables.VolumeTypeOS:
+                    is_continue_encryption = False
+            if is_continue_encryption:        
+                handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation)
+            else:
+                msg = 'Encryption operation {2} is not supported to {0}, volume type: {1}, OS encryption status: {2}'\
+                .format(security_Type,volume_type,encryption_operation, encryption_status['os'])
+                logger.log(msg)
+                hutil.do_exit(exit_code=CommonVariables.configuration_error,
+                          operation='Enable',
+                          status=CommonVariables.extension_error_status,
+                          code=(CommonVariables.configuration_error),
+                          message=msg)
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
@@ -872,7 +907,7 @@ def enable_encryption():
     trying to mount the crypted items.
     """
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
-    bek_util = BekUtil(disk_util, logger)
+    bek_util = BekUtil(disk_util, logger,encryption_environment)
 
     existing_passphrase_file = None
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -937,7 +972,6 @@ def enable_encryption():
             start_daemon('EnableEncryption')
         else:
             encryption_config = EncryptionConfig(encryption_environment, logger)
-
             hutil.save_seq()
 
             encryption_config.volume_type = extension_parameter.VolumeType
@@ -971,7 +1005,22 @@ def enable_encryption():
 
                     bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
-                if extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
+                #If PrivatePreview.ConfidentialEncryptionTempDisk is set to True in public settings
+                #then temp disk encryption will happen for CVM type
+                  
+                public_settings = get_public_settings()
+                confidential_encryption_tempdisk = public_settings.get("PrivatePreview.ConfidentialEncryptionTempDisk")
+                encryptResourceDisk = False
+                if security_Type==CommonVariables.ConfidentialVM:
+                    if confidential_encryption_tempdisk:
+                        encryptResourceDisk = True
+                    else: 
+                        message = "Resource disk not encrypted. It is confidential VMs, but PrivatePreview.ConfidentialEncryptionTempDisk is not set"
+                        logger.log(msg=message)
+                elif extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
+                    encryptResourceDisk = True
+
+                if encryptResourceDisk:
                     current_volume_type = extension_parameter.VolumeType.lower()
                     if current_volume_type == CommonVariables.VolumeTypeData.lower() or current_volume_type == CommonVariables.VolumeTypeAll.lower():
                         try:
@@ -986,7 +1035,11 @@ def enable_encryption():
                                           message=message)
                         passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
                         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-                        resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info)
+                        retain_mountpoint = False
+                        if security_Type == CommonVariables.ConfidentialVM:
+                            logger.log("retaining the mountpoint")
+                            retain_mountpoint = True
+                        resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info,retain_mountpoint)
                         rd_encrypted = resource_disk_util.encrypt_resource_disk()
                         if not rd_encrypted:
                             hutil.save_seq()
@@ -1891,6 +1944,16 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
 
 def daemon_encrypt():
+    #TODO: TEMP disk encryption, remove this portion of code to unblock Data disk encryption. 
+    logger.log("security type is {0}".format(security_Type))
+    if security_Type == CommonVariables.ConfidentialVM:
+        msg = "Currently for CVM, Data disk encryption is not supported."
+        logger.log(msg)
+        hutil.do_status_report(operation="EnableEncryption",
+                       status=CommonVariables.extension_success_status,
+                       status_code=str(CommonVariables.success),
+                       message=msg)
+        return
     # Ensure the same configuration is executed only once
     # If the previous enable failed, we do not have retry logic here.
     # TODO Remount all
@@ -1910,7 +1973,7 @@ def daemon_encrypt():
     try to find the attached bek volume, and use the file to mount the crypted volumes,
     and if the passphrase file is found, then we will re-use it for the future.
     """
-    bek_util = BekUtil(disk_util, logger)
+    bek_util = BekUtil(disk_util, logger,encryption_environment)
     if encryption_config.config_file_exists():
         bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
 
@@ -2352,9 +2415,12 @@ def start_daemon(operation):
     devnull = open(os.devnull, 'wb')
     subprocess.Popen(args, stdout=devnull, stderr=devnull)
 
+    #TODO: disk are not stamped with current config, currently we do only temp disk encryption.
+    #this portion of code must be reviewed during data disk encryption for CVM. 
     encryption_config = EncryptionConfig(encryption_environment, logger)
     if encryption_config.config_file_exists():
-        if are_disks_stamped_with_current_config(encryption_config):
+        if are_disks_stamped_with_current_config(encryption_config) or \
+            security_Type == CommonVariables.ConfidentialVM:
             hutil.do_exit(exit_code=0,
                           operation=operation,
                           status=CommonVariables.extension_success_status,

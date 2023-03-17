@@ -27,8 +27,6 @@ from Common import CommonVariables, CryptItem
 
 class ResourceDiskUtil(object):
     """ Resource Disk Encryption Utilities """
-
-    RD_MOUNT_POINT = '/mnt/resource'
     _RD_BASE_DEV_PATH_CACHE = ""
     DEV_DM_PREFIX = '/dev/dm-'
     # todo: consolidate this and other key file path references
@@ -36,7 +34,7 @@ class ResourceDiskUtil(object):
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
-    def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info):
+    def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info, retain_mountpoint):
         self.logger = logger
         self.executor = CommandExecutor(self.logger)
         self.disk_util = disk_util
@@ -44,18 +42,22 @@ class ResourceDiskUtil(object):
         self.passphrase_filename = passphrase_filename  # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
         self.public_settings = public_settings
         self.distro_info = distro_info
+        self.dev_path_options = [
+            os.path.join(CommonVariables.azure_symlinks_dir, 'resource'),
+            os.path.join(CommonVariables.cloud_symlinks_dir, 'azure_resource'),
+            os.path.join(CommonVariables.azure_symlinks_dir, 'scsi0/lun1')
+        ]
+        self.RD_MOUNT_POINT = '/mnt/resource'
+        if retain_mountpoint == True:
+            device, mountpoint, fs, opts = self._get_rd_fstab_details() 
+            self.RD_MOUNT_POINT = mountpoint
+        self.logger.log("resource disk mount point is {0}".format(self.RD_MOUNT_POINT))
 
     def _get_rd_base_dev_path(self):
         if self._RD_BASE_DEV_PATH_CACHE:
             return self._RD_BASE_DEV_PATH_CACHE
 
-        dev_path_options = [
-            os.path.join(CommonVariables.azure_symlinks_dir, 'resource'),
-            os.path.join(CommonVariables.cloud_symlinks_dir, 'azure_resource'),
-            os.path.join(CommonVariables.azure_symlinks_dir, 'scsi0/lun1')
-        ]
-
-        for option in dev_path_options:
+        for option in self.dev_path_options:
             if os.path.exists(option):
                 self._RD_BASE_DEV_PATH_CACHE = option
                 self.logger.log("Setting RD_BASE_DEV_PATH to " + option)
@@ -263,6 +265,21 @@ class ResourceDiskUtil(object):
             # nothing to unmount
             return True
 
+    def _get_rd_fstab_details(self):
+        fstab_location = "/etc/fstab"
+        rd_dev_paths = ["{0}-part1".format(path) for path in self.dev_path_options if os.path.exists(path)]
+        if os.path.exists(fstab_location):
+            with open('/etc/fstab', 'r') as f:
+                lines = f.readlines()
+            for i in range(len(lines)):
+                line = lines[i]                 
+                device, mountpoint, fs, opts = self.crypt_mount_config_util.parse_fstab_line(line)
+                if device in rd_dev_paths or device == "/dev/mapper/resourceencrypt":
+                    self.logger.log("resource disk fstab details- {0}, {1}, {2}, {3}".format(device,mountpoint,fs,opts))
+                    return device,mountpoint,fs,opts
+        return None,None,None,None
+
+
     def try_remount(self):
         """ mount the resource disk if not already mounted"""
         self.logger.log("In try_remount")
@@ -351,24 +368,28 @@ class ResourceDiskUtil(object):
         crypt_item.mapper_name = self.RD_MAPPER_NAME
         crypt_item.uses_cleartext_key = False
         crypt_item.mount_point = self.RD_MOUNT_POINT
+        if self.passphrase_filename != None:
+            crypt_item.keyfile_path = self.passphrase_filename
         self.crypt_mount_config_util.remove_crypt_item(crypt_item)  # Remove old item in case it was already there
         self.add_to_fstab()
         backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")
         self.crypt_mount_config_util.add_crypt_item_to_crypttab(crypt_item, backup_folder=backup_folder)
         #self.add_to_fstab()
 
-    def automount(self):
+    def automount(self,encrypt_format_device=False):
         """
         Mount the resource disk (encrypted or not)
         or
         encrypt the resource disk and mount it if enable was called with EFA
+        or if encrypt format device is set to True.
         If False is returned, the resource disk is not mounted.
         """
         # try to remount if the disk was previously encrypted and is still valid
         if self.try_remount():
             return True
         # unencrypted or unusable
-        elif self._is_encrypt_format_all():
+        elif self._is_encrypt_format_all() or \
+             encrypt_format_device:
             return self.encrypt_format_mount()
         else:
             self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
