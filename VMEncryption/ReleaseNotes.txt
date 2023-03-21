@@ -1,3 +1,8 @@
+1.2.0.97
+-Using no proxy, IMDS failure as non terminal.
+-Add Ubuntu 22.04 support. 
+-ADE flow for cvm phase 1- blocking ADE for CVM. 
+
 1.2.0.96
 - Update ade parse script to handle duplicate parameters
 - Use grub2-mkconfig to add kernel parameters
