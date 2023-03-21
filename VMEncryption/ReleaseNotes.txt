@@ -1,3 +1,7 @@
+1.2.0.98
+-Add private support for ADE with ManagedHSM
+-Add flow for encrypting temp disks in a CVM
+
 1.2.0.97
 -Using no proxy, IMDS failure as non terminal.
 -Add Ubuntu 22.04 support. 
