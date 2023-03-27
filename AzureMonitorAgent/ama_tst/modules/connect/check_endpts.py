@@ -21,6 +21,8 @@ def check_endpt_ssl(ssl_cmd, endpoint):
     try:
         ssl_output = subprocess.check_output(ssl_cmd.format(endpoint), shell=True,\
                      stderr=subprocess.STDOUT, universal_newlines=True)
+        #TODO
+        print(ssl_output)
         ssl_output_lines = ssl_output.split('\n')
         
         (connected, verified) = (False, False)
@@ -55,6 +57,8 @@ def check_internet_connect():
 def resolve_ip(endpoint):
     try:
         result = subprocess.call(['nslookup', endpoint], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        #TODO
+        print(result)
         if not result == 0:
             return False, "nslookup {0}".format(endpoint)
         else:
@@ -76,6 +80,8 @@ def check_endpt_curl(endpoint):
             command = command + ' -U {0}:{1}'.format(username, password)
         output = subprocess.check_output(command, shell=True,\
                      stderr=subprocess.STDOUT, universal_newlines=True)
+        #TODO
+        print(output)
         if output == "Healthy":
             return NO_ERROR
         else:
@@ -95,6 +101,7 @@ def check_ama_endpts():
     endpoints = [GLOBAL_HANDLER_URL]
     regions = geninfo_lookup('DCR_REGION')
     workspace_ids = geninfo_lookup('DCR_WORKSPACE_ID')
+    dce = geninfo_lookup('DCE')
     
     if regions == None or workspace_ids == None:
         return ERR_INFO_MISSING
@@ -115,6 +122,9 @@ def check_ama_endpts():
         for endpoint in endpoints:
             endpoint.replace('.com', url_suffix)
 
+    for endpoint in dce:
+        endpoints.append(endpoint)
+        
     for endpoint in endpoints:
         # check if IP address can be resolved using nslookup
         resolved, e = resolve_ip(endpoint)
