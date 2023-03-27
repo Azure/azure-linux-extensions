@@ -1174,11 +1174,9 @@ def syslogconfig_watcher(hutil_error, hutil_log):
             if syslog_enabled:
                 # place syslog local configs
                 syslog_enabled  = False
-                hutil_log("generate local syslog configs")
                 generate_localsyslog_configs()
             else:
                 # remove syslog local configs
-                hutil_log("remove local syslog configs")
                 remove_localsyslog_configs()
 
         except IOError as e:
@@ -1200,6 +1198,7 @@ def generate_localsyslog_configs():
         os.chmod('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
         os.chmod('/etc/rsyslog.d/10-azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
         run_command_and_log(get_service_command("rsyslog", "restart"))
+        hutil_log_info("Installed local syslog configuration files and restarted syslog")
 
     if os.path.exists('/etc/syslog-ng/syslog-ng.conf') and not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
         syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
@@ -1207,8 +1206,7 @@ def generate_localsyslog_configs():
         copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
         os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
         run_command_and_log(get_service_command("syslog-ng", "restart"))
-
-    hutil_log_info("Installed local syslog configuration files when not found and restarted syslog")
+        hutil_log_info("Installed local syslog configuration files and restarted syslog")
 
 def remove_localsyslog_configs():
     """
@@ -1218,12 +1216,12 @@ def remove_localsyslog_configs():
         os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
         os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
         run_command_and_log(get_service_command("rsyslog", "restart"))
+        hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
 
     if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
         os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
         run_command_and_log(get_service_command("syslog-ng", "restart"))
-
-    hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
+        hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
 
 def metrics():
     """
