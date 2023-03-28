@@ -141,6 +141,15 @@ name_map = {
 "LogicalDisk\\ReadsPerSecond" : {"plugin":"diskio_vmi", "field":"LogicalDisk\\\\\\\\ReadsPerSecond", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 "LogicalDisk\\WritesPerSecond" : {"plugin":"diskio_vmi", "field":"LogicalDisk\\\\\\\\WritesPerSecond", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 
+# SystemUp time plugin
+"Uptime" : {"plugin":"system", "field":"uptime", "module":"system"},
+"Load1" : {"plugin":"system", "field":"load1", "module":"system"},
+"Load5" : {"plugin":"system", "field":"load5", "module":"system"},
+"Load15" : {"plugin":"system", "field":"load15", "module":"system"},
+"Users" : {"plugin":"system", "field":"n_users", "module":"system"},
+"CPUs" : {"plugin":"system", "field":"n_cpus", "module":"system"},
+"UniqueUsers" : {"plugin":"system", "field":"n_unique_users", "module":"system"},
+
 # #OMI Disk plugin
 "disk->disk read guest os" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "ladtablekey":"/builtin/disk/readbytespersecond"},
 "disk->disk write guest os" : {"plugin":"diskio", "field":"write_bytes", "op":"rate", "ladtablekey":"/builtin/disk/writebytespersecond"},
