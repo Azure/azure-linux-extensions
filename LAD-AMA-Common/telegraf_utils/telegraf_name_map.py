@@ -148,7 +148,7 @@ name_map = {
 "Load15" : {"plugin":"system", "field":"load15", "module":"system"},
 "Users" : {"plugin":"system", "field":"n_users", "module":"system"},
 "CPUs" : {"plugin":"system", "field":"n_cpus", "module":"system"},
-"UniqueUsers" : {"plugin":"system", "field":"n_unique_users", "module":"system"},
+"Unique Users" : {"plugin":"system", "field":"n_unique_users", "module":"system"},
 
 # #OMI Disk plugin
 "disk->disk read guest os" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "ladtablekey":"/builtin/disk/readbytespersecond"},
