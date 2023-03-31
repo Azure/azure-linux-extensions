@@ -52,11 +52,6 @@ class SizeCalculation(object):
         self.root_devices = []
         self.root_mount_points = ['/' , '/boot/efi']
 
-        # The command lsscsi is used for mapping the LUN numbers to the disk_names
-        self.get_lsscsi_list() #populates self.lsscsi_list 
-        self.get_lsblk_list() #populates self.lsblk_list
-        self.get_pvs_list()#populates pvs list
-
         self.devicesToInclude = [] #partitions to be included
         self.device_mount_points = []
         self.isAnyDiskExcluded = False
@@ -181,6 +176,11 @@ class SizeCalculation(object):
             [('sysfs', 'sysfs', '/sys'), ('proc', 'proc', '/proc'), ('udev', 'devtmpfs', '/dev'),..]
             Since root devices are at mount points '/' and '/boot/efi' we use file_system_info to find the root_devices based on the mount points.
         '''
+
+        # The command lsscsi is used for mapping the LUN numbers to the disk_names
+        self.get_lsscsi_list() #populates self.lsscsi_list 
+        self.get_lsblk_list() #populates self.lsblk_list
+        self.get_pvs_list()#populates pvs list
 
         for file_system in self.file_systems_info:
             if(file_system[2] in self.root_mount_points):
@@ -337,6 +337,12 @@ class SizeCalculation(object):
                 fstype = ''
                 isNetworkFs = False
                 isKnownFs = False
+
+                if int(used) < 0 :
+                    self.logger.log("The used space is negative, so marking the size computation as failed and returning zero")
+                    self.size_calc_failed = True
+                    return 0,self.size_calc_failed
+
                 for file_system_info in self.file_systems_info:
                     if device == file_system_info[0] and mountpoint == file_system_info[2]:
                         fstype = file_system_info[1]
