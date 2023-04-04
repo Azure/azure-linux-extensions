@@ -18,6 +18,7 @@ JOURNALCTL_CMD = "journalctl -u {0} --no-pager --since \"30 days ago\" > {1}"
 PS_CMD_CPU = "ps aux --sort=-pcpu | head -10"
 PS_CMD_RSS = "ps aux --sort -rss | head -10"
 PS_CMD_VSZ = "ps aux --sort -vsz | head -10"
+DU_CMD = "du -h -d 1 {0} /var/opt/microsoft/azuremonitoragent/events"
 
 
 
@@ -233,6 +234,18 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write(helpers.run_cmd_output(cmd))
             outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
+
+        # du output on events folder
+        for flag in ["", "--apparent-size"]:
+            du_full_cmd = DU_CMD.format(flag)
+            outfile.write("Output of command: {0}\n".format(du_full_cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(du_full_cmd))
+            outfile.write("--------------------------------------------------------------------------------\n")
+        outfile.write("--------------------------------------------------------------------------------\n")
+
+
+
 
 
 
