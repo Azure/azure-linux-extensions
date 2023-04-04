@@ -58,6 +58,7 @@ def copy_dircontents(src, dst):
 def collect_logs(output_dirpath, pkg_manager):
     # collect MDSD information
     copy_file("/etc/default/azuremonitoragent", os.path.join(output_dirpath,"mdsd"))
+    copy_file("/var/opt/microsoft/azuremonitoragent/events/taskstate.json", os.path.join(output_dirpath,"mdsd"))
     copy_dircontents("/var/opt/microsoft/azuremonitoragent/log", os.path.join(output_dirpath,"mdsd","logs"))
     # collect AMA DCR
     copy_dircontents("/etc/opt/microsoft/azuremonitoragent", os.path.join(output_dirpath,"DCR"))
