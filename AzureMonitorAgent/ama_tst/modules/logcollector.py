@@ -2,7 +2,6 @@ import datetime
 import os
 import platform
 import shutil
-import subprocess
 
 import helpers
 from error_codes        import *
