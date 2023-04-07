@@ -53,6 +53,7 @@ from OnGoingItemConfig import OnGoingItemConfig
 from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from OnlineEncryptionHandler import OnlineEncryptionHandler
+from VolumeNotificationService import VolumeNotificationService
 from io import open
 
 
@@ -67,11 +68,17 @@ def disable():
     # to restore these configs in their update step rather than their install step once all
     # released versions of the extension are at this version or above
     hutil.archive_old_configs()
+    if security_Type == CommonVariables.ConfidentialVM:
+        vns_service = VolumeNotificationService(logger=logger)
+        vns_service.stop()
     hutil.do_exit(0, 'Disable', CommonVariables.extension_success_status, '0', 'Disable succeeded')
 
 
 def uninstall():
     hutil.do_parse_context('Uninstall')
+    if security_Type == CommonVariables.ConfidentialVM:
+        vns_service = VolumeNotificationService(logger=logger)
+        vns_service.deRegister()
     hutil.do_exit(0, 'Uninstall', CommonVariables.extension_success_status, '0', 'Uninstall succeeded')
 
 
@@ -88,9 +95,9 @@ def disable_encryption():
         'status_code': str(CommonVariables.success),
         'message': 'Decryption completed'
     }
-
-    hutil.exit_if_same_seq(exit_status)
-    hutil.save_seq()
+    if vns_call:
+        hutil.exit_if_same_seq(exit_status)
+        hutil.save_seq()
 
     try:
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
@@ -173,7 +180,9 @@ def disable_encryption():
 
 
 def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_marker=None):
-
+    if security_Type == CommonVariables.ConfidentialVM:
+        logger.log(msg="Do not send vm setting to host for stamping.",level=CommonVariables.InfoLevel)
+        return
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
     bek_util = BekUtil(disk_util, logger,encryption_environment)
@@ -580,9 +589,14 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
         if se_linux_status is not None and se_linux_status.lower() == 'enforcing':
             encryption_environment.enable_se_linux()
 
+def is_vns_call():
+    for a in sys.argv[:1]:
+        if re.match("^([-/]*)(vnscall)", a):
+            return True
+    return False
 
 def main():
-    global hutil, DistroPatcher, logger, encryption_environment, security_Type
+    global hutil, DistroPatcher, logger, encryption_environment, security_Type, vns_call
     HandlerUtil.waagent.Log("{0} started to handle.".format(CommonVariables.extension_name))
 
     hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
@@ -595,9 +609,14 @@ def main():
     imds_Stored_Results=IMDSStoredResults(logger=logger,encryption_environment=encryption_environment)
     if imds_Stored_Results.config_file_exists():
         security_Type = imds_Stored_Results.get_security_type()
+    else:
+        #TODO: read from IMDS. subject to clarification. 
+        pass
 
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     hutil.disk_util = disk_util
+    vns_service = None
+    vns_call = is_vns_call()
 
     for a in sys.argv[1:]:
         if re.match("^([-/]*)(disable)", a):
@@ -697,6 +716,21 @@ def enable():
         global security_Type
         security_Type = imds_Stored_Results.get_security_type()
         logger.log('security type stored result {0}'.format(security_Type))
+        
+        #register/enable and start vns service for CVM
+        if not vns_call and security_Type == CommonVariables.ConfidentialVM:
+            vns_service = VolumeNotificationService(logger=logger)
+            ret = vns_service.is_enabled()
+            if ret == VolumeNotificationService.VnsServiceNotRegistered:
+                vns_service.register()
+            vns_service.start()
+            if vns_service.status == VolumeNotificationService.VnsServiceActive:
+                logger.log('Volume notification is active!.')
+                hutil.do_exit(exit_code=CommonVariables.success,
+                              operation='VNS_registration',
+                              code=str(CommonVariables.success),
+                              message='VNS service is registered sucessfully!')
+
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
@@ -867,7 +901,8 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
 
     if extension_parameter.config_file_exists() and extension_parameter.config_changed():
         logger.log("Config has changed, updating encryption settings")
-        hutil.exit_if_same_seq()
+        if not vns_call:
+            hutil.exit_if_same_seq()
         # If a daemon is already running reject and exit an update encryption settings request
         if is_daemon_running():
             logger.log("An operation already running. Cannot accept an update settings request.")
@@ -888,7 +923,8 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
             logger.log('Encryption marker exists. Calling Enable')
             enable_encryption()
         else:
-            hutil.exit_if_same_seq()
+            if not vns_call:
+                hutil.exit_if_same_seq()
             are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
             if are_devices_encrypted:
                 hutil.do_exit(exit_code=CommonVariables.success,
@@ -1073,7 +1109,8 @@ def enable_encryption():
 
 def perform_migration(encryption_config, crypt_mount_config_util):
     logger.log("Migrate operation found. Starting migration flow.")
-    hutil.exit_if_same_seq()
+    if not vns_call:
+        hutil.exit_if_same_seq()
 
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
     extension_parameter.VolumeType = encryption_config.get_volume_type()  # After migration config file has current volume type
@@ -1179,6 +1216,8 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
             crypt_item_to_update.file_system = file_system
             crypt_item_to_update.uses_cleartext_key = False
             crypt_item_to_update.current_luks_slot = 0
+            if security_Type == CommonVariables.ConfidentialVM:
+                crypt_item_to_update.keyfile_path = passphrase
 
             if "name" in encryption_item and encryption_item["name"] != "":
                 crypt_item_to_update.mount_point = os.path.join("/mnt/", str(encryption_item["name"]))
@@ -1365,6 +1404,8 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                 crypt_item_to_update.uses_cleartext_key = False
                 crypt_item_to_update.current_luks_slot = 0
+                if security_Type == CommonVariables.ConfidentialVM:
+                    crypt_item_to_update.keyfile_path = passphrase_file
                 # if the original mountpoint is empty, then leave
                 # it as None
                 mount_point = ongoing_item_config.get_mount_point()
@@ -1524,6 +1565,8 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
                     crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                     crypt_item_to_update.uses_cleartext_key = False
                     crypt_item_to_update.current_luks_slot = 0
+                    if security_Type == CommonVariables.ConfidentialVM:
+                        crypt_item_to_update.keyfile_path=passphrase_file
 
                     # if the original mountpoint is empty, then leave
                     # it as None
@@ -1957,7 +2000,7 @@ def daemon_encrypt():
                        status=CommonVariables.extension_success_status,
                        status_code=str(CommonVariables.success),
                        message=msg)
-        return
+        #return
     # Ensure the same configuration is executed only once
     # If the previous enable failed, we do not have retry logic here.
     # TODO Remount all
@@ -2044,7 +2087,9 @@ def daemon_encrypt():
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
                                   passphrase_file=bek_passphrase_file)
-
+    if security_Type == CommonVariables.ConfidentialVM:
+        return
+    
     if volume_type == CommonVariables.VolumeTypeOS.lower() or \
        volume_type == CommonVariables.VolumeTypeAll.lower():
         # import OSEncryption here instead of at the top because it relies
