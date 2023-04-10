@@ -2,7 +2,6 @@ import datetime
 import os
 import platform
 import shutil
-import subprocess
 
 import helpers
 from error_codes        import *
@@ -18,6 +17,7 @@ JOURNALCTL_CMD = "journalctl -u {0} --no-pager --since \"30 days ago\" > {1}"
 PS_CMD_CPU = "ps aux --sort=-pcpu | head -10"
 PS_CMD_RSS = "ps aux --sort -rss | head -10"
 PS_CMD_VSZ = "ps aux --sort -vsz | head -10"
+DU_CMD = "du -h -d 1 {0} /var/opt/microsoft/azuremonitoragent/events"
 
 
 
@@ -58,6 +58,7 @@ def copy_dircontents(src, dst):
 def collect_logs(output_dirpath, pkg_manager):
     # collect MDSD information
     copy_file("/etc/default/azuremonitoragent", os.path.join(output_dirpath,"mdsd"))
+    copy_file("/var/opt/microsoft/azuremonitoragent/events/taskstate.json", os.path.join(output_dirpath,"mdsd"))
     copy_dircontents("/var/opt/microsoft/azuremonitoragent/log", os.path.join(output_dirpath,"mdsd","logs"))
     # collect AMA DCR
     copy_dircontents("/etc/opt/microsoft/azuremonitoragent", os.path.join(output_dirpath,"DCR"))
@@ -232,6 +233,18 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write(helpers.run_cmd_output(cmd))
             outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
+
+        # du output on events folder
+        for flag in ["", "--apparent-size"]:
+            du_full_cmd = DU_CMD.format(flag)
+            outfile.write("Output of command: {0}\n".format(du_full_cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(du_full_cmd))
+            outfile.write("--------------------------------------------------------------------------------\n")
+        outfile.write("--------------------------------------------------------------------------------\n")
+
+
+
 
 
 
