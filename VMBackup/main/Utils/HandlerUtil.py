@@ -343,7 +343,7 @@ class HandlerUtility:
                 config = ConfigParsers.ConfigParser()
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)            
+                    value = config.get('SnapshotThread',key)
         except Exception as e:
             errorMsg = "Unable to read "+ configfile +" with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.log(errorMsg, 'Warning')
