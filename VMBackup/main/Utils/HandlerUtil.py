@@ -176,7 +176,8 @@ class HandlerUtility:
             msg = str(msg, errors="backslashreplace")
         msg = str(datetime.datetime.utcnow()) + " " + str(self._get_log_prefix()) + msg + "\n"
         try:
-            with open(self.logging_file, "a+") as C :
+            #Open the file only in Append mode as only write operation is performed at the end of the file
+            with open(self.logging_file, "a") as C :
                 C.write(msg)
         except IOError:
             pass
@@ -342,9 +343,7 @@ class HandlerUtility:
                 config = ConfigParsers.ConfigParser()
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)
-            else:
-                self.log("File does not exist at " + configfile)  
+                    value = config.get('SnapshotThread',key)            
         except Exception as e:
             errorMsg = "Unable to read "+ configfile +" with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.log(errorMsg, 'Warning')
@@ -641,7 +640,7 @@ class HandlerUtility:
         try:
             tempStatusFile =  os.path.join(self._context._status_dir, CommonVariables.TempStatusFileName)
             if self._context._status_file:
-                with open(tempStatusFile,'w+') as f:
+                with open(tempStatusFile,'w') as f:
                     f.write(stat_rept_file)
                 os.rename(tempStatusFile, self._context._status_file)
         except Exception as e:
@@ -712,6 +711,7 @@ class HandlerUtility:
         return False
 
     def get_prev_log(self):
+        self.log("obtaining previous logs")
         with open(self._context._log_file, "r") as f:
             lines = f.readlines()
         if(len(lines) > 300):
