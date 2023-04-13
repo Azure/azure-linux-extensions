@@ -8,11 +8,17 @@ CLCONF_PATH = "/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-ag
 
 def check_customlog_input():
     cl_input = geninfo_lookup('CL_INPUT')
-    if ( cl_input == None or len(cl_input) == 0):
+    if (cl_input == None or len(cl_input) == 0):
+        error_info.append(("No custom logs file path",))
         return ERR_CL_INPUT
     for path in cl_input:
-        check_path = run_cmd_output('ls {0}'.format(path)).strip()
-        if check_path.endswith('No such file or directory'):
+        try: 
+            check_path = run_cmd_output('ls {0}'.format(path)).strip()
+            if check_path.endswith('No such file or directory'):
+                error_info.append((check_path,))
+                return ERR_CL_INPUT
+        except Exception as e:
+            error_info.append((e,))
             return ERR_CL_INPUT
 
     return NO_ERROR

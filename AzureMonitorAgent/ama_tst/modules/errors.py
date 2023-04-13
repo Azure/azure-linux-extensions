@@ -79,16 +79,16 @@ error_messages = {
     WARN_LOGROTATE : "Logrotate isn't rotating log {0}: its current size is {1}, and it should have "\
           "been rotated at {2}. Please see {3} for more information.",
     ERR_FILE_ACCESS : "Couldn't access or run {0} due to the following reason: {1}.",
-    ERR_SYSLOG : "Couldn't find either 'rsyslog' or 'syslogng' on machine. Please download "\
+    ERR_SYSLOG : "Couldn't find either 'rsyslog' or 'syslog-ng' on machine. Please download "\
           "one of the two services and try again.",
     ERR_SERVICE_STATUS : "{0} current status is the following: '{1}'. Please check the status of {0} "\
           "using {2} for more information.",
     ERR_FILE_EMPTY : "File {0} is empty.",
-    ERR_CONF_FILE_PERMISSION : "{0} {1} is not accesible by syslog user. Please grant syslog user {2} permssion",
+    ERR_CONF_FILE_PERMISSION : "{0} {1} is not accesible by syslog user. Please grant syslog user {2} permission.",
     ERR_CL_CONF : "Custom logs configuration file /etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf "\
                         "cannot be parsed.\n\nError Details:\n{0}",
     ERR_CL_INPUT : "Custom logs input file path is either empty or invalid. Please check your input path in "\
-                        "/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf"
+                        "/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf.\n\nError Details:\n{0}"
 }
 
 
