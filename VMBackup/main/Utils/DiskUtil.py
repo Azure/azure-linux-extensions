@@ -310,7 +310,10 @@ class DiskUtil(object):
             self.logger.log(errMsg, True, 'Error')
             is_mount_path_wrong = True
         if is_mount_path_wrong == False :
+            #adding additional logging to capture issues related to extension process getting stuck after this step
+            self.logger.log("Starting communitcate() on the mount path " + str(mount_path), True)
             out_mount_output, err = p.communicate()
+            self.logger.log("Completed communitcate() on the mount path " + str(mount_path), True)
             if sys.version_info > (3,):
                 out_mount_output = str(out_mount_output, encoding='utf-8', errors="backslashreplace")
             else:
