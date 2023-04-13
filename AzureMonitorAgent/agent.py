@@ -110,7 +110,6 @@ PackageManager = ''
 PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
-AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -166,8 +165,6 @@ def main():
             operation = 'Update'
         elif re.match('^([-/]*)(metrics)', option):
             operation = 'Metrics'
-        elif re.match('^([-/]*)(syslogconfig)', option):
-            operation = 'Syslogconfig'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -387,8 +384,6 @@ def uninstall():
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
 
-    remove_localsyslog_configs()
-
     # Retry, since uninstall can fail due to concurrent package operations
     try:
         exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
@@ -415,7 +410,6 @@ def enable():
         (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application") or
         (public_settings is not None and public_settings.get(AzureMonitorConfigKey) is not None and public_settings.get(AzureMonitorConfigKey).get("ensure") == True)):
         start_metrics_process()
-        start_syslogconfig_process()
 
     exit_if_vm_not_supported('Enable')
 
@@ -486,8 +480,6 @@ def enable():
         hutil_log_info("Detected Geneva mode; azuremonitoragent service will be started to handle Geneva configuration")
         ensure["azuremonitoragent"] = True
         handle_gcs_config(public_settings, protected_settings, default_configs)
-        # generate local syslog configuration files as in 1P syslog is not driven from DCR
-        generate_localsyslog_configs()
 
     config_file = "/etc/default/azuremonitoragent"
     temp_config_file = "/etc/default/azuremonitoragent_temp"
@@ -713,9 +705,6 @@ def disable():
     #stop the metrics process
     stop_metrics_process()
 
-    #stop syslog config watcher process
-    stop_syslogconfig_process()
-
     # stop amacoreagent and agent launcher
     hutil_log_info('Handler initiating Core Agent and agent launcher')
     if is_systemd() and platform.machine() != 'aarch64':
@@ -882,25 +871,6 @@ def stop_metrics_process():
 
         run_command_and_log("rm "+pids_filepath)
 
-def stop_syslogconfig_process():
-    
-    pids_filepath = os.path.join(os.getcwd(),'amasyslogconfig.pid')
-
-    # kill existing syslog config watcher
-    if os.path.exists(pids_filepath):
-        with open(pids_filepath, "r") as f:
-            for pid in f.readlines():
-                # Verify the pid actually belongs to AMA syslog watcher.
-                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
-                if os.path.exists(cmd_file):
-                    with open(cmd_file, "r") as pidf:
-                        cmdline = pidf.readlines()
-                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-syslogconfig") >= 0:
-                            kill_cmd = "kill " + pid
-                            run_command_and_log(kill_cmd)
-
-        run_command_and_log("rm "+ pids_filepath)
-
 def is_metrics_process_running():
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
     if os.path.exists(pids_filepath):
@@ -912,21 +882,6 @@ def is_metrics_process_running():
                     with open(cmd_file, "r") as pidf:
                         cmdline = pidf.readlines()
                         if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
-                            return True
-
-    return False
-
-def is_syslogconfig_process_running():
-    pids_filepath = os.path.join(os.getcwd(),'amasyslogconfig.pid')
-    if os.path.exists(pids_filepath):
-        with open(pids_filepath, "r") as f:
-            for pid in f.readlines():
-                # Verify the pid actually belongs to AMA syslog watcher.
-                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
-                if os.path.exists(cmd_file):
-                    with open(cmd_file, "r") as pidf:
-                        cmdline = pidf.readlines()
-                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-syslogconfig") >= 0:
                             return True
 
     return False
@@ -947,23 +902,6 @@ def start_metrics_process():
         args = [sys.executable, ama_path, '-metrics']
         log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
         hutil_log_info('start watcher process '+str(args))
-        subprocess.Popen(args, stdout=log, stderr=log)
-
-def start_syslogconfig_process():
-    """
-    Start syslog check process that performs periodic DCR monitoring activities and looks for syslog config changes
-    :return: None
-    """
-
-    # test
-    if not is_syslogconfig_process_running():
-        stop_syslogconfig_process()
-
-        # Start syslog config watcher
-        ama_path = os.path.join(os.getcwd(), 'agent.py')
-        args = [sys.executable, ama_path, '-syslogconfig']
-        log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
-        hutil_log_info('start syslog watcher process '+str(args))
         subprocess.Popen(args, stdout=log, stderr=log)
 
 def metrics_watcher(hutil_error, hutil_log):
@@ -1149,80 +1087,6 @@ def metrics_watcher(hutil_error, hutil_log):
         finally:
             time.sleep(sleepTime)
 
-def syslogconfig_watcher(hutil_error, hutil_log):
-    """
-    Watcher thread to monitor syslog configuration changes and to take action on them
-    """
-    syslog_enabled  = False
-    # Check for config changes every 30 seconds
-    sleepTime =  30
-
-    # Sleep before starting the monitoring
-    time.sleep(sleepTime)
-
-    while True:
-        try:       
-            if os.path.isfile(AMASyslogConfigMarkerPath):
-                f = open(AMASyslogConfigMarkerPath, "r")
-                data = f.read()
-
-                if (data != ''):
-                    if "true" in data:
-                        syslog_enabled = True
-                f.close()
-
-            if syslog_enabled:
-                # place syslog local configs
-                syslog_enabled  = False
-                generate_localsyslog_configs()
-            else:
-                # remove syslog local configs
-                remove_localsyslog_configs()
-
-        except IOError as e:
-            hutil_error('I/O error in setting up syslog config watcher. Exception={0}'.format(e))
-
-        except Exception as e:
-            hutil_error('Error in setting up syslog config watcher. Exception={0}'.format(e))
-
-        finally:
-            time.sleep(sleepTime)
-
-def generate_localsyslog_configs():
-    """
-    Install local syslog configuration files if not present and restart syslog
-    """
-    if os.path.exists('/etc/rsyslog.d/') and not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent.conf","/etc/rsyslog.d/10-azuremonitoragent.conf")
-        os.chmod('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        os.chmod('/etc/rsyslog.d/10-azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        run_command_and_log(get_service_command("rsyslog", "restart"))
-        hutil_log_info("Installed local syslog configuration files and restarted syslog")
-
-    if os.path.exists('/etc/syslog-ng/syslog-ng.conf') and not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
-        syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
-        os.makedir(syslog_ng_confpath)
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
-        os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        run_command_and_log(get_service_command("syslog-ng", "restart"))
-        hutil_log_info("Installed local syslog configuration files and restarted syslog")
-
-def remove_localsyslog_configs():
-    """
-    Remove local syslog configuration files if present and restart syslog
-    """
-    if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
-        os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
-        os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
-        run_command_and_log(get_service_command("rsyslog", "restart"))
-        hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
-
-    if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
-        os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
-        run_command_and_log(get_service_command("syslog-ng", "restart"))
-        hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
-
 def metrics():
     """
     Take care of setting up telegraf and ME for metrics if configuration is present
@@ -1238,20 +1102,6 @@ def metrics():
 
     return 0, ""
 
-def syslogconfig():
-    """
-    Take care of setting up syslog configuration change watcher
-    """
-    pids_filepath = os.path.join(os.getcwd(), 'amasyslogconfig.pid')
-    py_pid = os.getpid()
-    with open(pids_filepath, 'w') as f:
-        f.write(str(py_pid) + '\n')
-
-    watcher_thread = Thread(target = syslogconfig_watcher, args = [hutil_log_error, hutil_log_info])
-    watcher_thread.start()
-    watcher_thread.join()
-
-    return 0, ""
 
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
@@ -1259,8 +1109,7 @@ operations = {'Disable' : disable,
               'Install' : install,
               'Enable' : enable,
               'Update' : update,
-              'Metrics' : metrics,
-              'Syslogconfig' : syslogconfig
+              'Metrics' : metrics
 }
 
 
