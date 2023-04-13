@@ -1,7 +1,6 @@
 [Unit]
 Description=Azure Disk Encryption Volume Notification Services
 Before=shutdown.target
-After=remote-fs.target
 After=systemd-journald-dev-log.socket
 Conflicts=shutdown.target
 
@@ -12,7 +11,8 @@ RestartSec=3
 TimeoutSec=30
 IgnoreSIGPIPE=no
 KillMode=control-group
-ExecStart=/opt/microsoft/azure-diskencryption/bin/ade-volume-notif-svc -d
+WorkingDirectory=/var/lib/waagent/Microsoft.Azure.Security.Edp.AzureDiskEncryptionForLinuxTest1-1.2.0.105
+ExecStart=/var/lib/waagent/Microsoft.Azure.Security.Edp.AzureDiskEncryptionForLinuxTest1-1.2.0.105/ade-volume-notif-svc -d
 #ExecStop=/bin/bash -c '$$(which kill) -15 $MAINPID'
 Delegate=yes
 MemoryMax=50MB
