@@ -144,6 +144,7 @@ class HandlerUtility:
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             self.update_settings_file()
+            self.log("Exiting current execution. This could be the enable() called by guest agent upon VM/waagent restart.")
             sys.exit(0)
 
     def log(self, message,level='Info'):
@@ -233,7 +234,7 @@ class HandlerUtility:
         else:
             self.log("waagent new path is used")
         if not _context:
-            self.log("maybe no new settings file found")
+            self.log("maybe no new settings file found. Exiting current execution.")
             sys.exit(0)
         self.log("exiting do_parse_context")
         return _context

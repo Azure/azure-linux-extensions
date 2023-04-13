@@ -318,7 +318,7 @@ class DiskUtil(object):
                 out_mount_output = str(out_mount_output, encoding='utf-8', errors="backslashreplace")
             else:
                 out_mount_output = str(out_mount_output)
-            self.logger.log("getting the mount info using mount_path " + out_mount_output, True)
+            self.logger.log("getting the mount info output using mount_path\n" + out_mount_output, True)
             error_msg = str(err)
             if(error_msg is not None and error_msg.strip() != ""):
                 self.logger.log(str(err), True)

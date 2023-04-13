@@ -49,6 +49,7 @@ class Backuplogger(object):
 
     """description of class"""
     def log(self, msg, local=False, level='Info'):
+        #self.hutil.log("Started backuplogger log function")
         if(self.enforced_local_flag_value == False and self.logging_off == True):
             self.hutil.log("enforced_local_flag_value is False and logging_off is true")
             return
@@ -70,6 +71,7 @@ class Backuplogger(object):
 
     def log_to_con(self, msg):
         try:
+            #self.hutil.log("Started backuplogger log_to_con function")
             with open(self.con_path, "wb") as C :
                 message = "".join(list(filter(lambda x : x in string.printable, msg)))
                 C.write(message.encode('ascii','ignore'))
@@ -81,6 +83,7 @@ class Backuplogger(object):
     def log_to_con_py3(self, msg, level='Info'):
         log_msg = ""
         try:
+            #self.hutil.log("Started backuplogger log_to_con_py3 function")
             if type(msg) is not str:
                 msg = str(msg, errors="backslashreplace")
             time = datetime.datetime.utcnow().strftime(u'%Y/%m/%d %H:%M:%S.%f')
