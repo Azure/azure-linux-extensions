@@ -304,17 +304,21 @@ class DiskUtil(object):
         is_mount_path_wrong = False
         try:
             p = Popen([str(mount_path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.logger.log("Performed Popen() on the mount path " + str(mount_path), True)
         except Exception as e:
             errMsg = 'Exception in mount command, error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             is_mount_path_wrong = True
         if is_mount_path_wrong == False :
+            #adding additional logging to capture issues related to extension process getting stuck after this step
+            self.logger.log("Starting communitcate() on the mount path " + str(mount_path), True)
             out_mount_output, err = p.communicate()
+            self.logger.log("Completed communitcate() on the mount path " + str(mount_path), True)
             if sys.version_info > (3,):
                 out_mount_output = str(out_mount_output, encoding='utf-8', errors="backslashreplace")
             else:
                 out_mount_output = str(out_mount_output)
-            self.logger.log("getting the mount info using mount_path " + out_mount_output, True)
+            self.logger.log("getting the mount info output using mount_path\n" + out_mount_output, True)
             error_msg = str(err)
             if(error_msg is not None and error_msg.strip() != ""):
                 self.logger.log(str(err), True)

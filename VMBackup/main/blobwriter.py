@@ -106,60 +106,63 @@ class BlobWriter(object):
                     STATUS_BLOB_LIMIT_BYTES = 10485760 # 10 MB
                     http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
-                    # Get Blob-properties to know content-length
-                    blobContentLength = int(blobProperties.contentLength)
-                    self.hutil.log("WritePageBlob: contentLength:"+str(blobContentLength))
-                    maxMsgLen = STATUS_BLOB_LIMIT_BYTES
-                    if (blobContentLength > STATUS_BLOB_LIMIT_BYTES):
-                        maxMsgLen = blobContentLength
-                    msgLen = len(msg)
-                    self.hutil.log("WritePageBlob: msg length:"+str(msgLen))
-                    if(len(msg) > maxMsgLen):
-                        msg = msg[msgLen-maxMsgLen:msgLen]
+
+                    if(blobProperties is not None):
+                        blobContentLength = int(blobProperties.contentLength)
+                        self.hutil.log("WritePageBlob: contentLength:"+str(blobContentLength))
+                        maxMsgLen = STATUS_BLOB_LIMIT_BYTES
+                        if (blobContentLength > STATUS_BLOB_LIMIT_BYTES):
+                            maxMsgLen = blobContentLength
                         msgLen = len(msg)
-                        self.hutil.log("WritePageBlob: msg length after aligning to maxMsgLen:"+str(msgLen))
-                    if((msgLen % PAGE_SIZE_BYTES) != 0):
-                        # Add padding to message to make its legth multiple of 512
-                        paddedLen = msgLen + (512 - (msgLen % PAGE_SIZE_BYTES))
-                        msg = msg.ljust(paddedLen)
-                        msgLen = len(msg)
-                        self.hutil.log("WritePageBlob: msg length after aligning to page-size(512):"+str(msgLen))
-                    if(blobContentLength < msgLen):
-                        # Try to resize blob to increase its size
-                        isSuccessful = self.try_resize_page_blob(blobUri, msgLen)
-                        if(isSuccessful == True):
-                            self.hutil.log("WritePageBlob: page-blob resized successfully new size(blobContentLength):"+str(msgLen))
-                            blobContentLength = msgLen
-                        else:
-                            self.hutil.log("WritePageBlob: page-blob resize failed")
-                    if(msgLen > blobContentLength):
-                        msg = msg[msgLen-blobContentLength:msgLen]
-                        msgLen = len(msg)
-                        self.hutil.log("WritePageBlob: msg length after aligning to blobContentLength:"+str(msgLen))
-                    # Write Pages
-                    result = CommonVariables.error
-                    bytes_sent = 0
-                    while (bytes_sent < msgLen):
-                        bytes_remaining = msgLen - bytes_sent
-                        pageContent = None
-                        if(bytes_remaining > PAGE_UPLOAD_LIMIT_BYTES): # more than 4 MB
-                            pageContent = msg[bytes_sent:bytes_sent+PAGE_UPLOAD_LIMIT_BYTES]
-                        else:
-                            pageContent = msg[bytes_sent:msgLen]
-                        self.hutil.log("WritePageBlob: pageContentLen:"+str(len(pageContent)))
-                        result = self.put_page_update(pageContent, blobUri, bytes_sent)
+                        self.hutil.log("WritePageBlob: msg length:"+str(msgLen))
+                        if(len(msg) > maxMsgLen):
+                            msg = msg[msgLen-maxMsgLen:msgLen]
+                            msgLen = len(msg)
+                            self.hutil.log("WritePageBlob: msg length after aligning to maxMsgLen:"+str(msgLen))
+                        if((msgLen % PAGE_SIZE_BYTES) != 0):
+                            # Add padding to message to make its legth multiple of 512
+                            paddedLen = msgLen + (512 - (msgLen % PAGE_SIZE_BYTES))
+                            msg = msg.ljust(paddedLen)
+                            msgLen = len(msg)
+                            self.hutil.log("WritePageBlob: msg length after aligning to page-size(512):"+str(msgLen))
+                        if(blobContentLength < msgLen):
+                            # Try to resize blob to increase its size
+                            isSuccessful = self.try_resize_page_blob(blobUri, msgLen)
+                            if(isSuccessful == True):
+                                self.hutil.log("WritePageBlob: page-blob resized successfully new size(blobContentLength):"+str(msgLen))
+                                blobContentLength = msgLen
+                            else:
+                                self.hutil.log("WritePageBlob: page-blob resize failed")
+                        if(msgLen > blobContentLength):
+                            msg = msg[msgLen-blobContentLength:msgLen]
+                            msgLen = len(msg)
+                            self.hutil.log("WritePageBlob: msg length after aligning to blobContentLength:"+str(msgLen))
+                        # Write Pages
+                        result = CommonVariables.error
+                        bytes_sent = 0
+                        while (bytes_sent < msgLen):
+                            bytes_remaining = msgLen - bytes_sent
+                            pageContent = None
+                            if(bytes_remaining > PAGE_UPLOAD_LIMIT_BYTES): # more than 4 MB
+                                pageContent = msg[bytes_sent:bytes_sent+PAGE_UPLOAD_LIMIT_BYTES]
+                            else:
+                                pageContent = msg[bytes_sent:msgLen]
+                            self.hutil.log("WritePageBlob: pageContentLen:"+str(len(pageContent)))
+                            result = self.put_page_update(pageContent, blobUri, bytes_sent)
+                            if(result == CommonVariables.success):
+                                self.hutil.log("WritePageBlob: page written succesfully")
+                            else:
+                                self.hutil.log("WritePageBlob: page failed to write")
+                                break
+                            bytes_sent = bytes_sent + len(pageContent)                      
                         if(result == CommonVariables.success):
-                            self.hutil.log("WritePageBlob: page written succesfully")
+                            self.hutil.log("WritePageBlob: page-blob written succesfully")
+                            retry_times = 0
                         else:
-                            self.hutil.log("WritePageBlob: page failed to write")
-                            break
-                        bytes_sent = bytes_sent + len(pageContent)                      
-                    if(result == CommonVariables.success):
-                        self.hutil.log("WritePageBlob: page-blob written succesfully")
-                        retry_times = 0
+                            self.hutil.log("WritePageBlob: page-blob failed to write")
+                            HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                     else:
-                        self.hutil.log("WritePageBlob: page-blob failed to write")
-                        HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
+                        self.hutil.log("Skipping WritePageBlob as blobProperties is None")
                 except Exception as e:
                     HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.statusBlobUploadError, "true")
                     self.hutil.log("WritePageBlob: Failed to write to page-blob with error: %s, stack trace: %s" % (str(e), traceback.format_exc()))
@@ -176,7 +179,9 @@ class BlobWriter(object):
                     http_util = HttpUtil(self.hutil)
                     sasuri_obj = urlparse.urlparse(blobUri + '&comp=page')
                     # Get Blob-properties to know content-length
-                    contentLength = int(blobProperties.contentLength)
+                    contentLength = 0
+                    if(blobProperties is not None):
+                        contentLength = int(blobProperties.contentLength)
                     # Clear Pages
                     if(contentLength > 0):
                         result = self.put_page_clear(blobUri, 0, contentLength)
@@ -280,15 +285,18 @@ class BlobWriter(object):
         try:
             if(blobUri is not None):
                 blobProperties = self.GetBlobProperties(blobUri)
-                if (str(blobProperties.blobType).lower() == "pageblob"):
-                    self.hutil.log("VerifyIfBlobIsEmpty: Skipping for page blob")
-                    return True
-                    
-                self.hutil.log("VerifyIfBlobIsEmpty: Content Length of blob: " + str(blobProperties.contentLength))
-                if(int(blobProperties.contentLength) == 0):
-                    return True
+                if (blobProperties is not None):
+                    if(str(blobProperties.blobType).lower() == "pageblob"):
+                        self.hutil.log("VerifyIfBlobIsEmpty: Skipping for page blob")
+                        return True
+                        
+                    self.hutil.log("VerifyIfBlobIsEmpty: Content Length of blob: " + str(blobProperties.contentLength))
+                    if(int(blobProperties.contentLength) == 0):
+                        return True
+                    else:
+                        return False
                 else:
-                    return False
+                    self.hutil.log("BlobProperties is None. Cannot verify accurately if blob is empty")
             else:
                 self.hutil.log("VerifyIfBlobIsEmpty: bloburi is None")
         except Exception as e:

@@ -144,6 +144,7 @@ class HandlerUtility:
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             self.update_settings_file()
+            self.log("Exiting current execution. This could be the enable() called by guest agent upon VM/waagent restart.")
             sys.exit(0)
 
     def log(self, message,level='Info'):
@@ -176,7 +177,8 @@ class HandlerUtility:
             msg = str(msg, errors="backslashreplace")
         msg = str(datetime.datetime.utcnow()) + " " + str(self._get_log_prefix()) + msg + "\n"
         try:
-            with open(self.logging_file, "a+") as C :
+            #Open the file only in Append mode as only write operation is performed at the end of the file
+            with open(self.logging_file, "a") as C :
                 C.write(msg)
         except IOError:
             pass
@@ -221,6 +223,12 @@ class HandlerUtility:
                     self.error('JSON exception decoding ' + cleartxt)
                 handlerSettings['protectedSettings'] = jctxt
                 self.log('Config decoded correctly.')
+                # cleaning/removing the temp files created
+                try:
+                    if os.path.isfile(f.name):
+                        os.remove(f.name)
+                except Exception as e:
+                    self.log('Failed to remove the temporary file ' + str(e))
         return config
 
     def do_parse_context(self, operation, seqNo):
@@ -232,8 +240,9 @@ class HandlerUtility:
         else:
             self.log("waagent new path is used")
         if not _context:
-            self.log("maybe no new settings file found")
+            self.log("maybe no new settings file found. Exiting current execution.")
             sys.exit(0)
+        self.log("exiting do_parse_context")
         return _context
 
     def try_parse_context(self, seqNo):
@@ -341,8 +350,10 @@ class HandlerUtility:
                 config = ConfigParsers.ConfigParser()
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)  
+                    value = config.get('SnapshotThread',key)
         except Exception as e:
+            errorMsg = "Unable to read "+ configfile +" with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
+            self.log(errorMsg, 'Warning')
             pass
 
         return value
@@ -636,7 +647,7 @@ class HandlerUtility:
         try:
             tempStatusFile =  os.path.join(self._context._status_dir, CommonVariables.TempStatusFileName)
             if self._context._status_file:
-                with open(tempStatusFile,'w+') as f:
+                with open(tempStatusFile,'w') as f:
                     f.write(stat_rept_file)
                 os.rename(tempStatusFile, self._context._status_file)
         except Exception as e:
@@ -707,6 +718,7 @@ class HandlerUtility:
         return False
 
     def get_prev_log(self):
+        self.log("obtaining previous logs")
         with open(self._context._log_file, "r") as f:
             lines = f.readlines()
         if(len(lines) > 300):
