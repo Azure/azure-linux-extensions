@@ -57,7 +57,7 @@ class ExtensionErrorCodeEnum():
     FailedWorkloadQuiescingTimeout = 510
     FailedWorkloadDatabaseInNoArchiveLog = 511
     FailedWorkloadLogModeChanged = 512
-    
+
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
             ExtensionErrorCodeEnum.success_appconsistent : Status.ExtVmHealthStateEnum.green,
