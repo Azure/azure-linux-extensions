@@ -42,7 +42,8 @@ class ExtensionErrorCodeEnum():
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
     FailedGuestAgentInvokedCommandTooLate = 402
-    
+    FailedInputMismatch = 405
+
     FailedWorkloadPreError = 500
     FailedWorkloadConfParsingError = 501
     FailedWorkloadInvalidRole = 502
@@ -56,6 +57,7 @@ class ExtensionErrorCodeEnum():
     FailedWorkloadQuiescingTimeout = 510
     FailedWorkloadDatabaseInNoArchiveLog = 511
     FailedWorkloadLogModeChanged = 512
+    
 
 class ExtensionErrorCodeHelper:
     ExtensionErrorCodeDict = {
@@ -99,6 +101,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedSnapshotLimitReached : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : Status.ExtVmHealthStateEnum.red,
+            ExtensionErrorCodeEnum.FailedInputMismatch : Status.ExtVmHealthStateEnum.red,
             
             ExtensionErrorCodeEnum.FailedWorkloadPreError : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadConfParsingError : Status.ExtVmHealthStateEnum.yellow,
@@ -128,6 +131,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount : "FailedRetryableUnableToOpenMount",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",
             ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : "FailedHandlerGuestAgentCertificateNotFound",
+            ExtensionErrorCodeEnum.FailedInputMismatch : "FailedInputMismatch",
 
             ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : "FailedPrepostPreScriptFailed",
             ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : "FailedPrepostPostScriptFailed",

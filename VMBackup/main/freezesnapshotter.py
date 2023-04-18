@@ -129,8 +129,24 @@ class FreezeSnapshotter(object):
 
             if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
                 if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True and (para_parser.includeLunList == None or para_parser.includeLunList.count == 0)):
-                    self.logger.log('Some disks are excluded from backup and LUN list is not present. Setting the snapshot mode to onlyGuest.')
-                    self.takeSnapshotFrom = CommonVariables.onlyGuest
+                    if( CommonVariables.isAnyDirectDriveDiskIncluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isAnyDirectDriveDiskIncluded] == True):
+                        errMsg = 'DirectDrive Disk is included, and there are some disks being excluded while taking the snapshots'\
+                                       'but the CRP did not pass the information about the disks to be included. So failing the backup'
+                        self.logger.log(errMsg, True, 'Error')
+                        self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInputMismatch)
+                    elif( CommonVariables.isVmgsBlobIncluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isVmgsBlobIncluded] == True):
+                        errMsg = 'VmgsBlob is included, and there are some disks being excluded while taking the snapshots'\
+                                       'but the CRP did not pass the information about the disks to be included. So failing the backup'
+                        self.logger.log(errMsg, True, 'Error')
+                        self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInputMismatch)
+                    elif( CommonVariables.isAnyWADiskIncluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isAnyWADiskIncluded] == True):
+                        errMsg = 'WADisk is included, and there are some disks being excluded while taking the snapshots'\
+                                       'but the CRP did not pass the information about the disks to be included. So failing the backup'
+                        self.logger.log(errMsg, True, 'Error')
+                        self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInputMismatch)
+                    else:
+                        self.logger.log('Some disks are excluded from backup and LUN list is not present. Setting the snapshot mode to onlyGuest.')
+                        self.takeSnapshotFrom = CommonVariables.onlyGuest
 
             #Check if snapshot uri has special characters
             if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):

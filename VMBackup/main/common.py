@@ -125,6 +125,7 @@ class CommonVariables:
     FailedPrepostPluginConfigPermissionError = 317
     FailedPrepostPluginConfigOwnershipError = 318
     FailedGuestAgentInvokedCommandTooLate = 402
+    FailedInputMismatch = 405
     
     FailedWorkloadPreError = 500
     FailedWorkloadConfParsingError = 501
