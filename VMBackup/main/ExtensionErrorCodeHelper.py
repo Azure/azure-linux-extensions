@@ -67,7 +67,8 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.error_12 : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotRateExceeded : Status.ExtVmHealthStateEnum.green,
-
+            ExtensionErrorCodeEnum.FailedInputMismatch : Status.ExtVmHealthStateEnum.green,
+            
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount : Status.ExtVmHealthStateEnum.yellow,
@@ -100,7 +101,6 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedSnapshotLimitReached : Status.ExtVmHealthStateEnum.red,
             ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : Status.ExtVmHealthStateEnum.red,
-            ExtensionErrorCodeEnum.FailedInputMismatch : Status.ExtVmHealthStateEnum.red,
             
             ExtensionErrorCodeEnum.FailedWorkloadPreError : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedWorkloadConfParsingError : Status.ExtVmHealthStateEnum.yellow,
@@ -124,13 +124,13 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.error : "error",
             ExtensionErrorCodeEnum.error_12 : "error_12",
             ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : "SuccessAlreadyProcessedInput",
+            ExtensionErrorCodeEnum.FailedInputMismatch : "FailedInputMismatch",
 
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : "FailedRetryableFsFreezeFailed",
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout : "FailedRetryableFsFreezeTimeout",
             ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount : "FailedRetryableUnableToOpenMount",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",
             ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : "FailedHandlerGuestAgentCertificateNotFound",
-            ExtensionErrorCodeEnum.FailedInputMismatch : "FailedInputMismatch",
 
             ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : "FailedPrepostPreScriptFailed",
             ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : "FailedPrepostPostScriptFailed",

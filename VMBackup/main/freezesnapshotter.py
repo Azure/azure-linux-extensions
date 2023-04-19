@@ -130,18 +130,18 @@ class FreezeSnapshotter(object):
             if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
                 if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True and (para_parser.includeLunList == None or para_parser.includeLunList.count == 0)):
                     if( CommonVariables.isAnyDirectDriveDiskIncluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isAnyDirectDriveDiskIncluded] == True):
-                        errMsg = 'DirectDrive Disk is included, and there are some disks being excluded while taking the snapshots'\
-                                       'but the CRP did not pass the information about the disks to be included. So failing the backup'
+                        errMsg = 'DirectDrive disk is included, so the host must create the snapshot. IsAnyDiskExcluded is true, but, the included LUN list is empty in the extension input, '\
+                                    'which is not allowed for host DoSnapshot. Thus, failing the extension run.'
                         self.logger.log(errMsg, True, 'Error')
                         self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInputMismatch)
                     elif( CommonVariables.isVmgsBlobIncluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isVmgsBlobIncluded] == True):
-                        errMsg = 'VmgsBlob is included, and there are some disks being excluded while taking the snapshots'\
-                                       'but the CRP did not pass the information about the disks to be included. So failing the backup'
+                        errMsg = 'VmgsBlob is included, so the host must create the snapshot. IsAnyDiskExcluded is true, but, the included LUN list is empty in the extension input, '\
+                                    'which is not allowed for host DoSnapshot. Thus, failing the extension run.'
                         self.logger.log(errMsg, True, 'Error')
                         self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInputMismatch)
                     elif( CommonVariables.isAnyWADiskIncluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isAnyWADiskIncluded] == True):
-                        errMsg = 'WADisk is included, and there are some disks being excluded while taking the snapshots'\
-                                       'but the CRP did not pass the information about the disks to be included. So failing the backup'
+                        errMsg = 'WADisk is included, so the host must create the snapshot. IsAnyDiskExcluded is true, but, the included LUN list is empty in the extension input, '\
+                                    'which is not allowed for host DoSnapshot. Thus, failing the extension run.'
                         self.logger.log(errMsg, True, 'Error')
                         self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInputMismatch)
                     else:
