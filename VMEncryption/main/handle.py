@@ -1239,6 +1239,11 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
             update_crypt_item_result = crypt_mount_config_util.add_crypt_item(crypt_item_to_update, backup_folder=backup_folder)
             if not update_crypt_item_result:
                 logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
+            #update luks2 header token field 
+            if security_Type == CommonVariables.ConfidentialVM:
+                disk_util.import_token(device_name=device_item.name,
+                                       passphrase_file=passphrase,
+                                       public_settings=get_public_settings())
         else:
             logger.log(msg="encryption failed with code {0}".format(encrypt_result), level=CommonVariables.ErrorLevel)
             return device_item
@@ -1901,6 +1906,11 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
                                                                                    status_prefix=status_prefix)
 
             if encryption_result_phase == CommonVariables.EncryptionPhaseDone:
+                #update luks2 header token field 
+                if security_Type == CommonVariables.ConfidentialVM:
+                    disk_util.import_token(device_name=device_item.name,
+                                           passphrase_file=passphrase_file,
+                                           public_settings=get_public_settings())
                 continue
             else:
                 # do exit to exit from this round

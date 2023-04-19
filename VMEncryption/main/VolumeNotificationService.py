@@ -73,7 +73,7 @@ class VolumeNotificationService(object):
         proc_comm = ProcessCommunicator()
         return_code = self.command_executor.Execute(cmd,communicator=proc_comm)
         if return_code!=0 and proc_comm.stderr:
-            self.logger("VolumeNotificationService::is_enabled %s",proc_comm.stderr.strip())
+            self.logger.log("VolumeNotificationService::is_enabled %s",proc_comm.stderr.strip())
             return VolumeNotificationService.VnsServiceNotRegistered
         return proc_comm.stdout.strip()
 

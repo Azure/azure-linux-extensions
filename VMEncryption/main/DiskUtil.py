@@ -114,6 +114,51 @@ class DiskUtil(object):
             dd_command = self.distro_patcher.dd_path + ' if=/dev/urandom bs=128 count=1 > ' + cleartext_key_file_path
             self.command_executor.ExecuteInBash(dd_command, raise_exception_on_failure=True)
         return cleartext_key_file_path
+    
+    def secure_key_wrap(self,protector,kekResourceID,kekUrl):
+        #TODO: SKW needed to be implemented. 
+        return protector
+    
+    def secure_key_unwrap(self,protector,kekResourceID,kekUrl):
+        #TODO: SKR needed to be implemented.
+        return protector
+    
+    def import_token(self,device_name,passphrase_file,public_settings):
+        self.logger.log(msg="import_token: device: {0} LUKS2 token field, update for wrapped passphrase")
+        protector = ""
+        with open(passphrase_file,"rb") as protector_file:
+            protector_data = protector_file.read()
+            import base64
+            protector = base64.standard_b64encode(protector_data).decode('utf_8')
+        KekVaultResourceId=public_settings.get(CommonVariables.KekVaultResourceIdKey)
+        KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
+        data={
+            "type":"Azure_Disk_Encryption",
+            "keyslots":[],
+            "KekVaultResourceId":KekVaultResourceId,
+            "KeyEncryptionKeyUrl":KeyEncryptionKeyUrl,
+            "KeyVaultResourceId":public_settings.get(CommonVariables.KeyVaultResourceIdKey),
+            "KeyVaultUrl":public_settings.get(CommonVariables.KeyVaultURLKey),
+            "ProtectorName":"BitlockerExtensionPasswordProtector",
+            "ProtectorValueBase64":self.secure_key_wrap(protector=protector,
+                                                        kekResourceID=KekVaultResourceId,
+                                                        kekUrl=KeyEncryptionKeyUrl)
+        }
+        #TODO: needed to decide on temp path.
+        custom_cmk = os.path.join("/var/lib/azure_disk_encryption_config/","custom_cmk.json")
+        out_file = open(custom_cmk,"w")
+        json.dump(data,out_file,indent=4)
+        device_path = os.path.join("/dev",device_name)
+        out_file.close()
+        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(custom_cmk,5,device_path)
+        process_comm = ProcessCommunicator()
+        status = self.command_executor.Execute(cmd,communicator=process_comm)
+        self.logger.log(msg="import_token: device: {0} status: {1}".format(device_name,status))
+        #os.remove(custom_cmk)
+        return status
+    
+    def export_token(self,device_name,passphrase_file,public_settings):
+        pass
 
     def encrypt_disk(self, dev_path, passphrase_file, mapper_name, header_file):
         return_code = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
