@@ -55,7 +55,8 @@ manifest_obj = [{
         "logFolder": "/var/log/azure/" + CommonVariables.extension_name + "/" + str(CommonVariables.extension_version),
         "configFolder": "/var/lib/waagent/" + CommonVariables.extension_name + "-" + str(CommonVariables.extension_version) + "/config",
         "statusFolder": "/var/lib/waagent/" + CommonVariables.extension_name + "-" + str(CommonVariables.extension_version) + "/status",
-        "heartbeatFile": "/var/lib/waagent/" + CommonVariables.extension_name + "-" + str(CommonVariables.extension_version) + "/heartbeat.log"
+        "heartbeatFile": "/var/lib/waagent/" + CommonVariables.extension_name + "-" + str(CommonVariables.extension_version) + "/heartbeat.log",
+        "eventsFolder": "/var/lib/waagent/" + CommonVariables.extension_name + "-" + str(CommonVariables.extension_version) + "/events"
     }
 }]
 
