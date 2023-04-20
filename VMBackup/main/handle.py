@@ -180,8 +180,8 @@ def freeze_snapshot(timeout):
         global hutil,backup_logger,run_result,run_status,error_msg,freezer,freeze_result,para_parser,snapshot_info_array,g_fsfreeze_on, workload_patch
         canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
         freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
-        if (hutil.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInputMismatch):
-            temp_result = CommonVariables.FailedInputMismatch
+        if (hutil.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList):
+            temp_result = CommonVariables.FailedInvalidDataDiskLunList
             temp_status = 'error'
             error_msg = "Input mismatch CRP did not send the LUN No's of disks to be included"
             exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
@@ -327,8 +327,8 @@ def daemon():
             canTakeCrashConsistentSnapshot = can_take_crash_consistent_snapshot(para_parser)
             temp_g_fsfreeze_on = True
             freeze_snap_shotter = FreezeSnapshotter(backup_logger, hutil, freezer, temp_g_fsfreeze_on, para_parser, canTakeCrashConsistentSnapshot)
-            if (hutil.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInputMismatch):
-                temp_result = CommonVariables.FailedInputMismatch
+            if (hutil.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList):
+                temp_result = CommonVariables.FailedInvalidDataDiskLunList
                 temp_status = 'error'
                 error_msg = "Input mismatch CRP did not send the LUN No's of disks to be included"
                 exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
