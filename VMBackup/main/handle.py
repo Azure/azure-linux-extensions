@@ -183,7 +183,8 @@ def freeze_snapshot(timeout):
         if (hutil.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList):
             temp_result = CommonVariables.FailedInvalidDataDiskLunList
             temp_status = 'error'
-            error_msg = "Input mismatch CRP did not send the LUN No's of disks to be included"
+            error_msg = 'Invalid Input. IsAnyDiskExcluded is marked as true but input LUN list received from CRP is empty. '\
+               'which is not allowed if VM has Direct Drives or if VM has Write Accelerated disks or if VM is a TVM/CVM.'
             exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
         backup_logger.log("Calling do snapshot method", True, 'Info')
         run_result, run_status, snapshot_info_array = freeze_snap_shotter.doFreezeSnapshot()
@@ -330,7 +331,8 @@ def daemon():
             if (hutil.ExtErrorCode == ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList):
                 temp_result = CommonVariables.FailedInvalidDataDiskLunList
                 temp_status = 'error'
-                error_msg = "Input mismatch CRP did not send the LUN No's of disks to be included"
+                error_msg = 'Invalid Input. IsAnyDiskExcluded is marked as true but input LUN list received from CRP is empty. '\
+               'which is not allowed if VM has Direct Drives or if VM has Write Accelerated disks or if VM is a TVM/CVM.'
                 exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
             if freeze_snap_shotter.is_command_timedout(para_parser) :
                 error_msg = "CRP timeout limit has reached, will not take snapshot."
