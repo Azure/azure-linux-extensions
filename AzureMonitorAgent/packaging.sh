@@ -38,6 +38,7 @@ mkdir -p packages MetricsExtensionBin ext/future amaCoreAgentBin agentLauncherBi
 
 # copy shell bundle to packages/
 cp $input_path/azuremonitoragent_$AGENT_VERSION* packages/
+cp $input_path/azuremonitoragent-$AGENT_VERSION* packages/
 cp $input_path/MetricsExtension* MetricsExtensionBin/
 cp $input_path/amacoreagent amaCoreAgentBin/
 cp $input_path/agentlauncher agentLauncherBin/
