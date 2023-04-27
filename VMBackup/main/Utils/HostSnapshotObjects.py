@@ -1,14 +1,19 @@
 import json
+from tkinter import SEL
+
+from main.common import CommonVariables
 
 class HostDoSnapshotRequestBody:
-    def __init__(self, taskId, diskIds, snapshotTaskToken, snapshotMetadata):
+    def __init__(self, taskId, diskIds, ttlFlag, snapshotTaskToken, snapshotMetadata):
         self.taskId = taskId
         self.diskIds = diskIds
         self.snapshotMetadata = snapshotMetadata
         self.snapshotTaskToken = snapshotTaskToken
+        self.settings = {}
+        self.settings[CommonVariables.ttlFlag] = ttlFlag
 
     def convertToDictionary(self):
-        return dict(taskId = self.taskId, diskIds = self.diskIds, snapshotTaskToken = self.snapshotTaskToken, snapshotMetadata = self.snapshotMetadata)
+        return dict(taskId = self.taskId, diskIds = self.diskIds, settings = self.settings, snapshotTaskToken = self.snapshotTaskToken, snapshotMetadata = self.snapshotMetadata)
 
 class HostPreSnapshotRequestBody:
     def __init__(self, taskId, snapshotTaskToken):

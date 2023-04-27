@@ -93,6 +93,7 @@ class ParameterParser(object):
         
         try:
             if(self.includedDisks != None):
+                self.ttlFlag = self.includedDisks[CommonVariables.ttlFlag]
                 if(CommonVariables.dataDiskLunList in self.includedDisks.keys() and self.includedDisks[CommonVariables.dataDiskLunList] != None):
                     self.includeLunList = self.includedDisks[CommonVariables.dataDiskLunList]
                 if(CommonVariables.isOSDiskIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isOSDiskIncluded] == True):
