@@ -9,7 +9,7 @@ from install.install import check_installation
 from connect.connect import check_connection
 from general_health.general_health  import check_general_health
 from high_cpu_mem.high_cpu_mem      import check_high_cpu_memory
-from syslog.syslog                  import check_syslog
+from syslog_tst.syslog                  import check_syslog
 from custom_logs.custom_logs        import check_custom_logs
 
 # check to make sure the user is running as root
