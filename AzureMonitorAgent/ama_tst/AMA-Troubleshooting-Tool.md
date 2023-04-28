@@ -60,11 +60,17 @@ The AMA Linux Troubleshooter requires Python 2.6+ installed on the machine, but 
 3. Agent is unhealthy, heartbeat doesn't work properly
   	* Submodule status
   	* Parse error files
-4. (PLANNED) Agent performance counter collection doesn't work properly
-5. (PLANNED) Agent has high CPU / memory usage
-6. (PLANNED) Agent syslog collection doesn't work properly
-7. (PLANNED) Agent custom log collection doesn't work properly
-8. (A) Run all scenarios
-	* Run through scenarios 1-7 in order
-9. (L) Collect logs
+4. Agent has high CPU / memory usage
+	* Check logrotate
+	* Monitor CPU/memory usage in 5 minutes (interaction mode only)
+5.  Agent syslog collection doesn't work properly
+	* Rsyslog / syslog-ng set up and running
+	* Syslog configuration being pulled / used
+	* Syslog socket is accessible
+6. Agent custom log collection doesn't work properly
+	* Custom log configuration being pulled / used
+	* Log file paths is valid
+7. (A) Run all scenarios
+	* Run through scenarios 1-6 in order
+8. (L) Collect logs
 	* Collects all of the logs needed to troubleshoot AMA in a zip file
