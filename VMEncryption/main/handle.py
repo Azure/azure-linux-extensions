@@ -71,6 +71,8 @@ def disable():
     if security_Type == CommonVariables.ConfidentialVM:
         vns_service = VolumeNotificationService(logger=logger)
         vns_service.stop()
+        #mask the service, to avoid spontaneous service start.
+        vns_service.mask()
     hutil.do_exit(0, 'Disable', CommonVariables.extension_success_status, '0', 'Disable succeeded')
 
 
@@ -78,7 +80,9 @@ def uninstall():
     hutil.do_parse_context('Uninstall')
     if security_Type == CommonVariables.ConfidentialVM:
         vns_service = VolumeNotificationService(logger=logger)
-        vns_service.deRegister()
+        vns_service.stop()
+        vns_service.disable()
+        vns_service.unregister()
     hutil.do_exit(0, 'Uninstall', CommonVariables.extension_success_status, '0', 'Uninstall succeeded')
 
 
@@ -720,16 +724,22 @@ def enable():
         #register/enable and start vns service for CVM
         if not vns_call and security_Type == CommonVariables.ConfidentialVM:
             vns_service = VolumeNotificationService(logger=logger)
-            ret = vns_service.is_enabled()
-            if ret == VolumeNotificationService.VnsServiceNotRegistered:
-                vns_service.register()
+            if not vns_service.is_enabled():
+                vns_service.register()   
+            #run unmask enable and start in all cases. 
+            vns_service.unmask() 
+            vns_service.enable()
             vns_service.start()
-            if vns_service.status == VolumeNotificationService.VnsServiceActive:
+            logger.log(msg="service {0} is-active status {1} is-enabled status {2}".format())
+            if vns_service.is_active():
                 logger.log('Volume notification is active!.')
                 hutil.do_exit(exit_code=CommonVariables.success,
                               operation='VNS_registration',
                               code=str(CommonVariables.success),
                               message='VNS service is registered sucessfully!')
+            else:
+                #run the normal enable call. 
+                pass
 
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
@@ -901,7 +911,7 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
 
     if extension_parameter.config_file_exists() and extension_parameter.config_changed():
         logger.log("Config has changed, updating encryption settings")
-        if not vns_call:
+        if vns_call:
             hutil.exit_if_same_seq()
         # If a daemon is already running reject and exit an update encryption settings request
         if is_daemon_running():
@@ -923,7 +933,7 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
             logger.log('Encryption marker exists. Calling Enable')
             enable_encryption()
         else:
-            if not vns_call:
+            if vns_call:
                 hutil.exit_if_same_seq()
             are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
             if are_devices_encrypted:
@@ -1109,7 +1119,7 @@ def enable_encryption():
 
 def perform_migration(encryption_config, crypt_mount_config_util):
     logger.log("Migrate operation found. Starting migration flow.")
-    if not vns_call:
+    if vns_call:
         hutil.exit_if_same_seq()
 
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())

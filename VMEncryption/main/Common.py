@@ -63,7 +63,7 @@ class CommonVariables:
     """
     vns_service_file = 'azure-diskencryption-vol-notif.service'
     vns_service_name = 'ade-volume-notif-svc'
-    vns_service_placeholder_path = '/etc/systemd/system/azure-diskencryption-vol-notif.service'
+    vns_service_placeholder_path = '/lib/systemd/system/'
     
     """
     Find more on Azure wire service IP address here: "https://docs.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16"

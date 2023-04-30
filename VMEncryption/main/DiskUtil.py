@@ -133,6 +133,7 @@ class DiskUtil(object):
         KekVaultResourceId=public_settings.get(CommonVariables.KekVaultResourceIdKey)
         KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
         data={
+            "version":"1.0",
             "type":"Azure_Disk_Encryption",
             "keyslots":[],
             "KekVaultResourceId":KekVaultResourceId,

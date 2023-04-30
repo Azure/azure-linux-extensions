@@ -27,12 +27,6 @@ from CommandExecutor import CommandExecutor,ProcessCommunicator
 for block device type and partition sub system.
 VNS service invokes ADE if any add/change event get created.'''
 class VolumeNotificationService(object):
-    VnsServiceRegistered = "registered"
-    VnsServiceNotRegistered = "notregistered"
-    VnsServiceActive = "active"
-    VnsServiceNotActive = "inactive"
-    VnsServiceEnabled="enabled"
-
     def __init__(self,logger,servicepath = None):
         '''init call'''
         self.logger = logger
@@ -43,12 +37,12 @@ class VolumeNotificationService(object):
              self.workingDirectory = os.path.join(os.getcwd(),'..')
         #normalize the path
         self.workingDirectory = os.path.normpath(self.workingDirectory)
-    
+
     def _service_file(self):
         '''service file path'''
         return os.path.join(self.workingDirectory,CommonVariables.vns_service_file)
     
-    def _tmp_service_file(self):
+    def _temp_service_file(self):
         '''get tem service file path'''
         return self._service_file()+'_tmp'
     
@@ -56,26 +50,6 @@ class VolumeNotificationService(object):
         '''check if service file exists.'''
         serviceFilePath = self._service_file()
         return os.path.exists(serviceFilePath)
-    
-    def enable(self):
-        '''enable the vns service'''
-        cmd = 'systemctl enable '+CommonVariables.vns_service_file
-        return self.command_executor.Execute(cmd)
-    
-    def disable(self):
-        '''disabling the service'''
-        cmd = 'systemctl disable '+CommonVariables.vns_service_file
-        return self.command_executor.Execute(cmd)
-    
-    def is_enabled(self):
-        '''check if service is enabled or not, if service not registered it returns VnsServiceNotRegistered'''
-        cmd = 'systemctl is-enabled '+CommonVariables.vns_service_file
-        proc_comm = ProcessCommunicator()
-        return_code = self.command_executor.Execute(cmd,communicator=proc_comm)
-        if return_code!=0 and proc_comm.stderr:
-            self.logger.log("VolumeNotificationService::is_enabled %s",proc_comm.stderr.strip())
-            return VolumeNotificationService.VnsServiceNotRegistered
-        return proc_comm.stdout.strip()
 
     def _edit_service_config(self):
         '''edit WorkingDirectory and ExecStart path of config file'''
@@ -93,64 +67,96 @@ class VolumeNotificationService(object):
                 if os.path.exists(vnsservice):
                      config['Service']['ExecStart'] =vnsservice+' -d'
             #save config file
-            with open(self._tmp_service_file(), 'w') as configfile:
+            with open(self._temp_service_file(), 'w') as configfile:
                 config.write(configfile) 
             return True
         return False
+    
+    def mask(self):
+        '''mask service'''
+        cmd = 'systemctl mask '+CommonVariables.vns_service_file
+        return self.command_executor.Execute(cmd)==0
+        
+    def unmask(self):
+        '''unmask service'''
+        cmd = 'systemctl unmask '+CommonVariables.vns_service_file
+        return self.command_executor.Execute(cmd)==0
+
+    def enable(self):
+        '''enable the vns service,required in case of restart.'''
+        cmd = 'systemctl enable '+CommonVariables.vns_service_file
+        return self.command_executor.Execute(cmd)==0
+    
+    def disable(self):
+        '''disabling the service'''
+        cmd = 'systemctl disable '+CommonVariables.vns_service_file
+        return self.command_executor.Execute(cmd)==0
+    
+    def is_enabled(self):
+        '''check if service is enabled or not'''
+        cmd = 'systemctl is-enabled '+CommonVariables.vns_service_file
+        proc_comm = ProcessCommunicator()
+        ret = self.command_executor.Execute(cmd,communicator=proc_comm)==0
+        status = ""
+        if proc_comm.stderr:
+            status=proc_comm.stderr.strip()
+        else:
+            status=proc_comm.stdout.strip()
+        msg="VolumeNotificationService:is_enabled status is {0}".format(status)
+        self.logger.log(msg=msg)
+        return ret
+        
 
     def register(self):
         '''update service config file in systemd and load it'''
-        return_code=None
+        return_code=1
         if self._edit_service_config():
             runningservicefilepath = os.path.join(CommonVariables.vns_service_placeholder_path,
                                                    CommonVariables.vns_service_file)
             if os.path.exists(runningservicefilepath):
                 os.remove(runningservicefilepath)
-            shutil.copy(self._tmp_service_file(),runningservicefilepath)
+            shutil.copy(self._temp_service_file(),runningservicefilepath)
             cmd = 'systemctl daemon-reload'
             return_code = self.command_executor.Execute(cmd)
-            if return_code == 0:
-                #enable the service 
-                return_code = self.enable()
-        return return_code
+        return return_code==0
 
-    def deRegister(self):
+    def unregister(self):
         '''remove service config file from systemd and reload systemctl.'''
-        #stop service
-        self.stop()
-        #disable service
-        self.disable()
         #remove file from service placeholder.
         runningservicefilepath = os.path.join(CommonVariables.vns_service_placeholder_path,
                                               CommonVariables.vns_service_file)
         if os.path.exists(runningservicefilepath):
             os.remove(runningservicefilepath)
         cmd = 'systemctl daemon-reload'
-        return_code = self.command_executor.Execute(cmd)
-        return return_code
+        return self.command_executor.Execute(cmd)==0
 
     def start(self):
         '''this will start the service'''
         cmd = 'systemctl start ' + CommonVariables.vns_service_file
-        return_code = self.command_executor.Execute(cmd)
-        return return_code
+        return self.command_executor.Execute(cmd)==0
 
     def stop(self):
         '''this will stop the service'''
         cmd = 'systemctl stop ' + CommonVariables.vns_service_file
-        return self.command_executor.Execute(cmd)
+        return self.command_executor.Execute(cmd)==0
 
     def restart(self):
         '''This will restart the service'''
         cmd = 'systemctl restart '+CommonVariables.vns_service_file
-        return self.command_executor.Execute(cmd)
+        return self.command_executor.Execute(cmd)==0
 
-    def status(self):
+    def is_active(self):
         '''
-        ActiveState of service is active and inactive 
+        ActiveState of service is active (0) and inactive (1) 
         '''
-        cmd = 'systemctl show -p ActiveState --value '+ CommonVariables.vns_service_file
-        proc_comm=ProcessCommunicator()
-        self.command_executor.Execute(cmd,communicator=proc_comm)
-        status=proc_comm.stdout
-        return status.strip()
+        cmd = 'systemctl is-active '+ CommonVariables.vns_service_file
+        proc_comm = ProcessCommunicator()
+        ret=self.command_executor.Execute(cmd,communicator=proc_comm)==0
+        status = ""
+        if proc_comm.stderr:
+            status=proc_comm.stderr.strip()
+        else:
+            status=proc_comm.stdout.strip()
+        msg="VolumeNotificationService:is_active status is {0}".format(status)
+        self.logger.log(msg=msg)
+        return ret
