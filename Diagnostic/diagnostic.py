@@ -260,7 +260,7 @@ def check_for_supported_waagent_and_distro_version():
     if g_dist_config is None:
         msg = ("LAD does not support distro/version ({0}); not installed.").format(str(platform.dist()))
         hutil.log(msg)
-        hutil.do_status_report(g_ext_op_type, 'error', '1', msg)
+        hutil.do_status_report(g_ext_op_type, 'error', '2', msg)
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=g_ext_op_type,
                                   isSuccess=False,

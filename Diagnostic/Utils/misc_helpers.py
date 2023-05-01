@@ -152,7 +152,7 @@ class LadLogHelper(object):
         """
         config_invalid_log = "Invalid config settings given: {0}".format(config_invalid_reason)
         self._logger_error(config_invalid_log)
-        self._status_reporter(ext_event_type, 'error', '1', config_invalid_log)
+        self._status_reporter(ext_event_type, 'error', '2', config_invalid_log)
         self._waagent_event_adder(name=self._ext_name,
                                   op=ext_event_type,
                                   isSuccess=False,
@@ -169,7 +169,7 @@ class LadLogHelper(object):
         """
         message = "Problem(s) detected in generated mdsd configuration. Config validation message: {0}".format(config_validate_cmd_msg)
         self._logger_error(message)
-        self._status_reporter(ext_event_type, 'error', '1', message)
+        self._status_reporter(ext_event_type, 'error', '2', message)
         self._waagent_event_adder(name=self._ext_name,
                       op=ext_event_type,
                       isSuccess=False,
