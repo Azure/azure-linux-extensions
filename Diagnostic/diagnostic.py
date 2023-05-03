@@ -495,7 +495,7 @@ def start_mdsd(configurator):
                                                        g_mdsd_bin_path, xml_file, g_ext_dir)
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
     if config_validate_cmd_status is not 0:
-        # Invalid config, return error.
+        # Invalid config, report error.
         g_lad_log_helper.log_and_report_invalid_mdsd_cfg(g_ext_op_type,
                                                          config_validate_cmd_msg, read_file_to_string(xml_file))
         return
