@@ -261,13 +261,12 @@ def check_for_supported_waagent_and_distro_version():
             return False
 
     if g_dist_config is None:
-        msg = ("LAD does not support distro/version ({0}); not installed. This extension install/enable operation is "
-               "still considered a success as it's an external error.").format(str(platform.dist()))
+        msg = ("LAD does not support distro/version ({0}); not installed.").format(str(platform.dist()))
         hutil.log(msg)
-        hutil.do_status_report(g_ext_op_type, "success", '0', msg)
+        hutil.do_status_report(g_ext_op_type, 'error', '2', msg)
         waagent.AddExtensionEvent(name=hutil.get_name(),
                                   op=g_ext_op_type,
-                                  isSuccess=True,
+                                  isSuccess=False,
                                   version=hutil.get_extension_version(),
                                   message="Can't be installed on this OS " + str(platform.dist()))
         return False
@@ -496,7 +495,7 @@ def start_mdsd(configurator):
                                                        g_mdsd_bin_path, xml_file, g_ext_dir)
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
     if config_validate_cmd_status is not 0:
-        # Invalid config. Log error and report success.
+        # Invalid config, report error.
         g_lad_log_helper.log_and_report_invalid_mdsd_cfg(g_ext_op_type,
                                                          config_validate_cmd_msg, read_file_to_string(xml_file))
         return

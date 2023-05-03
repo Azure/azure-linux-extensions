@@ -150,14 +150,12 @@ class LadLogHelper(object):
                     secrets in the protected settings. This is for logging to Geneva for diagnostic purposes.
         :return: None
         """
-        config_invalid_log = "Invalid config settings given: " + config_invalid_reason + \
-                             ". Can't proceed, although this install/enable operation is reported as successful so " \
-                             "the VM can complete successful startup."
-        self._logger_log(config_invalid_log)
-        self._status_reporter(ext_event_type, 'success', '0', config_invalid_log)
+        config_invalid_log = "Invalid config settings given: {0}".format(config_invalid_reason)
+        self._logger_error(config_invalid_log)
+        self._status_reporter(ext_event_type, 'error', '2', config_invalid_log)
         self._waagent_event_adder(name=self._ext_name,
                                   op=ext_event_type,
-                                  isSuccess=True,  # Note this is True, because it is a user error.
+                                  isSuccess=False,
                                   version=self._ext_ver,
                                   message="Invalid handler settings encountered: {0}".format(redacted_handler_settings))
 
@@ -169,14 +167,12 @@ class LadLogHelper(object):
         :param mdsd_cfg_xml: Content of xmlCfg.xml to be sent to Geneva
         :return: None
         """
-        message = "Problem(s) detected in generated mdsd configuration. Can't enable, although this install/enable " \
-                  "operation is reported as successful so the VM can complete successful startup. Linux Diagnostic " \
-                  "Extension will exit. Config validation message: {0}".format(config_validate_cmd_msg)
-        self._logger_log(message)
-        self._status_reporter(ext_event_type, 'success', '0', message)
+        message = "Problem(s) detected in generated mdsd configuration. Config validation message: {0}".format(config_validate_cmd_msg)
+        self._logger_error(message)
+        self._status_reporter(ext_event_type, 'error', '2', message)
         self._waagent_event_adder(name=self._ext_name,
                       op=ext_event_type,
-                      isSuccess=True,  # Note this is True, because it is a user error.
+                      isSuccess=False,
                       version=self._ext_ver,
                       message="Problem(s) detected in generated mdsd configuration: {0}".format(mdsd_cfg_xml))
 
