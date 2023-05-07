@@ -43,6 +43,9 @@ class CommonVariables:
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
     ttlFlag = 'isSnapshotTTLEnabled'
+    useMccfForLAD = 'useMccfForLAD'
+    useMccfForDsas = 'useMccfForDsas'
+    settings = 'settings'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'

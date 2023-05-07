@@ -69,7 +69,7 @@ class GuestSnapshotter(object):
         self.configfile='/etc/azure/vmbackup.conf'
         self.hutil = hutil
 
-    def snapshot(self, sasuri, sasuri_index, ttlFlag, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
+    def snapshot(self, sasuri, sasuri_index, settings, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
         temp_logger=''
         error_logger=''
         snapshot_error = SnapshotError()
@@ -94,7 +94,8 @@ class GuestSnapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
-                headers["x-ms-meta-" + CommonVariables.ttlFlag] = ttlFlag
+                if(CommonVariables.ttlFlag in settings):
+                    headers["x-ms-ttl"] = settings[CommonVariables.ttlFlag]
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
@@ -126,7 +127,7 @@ class GuestSnapshotter(object):
         snapshot_result_error.put(snapshot_error)
         snapshot_info_indexer_queue.put(snapshot_info_indexer)
 
-    def snapshot_seq(self, sasuri, sasuri_index, ttlFlag, meta_data):
+    def snapshot_seq(self, sasuri, sasuri_index, settings, meta_data):
         result = None
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
@@ -149,7 +150,9 @@ class GuestSnapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
-                headers["x-ms-meta-" + CommonVariables.ttlFlag] = ttlFlag
+                if(CommonVariables.ttlFlag in settings):
+                    headers["x-ms-ttl"] = settings[CommonVariables.ttlFlag]
+                   #headers["x-ms-snapshot-ttl-expiry-hours-" + flag] = settings[flag]
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
@@ -206,7 +209,7 @@ class GuestSnapshotter(object):
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
                     try:
-                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.ttlFlag, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.settings, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
                     except Exception as e:
                         self.logger.log("multiprocess queue creation failed")
                         all_snapshots_failed = True
@@ -295,7 +298,7 @@ class GuestSnapshotter(object):
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
-                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.ttlFlag, paras.backup_metadata)
+                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.settings, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
                     # update blob_snapshot_info_array element properties from snapshot_info_indexer object
