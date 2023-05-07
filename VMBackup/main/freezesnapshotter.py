@@ -127,30 +127,10 @@ class FreezeSnapshotter(object):
                     self.logger.log('DirectDrive Disk is included. Setting the snapshot mode to onlyHost.')
                     self.takeSnapshotFrom = CommonVariables.onlyHost
 
-            if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks):
-                # IsAnyDiskExcluded is true, but the included LUN list is empty in the extensions input
+            if(para_parser.includedDisks != None and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys()):
                 if (para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] == True and (para_parser.includeLunList == None or para_parser.includeLunList.count == 0)):
-                    # When the direct drive disk is part of the disks. so, failing the extension as snapshot can't be taken via Guest
-                    if( CommonVariables.isAnyDirectDriveDiskIncluded in para_parser.includedDisks and para_parser.includedDisks[CommonVariables.isAnyDirectDriveDiskIncluded] == True):
-                        errMsg = 'DirectDrive disk is included, so the host must create the snapshot. IsAnyDiskExcluded is true, but, the included LUN list is empty in the extension input, '\
-                                    'which is not allowed for host DoSnapshot. Thus, failing the extension run.'
-                        self.logger.log(errMsg, True, 'Error')
-                        self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList)
-                    # When the VmgsBlob is part of the disks. so, failing the extension as snapshot can't be taken via Guest
-                    elif( CommonVariables.isVmgsBlobIncluded in para_parser.includedDisks and para_parser.includedDisks[CommonVariables.isVmgsBlobIncluded] == True):
-                        errMsg = 'VmgsBlob is included, so the host must create the snapshot. IsAnyDiskExcluded is true, but, the included LUN list is empty in the extension input, '\
-                                    'which is not allowed for host DoSnapshot. Thus, failing the extension run.'
-                        self.logger.log(errMsg, True, 'Error')
-                        self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList)
-                    # When the WADisk is part of the disks. so, failing the extension as snapshot can't be taken via Guest
-                    elif( CommonVariables.isAnyWADiskIncluded in para_parser.includedDisks and para_parser.includedDisks[CommonVariables.isAnyWADiskIncluded] == True):
-                        errMsg = 'WADisk is included, so the host must create the snapshot. IsAnyDiskExcluded is true, but, the included LUN list is empty in the extension input, '\
-                                    'which is not allowed for host DoSnapshot. Thus, failing the extension run.'
-                        self.logger.log(errMsg, True, 'Error')
-                        self.hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList)
-                    else:
-                        self.logger.log('Some disks are excluded from backup and LUN list is not present. Setting the snapshot mode to onlyGuest.')
-                        self.takeSnapshotFrom = CommonVariables.onlyGuest
+                    self.logger.log('Some disks are excluded from backup and LUN list is not present. Setting the snapshot mode to onlyGuest.')
+                    self.takeSnapshotFrom = CommonVariables.onlyGuest
 
             #Check if snapshot uri has special characters
             if self.hutil.UriHasSpecialCharacters(self.para_parser.blobs):

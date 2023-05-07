@@ -1,1 +1,0 @@
-# Syslog check helper script for AMA

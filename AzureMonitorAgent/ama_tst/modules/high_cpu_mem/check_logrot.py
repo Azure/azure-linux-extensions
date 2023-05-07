@@ -43,7 +43,7 @@ def check_size_config(logrotate_configs):
             size_curr = os.path.getsize(k)
             if (size_curr > size_limit):
                 error_info.append((k, size_curr, size_limit, LR_CONFIG_PATH))
-                return WARN_LOGROTATE
+                return ERR_LOGROTATE
 
         # couldn't get current size of file
         except os.error as e:

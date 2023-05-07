@@ -257,31 +257,6 @@ def find_dcr_workspace():
     general_info['ME_REGION'] = me_region
     return (dcr_workspace, dcr_region, None)
 
-def find_dce():
-    global general_info
-    
-    dce = set()
-    try:
-        for file in os.listdir(CONFIG_DIR):
-            file_path = CONFIG_DIR + "/" + file
-            with open(file_path) as f:
-                result = json.load(f)
-                channels = result['channels']
-                for channel in channels:
-                    if channel['protocol'] == 'gig':
-                        # parse dce logs ingestion endpoint
-                        ingest_endpoint_url = channel['endpointUriTemplate']
-                        ingest_endpoint = ingest_endpoint_url.split('https://')[1].split('/')[0]
-                        dce.add(ingest_endpoint)
-                        # parse dce configuration access endpoint
-                        configuration_endpoint_url = channel['tokenEndpointUri']
-                        configuration_endpoint = configuration_endpoint_url.split('https://')[1].split('/')[0]
-                        dce.add(configuration_endpoint)
-    except (FileNotFoundError, AttributeError, KeyError) as e:
-        return (None, None, e)
-
-    general_info['DCE'] = dce
-    return (dce, None)
 
 def is_metrics_configured():
     global general_info

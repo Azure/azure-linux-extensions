@@ -2,7 +2,7 @@ import subprocess
 
 from error_codes import *
 from errors      import error_info
-from helpers     import geninfo_lookup, find_dce
+from helpers     import geninfo_lookup
 
 SSL_CMD = "echo | openssl s_client -connect {0}:443 -brief"
 CURL_CMD = "curl -s -S -k https://{0}/ping"
@@ -115,13 +115,6 @@ def check_ama_endpts():
         for endpoint in endpoints:
             endpoint.replace('.com', url_suffix)
 
-    dce, e = find_dce()
-    if e != None:
-        error_info.append((e,))
-        return ERR_DCE
-    for endpoint in dce:
-        endpoints.append(endpoint)
-        
     for endpoint in endpoints:
         # check if IP address can be resolved using nslookup
         resolved, e = resolve_ip(endpoint)
