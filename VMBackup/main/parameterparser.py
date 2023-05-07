@@ -34,8 +34,6 @@ class ParameterParser(object):
         self.customSettings = None
         self.snapshotTaskToken = ''
         self.includedDisks = None
-        self.settings = None
-        self. wellKnownFlags = ['isSnapshotTTLEnabled','useMccfFoeLAD','useMCCFForDsas']
         self.includeLunList = []    #To be shared with HP
 
         """
@@ -77,8 +75,6 @@ class ParameterParser(object):
             self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
         if(CommonVariables.includedDisks in self.public_config_obj.keys()):
             self.includedDisks = self.public_config_obj[CommonVariables.includedDisks]
-        if(CommonVariables.settings in self.public_config_obj.keys()):
-            self.settings = self.public_config_obj[CommonVariables.settings]
 
         """
         first get the protected configuration
@@ -97,6 +93,7 @@ class ParameterParser(object):
         
         try:
             if(self.includedDisks != None):
+                self.ttlFlag = self.includedDisks[CommonVariables.ttlFlag]
                 if(CommonVariables.dataDiskLunList in self.includedDisks.keys() and self.includedDisks[CommonVariables.dataDiskLunList] != None):
                     self.includeLunList = self.includedDisks[CommonVariables.dataDiskLunList]
                 if(CommonVariables.isOSDiskIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isOSDiskIncluded] == True):
@@ -105,14 +102,4 @@ class ParameterParser(object):
                     backup_logger.log("LUN list - " + str(self.includeLunList), True)
         except Exception as e:
             errorMsg = "Exception occurred while populating includeLunList, Exception: %s" % (str(e))
-            backup_logger.log(errorMsg, True)
-
-        try:
-            if(self.settings != None):
-                for flag in self.settings.keys():
-                    if flag not in self.wellKnownFlags:
-                        backup_logger.log("The flags passed through settings dictionary is different from the expected one")
-                        raise Exception()
-        except Exception as e:
-            errorMsg = "The received flag is different from the expected one, Exception: %s" % (str(e))
             backup_logger.log(errorMsg, True)
