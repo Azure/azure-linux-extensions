@@ -11,6 +11,11 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <deque>
+#include<vector>
+#include <string>
+#include<sstream>
+#include<algorithm>
 
 #define LOG_PRIORITY 3
 #define LOG_LEVEL 3
@@ -19,13 +24,11 @@
 #define LOG_DIRETORY "/tmp"
 #define LOG_FILE_TEMPLATE "%s/ade_vol_notif-%s.log"
 #define ADE_EVENT_THRESHOLD 4
-#define ADE_COUNT_WAIT_TIME 30
-#define ADE_WAIT_TIME 900
-#define ADE_NOT_STARTED "not_started";
-#define ADE_FINISHED "finished";
-#define ADE_RUNNING "running";
+#define ADE_COUNT_WAIT_TIME_SEC 30
+#define ADE_WAIT_TIME_SEC 900
 
-char* ade_status = ADE_NOT_STARTED;
+enum class AdeStatus{ADE_NOT_STARTED,ADE_RUNNING,ADE_FINISHED};
+AdeStatus ade_status = AdeStatus::ADE_NOT_STARTED;
 time_t ade_finished;
 
 
@@ -33,71 +36,14 @@ time_t ade_finished;
 static char log_file_path[1024];
 void custom_log(const char *format, ...);
 
-struct Node{
-    struct Node* next;
-    char* syspath;
+struct device{
+        std::string syspath;
+        std::string action;
 };
 
-struct Node* createNode(const char* syspath){
-    if(syspath == NULL) return NULL;
-    struct Node* tmp = (struct Node*)malloc(sizeof(struct Node*));
-    tmp->next = NULL;
-    tmp->syspath = (char*) malloc(sizeof(char)*strlen(syspath));
-    strcpy(tmp->syspath,syspath);
-    return tmp;
+void addNode(std::deque<device>& dq, const char* syspath, const char* action){
+        dq.push_back({syspath,action});
 }
-
-struct Node** nextNode(struct Node* node){
-    if(node==NULL)return NULL;
-    return &node->next;
-}
-
-void removeNode(struct Node** node){
-        if(*node==NULL) {
-            custom_log("node is null\n");
-            return;}
-        custom_log("removing syspath: %s\n", (*node)->syspath);
-        struct Node* tmp = *node;
-        if(tmp->next==NULL){
-            *node = NULL;
-            free(tmp->syspath);
-            free(tmp);
-        }else{
-            *node=tmp->next;
-            free(tmp->syspath);
-            free(tmp);
-        }
-}
-
-void addNode(struct Node** first, const char* ch){
-        struct Node* node = createNode(ch);
-        if(node==NULL) return;
-        if(*first==NULL){
-            *first = node;
-        }else{
-          node->next = *first;
-          *first=node;
-        }
-}
-
-int lstLength(struct Node* first){
-        struct Node* tmp = first;
-        int count =0;
-        while(tmp!=NULL){
-                tmp=tmp->next;
-                count++;
-        }
-        return count;
-}
-int is_devnode_added(struct Node* first, const char* syspath){
-        struct Node* tmp = first;
-        while(tmp!=NULL){
-                if(strcmp(syspath,tmp->syspath)==0) return 1;
-                tmp=tmp->next;
-        }
-        return 0;
-}
-
 
 void custom_log(const char *format, ...) {
     FILE *log_file = fopen(log_file_path, "a");
@@ -179,7 +125,7 @@ void daemonize(int argc, char *argv[])
 }
 
 void invoke_ade(const char* path){
-    ade_status = ADE_RUNNING;
+    ade_status = AdeStatus::ADE_RUNNING;
     pid_t pAde = fork();
     if(pAde==0){
             // in case of child process.
@@ -205,8 +151,8 @@ void invoke_ade(const char* path){
             custom_log("child process %d created, checking daemon", getpid());
             custom_log("changing directory to %s", path);
             chdir(path);
-            execl(          "daemon_delay.sh",
-                            "daemon_delay.sh",
+            execl(          "ade_daemon_delay.sh",
+                            "ade_daemon_delay.sh",
                             "extension_shim.sh",
                             NULL);
             int err = errno;
@@ -218,7 +164,7 @@ void invoke_ade(const char* path){
        pid_t childPid = wait(NULL);
        custom_log("child process %d is completed",childPid);
     }
-    ade_status = ADE_FINISHED;
+    ade_status = AdeStatus::ADE_FINISHED;
     ade_finished = time(NULL);
 }
 
@@ -231,16 +177,45 @@ int is_device_crypted_from_syspath(const char* syspath){
         custom_log("get_dev_fsUsage_from_syspath: syspath %s usage status is %s",syspath, fs_usage);
         if(fs_usage!=NULL && strcmp(fs_usage,"crypto")==0) ret = 1;
         udev_device_unref(dev);
+        udev_unref(udev);
         return ret;
 }
-void cleanCryptedDevFromList(struct Node** first){
-        struct Node** tmp = first;
-        while(*tmp!=NULL){
-                struct Node** rNode = tmp ;
-                tmp =&((*tmp)->next);
-                if(is_device_crypted_from_syspath((*rNode)->syspath)){
-                        removeNode(rNode);
+
+bool is_devnode_added(std::deque<device>&dq, const char* syspath, const char* action){
+        for(auto it:dq)
+                if(             strcmp(it.syspath.c_str(),syspath)==0 &&
+                                strcmp(it.action.c_str(),action)==0) return true;
+        return false;
+}
+
+void cleanCryptedDevFromList(std::deque<device>&dq){
+        using itdeque=std::deque<device>::iterator;
+        std::vector<itdeque> cryptedDevices;
+        //removing crypted changed devices,
+        for(itdeque it=dq.begin(); it!=dq.end(); it++){
+                if(             it->action =="change" &&
+                                is_device_crypted_from_syspath(it->syspath.c_str())){
+                        cryptedDevices.push_back(it);
                 }
+        }
+        //remove previously add crypted devices, which are mounted now.
+        for(itdeque it=dq.begin(); it!=dq.end(); it++){
+                  for(auto itd:cryptedDevices){
+                          if(it==itd) continue;
+                          if(it->action!="change" && it->syspath==itd->syspath){
+                                  cryptedDevices.push_back(it); break;
+                          }
+                  }
+        }
+        for(auto it:cryptedDevices){
+                dq.erase(it);
+        }
+}
+
+void printdq(std::deque<device>&dq){
+        custom_log("deque item count: %d",dq.size());
+        for(auto it:dq){
+                custom_log("deque item: action %s, syspath %s",it.action.c_str(), it.syspath.c_str());
         }
 }
 
@@ -317,6 +292,7 @@ int main(int argc, char *argv[]) {
     first_dev_node = time(NULL);
     ade_finished  = time(NULL);
     int dev_node_count;
+    std::deque<device> dq;
     while (1) {
         fd_set fds;
         struct timeval tv;
@@ -355,45 +331,55 @@ int main(int argc, char *argv[]) {
             custom_log("Syspath : %s", syspath);
 
             if (            action != NULL &&
-                            strcmp(action, "change") == 0 &&
+                            (strcmp(action, "change") == 0 ||
+                            strcmp(action, "add") == 0) &&
                             fsUsage != NULL &&
-                            strcmp(fsUsage, "filesystem") == 0){
-                    if(is_devnode_added(first,syspath)==0){
+                            (strcmp(fsUsage, "filesystem") == 0||
+                             strcmp(fsUsage, "crypto") == 0)){
+                   if(!is_devnode_added(dq,syspath,action)){
                             custom_log("adding Device node %s in list\n",devnode);
-                            addNode(&first,syspath);
+                            addNode(dq,syspath,action);
                             if(dev_node_count ==0){
                                 first_dev_node = time(NULL);
                             }
                     }
             }
             //ADE generated dev events must be removed from list.
-            cleanCryptedDevFromList(&first);
-            
+            cleanCryptedDevFromList(dq);
+            printdq(dq);
             custom_log("Processing udev monitoring event is done!\n");
             udev_device_unref(dev);
         }
         usleep(250*1000);
-        dev_node_count = lstLength(first);
+        dev_node_count = dq.size();
         int diff_for_ade_loop = (int)difftime(time(NULL),ade_finished);
         int diff_for_dev_nodes = dev_node_count>0?(int)difftime(time(NULL),first_dev_node):0;
+        bool ade_invoked = false;
         //Logic to invoke ADE.
         if (dev_node_count >= ADE_EVENT_THRESHOLD){
                     custom_log("dev node count %d max to trigger %d for running ADE!"
                     ,dev_node_count,ADE_EVENT_THRESHOLD);
                     invoke_ade(current_working_directory);
-        }else if(diff_for_ade_loop>=ADE_WAIT_TIME){
+                    ade_invoked=true;
+        }else if(diff_for_ade_loop>=ADE_WAIT_TIME_SEC){
             custom_log("running ADE in every %d sec, last ade run was at %s, diff: %d, dev nodes in list %d"
-            ,ADE_WAIT_TIME,ctime(&ade_finished),diff_for_ade_loop,dev_node_count);
+            ,ADE_WAIT_TIME_SEC,ctime(&ade_finished),diff_for_ade_loop,dev_node_count);
             custom_log("diff_for_ade_loop: %d, diff_for_dev_nodes: %d",diff_for_ade_loop,diff_for_dev_nodes);
             invoke_ade(current_working_directory);
-        }else if(dev_node_count>0 && diff_for_dev_nodes>ADE_COUNT_WAIT_TIME){
+            ade_invoked=true;
+        }else if(dev_node_count>0 && diff_for_dev_nodes>ADE_COUNT_WAIT_TIME_SEC){
             custom_log("running ADE, dev nodes in list %d, last ade run was at %s, diff: %d"
             ,dev_node_count,ctime(&first_dev_node),diff_for_dev_nodes);
             custom_log("diff_for_ade_loop: %d, diff_for_dev_nodes: %d",diff_for_ade_loop,diff_for_dev_nodes);
             invoke_ade(current_working_directory);
+            ade_invoked=true;
         }else{
             printf("...");
         }
+        if(ade_invoked){
+           first_dev_node = time(NULL);
+        }
+
     }
     udev_monitor_unref(mon);
     udev_unref(udev);
