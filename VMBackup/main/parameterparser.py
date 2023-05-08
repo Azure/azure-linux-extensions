@@ -115,4 +115,4 @@ class ParameterParser(object):
                         foundFlag = True
                         break
                 if(foundFlag != True):
-                    backup_logger.log("The flags passed through settings dictionary" + str(flag) +" is different from the expected one", True)
+                    backup_logger.log("The flags passed through settings dictionary " + str(flag) +" is different from the expected one", True)
