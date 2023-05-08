@@ -42,6 +42,11 @@ class CommonVariables:
     statusBlobUploadError = 'statusBlobUploadError'
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
+    isSnapshotTTLEnabled = 'isSnapshotTTLEnabled'
+    useMCCFForLAD = ' UseMCCFForLAD'
+    useMCCFToFetchDSASForAllDisks = 'UseMCCFToFetchDSASForAllDisks'
+    settings = 'settings'
+
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
