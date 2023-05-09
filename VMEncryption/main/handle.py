@@ -734,6 +734,7 @@ def enable():
                 logger.log('Volume notification is active!.')
                 hutil.do_exit(exit_code=CommonVariables.success,
                               operation='VNS_registration',
+                              status=CommonVariables.extension_success_status,
                               code=str(CommonVariables.success),
                               message='VNS service is registered sucessfully!')
             else:

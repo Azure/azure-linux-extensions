@@ -34,7 +34,8 @@ class VolumeNotificationService(object):
         if servicepath and os.path.exists(servicepath):
             self.workingDirectory = servicepath
         else:
-             self.workingDirectory = os.path.join(os.getcwd(),'..')
+             fileDirectory=os.path.dirname(__file__)
+             self.workingDirectory = os.path.join(fileDirectory,'..')
         #normalize the path
         self.workingDirectory = os.path.normpath(self.workingDirectory)
 
@@ -110,6 +111,7 @@ class VolumeNotificationService(object):
     def register(self):
         '''update service config file in systemd and load it'''
         return_code=1
+        self.logger.log("service file path: {0}".format(self._service_file()))
         if self._edit_service_config():
             runningservicefilepath = os.path.join(CommonVariables.vns_service_placeholder_path,
                                                    CommonVariables.vns_service_file)
