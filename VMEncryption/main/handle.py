@@ -99,7 +99,7 @@ def disable_encryption():
         'status_code': str(CommonVariables.success),
         'message': 'Decryption completed'
     }
-    if vns_call:
+    if not vns_call:
         hutil.exit_if_same_seq(exit_status)
         hutil.save_seq()
 
@@ -594,7 +594,7 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
             encryption_environment.enable_se_linux()
 
 def is_vns_call():
-    for a in sys.argv[:1]:
+    for a in sys.argv[1:]:
         if re.match("^([-/]*)(vnscall)", a):
             return True
     return False
@@ -619,7 +619,6 @@ def main():
 
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     hutil.disk_util = disk_util
-    vns_service = None
     vns_call = is_vns_call()
 
     for a in sys.argv[1:]:
@@ -730,7 +729,7 @@ def enable():
             vns_service.unmask() 
             vns_service.enable()
             vns_service.start()
-            logger.log(msg="service {0} is-active status {1} is-enabled status {2}".format())
+            #logger.log(msg="service {0} is-active status {1} is-enabled status {2}".format())
             if vns_service.is_active():
                 logger.log('Volume notification is active!.')
                 hutil.do_exit(exit_code=CommonVariables.success,
@@ -911,7 +910,7 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
 
     if extension_parameter.config_file_exists() and extension_parameter.config_changed():
         logger.log("Config has changed, updating encryption settings")
-        if vns_call:
+        if not vns_call:
             hutil.exit_if_same_seq()
         # If a daemon is already running reject and exit an update encryption settings request
         if is_daemon_running():
@@ -933,7 +932,7 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
             logger.log('Encryption marker exists. Calling Enable')
             enable_encryption()
         else:
-            if vns_call:
+            if not vns_call:
                 hutil.exit_if_same_seq()
             are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
             if are_devices_encrypted:
@@ -1119,7 +1118,7 @@ def enable_encryption():
 
 def perform_migration(encryption_config, crypt_mount_config_util):
     logger.log("Migrate operation found. Starting migration flow.")
-    if vns_call:
+    if not vns_call:
         hutil.exit_if_same_seq()
 
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), get_public_settings())
