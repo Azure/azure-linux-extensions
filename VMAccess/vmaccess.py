@@ -83,8 +83,13 @@ class ConfigurationProvider(object):
         else:
             return False
 
+Configuration = None
+try:
+    Configuration = ConfigurationProvider("/etc/waagent.conf")
+except Exception as e:
+    # configuration path for CoreOS
+    Configuration = ConfigurationProvider("/usr/share/oem/waagent.conf")
 
-Configuration = ConfigurationProvider("/etc/waagent.conf")
 MyDistro = dist_utils.get_my_distro(Configuration)
 
 
