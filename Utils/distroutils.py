@@ -10,16 +10,10 @@ import Utils.extensionutils as ext_utils
 import Utils.constants as constants
 
 
-def get_my_distro(config):
+def get_my_distro(os_name, config):
     if 'FreeBSD' in platform.system():
         return FreeBSDDistro(config)
-
-    if os.path.isfile(constants.os_release):
-        os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
-    elif os.path.isfile(constants.system_release):
-        os_name = ext_utils.get_file_contents(constants.system_release)
-    else:
-        return GenericDistro(config)
+    
     if os_name is not None:
         if re.search("fedora", os_name, re.IGNORECASE):
             # Fedora
