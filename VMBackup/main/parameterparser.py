@@ -35,7 +35,7 @@ class ParameterParser(object):
         self.snapshotTaskToken = ''
         self.includedDisks = None
         self.settings = None
-        self.wellKnownSettingFlags = ['isSnapshotTTLEnabled','UseMCCFForLAD','UseMCCFToFetchDSASForAllDisks']
+        self.wellKnownSettingFlags = {'isSnapshotTTLEnabled','UseMCCFForLAD','UseMCCFToFetchDSASForAllDisks'}
         self.includeLunList = []    #To be shared with HP
 
         """
@@ -77,8 +77,8 @@ class ParameterParser(object):
             self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
         if(CommonVariables.includedDisks in self.public_config_obj.keys()):
             self.includedDisks = self.public_config_obj[CommonVariables.includedDisks]
-        if(CommonVariables.settings in self.public_config_obj.keys()):
-            self.settings = self.public_config_obj[CommonVariables.settings]
+        if("dynamicConfigsFromCRP" in self.public_config_obj.keys()):
+            self.settings = self.public_config_obj['dynamicConfigsFromCRP']
 
         """
         first get the protected configuration
@@ -109,10 +109,6 @@ class ParameterParser(object):
         
         if(self.settings != None):
             for flag in self.settings.keys():
-                foundFlag = False
-                for wellKnownFlag in self.wellKnownSettingFlags:
-                    if wellKnownFlag.lower() == flag.lower():
-                        foundFlag = True
-                        break
-                if(foundFlag != True):
-                    backup_logger.log("The flags passed through settings dictionary " + str(flag) +" is different from the expected one", True)
+                if(flag not in self.wellKnownSettingFlags):
+                    backup_logger.log("The received " + str(flag) + " is not an expected setting name.", True)
+            backup_logger.log("settings received " + str(self.settings), True)

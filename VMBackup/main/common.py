@@ -43,10 +43,8 @@ class CommonVariables:
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
     isSnapshotTTLEnabled = 'isSnapshotTTLEnabled'
-    useMCCFForLAD = ' UseMCCFForLAD'
+    useMCCFForLAD = 'UseMCCFForLAD'
     useMCCFToFetchDSASForAllDisks = 'UseMCCFToFetchDSASForAllDisks'
-    settings = 'settings'
-
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
