@@ -61,7 +61,9 @@ class ConfigurationProvider(object):
     def __init__(self, wala_config_file):
         self.values = dict()
         if not os.path.isfile(wala_config_file):
-            raise ValueError("Missing configuration in {0}".format(wala_config_file))
+            logger.warning("Missing configuration in {0}, setting default values for PasswordCryptId and PasswordCryptSaltLength".format(wala_config_file))
+            self.values["Provisioning.PasswordCryptId"] = "6"
+            self.values["Provisioning.PasswordCryptSaltLength"] = 10
         try:
             for line in ext_utils.get_file_contents(wala_config_file).split('\n'):
                 if not line.startswith("#") and "=" in line:
@@ -73,10 +75,8 @@ class ConfigurationProvider(object):
                         self.values[parts[0]] = None
         # when get_file_contents returns none
         except AttributeError:
-            logger.warning("Unable to parse {0}".format(wala_config_file))
-            logger.log("Setting default values for PasswordCryptId and PasswordCryptSaltLength")
-            self.values["Provisioning.PasswordCryptId"] = 6
-            self.values["Provisioning.PasswordCryptSaltLength"] = 10
+            logger.error("Unable to parse {0}".format(wala_config_file))
+            raise
         return
 
     def get(self, key):
@@ -241,7 +241,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     try:
         ovf_xml = ext_utils.get_file_contents('/var/lib/waagent/ovf-env.xml')
         if ovf_xml is not None:
-            ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration)
+            ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration, False, False)
     except (EnvironmentError, ValueError, KeyError, AttributeError, TypeError):
         pass
     if ovf_env is None:
