@@ -48,10 +48,14 @@ class DiskUtil(object):
         self.vmbus_sys_path = '/sys/bus/vmbus/devices'
 
         self.command_executor = CommandExecutor(self.logger)
-
         self._LUN_PREFIX = "lun"
         self._SCSI_PREFIX = "scsi"
-
+    
+    def _get_SKR_exe_path(self):
+        absFilePath=os.path.abspath(__file__)
+        currentDir = os.path.dirname(absFilePath)
+        return os.path.normpath(os.path.join(currentDir,".."))
+    
     def get_osmapper_path(self):
         return os.path.join(CommonVariables.dev_mapper_root, CommonVariables.osmapper_name)
 
@@ -114,24 +118,38 @@ class DiskUtil(object):
             dd_command = self.distro_patcher.dd_path + ' if=/dev/urandom bs=128 count=1 > ' + cleartext_key_file_path
             self.command_executor.ExecuteInBash(dd_command, raise_exception_on_failure=True)
         return cleartext_key_file_path
-    
-    def secure_key_wrap(self,protector,kekResourceID,kekUrl):
-        #TODO: SKW needed to be implemented. 
-        return protector
-    
-    def secure_key_unwrap(self,protector,kekResourceID,kekUrl):
-        #TODO: SKR needed to be implemented.
-        return protector
+       
+    def secure_key_release_operation(self,protectorbase64,kekUrl,operation,attestationUrl=None):
+        '''This function release key and does wrap/unwrap operation on protector'''
+        skr_app = os.path.join(self._get_SKR_exe_path(),CommonVariables.secure_key_release_app)
+        if attestationUrl:
+            cmd = "{0} -a {1} -k {2} -s {3}".format(skr_app,attestationUrl,kekUrl,protectorbase64)
+        else:
+            cmd = "{0} -k {1} -s {2}".format(skr_app,kekUrl,protectorbase64)
+        cmd = "{0} {1}".format(cmd,operation)
+        process_comm = ProcessCommunicator()
+        ret = self.command_executor.Execute(cmd,communicator=process_comm)
+        if ret:
+            msg = ""
+            if process_comm.stderr:
+                msg = process_comm.stderr.strip()
+            elif process_comm.stdout:
+                msg = process_comm.stdout.strip()
+            else:
+                pass
+            self.logger.log(msg=msg)
+            return None
+        return process_comm.stdout.strip()
     
     def import_token(self,device_name,passphrase_file,public_settings):
         self.logger.log(msg="import_token: device: {0} LUKS2 token field, update for wrapped passphrase")
         protector = ""
         with open(passphrase_file,"rb") as protector_file:
-            protector_data = protector_file.read()
-            import base64
-            protector = base64.standard_b64encode(protector_data).decode('utf_8')
+            #passphrase stored in keyfile in base64
+            protector = protector_file.read()
         KekVaultResourceId=public_settings.get(CommonVariables.KekVaultResourceIdKey)
         KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
+        AttestationUrl = public_settings.get(CommonVariables.AttestationUrl)
         data={
             "version":"1.0",
             "type":"Azure_Disk_Encryption",
@@ -140,10 +158,12 @@ class DiskUtil(object):
             "KeyEncryptionKeyUrl":KeyEncryptionKeyUrl,
             "KeyVaultResourceId":public_settings.get(CommonVariables.KeyVaultResourceIdKey),
             "KeyVaultUrl":public_settings.get(CommonVariables.KeyVaultURLKey),
+            "AttestationUrl":AttestationUrl,
             "ProtectorName":"BitlockerExtensionPasswordProtector",
-            "ProtectorValueBase64":self.secure_key_wrap(protector=protector,
-                                                        kekResourceID=KekVaultResourceId,
-                                                        kekUrl=KeyEncryptionKeyUrl)
+            "ProtectorValueBase64":self.secure_key_release_operation(protectorbase64=protector,
+                                                        kekUrl=KeyEncryptionKeyUrl,
+                                                        operation=CommonVariables.secure_key_release_wrap,
+                                                        attestationUrl=AttestationUrl)
         }
         #TODO: needed to decide on temp path.
         custom_cmk = os.path.join("/var/lib/azure_disk_encryption_config/","custom_cmk.json")

@@ -48,6 +48,12 @@ class CommonVariables:
     encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
 
     """
+    Secure Key release for CVM
+    """
+    secure_key_release_wrap="-w"
+    secure_key_release_unwrap="-u"
+    secure_key_release_app = "AzureAttestSKR"
+    """
     IMDS IP:
     """
     static_IMDS_IP = '169.254.169.254'
@@ -116,6 +122,7 @@ class CommonVariables:
     KekVaultResourceIdKey = 'KekVaultResourceId'
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
     DiskFormatQuerykey = "DiskFormatQuery"
+    AttestationUrl = "AttestationUrl"
     PassphraseKey = 'Passphrase'
     MigrateKey = 'MigrateFlag'
     MigrateValue = 'Migrate'

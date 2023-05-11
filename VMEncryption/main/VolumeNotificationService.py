@@ -34,7 +34,8 @@ class VolumeNotificationService(object):
         if servicepath and os.path.exists(servicepath):
             self.workingDirectory = servicepath
         else:
-             fileDirectory=os.path.dirname(__file__)
+             absFilePath=os.path.abspath(__file__)
+             fileDirectory=os.path.dirname(absFilePath)
              self.workingDirectory = os.path.join(fileDirectory,'..')
         #normalize the path
         self.workingDirectory = os.path.normpath(self.workingDirectory)
