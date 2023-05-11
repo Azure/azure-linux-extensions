@@ -461,7 +461,7 @@ def stop_telegraf_service(is_lad):
         telegraf_service_path = get_telegraf_service_path()
 
         if os.path.isfile(telegraf_service_path):
-            code = os.system("sudo systemctl stop metrics-sourcer")
+            code = os.system("systemctl stop {0}".format(telegraf_service_name))              
         else:
             return False, "Telegraf service file does not exist. Failed to stop telegraf service: metrics-sourcer.service."
 
@@ -536,9 +536,14 @@ def setup_telegraf_service(telegraf_bin, telegraf_d_conf_dir, telegraf_agent_con
             os.system(r"sed -i 's+%TELEGRAF_AGENT_CONFIG%+{1}+' {0}".format(telegraf_service_path, telegraf_agent_conf))
             os.system(r"sed -i 's+%TELEGRAF_CONFIG_DIR%+{1}+' {0}".format(telegraf_service_path, telegraf_d_conf_dir))
 
-            daemon_reload_status = os.system("sudo systemctl daemon-reload")
+            daemon_reload_status = os.system("systemctl daemon-reload")
             if daemon_reload_status != 0:
-                raise Exception("Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service.")
+                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service. Check system for hardening. Exit code:" + str(daemon_reload_status)
+                if HUtilObj is not None:
+                    HUtilObj.log(message)
+                else:
+                    print('Info: {0}'.format(message))
+
         else:
             raise Exception("Unable to copy Telegraf service template file to {0}. Failed to setup telegraf service.".format(telegraf_service_path))
     else:
@@ -572,9 +577,9 @@ def start_telegraf(is_lad):
 
     # If the VM has systemd, telegraf will be managed as a systemd service
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart metrics-sourcer")
+        service_restart_status = os.system("systemctl restart {0}".format(telegraf_service_name))        
         if service_restart_status != 0:
-            log_messages += "Unable to start Telegraf service. Failed to start telegraf service."
+            log_messages += "Unable to start Telegraf service using systemctl. Failed to start telegraf service. Check system for hardening."
             return False, log_messages
 
     # Otherwise, start telegraf as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
