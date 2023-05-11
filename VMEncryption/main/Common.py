@@ -53,6 +53,11 @@ class CommonVariables:
     secure_key_release_wrap="-w"
     secure_key_release_unwrap="-u"
     secure_key_release_app = "AzureAttestSKR"
+
+    """
+    CVM LUKS2 header token
+    """
+    cvm_ade_vm_encryption_token_id = 5
     """
     IMDS IP:
     """

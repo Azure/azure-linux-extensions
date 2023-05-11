@@ -780,6 +780,8 @@ def enable():
                                   bek_util=bek_util,
                                   encryption_config=encryption_config,
                                   passphrase_file=generated_passphrase_file)
+        if security_Type == CommonVariables.ConfidentialVM:
+            crypt_mount_config_util.device_unlock_using_luks2_header()
 
         encryption_status = json.loads(disk_util.get_encryption_status())
         logger.log('Data Disks Status: {0}'.format(encryption_status['data']))

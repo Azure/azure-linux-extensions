@@ -55,6 +55,18 @@ class CryptMountConfigUtil(object):
         self.disk_util = disk_util
         self.command_executor = CommandExecutor(self.logger)
 
+    def get_key_file_path(self,devpath,key_mount_point=CommonVariables.encryption_key_mount_point):
+            key_file = ""
+         # get the scsi and lun number for the dev_path of this crypt_item
+            scsi_lun_numbers = self.disk_util.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(devpath)])
+            if len(scsi_lun_numbers) == 0:
+                # The default in case we didn't get any scsi/lun numbers
+                key_file = os.path.join(key_mount_point, self.encryption_environment.default_bek_filename)
+            else:
+                scsi_controller, lun_number = scsi_lun_numbers[0]
+                key_file = os.path.join(key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
+            return key_file
+    
     def parse_crypttab_line(self, line):
         crypttab_parts = line.strip().split()
 
@@ -97,8 +109,48 @@ class CryptMountConfigUtil(object):
         crypt_item.file_system = crypt_mount_item_properties[4]
         crypt_item.uses_cleartext_key = True if crypt_mount_item_properties[5] == "True" else False
         crypt_item.current_luks_slot = int(crypt_mount_item_properties[6]) if len(crypt_mount_item_properties) > 6 else -1
-
         return crypt_item
+    
+    def device_unlock_using_luks2_header(self):
+        """Reads vm setting properties of blcock devices that have wrapped passphrase in tokens in LUKS header."""
+        self.logger.log("device_unlock_using_luks2_header Start")
+        device_items = self.disk_util.get_device_items(None)
+        azure_name_table = self.disk_util.get_block_device_to_azure_udev_table()
+        for device_item in device_items:
+            if device_item.file_system == "crypto_LUKS": 
+                device_item_path = self.disk_util.get_device_path(device_item.name)
+                device_item_real_path = os.path.realpath(device_item_path)
+                if self.disk_util.is_device_locked(device_item_real_path,None):
+                    self.logger.log("Found an encrypted device {0} in locked state.".format(device_item.name))
+                    #read protector from device luks header.
+                    protector = self.disk_util.export_token(device_item.name)
+                    if not protector:
+                        self.logger.log("device_unlock_using_luks2_header {0} device does not have token field containing wrapped protector.".format(device))
+                        continue
+                    crypt_item = CryptItem()
+                    crypt_item.dev_path = azure_name_table[device_item_path] if device_item_path in azure_name_table else device_item_path
+                    #using UUID of crypted device as mappers name. 
+                    crypt_item.mapper_name = self.disk_util.get_device_items_property(dev_name=device_item.name,
+                                                                                      property_name='UUID')
+                    crypt_item.uses_cleartext_key = False
+                    crypt_item.current_luks_slot = -1
+                    passphrase_file = self.get_key_file_path(device_item_real_path,"/var/lib/azure_disk_encryption_config")
+                    with open(passphrase_file, 'w') as f:
+                        f.writelines(protector)
+                    crypt_item.keyfile_path = passphrase_file
+
+                    return_code = self.disk_util.luks_open(passphrase_file=passphrase_file,
+                                                           dev_path=device_item_real_path,
+                                                           mapper_name=crypt_item.mapper_name,
+                                                           header_file=None,
+                                                           uses_cleartext_key=False)
+                    if return_code != CommonVariables.process_success:
+                        self.logger.log(msg='device_unlock_using_luks2_header cryptsetup luksOpen failed return code {0}'.format(return_code),level=CommonVariables.ErrorLevel)
+                        continue
+                    self.add_crypt_item(crypt_item=crypt_item,
+                                        backup_folder=None)
+                    #TODO: look at "for added crypted device there will not be any mount points."
+        self.logger.log("device_unlock_using_luks2_header End")
 
     def consolidate_azure_crypt_mount(self, passphrase_file):
         """
@@ -291,7 +343,7 @@ class CryptMountConfigUtil(object):
 
             if not crypt_item.dev_path:
                 raise Exception("Could not locate block device for rootfs")
-
+            
             crypt_item.luks_header_path = "/boot/luks/osluksheader"
 
             if not os.path.exists(crypt_item.luks_header_path):

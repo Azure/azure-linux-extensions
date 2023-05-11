@@ -104,7 +104,15 @@ class DiskUtil(object):
         path_var = device_header_path if device_header_path else device_path
         cmd = 'cryptsetup isLuks ' + path_var
         return (int)(self.command_executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
-
+      
+    def is_device_locked(self, device_path, device_header_path):
+        '''Checks if device is locked or unlocked'''
+        if not self.is_luks_device(device_path=device_path, device_header_path=device_header_path):
+            return False
+        path_var = device_header_path if device_header_path else device_path
+        cmd = 'test -b /dev/disk/by-id/dm-uuid-*$(cryptsetup luksUUID {0} | tr -d -)*'.format(path_var)
+        return (int)(self.command_executor.ExecuteInBash(cmd,suppress_logging=True)) != CommonVariables.process_success
+    
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
         if not os.path.exists(luks_header_file_path):
@@ -128,7 +136,8 @@ class DiskUtil(object):
             cmd = "{0} -k {1} -s {2}".format(skr_app,kekUrl,protectorbase64)
         cmd = "{0} {1}".format(cmd,operation)
         process_comm = ProcessCommunicator()
-        ret = self.command_executor.Execute(cmd,communicator=process_comm)
+        #needed to subpress logic for this execute command. run this command silently due to password. 
+        ret = self.command_executor.Execute(cmd,communicator=process_comm,suppress_logging=True)
         if ret:
             msg = ""
             if process_comm.stderr:
@@ -142,14 +151,22 @@ class DiskUtil(object):
         return process_comm.stdout.strip()
     
     def import_token(self,device_name,passphrase_file,public_settings):
+        '''this function reads passphrase from passphrase file, wrap it and update in token field of LUKS2 header.'''
         self.logger.log(msg="import_token: device: {0} LUKS2 token field, update for wrapped passphrase")
         protector = ""
         with open(passphrase_file,"rb") as protector_file:
-            #passphrase stored in keyfile in base64
-            protector = protector_file.read()
+            #passphrase stored in keyfile is base64
+            protector = protector_file.read().decode('utf-8')
         KekVaultResourceId=public_settings.get(CommonVariables.KekVaultResourceIdKey)
         KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
         AttestationUrl = public_settings.get(CommonVariables.AttestationUrl)
+        wrappedProtector = self.secure_key_release_operation(protectorbase64=protector,
+                                                        kekUrl=KeyEncryptionKeyUrl,
+                                                        operation=CommonVariables.secure_key_release_wrap,
+                                                        attestationUrl=AttestationUrl)
+        if not wrappedProtector:
+            self.logger.log(f"protector is not wrapped successful for device {0}".format(device_name))
+            return False
         data={
             "version":"1.0",
             "type":"Azure_Disk_Encryption",
@@ -160,10 +177,7 @@ class DiskUtil(object):
             "KeyVaultUrl":public_settings.get(CommonVariables.KeyVaultURLKey),
             "AttestationUrl":AttestationUrl,
             "ProtectorName":"BitlockerExtensionPasswordProtector",
-            "ProtectorValueBase64":self.secure_key_release_operation(protectorbase64=protector,
-                                                        kekUrl=KeyEncryptionKeyUrl,
-                                                        operation=CommonVariables.secure_key_release_wrap,
-                                                        attestationUrl=AttestationUrl)
+            "ProtectorValueBase64":wrappedProtector
         }
         #TODO: needed to decide on temp path.
         custom_cmk = os.path.join("/var/lib/azure_disk_encryption_config/","custom_cmk.json")
@@ -171,15 +185,35 @@ class DiskUtil(object):
         json.dump(data,out_file,indent=4)
         device_path = os.path.join("/dev",device_name)
         out_file.close()
-        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(custom_cmk,5,device_path)
+        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(custom_cmk,CommonVariables.cvm_ade_vm_encryption_token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd,communicator=process_comm)
         self.logger.log(msg="import_token: device: {0} status: {1}".format(device_name,status))
-        #os.remove(custom_cmk)
-        return status
+        os.remove(custom_cmk)
+        return status==CommonVariables.process_success
     
-    def export_token(self,device_name,passphrase_file,public_settings):
-        pass
+    def export_token(self,device_name):
+        '''This function reads token id from luks2 header field and unwrap passphrase'''
+        device_path = os.path.join("/dev",device_name)
+        protector = None
+        cmd = "cryptsetup token export --token-id {0} {1}".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_path)
+        process_comm = ProcessCommunicator()
+        status = self.command_executor.Execute(cmd, communicator=process_comm)
+        if status != 0:
+            return None
+        token = process_comm.stdout
+        disk_encryption_setting=json.loads(token)
+        if disk_encryption_setting['version'] == "1.0":
+            keyEncryptionKeyUrl=disk_encryption_setting['KeyEncryptionKeyUrl']
+            wrappedProtector = disk_encryption_setting['ProtectorValueBase64']
+            attestationUrl = disk_encryption_setting['AttestationUrl']
+        if wrappedProtector:
+            #unwrap the protector.
+            protector=self.secure_key_release_operation(attestationUrl=attestationUrl,
+                                                        kekUrl=keyEncryptionKeyUrl,
+                                                        protectorbase64=wrappedProtector,
+                                                        operation=CommonVariables.secure_key_release_unwrap)
+        return protector
 
     def encrypt_disk(self, dev_path, passphrase_file, mapper_name, header_file):
         return_code = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
@@ -1249,3 +1283,5 @@ class DiskUtil(object):
             self.logger.log("getting exception on finding osmapper.")
             raise
         return osmapper_name
+
+    
