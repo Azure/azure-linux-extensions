@@ -589,7 +589,7 @@ def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_a
 
             daemon_reload_status = os.system("systemctl daemon-reload")
             if daemon_reload_status != 0:
-                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service. Exit code:" + str(daemon_reload_status)
+                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service. Check system for hardening. Exit code:" + str(daemon_reload_status)
                 if HUtilObj is not None:
                     HUtilObj.log(message)
                 else:
@@ -631,7 +631,7 @@ def start_telegraf(is_lad):
     if metrics_utils.is_systemd():
         service_restart_status = os.system("systemctl restart {0}".format(telegraf_service_name))        
         if service_restart_status != 0:
-            log_messages += "Unable to start Telegraf service using systemctl. Failed to start telegraf service."
+            log_messages += "Unable to start Telegraf service using systemctl. Failed to start telegraf service. Check system for hardening."
             return False, log_messages
 
     # Otherwise, start telegraf as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
