@@ -241,6 +241,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     if not protect_settings or 'username' not in protect_settings:
         return
 
+    hutil.log(protect_settings)
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
