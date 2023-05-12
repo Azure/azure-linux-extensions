@@ -277,11 +277,11 @@ def _set_user_account_pub_key(protect_settings, hutil):
     # Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt:
         # support for SSH2-compatible format for public keys in addition to OpenSSH-compatible format
-        logger.log(cert_txt)
+        hutil.log(cert_txt)
         if (cert_txt.strip().startswith(BeginSSHTag)):
             ext_utils.set_file_contents("temp.pub", cert_txt.strip())
             retcode, output = ext_utils.run_command_get_output(['ssh-keygen', '-i', '-f', 'temp.pub'])
-            logger.log(output)
+            hutil.log(output)
             if retcode > 0:
                 raise Exception("Failed to convert SSH2 key to OpenSSH key.")
             cert_txt = output
