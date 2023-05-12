@@ -244,6 +244,8 @@ def _set_user_account_pub_key(protect_settings, hutil):
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
+    hutil.log("cert_txt")
+    hutil.log(cert_txt)
     expiration = protect_settings.get('expiration')
     no_convert = False
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
