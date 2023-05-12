@@ -42,6 +42,7 @@ SshdConfigPath = '/etc/ssh/sshd_config'
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
 
+
 class ConfigurationProvider(object):
     """
     Parse amd store key:values in waagent.conf
