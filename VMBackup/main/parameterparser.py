@@ -36,7 +36,7 @@ class ParameterParser(object):
         self.includedDisks = None
         self.settings = {}
         self.dynamicConfigsFromCRP = None
-        self.wellKnownSettingFlags = {'isSnapshotTtlEnabled': False, 'useMccfToFetchDsasForAllDisks': False, 'useMccfForLad': False}
+        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
         self.includeLunList = []    #To be shared with HP
 
         """
