@@ -49,8 +49,9 @@ def get_os_name():
     return None
 
 def get_linux_agent_conf_filename(os_name):
-    if os_name is not None and re.search("coreos", os_name, re.IGNORECASE):
-        return "/usr/share/oem/waagent.conf"
+    if os_name is not None:
+        if re.search("coreos", os_name, re.IGNORECASE) or re.search("flatcar", os_name, re.IGNORECASE):
+            return "/usr/share/oem/waagent.conf"
     return "/etc/waagent.conf"
 
 class ConfigurationProvider(object):
@@ -64,6 +65,7 @@ class ConfigurationProvider(object):
             logger.warning("Missing configuration in {0}, setting default values for PasswordCryptId and PasswordCryptSaltLength".format(wala_config_file))
             self.values["Provisioning.PasswordCryptId"] = "6"
             self.values["Provisioning.PasswordCryptSaltLength"] = 10
+            return
         try:
             for line in ext_utils.get_file_contents(wala_config_file).split('\n'):
                 if not line.startswith("#") and "=" in line:
