@@ -69,7 +69,7 @@ class HostSnapshotter(object):
                 headers['Content-type'] = 'application/json'
                 if (paras.includeLunList != None and paras.includeLunList.count != 0):
                     diskIds = paras.includeLunList
-                hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, paras.settings, paras.snapshotTaskToken, meta_data)
+                hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, paras.wellKnownSettingFlags, paras.snapshotTaskToken, meta_data)
                 body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
                 self.logger.log('Host Request body : ' + str(body_content))

@@ -94,7 +94,7 @@ class GuestSnapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
-                if(CommonVariables.isSnapshotTTLEnabled in settings and settings[CommonVariables.isSnapshotTTLEnabled]):
+                if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
                     headers["x-ms-snapshot-ttl-expiry-hours"] = '1'
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
@@ -150,7 +150,7 @@ class GuestSnapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
-                if(CommonVariables.isSnapshotTTLEnabled in settings and settings[CommonVariables.isSnapshotTTLEnabled]):
+                if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
                     headers["x-ms-snapshot-ttl-expiry-hours"] = '1'
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)

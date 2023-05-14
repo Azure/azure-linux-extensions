@@ -35,7 +35,7 @@ class ParameterParser(object):
         self.snapshotTaskToken = ''
         self.includedDisks = None
         self.settings = None
-        self.wellKnownSettingFlags = {'isSnapshotTTLEnabled','UseMCCFForLAD','UseMCCFToFetchDSASForAllDisks'}
+        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
         self.includeLunList = []    #To be shared with HP
 
         """
@@ -111,4 +111,7 @@ class ParameterParser(object):
             for flag in self.settings.keys():
                 if(flag not in self.wellKnownSettingFlags):
                     backup_logger.log("The received " + str(flag) + " is not an expected setting name.", True)
+                else:
+                    self.wellKnownSettingFlags[flag] = self.settings[flag]
             backup_logger.log("settings received " + str(self.settings), True)
+            backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
