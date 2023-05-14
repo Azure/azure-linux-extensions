@@ -34,8 +34,9 @@ class ParameterParser(object):
         self.customSettings = None
         self.snapshotTaskToken = ''
         self.includedDisks = None
-        self.settings = None
-        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
+        self.settings = {}
+        self.dynamicConfigsFromCRP = None
+        self.wellKnownSettingFlags = {'isSnapshotTtlEnabled': False, 'useMccfToFetchDsasForAllDisks': False, 'useMccfForLad': False}
         self.includeLunList = []    #To be shared with HP
 
         """
@@ -54,7 +55,6 @@ class ParameterParser(object):
         elif(CommonVariables.customSettings in protected_settings.keys()):
             backup_logger.log("Reading customSettings from protected_settings", True)
             self.customSettings = protected_settings.get(CommonVariables.customSettings)
-
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):
@@ -77,8 +77,8 @@ class ParameterParser(object):
             self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
         if(CommonVariables.includedDisks in self.public_config_obj.keys()):
             self.includedDisks = self.public_config_obj[CommonVariables.includedDisks]
-        if("dynamicConfigsFromCRP" in self.public_config_obj.keys()):
-            self.settings = self.public_config_obj['dynamicConfigsFromCRP']
+        if("dynamicConfigsFromCRP" in self.public_config_obj):
+            self.dynamicConfigsFromCRP = self.public_config_obj['dynamicConfigsFromCRP']
 
         """
         first get the protected configuration
@@ -107,11 +107,19 @@ class ParameterParser(object):
             errorMsg = "Exception occurred while populating includeLunList, Exception: %s" % (str(e))
             backup_logger.log(errorMsg, True)
         
-        if(self.settings != None):
-            for flag in self.settings.keys():
-                if(flag not in self.wellKnownSettingFlags):
-                    backup_logger.log("The received " + str(flag) + " is not an expected setting name.", True)
-                else:
-                    self.wellKnownSettingFlags[flag] = self.settings[flag]
-            backup_logger.log("settings received " + str(self.settings), True)
-            backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
+        if(self.dynamicConfigsFromCRP != None):
+            try:
+                dynamicConfigsFromCRP_str = json.dumps(self.dynamicConfigsFromCRP)
+                listOfSettings = json.loads(dynamicConfigsFromCRP_str)
+                for dictionary in listOfSettings:
+                    self.settings[dictionary['Key']] = dictionary['Value']
+                backup_logger.log("settings received " + str(self.settings), True)
+                for flag in self.settings.keys():
+                    if(flag not in self.wellKnownSettingFlags):
+                        backup_logger.log("The received " + str(flag) + " is not an expected setting name.", True)
+                    else:
+                        self.wellKnownSettingFlags[flag] = self.settings[flag]
+                backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
+            except Exception as e:
+                errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
+                backup_logger.log(errorMsg, True)
