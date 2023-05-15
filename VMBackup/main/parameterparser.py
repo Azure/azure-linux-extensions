@@ -109,9 +109,7 @@ class ParameterParser(object):
         
         if(self.dynamicConfigsFromCRP != None):
             try:
-                dynamicConfigsFromCRP_str = json.dumps(self.dynamicConfigsFromCRP)
-                listOfSettings = json.loads(dynamicConfigsFromCRP_str)
-                for dictionary in listOfSettings:
+                for dictionary in self.dynamicConfigsFromCRP:
                     self.settings[dictionary['Key']] = dictionary['Value']
                 backup_logger.log("settings received " + str(self.settings), True)
                 for flag in self.settings.keys():
