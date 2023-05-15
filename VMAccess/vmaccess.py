@@ -124,9 +124,6 @@ def enable():
         reset_ssh = None
         remove_user = None
         protect_settings = hutil.get_protected_settings()
-        hutil.log("cert_txt 1")
-        hutil.log(protect_settings.get('ssh_key'))
-        hutil.log("done logging cert_txt")
         if protect_settings:
             reset_ssh = protect_settings.get('reset_ssh')
             remove_user = protect_settings.get('remove_user')
@@ -247,8 +244,6 @@ def _set_user_account_pub_key(protect_settings, hutil):
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
-    hutil.log("cert_txt")
-    hutil.log(cert_txt)
     expiration = protect_settings.get('expiration')
     no_convert = False
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
@@ -282,11 +277,9 @@ def _set_user_account_pub_key(protect_settings, hutil):
     # Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt:
         # support for SSH2-compatible format for public keys in addition to OpenSSH-compatible format
-        hutil.log(cert_txt)
         if (cert_txt.strip().startswith(BeginSSHTag)):
             ext_utils.set_file_contents("temp.pub", cert_txt.strip())
             retcode, output = ext_utils.run_command_get_output(['ssh-keygen', '-i', '-f', 'temp.pub'])
-            hutil.log(output)
             if retcode > 0:
                 raise Exception("Failed to convert SSH2 key to OpenSSH key.")
             cert_txt = output
