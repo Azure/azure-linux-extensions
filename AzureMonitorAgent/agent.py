@@ -1196,13 +1196,13 @@ def generate_localsyslog_configs():
     """
 
     public_settings, _ = get_settings()
-    port = ''
+    syslog_port = ''
     if os.path.isfile(AMASyslogPortFilePath):
         f = open(AMASyslogPortFilePath, "r")
-        port = f.read()
+        syslog_port = f.read()
         f.close()
 
-    if public_settings is not None and "useOmfwd" in public_settings and port != '':
+    if public_settings is not None and "useOmfwd" in public_settings and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
@@ -1213,7 +1213,7 @@ def generate_localsyslog_configs():
                 os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
                 restartRequired = True                
             
-            portSetting = 'Port="' + port + '"'
+            portSetting = 'Port="' + syslog_port + '"'
             defaultPortSetting = 'Port="28330"'
             portUpdated = False
             with open('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf') as f:
@@ -1243,7 +1243,7 @@ def generate_localsyslog_configs():
                 os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
                 restartRequired = True
 
-            portSetting = "port(" + port + ")"
+            portSetting = "port(" + syslog_port + ")"
             defaultPortSetting = "port(28330)"
             portUpdated = False
             with open('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf') as f:
