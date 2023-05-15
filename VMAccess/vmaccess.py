@@ -75,7 +75,7 @@ class ConfigurationProvider(object):
                         self.values[parts[0]] = value
                     else:
                         self.values[parts[0]] = None
-        # when get_file_contgents returns none
+        # when get_file_contents returns none
         except AttributeError:
             logger.error("Unable to parse {0}".format(wala_config_file))
             raise
