@@ -34,7 +34,6 @@ class ParameterParser(object):
         self.customSettings = None
         self.snapshotTaskToken = ''
         self.includedDisks = None
-        self.settings = {}
         self.dynamicConfigsFromCRP = None
         self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
         self.includeLunList = []    #To be shared with HP
@@ -110,12 +109,14 @@ class ParameterParser(object):
         if(self.dynamicConfigsFromCRP != None):
             try:
                 for config in self.dynamicConfigsFromCRP:
-                    self.settings[config['Key']] = config['Value']
-                    if(config['Key'] in self.wellKnownSettingFlags):
-                        self.wellKnownSettingFlags[config['Key']] = self.settings[config['Key']]
+                    if 'Key' in config and 'Value' in config:
+                        if(config['Key'] in self.wellKnownSettingFlags):
+                            self.wellKnownSettingFlags[config['Key']] = config['Value']
+                        else:
+                            backup_logger.log("The received " + str(config['Key']) + " is not an expected setting name.", True)
                     else:
-                        backup_logger.log("The received " + str(config['Key']) + " is not an expected setting name.", True)
-                backup_logger.log("settings received " + str(self.settings), True)
+                        backup_logger.log("The received dynamicConfigsFromCRP is not in expected format.", True)
+                backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
                 backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
             except Exception as e:
                 errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
