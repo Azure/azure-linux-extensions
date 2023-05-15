@@ -93,7 +93,7 @@ def stop_metrics_service(is_lad):
         metrics_service_name = get_metrics_extension_service_name(is_lad)
 
         if os.path.isfile(metrics_service_path):
-            code = os.system("sudo systemctl stop {0}".format(metrics_service_name))
+            code = os.system("systemctl stop {0}".format(metrics_service_name))            
         else:
             return False, "Metrics Extension service file does not exist. Failed to stop ME service: {0}.service.".format(metrics_service_name)
 
@@ -307,9 +307,9 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
             os.system(r"sed -i 's+%ME_INFLUX_PORT%+{1}+' {0}".format(me_service_path, me_influx_port))
             os.system(r"sed -i 's+%ME_DATA_DIRECTORY%+{1}+' {0}".format(me_service_path, configFolder))
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
-            daemon_reload_status = os.system("sudo systemctl daemon-reload")
+            daemon_reload_status = os.system("systemctl daemon-reload")
             if daemon_reload_status != 0:
-                message = "Unable to reload systemd after ME service file change. Failed to set up ME service. Exit code:" + str(daemon_reload_status)
+                message = "Unable to reload systemd after ME service file change. Failed to set up ME service. Check system for hardening. Exit code:" + str(daemon_reload_status)
                 if HUtilObj is not None:
                     HUtilObj.log(message)
                 else:
@@ -350,9 +350,9 @@ def start_metrics(is_lad):
     # If the VM has systemd, then we use that to start/stop
     metrics_service_name = get_metrics_extension_service_name(is_lad)
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart {0}".format(metrics_service_name))
+        service_restart_status = os.system("systemctl restart {0}".format(metrics_service_name))
         if service_restart_status != 0:
-            log_messages += "Unable to start {0}. Failed to start ME service.".format(metrics_service_name)
+            log_messages += "Unable to start {0} using systemctl. Failed to start ME service. Check system for hardening.".format(metrics_service_name)
             return False, log_messages
 
     #Else start ME as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
