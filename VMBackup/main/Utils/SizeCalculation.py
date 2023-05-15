@@ -68,7 +68,7 @@ class SizeCalculation(object):
             self.logger.log("As the LunList is empty including all disks")
     
     def get_lsscsi_list(self):
-        command = "sudo lsscsi"
+        command = "lsscsi"
         try:
             self.lsscsi_list = (os.popen(command).read()).splitlines()
         except Exception as e:
@@ -86,10 +86,10 @@ class SizeCalculation(object):
 
     def get_pvs_list(self):
         try:
-            self.pvs_output = os.popen("sudo pvs").read().strip().split("\n")
+            self.pvs_output = os.popen("pvs").read().strip().split("\n")
             self.pvs_output = self.pvs_output[1:]
         except Exception as e:
-            error_msg = "Failed to execute the command sudo pvs because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command pvs because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.pvs_output = []
 
@@ -112,7 +112,7 @@ class SizeCalculation(object):
                 idxOfColon = item.rindex(':',0,item.index(']'))# to get the index of last ':'
                 idxOfColon += 1
                 lunNumber = int(item[idxOfColon:item.index(']')])
-                # item_split is the list of elements present in the one row of the cmd sudo lsscsi
+                # item_split is the list of elements present in the one row of the cmd lsscsi
                 self.item_split = item.split()
                 #storing the corresponding device name from the list
                 device_name = self.item_split[len(self.item_split)-1]
@@ -128,7 +128,7 @@ class SizeCalculation(object):
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         else:
             self.size_calc_failed = True
-            self.logger.log("There is some glitch in executing the command 'sudo lsscsi' and therefore size calculation is marked as failed.")
+            self.logger.log("There is some glitch in executing the command 'lsscsi' and therefore size calculation is marked as failed.")
 
     def get_logicalVolumes_for_billing(self):
         try:
