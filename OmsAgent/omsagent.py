@@ -284,7 +284,7 @@ def main():
                     hutil_log_info('Exception info: {0}'.format(traceback.format_exc()))
 
     exit_code = check_disk_space_availability()
-    if exit_code is not 0:
+    if exit_code != 0:
         message = '{0} failed due to low disk space'.format(operation)
         log_and_exit(operation, exit_code, message)
 
@@ -312,12 +312,12 @@ def main():
 
         # Exit code 1 indicates a general problem that doesn't have a more
         # specific error code; it often indicates a missing dependency
-        if exit_code is 1 and operation == 'Install':
+        if exit_code == 1 and operation == 'Install':
             message = 'Install failed with exit code 1. Please check that ' \
                       'dependencies are installed. For details, check logs ' \
                       'in /var/log/azure/Microsoft.EnterpriseCloud.' \
                       'Monitoring.OmsAgentForLinux'
-        elif exit_code is 127 and operation == 'Install':
+        elif exit_code == 127 and operation == 'Install':
             # happens if shell bundle couldn't be extracted due to low space or missing dependency
             exit_code = 52 # since it is a missing dependency
             message = 'Install failed with exit code 127. Please check that ' \
@@ -328,7 +328,7 @@ def main():
             message = 'Install failed with exit code {0} because the ' \
                       'package manager on the VM is currently locked: ' \
                       'please wait and try again'.format(DPKGLockedErrorCode)
-        elif exit_code is not 0:
+        elif exit_code != 0:
             message = '{0} failed with exit code {1} {2}'.format(operation,
                                                              exit_code, output)
     except OmsAgentForLinuxException as e:
@@ -661,7 +661,7 @@ def enable():
     except:
         hutil_log_info('Failed to set permissions for OMS directories, could potentially have issues uploading.')
 
-    if exit_code is 0:
+    if exit_code == 0:
         # Create a marker file to denote the workspace that was
         # onboarded using the extension. This will allow supporting
         # multi-homing through the extension like Windows does
@@ -1020,7 +1020,7 @@ def exit_if_openssl_unavailable(operation):
     If not, throw error to return UnsupportedOpenSSL error code
     """
     exit_code, output = run_get_output('which openssl', True, False)
-    if exit_code is not 0:
+    if exit_code != 0:
         log_and_exit(operation, UnsupportedOpenSSL, 'OpenSSL is not available')
     return 0
 
@@ -1036,11 +1036,11 @@ def exit_if_gpg_unavailable(operation):
     if (vm_supp and (vm_dist.lower().startswith('debian'))):
         # Check if GPG already on VM
         check_exit_code, _ = run_get_output('which gpg', True, False)
-        if check_exit_code is not 0:
+        if check_exit_code != 0:
             # GPG not on VM, attempt to install
             hutil_log_info('GPG not found, attempting to install')
             exit_code, output = run_get_output(InstallExtraPackageCommandApt.format('gpg'))
-            if exit_code is not 0:
+            if exit_code != 0:
                 log_and_exit(operation, UnsupportedGpg, 'GPG could not be installed: {0}'.format(output))
             else:
                 hutil_log_info('GPG successfully installed')
@@ -1209,7 +1209,7 @@ def detect_scom_connection():
         cert_cmd = 'openssl x509 -in {0} -noout -text'.format(SCOMCertPath)
         cert_exit_code, cert_output = run_get_output(cert_cmd, chk_err = False,
                                                      log_cmd = False)
-        if cert_exit_code is 0:
+        if cert_exit_code == 0:
             issuer_re = re.compile(SCOMCertIssuerRegex, re.M)
             if issuer_re.search(cert_output):
                 hutil_log_info('SCOM cert exists and is signed by SCOM server')
@@ -1244,11 +1244,11 @@ def detect_scom_using_omsadmin():
     # Guard against older omsadmin.sh versions
     if ('illegal option' not in output.lower()
             and 'unknown option' not in output.lower()):
-        if exit_code is 0:
+        if exit_code == 0:
             hutil_log_info('According to {0}, SCOM port is ' \
                            'open'.format(omsadmin_cmd))
             return True
-        elif exit_code is 1:
+        elif exit_code == 1:
             hutil_log_info('According to {0}, SCOM port is not ' \
                            'open'.format(omsadmin_cmd))
     return False
@@ -1265,11 +1265,11 @@ def detect_scom_using_omiconfigeditor():
     # Guard against older omiconfigeditor versions
     if ('illegal option' not in output.lower()
             and 'unknown option' not in output.lower()):
-        if exit_code is 0:
+        if exit_code == 0:
             hutil_log_info('According to {0}, SCOM port is ' \
                            'open'.format(omi_cmd))
             return True
-        elif exit_code is 1:
+        elif exit_code == 1:
             hutil_log_info('According to {0}, SCOM port is not ' \
                            'open'.format(omi_cmd))
     return False
@@ -1318,7 +1318,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
         hutil_log_info('Output: \n{0}'.format(output))
 
     # For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log
-    if exit_code is 17:
+    if exit_code == 17:
         if "Failed dependencies:" in output:
             # 52 is the exit code for missing dependency
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
@@ -1339,7 +1339,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             exit_code = 52
             output = "There seems to be insufficient memory for the installation. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-    elif exit_code is 19:
+    elif exit_code == 19:
         if "rpmdb" in output or "cannot open Packages database" in output or "dpkg (subprocess): cannot set security execution context for maintainer script" in output or "is locked by another process" in output:
             # OMI (19) happens to be the first package we install and if we get rpmdb failures, its a system issue
             # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
@@ -1352,7 +1352,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             exit_code = 52
             output = "Installation failed due to missing dependencies. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-    elif exit_code is 33:
+    elif exit_code == 33:
         if "Permission denied" in output:
             # Enable failures
             # 52 is the exit code for missing dependency. 
@@ -1360,19 +1360,19 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             exit_code = 52
             output = "Installation failed due to insufficient permissions. Please ensure omsagent user is part of the sudoer file and has sufficient permissions, and omsconfig MetaConfig.mof can be generated. For details, check logs in /var/opt/microsoft/omsconfig/omsconfig.log and /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-    elif exit_code is 18:
+    elif exit_code == 18:
             # Install failures
             # DSC install failure
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             output = "Installation failed due to omsconfig package not being able to install. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-    elif exit_code is 5:
+    elif exit_code == 5:
         if "Reason: InvalidWorkspaceKey" in output or "Reason: MissingHeader" in output:
             # Enable failures
             # 53 is the exit code for configuration errors
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             exit_code = 53
             output = "Installation failed due to incorrect workspace key. Please check if the workspace key is correct. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
-    elif exit_code is 8:
+    elif exit_code == 8:
         if "Check the correctness of the workspace ID and shared key" in output or "internet connectivity" in output:
             # Enable failures
             # 53 is the exit code for configuration errors
@@ -1380,7 +1380,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
             exit_code = 53
             output = "Installation failed due to curl error while onboarding. Please check the internet connectivity or the workspace key. For details, check logs in /var/log/azure/Microsoft.EnterpriseCloud.Monitoring.OmsAgentForLinux/extension.log"
 
-    if exit_code is not 0 and exit_code is not 52:
+    if exit_code != 0 and exit_code != 52:
         if "dpkg:" in output or "dpkg :" in output or "rpmdb:" in output or "rpm.lock" in output or "locked by another process" in output:
             # If we get rpmdb failures, its a system issue.
             # 52 is the exit code for missing dependency i.e. rpmdb, libc6 or libpam-runtime
@@ -1485,7 +1485,7 @@ def is_dpkg_locked(exit_code, output):
     If dpkg is locked, the output will contain a message similar to 'dpkg
     status database is locked by another process'
     """
-    if exit_code is not 0:
+    if exit_code != 0:
         dpkg_locked_search = r'^.*dpkg.+lock.*$'
         dpkg_locked_re = re.compile(dpkg_locked_search, re.M)
         if dpkg_locked_re.search(output):
@@ -1527,14 +1527,14 @@ def retry_if_dpkg_locked_or_curl_is_not_found(exit_code, output):
     if dpkg_locked:
         return True, 'Retrying command because package manager is locked.', \
                retry_verbosely
-    elif (not curl_found and apt_get_exit_code is 0 and
+    elif (not curl_found and apt_get_exit_code == 0 and
             ('apt-get -f install' in output
             or 'Unmet dependencies' in output.lower())):
         hutil_log_info('Installing all dependencies of curl:')
         run_command_and_log('apt-get -f install')
         return True, 'Retrying command because curl and its dependencies ' \
                      'needed to be installed', retry_verbosely
-    elif not curl_found and apt_get_exit_code is 0:
+    elif not curl_found and apt_get_exit_code == 0:
         hutil_log_info('Updating package lists to make curl available')
         run_command_and_log('apt-get update')
         return True, 'Retrying command because package lists needed to be ' \
@@ -2009,8 +2009,8 @@ def retry_get_workspace_info_from_oms(oms_response):
         hutil_log_error('Unable to get HTTP code from OMS repsonse')
         return False
 
-    if (oms_response_http_code is 202 or oms_response_http_code is 204
-                                      or oms_response_http_code is 404):
+    if (oms_response_http_code == 202 or oms_response_http_code == 204
+                                      or oms_response_http_code == 404):
         hutil_log_info('Retrying ValidateMachineIdentity OMS request ' \
                        'because workspace is still being provisioned; HTTP ' \
                        'code from OMS is {0}'.format(oms_response_http_code))
@@ -2081,7 +2081,7 @@ def log_and_exit(operation, exit_code = 1, message = ''):
     """
     Log the exit message and perform the exit
     """
-    if exit_code is 0:
+    if exit_code == 0:
         waagent_log_info(message)
         hutil_log_info(message)
         exit_status = 'success'
