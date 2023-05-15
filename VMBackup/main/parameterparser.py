@@ -108,6 +108,7 @@ class ParameterParser(object):
         
         if(self.dynamicConfigsFromCRP != None):
             try:
+                backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
                 for config in self.dynamicConfigsFromCRP:
                     if 'Key' in config and 'Value' in config:
                         if(config['Key'] in self.wellKnownSettingFlags):
@@ -116,7 +117,6 @@ class ParameterParser(object):
                             backup_logger.log("The received " + str(config['Key']) + " is not an expected setting name.", True)
                     else:
                         backup_logger.log("The received dynamicConfigsFromCRP is not in expected format.", True)
-                backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
                 backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
             except Exception as e:
                 errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
