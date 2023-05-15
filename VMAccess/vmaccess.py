@@ -124,6 +124,9 @@ def enable():
         reset_ssh = None
         remove_user = None
         protect_settings = hutil.get_protected_settings()
+        hutil.log("cert_txt 1")
+        hutil.log(protect_settings.get('ssh_key'))
+        hutil.log("done logging cert_txt")
         if protect_settings:
             reset_ssh = protect_settings.get('reset_ssh')
             remove_user = protect_settings.get('remove_user')
