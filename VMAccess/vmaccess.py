@@ -75,7 +75,7 @@ class ConfigurationProvider(object):
                         self.values[parts[0]] = value
                     else:
                         self.values[parts[0]] = None
-        # when get_file_contents returns none
+        # when get_file_contgents returns none
         except AttributeError:
             logger.error("Unable to parse {0}".format(wala_config_file))
             raise
@@ -405,7 +405,7 @@ def _get_default_ssh_config_filename():
             return "SuSE_default"
         if re.search("ubuntu", OSName, re.IGNORECASE):
             return "ubuntu_default"
-        return "default"
+    return "default"
 
 
 def _reset_sshd_config(sshd_file_path):
