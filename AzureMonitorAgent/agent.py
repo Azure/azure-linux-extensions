@@ -47,6 +47,7 @@ import crypt
 import xml.dom.minidom
 import re
 import hashlib
+import fileinput
 from collections import OrderedDict
 from distutils.version import LooseVersion
 from hashlib import sha256
@@ -111,6 +112,7 @@ PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
+AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -1192,34 +1194,112 @@ def generate_localsyslog_configs():
     """
     Install local syslog configuration files if not present and restart syslog
     """
-    if os.path.exists('/etc/rsyslog.d/') and not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent.conf","/etc/rsyslog.d/10-azuremonitoragent.conf")
-        os.chmod('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        os.chmod('/etc/rsyslog.d/10-azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        run_command_and_log(get_service_command("rsyslog", "restart"))
-        hutil_log_info("Installed local syslog configuration files and restarted syslog")
 
-    if os.path.exists('/etc/syslog-ng/syslog-ng.conf') and not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
-        syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
-        os.makedir(syslog_ng_confpath)
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
-        os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        run_command_and_log(get_service_command("syslog-ng", "restart"))
-        hutil_log_info("Installed local syslog configuration files and restarted syslog")
+    public_settings, _ = get_settings()
+    syslog_port = ''
+    if os.path.isfile(AMASyslogPortFilePath):
+        f = open(AMASyslogPortFilePath, "r")
+        syslog_port = f.read()
+        f.close()
+
+    if public_settings is not None and "useOmfwd" in public_settings and syslog_port != '':
+        if os.path.exists('/etc/rsyslog.d/'):            
+            restartRequired = False
+            if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+                    os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                    os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+                os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True                
+            
+            portSetting = 'Port="' + syslog_port + '"'
+            defaultPortSetting = 'Port="28330"'
+            portUpdated = False
+            with open('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf') as f:
+                if portSetting not in f.read():
+                    portUpdated = True
+
+            if portUpdated == True:
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+                with fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak') as file:
+                    for line in file:
+                        print(line.replace(defaultPortSetting, portSetting), end='')
+                os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+            
+            if restartRequired == True:
+                run_command_and_log(get_service_command("rsyslog", "restart"))
+                hutil_log_info("Installed local syslog configuration files and restarted syslog")
+
+        if os.path.exists('/etc/syslog-ng/syslog-ng.conf'):
+            restartRequired = False
+            if not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+                if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+                    os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+                syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
+                os.makedir(syslog_ng_confpath)
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+                os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+
+            portSetting = "port(" + syslog_port + ")"
+            defaultPortSetting = "port(28330)"
+            portUpdated = False
+            with open('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf') as f:
+                if portSetting not in f.read():
+                    portUpdated = True
+
+            if portUpdated == True:
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+                with fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak') as file:
+                    for line in file:
+                        print(line.replace(defaultPortSetting, portSetting), end='')
+                os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+            
+            if restartRequired == True:
+                run_command_and_log(get_service_command("syslog-ng", "restart"))
+                hutil_log_info("Installed local syslog configuration files and restarted syslog")    
+    else:
+        if os.path.exists('/etc/rsyslog.d/') and not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+            if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+                os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent.conf","/etc/rsyslog.d/10-azuremonitoragent.conf")
+            os.chmod('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            os.chmod('/etc/rsyslog.d/10-azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            run_command_and_log(get_service_command("rsyslog", "restart"))
+            hutil_log_info("Installed local syslog configuration files and restarted syslog")
+
+        if os.path.exists('/etc/syslog-ng/syslog-ng.conf') and not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+            if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+                os.remove("/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+            syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
+            os.makedir(syslog_ng_confpath)
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+            os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            run_command_and_log(get_service_command("syslog-ng", "restart"))
+            hutil_log_info("Installed local syslog configuration files and restarted syslog")
 
 def remove_localsyslog_configs():
     """
     Remove local syslog configuration files if present and restart syslog
-    """
-    if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
-        os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
-        os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
+    """    
+    if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf') or os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+            os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+            os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+            os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
         run_command_and_log(get_service_command("rsyslog", "restart"))
         hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
 
-    if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
-        os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+    if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf') or os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+        if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+            os.remove("/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+        if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+            os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
         run_command_and_log(get_service_command("syslog-ng", "restart"))
         hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
 
