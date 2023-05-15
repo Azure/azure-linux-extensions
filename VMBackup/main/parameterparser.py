@@ -109,14 +109,13 @@ class ParameterParser(object):
         
         if(self.dynamicConfigsFromCRP != None):
             try:
-                for dictionary in self.dynamicConfigsFromCRP:
-                    self.settings[dictionary['Key']] = dictionary['Value']
-                backup_logger.log("settings received " + str(self.settings), True)
-                for flag in self.settings.keys():
-                    if(flag not in self.wellKnownSettingFlags):
-                        backup_logger.log("The received " + str(flag) + " is not an expected setting name.", True)
+                for config in self.dynamicConfigsFromCRP:
+                    self.settings[config['Key']] = config['Value']
+                    if(config['Key'] in self.wellKnownSettingFlags):
+                        self.wellKnownSettingFlags[config['Key']] = self.settings[config['Key']]
                     else:
-                        self.wellKnownSettingFlags[flag] = self.settings[flag]
+                        backup_logger.log("The received " + str(config['Key']) + " is not an expected setting name.", True)
+                backup_logger.log("settings received " + str(self.settings), True)
                 backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
             except Exception as e:
                 errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
