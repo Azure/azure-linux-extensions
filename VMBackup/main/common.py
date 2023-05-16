@@ -42,6 +42,12 @@ class CommonVariables:
     statusBlobUploadError = 'statusBlobUploadError'
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
+    isSnapshotTtlEnabled = 'isSnapshotTtlEnabled'
+    useMccfForLad = 'useMccfForLad'
+    useMccfToFetchDsasForAllDisks = 'useMccfToFetchDsasForAllDisks'
+    key = 'Key'
+    value = 'Value'
+    snapshotTtlHeader = 'x-ms-snapshot-ttl-expiry-hours'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
