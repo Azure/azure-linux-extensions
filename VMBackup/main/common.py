@@ -47,8 +47,7 @@ class CommonVariables:
     useMccfToFetchDsasForAllDisks = 'useMccfToFetchDsasForAllDisks'
     key = 'Key'
     value = 'Value'
-    headerPrefix = 'x-ms-snapshot-ttl-expiry-hours'
-
+    snapshotTtlHeader = 'x-ms-snapshot-ttl-expiry-hours'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
