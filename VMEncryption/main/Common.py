@@ -58,6 +58,8 @@ class CommonVariables:
     CVM LUKS2 header token
     """
     cvm_ade_vm_encryption_token_id = 5
+    ADEEncryptionVersionInLuksToken_1_0='1.0'
+    PassphraseNameValue = 'LUKSPasswordProtector'
     """
     IMDS IP:
     """
@@ -127,8 +129,9 @@ class CommonVariables:
     KekVaultResourceIdKey = 'KekVaultResourceId'
     KeyEncryptionAlgorithmKey = 'KeyEncryptionAlgorithm'
     DiskFormatQuerykey = "DiskFormatQuery"
-    AttestationUrl = "AttestationUrl"
+    AttestationURLKey = "AttestationURL"
     PassphraseKey = 'Passphrase'
+    PassphraseNameKey = 'PassphraseName'
     MigrateKey = 'MigrateFlag'
     MigrateValue = 'Migrate'
     PassphraseLengthInBytes = 127

@@ -123,7 +123,7 @@ class CryptMountConfigUtil(object):
                 if self.disk_util.is_device_locked(device_item_real_path,None):
                     self.logger.log("Found an encrypted device {0} in locked state.".format(device_item.name))
                     #read protector from device luks header.
-                    protector = self.disk_util.export_token(device_item.name)
+                    protector = self.disk_util.export_token(device_name=device_item.name)
                     if not protector:
                         self.logger.log("device_unlock_using_luks2_header {0} device does not have token field containing wrapped protector.".format(device))
                         continue
