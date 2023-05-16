@@ -1201,8 +1201,8 @@ def generate_localsyslog_configs():
         f = open(AMASyslogPortFilePath, "r")
         syslog_port = f.read()
         f.close()
-
-    if public_settings is not None and "useOmfwd" in public_settings and syslog_port != '':
+    
+    if public_settings is not None and "useSyslogTcp" in public_settings and public_settings.get("useSyslogTcp") == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
