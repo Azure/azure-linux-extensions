@@ -624,6 +624,7 @@ def enable():
     except Exception as e:
         hutil.update_settings_file()
         errMsg = 'Failed to call the daemon with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+        backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
         temp_status= 'error'
         temp_result=CommonVariables.error
