@@ -129,13 +129,14 @@ class DiskUtil(object):
                 sp = "-".join(file.split('-')[:-5])
                 mapper_name = file.split('{0}-'.format(sp))[-1:][0]
                 cmd = "cryptsetup status {0}".format(mapper_name)
-                if self.command_executor.Execute(cmd,suppress_logging=True) == CommonVariables.process_success:
+                comm = ProcessCommunicator()
+                if self.command_executor.Execute(cmd,communicator=comm,suppress_logging=True) == CommonVariables.process_success:
                     locked = False
                     self.logger.log("is_device_locked device path {0} is opened.".format(device_path))
                     continue
-                msg = cmd.stderr
+                msg = comm.stderr
                 if not msg:
-                    msg = cmd.stdout
+                    msg = comm.stdout
                 self.logger.log("is_device_locked status for mapper {0} is {1}".format(mapper_name,msg))
                 cmd = "cryptsetup luksClose {0}".format(mapper_name)
                 self.command_executor.Execute(cmd)
@@ -175,7 +176,7 @@ class DiskUtil(object):
         process_comm = ProcessCommunicator()
         #needed to subpress logic for this execute command. run this command silently due to password. 
         ret = self.command_executor.Execute(cmd,communicator=process_comm,suppress_logging=True)
-        if ret:
+        if ret!=CommonVariables.process_success:
             msg = ""
             if process_comm.stderr:
                 msg = process_comm.stderr.strip()

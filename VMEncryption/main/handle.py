@@ -699,6 +699,11 @@ def is_daemon_running():
 
 
 def enable():
+    lock = ProcessLock(logger=logger, lock_file_path=encryption_environment.enable_lock_file_path)
+    if not lock.try_lock():
+        logger.log("there's another enable running, please wait it to exit.", level=CommonVariables.WarningLevel)
+        return
+    logger.log('enable process lock, PID {0}'.format(os.getpid()))
     try:
         hutil.do_parse_context('Enable')
         logger.log('Enabling extension')
@@ -732,14 +737,13 @@ def enable():
             #logger.log(msg="service {0} is-active status {1} is-enabled status {2}".format())
             if vns_service.is_active():
                 logger.log('Volume notification is active!.')
-                hutil.do_exit(exit_code=CommonVariables.success,
-                              operation='VNS_registration',
+                hutil.do_status_report(operation='VNS_registration',
                               status=CommonVariables.extension_success_status,
-                              code=str(CommonVariables.success),
+                              status_code=str(CommonVariables.success),
                               message='VNS service is registered sucessfully!')
             else:
-                #run the normal enable call. 
-                pass
+                logger.log('Volume notification is not active!.',level=CommonVariables.WarningLevel) 
+                
 
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
@@ -873,7 +877,9 @@ def enable():
                       status=CommonVariables.extension_error_status,
                       code=str(CommonVariables.unknown_error),
                       message=msg)
-
+    finally:
+        lock.release_lock()
+        logger.log("exiting enable lock, PID {0}".format(os.getpid()))
 
 def are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation):
     are_data_disk_encrypted = True if encryption_status['data'] == 'Encrypted' else False
