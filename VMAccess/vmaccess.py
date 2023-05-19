@@ -282,6 +282,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
             retcode, output = ext_utils.run_command_get_output(['ssh-keygen', '-i', '-f', 'temp.pub'])
             if retcode > 0:
                 raise Exception("Failed to convert SSH2 key to OpenSSH key.")
+            hutil.log("Succeeded in converting SSH2 key to OpenSSH key.")
             cert_txt = output
             os.remove("temp.pub")
 
