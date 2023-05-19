@@ -101,7 +101,7 @@ class ConfigurationProvider(object):
 
 OSName = get_os_name()
 Configuration = ConfigurationProvider(get_linux_agent_conf_filename(OSName))
-MyDistro = dist_utils.get_my_distro(OSName, Configuration)
+MyDistro = dist_utils.get_my_distro(Configuration, OSName)
 
 
 def main():
