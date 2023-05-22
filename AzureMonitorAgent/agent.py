@@ -113,6 +113,11 @@ MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricC
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
 AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
+AMAConfigCacheDir = '/etc/opt/microsoft/azuremonitoragent/config-cache/'
+SyslogAllFacilties = ["auth","authpriv","cron","daemon","mark","kern","local0","local1","local2","local3","local4","local5","local6","local7","lpr","mail","news","syslog","user","uucp"]
+SyslogAllLogLevels = ["Debug","Info","Notice","Warning","Error","Critical","Alert","Emergency"]
+SyslogDefaultLocalConfigFile = '/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent.conf'
+SyslogCurrentLocalConfigFile = '/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-current.conf'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -134,6 +139,15 @@ SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
 
+class SyslogLogLevels():
+    Debug = 0
+    Info = 1
+    Notice = 2
+    Warning = 3
+    Error = 4
+    Criticial = 5
+    Alert = 6
+    Emergency = 7
 
 # Change permission of log path - if we fail, that is not an exit case
 try:
@@ -488,8 +502,8 @@ def enable():
         hutil_log_info("Detected Geneva mode; azuremonitoragent service will be started to handle Geneva configuration")
         ensure["azuremonitoragent"] = True
         handle_gcs_config(public_settings, protected_settings, default_configs)
-        # generate local syslog configuration files as in 1P syslog is not driven from DCR
-        generate_localsyslog_configs()
+        # always generate local syslog configuration files for 1P since syslog is not driven from DCR
+        generate_localsyslog_configs(SyslogDefaultLocalConfigFile)
 
     config_file = "/etc/default/azuremonitoragent"
     temp_config_file = "/etc/default/azuremonitoragent_temp"
@@ -1158,7 +1172,7 @@ def syslogconfig_watcher(hutil_error, hutil_log):
     syslog_enabled  = False
     # Check for config changes every 30 seconds
     sleepTime =  30
-
+    currentSyslogFilterMap = {}
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
 
@@ -1174,12 +1188,121 @@ def syslogconfig_watcher(hutil_error, hutil_log):
                 f.close()
 
             if syslog_enabled:
-                # place syslog local configs
-                syslog_enabled  = False
-                generate_localsyslog_configs()
+                defaultConfig = False
+                syslogFilterMap = {}
+                for filename in os.listdir(AMAConfigCacheDir): # navigate over all configchunk files
+                    if filename.endswith('.json'):
+                        with open(os.path.join(AMAConfigCacheDir, filename)) as f:
+                            data = f.read()
+                            if (data != ''):
+                                hutil_log("could read dcr file from config chunk.")
+                                json_data = json.loads(data)
+                                for config in json_data['dataSources']: #navigate over all configuration elements
+                                    if config['configuration'] != '' and config['configuration']['facilityNames'] != '':
+                                        facilities = config['configuration']['facilityNames']
+                                        logLevels = config['configuration']['logLevels']
+                                        facilitlesStr = ''.join(facilities)
+                                        logLevelStr = ''.join(logLevels)
+                                        hutil_log("facilitie is current configchunk is." + facilitlesStr)
+                                        hutil_log("LogLevels is current configchunk is." + logLevelStr)
+                                        if facilities is not None and logLevels is not None:
+                                            if ''.join(SyslogAllFacilties) in facilitlesStr:
+                                                if ''.join(SyslogAllLogLevels) in logLevelStr:
+                                                    # all facility types with all log levels (*.*)
+                                                    # since uber config already in one DCR no need to parse other DCRs
+                                                    defaultConfig = True
+                                                    hutil_log("default config is true , line #1214")
+                                                    break
+                                                else:
+                                                    # All facilities with custom log levels - find lowest priority (*.ERR)
+                                                    newMinLevel = config['configuration']['logLevels'][0] # take the lowest priority in the logLevels list
+                                                    hutil_log("line #1219 " + newMinLevel)
+                                                    if newMinLevel is not None and newMinLevel != '':
+                                                        if len(syslogFilterMap) > 0: # first check if the same facility already exists, set the lowest loglevel
+                                                            if syslogFilterMap['*'] is not None:
+                                                                if syslogFilterMap['*'] != '*' and SyslogLogLevels[syslogFilterMap['*']] > SyslogLogLevels[newMinLevel]:
+                                                                    syslogFilterMap['*'] = newMinLevel # *.Alert becomes *.Debug if newMinLevel is Debug and existing level is Alert
+                                                            else:
+                                                                # delete existing content since it is *. case
+                                                                syslogFilterMap = {}
+                                                                syslogFilterMap['*'] =  newMinLevel
+                                                        else:
+                                                            syslogFilterMap['*'] =  newMinLevel
+                                            else:
+                                                if ''.join(SyslogAllLogLevels) in logLevelStr:
+                                                    hutil_log("line# 1233")
+                                                    # custom facilities with all log levels (auth,cron.*)
+                                                    if syslogFilterMap['*'] is None: # if *. rule does not exist
+                                                        for facility in facilities:
+                                                            syslogFilterMap[facility] = '*'
+                                                    else:
+                                                        syslogFilterMap['*'] = '*'
+                                                        defaultConfig = True
+                                                        break
+
+                                                else:
+                                                    # custom facilities with custom log levels (auth.ERR)
+                                                    hutil_log("line# 1244")
+                                                    for facility in facilities:
+                                                        if syslogFilterMap[facility] is not None:
+                                                            # take the lowest loglevel except .*
+                                                            if syslogFilterMap[facility] != '*':
+                                                                newMinLevel = config['configuration']['logLevels'][0] # take the lowest priority in the logLevels list
+                                                                if SyslogLogLevels[syslogFilterMap[facility]] > SyslogLogLevels[newMinLevel]:
+                                                                    syslogFilterMap[facility] = newMinLevel
+                                                        else:
+                                                            syslogFilterMap[facility] = newMinLevel
+                            f.close()                
+                            if defaultConfig:
+                                # place default syslog local configs only if there is a change in DCR
+                                syslogFilterMap = {} # reset
+                                syslogFilterMap['*'] = '*'
+                                if currentSyslogFilterMap != syslogFilterMap:
+                                    hutil_log("line# 1261")
+                                    generate_localsyslog_configs(SyslogDefaultLocalConfigFile) #default AMA config
+                                    copyfile(SyslogDefaultLocalConfigFile, SyslogCurrentLocalConfigFile)
+                                    currentSyslogFilterMap = syslogFilterMap
+                                syslog_enabled  = False
+                                hutil_log("line# 1266")
+                                break
+                        
+                if len(syslogFilterMap) == 0: # fall back to AMA default in all error cases from parsing DCRs
+                    # place syslog local configs only if there is a change in DCR
+                    hutil_log("line# 1271")
+                    if not os.path.exists(SyslogCurrentLocalConfigFile):
+                        copyfile(SyslogDefaultLocalConfigFile, SyslogCurrentLocalConfigFile)
+                        generate_localsyslog_configs(SyslogCurrentLocalConfigFile)
+                        hutil_log("line# 1275")
+                    syslog_enabled  = False
+                else:
+                    # place syslog local configs only if there is a change in DCR
+                    if currentSyslogFilterMap != syslogFilterMap:
+                        f = open(SyslogDefaultLocalConfigFile, "r")
+                        syslogConfigFileContent = f.read()
+                        newSyslogFilterConfigData = ''
+                        hutil_log("line# 1283")
+
+                        if (syslogConfigFileContent != ''):
+                            index = 0
+                            for facility in syslogFilterMap:
+                                if index < len(syslogFilterMap) -1:
+                                    newSyslogFilterConfigData = newSyslogFilterConfigData + facility + '.' +  syslogFilterMap[facility] + ','
+                                else:
+                                    # the last facility in the list
+                                    newSyslogFilterConfigData = newSyslogFilterConfigData + facility + '.' +  syslogFilterMap[facility] + ' :omuxsock:'
+                                index = index + 1
+                            syslogConfigFileContent = syslogConfigFileContent.replace('*.* :omuxsock:', newSyslogFilterConfigData)
+                            currentF = open(SyslogCurrentLocalConfigFile, "w+")
+                            currentF.write(syslogConfigFileContent)
+                            currentF.close()
+                            generate_localsyslog_configs(SyslogCurrentLocalConfigFile)
+                            currentSyslogFilterMap = syslogFilterMap
+                        f.close() 
+                        syslog_enabled  = False
             else:
                 # remove syslog local configs
                 remove_localsyslog_configs()
+                currentSyslogFilterMap = {}
 
         except IOError as e:
             hutil_error('I/O error in setting up syslog config watcher. Exception={0}'.format(e))
@@ -1190,7 +1313,7 @@ def syslogconfig_watcher(hutil_error, hutil_log):
         finally:
             time.sleep(sleepTime)
 
-def generate_localsyslog_configs():
+def generate_localsyslog_configs(syslogLocalFile):
     """
     Install local syslog configuration files if not present and restart syslog
     """
@@ -1262,11 +1385,11 @@ def generate_localsyslog_configs():
                 run_command_and_log(get_service_command("syslog-ng", "restart"))
                 hutil_log_info("Installed local syslog configuration files and restarted syslog")    
     else:
-        if os.path.exists('/etc/rsyslog.d/') and not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+        if os.path.exists('/etc/rsyslog.d/'):
             if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
                 os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
             copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
-            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent.conf","/etc/rsyslog.d/10-azuremonitoragent.conf")
+            copyfile(syslogLocalFile,"/etc/rsyslog.d/10-azuremonitoragent.conf")
             os.chmod('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
             os.chmod('/etc/rsyslog.d/10-azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
             run_command_and_log(get_service_command("rsyslog", "restart"))
