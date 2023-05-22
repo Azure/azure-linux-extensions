@@ -24,6 +24,7 @@
 #define LOG_DIRETORY "/tmp"
 #define LOG_FILE_TEMPLATE "%s/ade_vol_notif-%s.log"
 #define ADE_EVENT_THRESHOLD 4
+#define ADE_MAX_ATTEMPT_FOR_DEVICE 2
 #define ADE_COUNT_WAIT_TIME_SEC 30
 #define ADE_WAIT_TIME_SEC 900
 
@@ -39,10 +40,11 @@ void custom_log(const char *format, ...);
 struct device{
         std::string syspath;
         std::string action;
+        int ade_attempt_count;
 };
 
 void addNode(std::deque<device>& dq, const char* syspath, const char* action){
-        dq.push_back({syspath,action});
+        dq.push_back({syspath,action,0});
 }
 
 void custom_log(const char *format, ...) {
@@ -124,8 +126,12 @@ void daemonize(int argc, char *argv[])
     dup(0);
 }
 
-void invoke_ade(const char* path){
+void invoke_ade(const char* path,std::deque<device>&dq){
     ade_status = AdeStatus::ADE_RUNNING;
+    //update counter in dq
+    for(auto item = dq.begin(); item!=dq.end(); item++){
+       item->ade_attempt_count+=1; 
+    }
     pid_t pAde = fork();
     if(pAde==0){
             // in case of child process.
@@ -174,7 +180,6 @@ int is_device_crypted_from_syspath(const char* syspath){
         udev = udev_new();
         struct udev_device* dev = udev_device_new_from_syspath(udev,syspath);
         const char* fs_usage = udev_device_get_property_value(dev,"ID_FS_USAGE");
-        custom_log("get_dev_fsUsage_from_syspath: syspath %s usage status is %s",syspath, fs_usage);
         if(fs_usage!=NULL && strcmp(fs_usage,"crypto")==0) ret = 1;
         udev_device_unref(dev);
         udev_unref(udev);
@@ -191,11 +196,20 @@ bool is_devnode_added(std::deque<device>&dq, const char* syspath, const char* ac
 void cleanCryptedDevFromList(std::deque<device>&dq){
         using itdeque=std::deque<device>::iterator;
         std::vector<itdeque> cryptedDevices;
-        //removing crypted changed devices,
+        //removing crypted changed devices, or attempt count is more than 
+        //ADE_MAX_ATTEMPT_FOR_DEVICE
         for(itdeque it=dq.begin(); it!=dq.end(); it++){
                 if(             it->action =="change" &&
                                 is_device_crypted_from_syspath(it->syspath.c_str())){
+                        custom_log("[removed] change to crypt, syspath %s",it->syspath.c_str());
                         cryptedDevices.push_back(it);
+                }
+                else if(it->ade_attempt_count>=ADE_MAX_ATTEMPT_FOR_DEVICE){
+                    cryptedDevices.push_back(it);
+                    custom_log("[removed] ade attempt count %d is >= %d, syspath %s",it->ade_attempt_count,ADE_MAX_ATTEMPT_FOR_DEVICE,it->syspath.c_str());
+                }
+                else{
+                    //do nothing
                 }
         }
         //remove previously add crypted devices, which are mounted now.
@@ -244,8 +258,8 @@ int main(int argc, char *argv[]) {
     }
 
     char current_working_directory[1024];
-    custom_log("current working directory %s\n",getcwd(current_working_directory,1024));
-
+    getcwd(current_working_directory,1024)
+    
     if (daemon_mode) {
         daemonize(argc, argv);
     }
@@ -309,26 +323,22 @@ int main(int argc, char *argv[]) {
             struct udev_device *dev;
 
             dev = udev_monitor_receive_device(mon);
-            custom_log("A new udev monitoring event is received!");
-
-            const char *action = udev_device_get_action(dev);
-                        custom_log("Action: %s", action);
-            const char *devtype = udev_device_get_devtype(dev);
-            custom_log("Device type: %s", devtype);
-            const char *subsystem = udev_device_get_subsystem(dev);
-            custom_log("Subsystem: %s", subsystem);
-            const char *devpath = udev_device_get_devpath(dev);
-            custom_log("Device path: %s", devpath);
+            custom_log("*******************A new udev monitoring event is received!*******************");
             const char *devnode = udev_device_get_devnode(dev);
             custom_log("Device node: %s", devnode);
+            const char *devtype = udev_device_get_devtype(dev);
+            const char *subsystem = udev_device_get_subsystem(dev);
+            custom_log("Device type: %s, Subsystem: %s",devtype,subsystem);
+            const char *action = udev_device_get_action(dev);
+            const char *fsType = udev_device_get_property_value(dev, "ID_FS_TYPE");
+            const char *fsUsage = udev_device_get_property_value(dev, "ID_FS_USAGE");
+            custom_log("Action: %s, Filesystem type: %s, Filesystem Usage: %s", action,fsType,fsUsage);
+            const char *devpath = udev_device_get_devpath(dev);
+            custom_log("Device path: %s", devpath);
             int is_initialized = udev_device_get_is_initialized(dev);
             custom_log("is_initialized: %d", is_initialized);
-            const char *fsType = udev_device_get_property_value(dev, "ID_FS_TYPE");
-            custom_log("Filesystem type: %s", fsType);
-            const char *fsUsage = udev_device_get_property_value(dev, "ID_FS_USAGE");
-            custom_log("Filesystem Usage: %s", fsUsage);
             const char* syspath = udev_device_get_syspath(dev);
-            custom_log("Syspath : %s", syspath);
+            //custom_log("Syspath : %s", syspath);
 
             if (            action != NULL &&
                             (strcmp(action, "change") == 0 ||
@@ -359,25 +369,26 @@ int main(int argc, char *argv[]) {
         if (dev_node_count >= ADE_EVENT_THRESHOLD){
                     custom_log("dev node count %d max to trigger %d for running ADE!"
                     ,dev_node_count,ADE_EVENT_THRESHOLD);
-                    invoke_ade(current_working_directory);
+                    invoke_ade(current_working_directory,dq);
                     ade_invoked=true;
         }else if(diff_for_ade_loop>=ADE_WAIT_TIME_SEC){
             custom_log("running ADE in every %d sec, last ade run was at %s, diff: %d, dev nodes in list %d"
             ,ADE_WAIT_TIME_SEC,ctime(&ade_finished),diff_for_ade_loop,dev_node_count);
             custom_log("diff_for_ade_loop: %d, diff_for_dev_nodes: %d",diff_for_ade_loop,diff_for_dev_nodes);
-            invoke_ade(current_working_directory);
+            invoke_ade(current_working_directory,dq);
             ade_invoked=true;
         }else if(dev_node_count>0 && diff_for_dev_nodes>ADE_COUNT_WAIT_TIME_SEC){
             custom_log("running ADE, dev nodes in list %d, last ade run was at %s, diff: %d"
             ,dev_node_count,ctime(&first_dev_node),diff_for_dev_nodes);
             custom_log("diff_for_ade_loop: %d, diff_for_dev_nodes: %d",diff_for_ade_loop,diff_for_dev_nodes);
-            invoke_ade(current_working_directory);
+            invoke_ade(current_working_directory,dq);
             ade_invoked=true;
         }else{
             printf("...");
         }
         if(ade_invoked){
            first_dev_node = time(NULL);
+           cleanCryptedDevFromList(dq);
         }
 
     }
