@@ -1208,7 +1208,7 @@ def generate_localsyslog_configs():
         if features is not None and "useSyslogTcp" in features:            
             useSyslogTcp = features.get("useSyslogTcp")    
     
-    if useSyslogTcp == True:
+    if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
