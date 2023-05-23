@@ -46,6 +46,8 @@ class UbuntuPatching(AbstractPatching):
         self.resize2fs_path = '/sbin/resize2fs'
         self.umount_path = '/bin/umount'
         self.touch_path = '/usr/bin/touch'
+        self.min_version_online_encryption='22.04'
+        self.support_online_encryption=self.validate_online_encryption_support()
 
     def packages_installed(self, packages):
         ''' return true if all packages in list are already installed '''

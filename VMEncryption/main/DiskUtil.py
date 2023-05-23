@@ -190,9 +190,9 @@ class DiskUtil(object):
         self.logger.log("secure_key_release_operation {0} end.".format(operation))
         return process_comm.stdout.strip()
     
-    def import_token(self,device_name,passphrase_file,public_settings):
+    def import_token(self,device_path,passphrase_file,public_settings):
         '''this function reads passphrase from passphrase file, wrap it and update in token field of LUKS2 header.'''
-        self.logger.log(msg="import_token for device: {0} started.".format(device_name))
+        self.logger.log(msg="import_token for device: {0} started.".format(device_path))
         protector = ""
         with open(passphrase_file,"rb") as protector_file:
             #passphrase stored in keyfile is base64
@@ -205,7 +205,7 @@ class DiskUtil(object):
                                                         operation=CommonVariables.secure_key_release_wrap,
                                                         attestationUrl=AttestationUrl)
         if not wrappedProtector:
-            self.logger.log("import_token protector wrapping is unsuccessful for device {0}".format(device_name))
+            self.logger.log("import_token protector wrapping is unsuccessful for device {0}".format(device_path))
             return False
         data={
             "version":CommonVariables.ADEEncryptionVersionInLuksToken_1_0,
@@ -224,13 +224,12 @@ class DiskUtil(object):
         out_file = open(custom_cmk,"w")
         json.dump(data,out_file,indent=4)
         out_file.close()
-        device_path = os.path.join("/dev",device_name)
         cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(custom_cmk,CommonVariables.cvm_ade_vm_encryption_token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd,communicator=process_comm)
-        self.logger.log(msg="import_token: device: {0} status: {1}".format(device_name,status))
+        self.logger.log(msg="import_token: device: {0} status: {1}".format(device_path,status))
         os.remove(custom_cmk)
-        self.logger.log(msg="import_token: device: {0} end.".format(device_name))
+        self.logger.log(msg="import_token: device: {0} end.".format(device_path))
         return status==CommonVariables.process_success
     
     def export_token(self,device_name):

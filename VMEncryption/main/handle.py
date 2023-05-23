@@ -1259,7 +1259,7 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
                 logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
             #update luks2 header token field 
             if security_Type == CommonVariables.ConfidentialVM:
-                disk_util.import_token(device_name=device_item.name,
+                disk_util.import_token(device_path=crypt_item_to_update.dev_path,
                                        passphrase_file=passphrase,
                                        public_settings=get_public_settings())
         else:
@@ -1859,7 +1859,10 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
 
     if encryption_marker.get_encryption_mode() == CommonVariables.EncryptionModeOnline:
         logger.log("Starting Online Encryption for data disks.")
-        online_enc_handle = OnlineEncryptionHandler(logger)
+        if security_Type == CommonVariables.ConfidentialVM:
+            online_enc_handle = OnlineEncryptionHandler(logger,security_Type,get_public_settings())
+        else:
+            online_enc_handle = OnlineEncryptionHandler(logger)
         if encryption_marker.get_encryption_phase() is not None and encryption_marker.get_encryption_phase() == CommonVariables.EncryptionPhaseResume:
             logger.log("Entering online encryption resume phase.")
             num_devices = online_enc_handle.get_device_items_for_resume(crypt_mount_config_util, disk_util)
@@ -1926,7 +1929,8 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
             if encryption_result_phase == CommonVariables.EncryptionPhaseDone:
                 #update luks2 header token field 
                 if security_Type == CommonVariables.ConfidentialVM:
-                    disk_util.import_token(device_name=device_item.name,
+                    device_path=os.path.join("/dev",device_item.name)
+                    disk_util.import_token(device_path=device_path,
                                            passphrase_file=passphrase_file,
                                            public_settings=get_public_settings())
                 continue

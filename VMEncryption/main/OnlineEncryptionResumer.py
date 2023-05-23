@@ -46,7 +46,7 @@ class OnlineEncryptionResumer:
             self.logger.log(msg)
             lock.release()
 
-    def begin_resume(self, log_status=True, lock=None):
+    def begin_resume(self, log_status=True, lock=None, import_token = False, public_setting=None):
         self.logger.log("Starting background resume encrytion for device: " + self.crypt_item.dev_path)
         mapper_path = os.path.join(CommonVariables.dev_mapper_root, self.crypt_item.mapper_name)
         if not os.path.exists(mapper_path):
@@ -87,6 +87,11 @@ class OnlineEncryptionResumer:
                         self.update_log(full_message, lock)
             if child.returncode == CommonVariables.success:
                 message = "Background encryption finished for {0}".format(self.crypt_item.dev_path)
+                if import_token and public_setting:
+                    self.update_log("Background token update to device {0}".format(self.crypt_item.dev_path))
+                    self.disk_util.import_token(device_path=self.crypt_item.dev_path,
+                                       passphrase_file=self.bek_file_path,
+                                       public_settings=public_setting)
                 if log_status:
                     self.hutil.do_status_report(operation='DataCopy',
                                                 status=CommonVariables.extension_success_status,

@@ -19,11 +19,14 @@ class OnlineEncryptionItem:
         self.crypt_item = crypt_item
         self.bek_file_path = bek_file_path
 
+
 class OnlineEncryptionHandler:
-    def __init__(self, logger):
+    def __init__(self, logger,security_type=None,public_setting=None):
         self.devices = Queue()
         self.logger = logger
         self.command_executor = CommandExecutor(self.logger)
+        self.security_type = security_type
+        self.public_setting = public_setting
 
     def handle(self, device_items_to_encrypt, passphrase_file, disk_util, crypt_mount_config_util, bek_util):
         for device_item in device_items_to_encrypt:
@@ -57,16 +60,18 @@ class OnlineEncryptionHandler:
 
             mapper_name = str(uuid.uuid4())
             init_status_code = self.command_executor.ExecuteInBash('cryptsetup reencrypt --encrypt --init-only --reduce-device-size {0} {1} {2} -d {3} -q'.format(CommonVariables.luks_header_sector_v2,
-                                                                                                                                                                  device_dev_path, mapper_name, passphrase_file))
+                                                                                                                                                               device_dev_path, mapper_name, passphrase_file))
             if init_status_code != CommonVariables.success:
                 self.logger.log("Failed to setup encryption layer for device: " + device_item.name)
                 return device_item
             
-            crypt_item = self.update_crypttab_and_fstab(disk_util, crypt_mount_config_util, mapper_name, device_dev_path, device_item.file_system, device_item.mount_point)
-
+            if self.security_type== CommonVariables.ConfidentialVM:
+                crypt_item = self.update_crypttab_and_fstab(disk_util, crypt_mount_config_util, mapper_name, device_dev_path, device_item.file_system, device_item.mount_point,passphrase_file)
+            else:
+                crypt_item = self.update_crypttab_and_fstab(disk_util, crypt_mount_config_util, mapper_name, device_dev_path, device_item.file_system, device_item.mount_point)
             self.devices.put(OnlineEncryptionItem(crypt_item, passphrase_file))
 
-    def update_crypttab_and_fstab(self, disk_util, crypt_mount_config_util, mapper_name, device_dev_path, device_filesystem, device_mount_point):
+    def update_crypttab_and_fstab(self, disk_util, crypt_mount_config_util, mapper_name, device_dev_path, device_filesystem, device_mount_point, passphrase_file=None):
         crypt_item_to_update = CryptItem()
         crypt_item_to_update.mapper_name = mapper_name
         original_dev_name_path = device_dev_path
@@ -75,6 +80,7 @@ class OnlineEncryptionHandler:
         crypt_item_to_update.file_system = device_filesystem
         crypt_item_to_update.uses_cleartext_key = False
         crypt_item_to_update.current_luks_slot = 0
+        crypt_item_to_update.keyfile_path = passphrase_file
         # if the original mountpoint is empty, then leave
         # it as None
         mount_point = device_mount_point
@@ -134,9 +140,13 @@ class OnlineEncryptionHandler:
         online_encryption_item = self.get_online_encryption_item(queue_lock, log_lock)
         while online_encryption_item is not None:
             self.update_log("Picked up device "+ online_encryption_item.crypt_item.dev_path, log_lock)
-            OnlineEncryptionResumer(online_encryption_item.crypt_item, disk_util, online_encryption_item.bek_file_path, self.logger, None).begin_resume(False, log_lock)
+            import_token=False
+            if self.security_type==CommonVariables.ConfidentialVM:
+                import_token=True
+            OnlineEncryptionResumer(online_encryption_item.crypt_item, disk_util, online_encryption_item.bek_file_path, self.logger, None).begin_resume(False, log_lock,import_token,self.public_setting)
             online_encryption_item = self.get_online_encryption_item(queue_lock, log_lock)
         self.devices.task_done()
+
 
     def update_log(self, msg, log_lock):
         log_lock.acquire()
