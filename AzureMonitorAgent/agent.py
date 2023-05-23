@@ -464,11 +464,9 @@ def enable():
             log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Mixing genevaConfiguration or azureMonitorConfiguration with other configuration schemas is not allowed')
 
         if geneva_configuration and geneva_configuration.get("enable") == True:
+            hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
             ensure["azuremonitoragentmgr"] = True
-            if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
-                hutil_log_info("Detected Geneva+ mode with 3P/AMCS mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
-            else:
-                hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
+            if not azure_monitor_configuration or (azure_monitor_configuration and azure_monitor_configuration.get("enable") != True):
                 generate_localsyslog_configs()
 
         if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
