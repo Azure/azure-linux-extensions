@@ -41,6 +41,18 @@ SshdConfigPath = '/etc/ssh/sshd_config'
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
 
+def get_os_name():
+    if os.path.isfile(constants.os_release):
+        return ext_utils.get_line_starting_with("NAME", constants.os_release)
+    elif os.path.isfile(constants.system_release):
+        return ext_utils.get_file_contents(constants.system_release)
+    return None
+
+def get_linux_agent_conf_filename(os_name):
+    if os_name is not None:
+        if re.search("coreos", os_name, re.IGNORECASE) or re.search("flatcar", os_name, re.IGNORECASE):
+            return "/usr/share/oem/waagent.conf"
+    return "/etc/waagent.conf"
 
 class ConfigurationProvider(object):
     """
@@ -50,7 +62,10 @@ class ConfigurationProvider(object):
     def __init__(self, wala_config_file):
         self.values = dict()
         if not os.path.isfile(wala_config_file):
-            raise ValueError("Missing configuration in {0}".format(wala_config_file))
+            logger.warning("Missing configuration in {0}, setting default values for PasswordCryptId and PasswordCryptSaltLength".format(wala_config_file))
+            self.values["Provisioning.PasswordCryptId"] = "6"
+            self.values["Provisioning.PasswordCryptSaltLength"] = 10
+            return
         try:
             for line in ext_utils.get_file_contents(wala_config_file).split('\n'):
                 if not line.startswith("#") and "=" in line:
@@ -84,8 +99,9 @@ class ConfigurationProvider(object):
             return False
 
 
-Configuration = ConfigurationProvider("/etc/waagent.conf")
-MyDistro = dist_utils.get_my_distro(Configuration)
+OSName = get_os_name()
+Configuration = ConfigurationProvider(get_linux_agent_conf_filename(OSName))
+MyDistro = dist_utils.get_my_distro(Configuration, OSName)
 
 
 def main():
@@ -228,7 +244,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     try:
         ovf_xml = ext_utils.get_file_contents('/var/lib/waagent/ovf-env.xml')
         if ovf_xml is not None:
-            ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration)
+            ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration, False, False)
     except (EnvironmentError, ValueError, KeyError, AttributeError, TypeError):
         pass
     if ovf_env is None:
@@ -374,28 +390,22 @@ def _set_sshd_config(config, name, val):
 
 
 def _get_default_ssh_config_filename():
-    if os.path.isfile(constants.os_release):
-        os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
-    elif os.path.isfile(constants.system_release):
-        os_name = ext_utils.get_file_contents(constants.system_release)
-    else:
-        return "default"
-    if os_name is not None:
+    if OSName is not None:
         # the default ssh config files are present in
         # /var/lib/waagent/Microsoft.OSTCExtensions.VMAccessForLinux-<version>/resources/
-        if re.search("centos", os_name, re.IGNORECASE):
+        if re.search("centos", OSName, re.IGNORECASE):
             return "centos_default"
-        if re.search("debian", os_name, re.IGNORECASE):
+        if re.search("debian", OSName, re.IGNORECASE):
             return "debian_default"
-        if re.search("fedora", os_name, re.IGNORECASE):
+        if re.search("fedora", OSName, re.IGNORECASE):
             return "fedora_default"
-        if re.search("red\s?hat", os_name, re.IGNORECASE):
+        if re.search("red\s?hat", OSName, re.IGNORECASE):
             return "redhat_default"
-        if re.search("suse", os_name, re.IGNORECASE):
+        if re.search("suse", OSName, re.IGNORECASE):
             return "SuSE_default"
-        if re.search("ubuntu", os_name, re.IGNORECASE):
+        if re.search("ubuntu", OSName, re.IGNORECASE):
             return "ubuntu_default"
-        return "default"
+    return "default"
 
 
 def _reset_sshd_config(sshd_file_path):
