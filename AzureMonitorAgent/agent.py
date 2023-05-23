@@ -466,8 +466,8 @@ def enable():
         if geneva_configuration and geneva_configuration.get("enable") == True:
             hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
             ensure["azuremonitoragentmgr"] = True
-            if not azure_monitor_configuration or (azure_monitor_configuration and azure_monitor_configuration.get("enable") != True):
-                generate_localsyslog_configs()
+            # Note that internally AMCS with geneva config path can be used in which case syslog should be handled same way as default 1P
+            generate_localsyslog_configs()
 
         if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
             hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
