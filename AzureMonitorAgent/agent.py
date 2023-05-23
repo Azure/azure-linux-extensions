@@ -464,6 +464,8 @@ def enable():
         if geneva_configuration and geneva_configuration.get("enable") == True:
             hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
             ensure["azuremonitoragentmgr"] = True
+            # Note that internally AMCS with geneva config path can be used in which case syslog should be handled same way as default 1P
+            generate_localsyslog_configs()
 
         if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
             hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
@@ -476,6 +478,8 @@ def enable():
     elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
         ensure["azuremonitoragentmgr"] = True
+        # generate local syslog configuration files as in auto config syslog is not driven from DCR
+        generate_localsyslog_configs()
 
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
