@@ -1,0 +1,21 @@
+[Unit]
+Description=Azure Disk Encryption Volume Notification Services
+Before=shutdown.target
+After=systemd-journald-dev-log.socket
+Conflicts=shutdown.target
+
+[Service]
+Type=forking
+Restart=on-failure
+RestartSec=3
+TimeoutSec=30
+IgnoreSIGPIPE=no
+KillMode=control-group
+WorkingDirectory=WorkingDirectory
+ExecStart=WorkingDirectory/ade-volume-notif-svc -d
+#ExecStop=/bin/bash -c '$$(which kill) -15 $MAINPID'
+Delegate=yes
+MemoryMax=50MB
+
+[Install]
+WantedBy=multi-user.target
