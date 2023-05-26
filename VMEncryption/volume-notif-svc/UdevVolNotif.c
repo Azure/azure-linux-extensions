@@ -258,7 +258,7 @@ int main(int argc, char *argv[]) {
     }
 
     char current_working_directory[1024];
-    getcwd(current_working_directory,1024)
+    getcwd(current_working_directory,1024);
     
     if (daemon_mode) {
         daemonize(argc, argv);

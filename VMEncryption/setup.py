@@ -73,6 +73,8 @@ packages_array.append(six_folder)
 transitions_folder = 'transitions/transitions'
 packages_array.append(transitions_folder)
 
+volume_notification_service = 'volume-notif-svc'
+packages_array.append(volume_notification_service)
 """
 copy the dependency to the local
 """
