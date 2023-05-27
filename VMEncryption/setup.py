@@ -35,6 +35,7 @@ from zipfile import ZipFile
 from shutil import copy2
 from shutil import copytree
 
+from main.CommandExecutor import ProcessCommunicator,CommandExecutor
 from main.Common import CommonVariables
 
 packages_array = []
@@ -163,6 +164,16 @@ target_zip_file_path = target_zip_file_location + target_folder_name + '.zip'
 target_zip_file = ZipFile(target_zip_file_path)
 target_zip_file.extractall(target_zip_file_location)
 
+def IsApplication(file_name):
+    cmd = 'file -i {0}'.format(file_name)
+    executor = CommandExecutor(None)
+    proc_comm = ProcessCommunicator()
+    ret = executor.Execute(cmd,communicator=proc_comm,suppress_logging=True)
+    if not ret:
+        if proc_comm.stdout.find('application')!=-1:
+            return True
+    return False
+
 def dos2unix(src):
     args = ["dos2unix", src]
     devnull = open(os.devnull, 'w')
@@ -194,7 +205,8 @@ def zip(src, dst):
         for filename in files:
             absname = os.path.abspath(os.path.join(dirname, filename))
             dos2unix(absname)
-            remove_utf8_bom(absname)
+            if not IsApplication(absname):
+                remove_utf8_bom(absname)
             arcname = absname[len(abs_src) + 1:]
             print('zipping %s as %s' % (os.path.join(dirname, filename), arcname))
             zf.write(absname, arcname)
