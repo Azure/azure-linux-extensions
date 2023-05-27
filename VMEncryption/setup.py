@@ -73,8 +73,6 @@ packages_array.append(six_folder)
 transitions_folder = 'transitions/transitions'
 packages_array.append(transitions_folder)
 
-volume_notification_service = 'volume-notif-svc'
-packages_array.append(volume_notification_service)
 """
 copy the dependency to the local
 """
@@ -207,4 +205,12 @@ final_folder_path = target_zip_file_location + target_folder_name
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
 copytree(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/', final_folder_path+'/'+main_folder+'/oscrypto/ubuntu_2004/encryptscripts/')
+#copy SKR app TODO: folder structure. 
+copy2('./AzureAttestSKR', final_folder_path+'/' )
+#temp VNS changes: folder structure. 
+copy2('./ade-volume-notif-svc', final_folder_path+'/')
+copy2('./ade_daemon_delay.sh', final_folder_path+'/')
+copy2('./ade_daemon_delay.sh', final_folder_path+'/')
+copy2('./azure-diskencryption-vol-notif.service', final_folder_path+'/')
+copytree('/volume-notif-svc/', final_folder_path+'/'+'/volume-notif-svc/')
 zip(final_folder_path, target_zip_file_path)
