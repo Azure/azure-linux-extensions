@@ -111,10 +111,14 @@ class ParameterParser(object):
                 backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
                 for config in self.dynamicConfigsFromCRP:
                     if CommonVariables.key in config and CommonVariables.value in config:
-                        if(config[CommonVariables.key].lower() in self.wellKnownSettingFlags.lower()):
-                            self.wellKnownSettingFlags[config[CommonVariables.key]] = config[CommonVariables.value]
-                        else:
-                            backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
+                        found = False
+                        for flag in self.wellKnownSettingFlags:
+                            if((config[CommonVariables.key]).lower() == flag.lower()):
+                                self.wellKnownSettingFlags[flag] = config[CommonVariables.value]
+                                found = True
+                                break
+                        if(found != True):
+                                backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
                     else:
                         backup_logger.log("The received dynamicConfigsFromCRP is not in expected format.", True)
                 backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
