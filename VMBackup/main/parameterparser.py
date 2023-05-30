@@ -36,7 +36,7 @@ class ParameterParser(object):
         self.includedDisks = None
         self.dynamicConfigsFromCRP = None
         self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
-        self.settingkeys = {"issnapshotttlenabled": CommonVariables.isSnapshotTtlEnabled, "usemccftofetchdsasforalldisks": CommonVariables.useMccfToFetchDsasForAllDisks, "usemccfforlad": CommonVariables.useMccfForLad}
+        self.settingKeysMapping= {"issnapshotttlenabled": CommonVariables.isSnapshotTtlEnabled, "usemccftofetchdsasforalldisks": CommonVariables.useMccfToFetchDsasForAllDisks, "usemccfforlad": CommonVariables.useMccfForLad}
         self.includeLunList = []    #To be shared with HP
 
         """
@@ -112,14 +112,10 @@ class ParameterParser(object):
                 backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
                 for config in self.dynamicConfigsFromCRP:
                     if CommonVariables.key in config and CommonVariables.value in config:
-                        found = False
-                        for flag in self.settingkeys:
-                            if((config[CommonVariables.key]).lower() == flag):
-                                self.wellKnownSettingFlags[self.settingkeys[flag]] = config[CommonVariables.value]
-                                found = True
-                                break
-                        if(found != True):
-                                backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
+                        if((config[CommonVariables.key]).lower() in self.settingKeysMapping):
+                            self.wellKnownSettingFlags[self.settingKeysMapping[config[CommonVariables.key].lower()]] = config[CommonVariables.value]
+                        else:
+                            backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
                     else:
                         backup_logger.log("The received dynamicConfigsFromCRP is not in expected format.", True)
                 backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
