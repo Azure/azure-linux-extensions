@@ -36,7 +36,10 @@ class ParameterParser(object):
         self.includedDisks = None
         self.dynamicConfigsFromCRP = None
         self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
-        self.settingKeysMapping= {"issnapshotttlenabled": CommonVariables.isSnapshotTtlEnabled, "usemccftofetchdsasforalldisks": CommonVariables.useMccfToFetchDsasForAllDisks, "usemccfforlad": CommonVariables.useMccfForLad}
+        settingKeysMapping= {}
+        settingKeysMapping[CommonVariables.isSnapshotTtlEnabled.lower()] = CommonVariables.isSnapshotTtlEnabled
+        settingKeysMapping[CommonVariables.useMccfToFetchDsasForAllDisks.lower()] = CommonVariables.useMccfToFetchDsasForAllDisks
+        settingKeysMapping[CommonVariables.useMccfForLad.lower()] = CommonVariables.useMccfForLad
         self.includeLunList = []    #To be shared with HP
 
         """
@@ -112,8 +115,8 @@ class ParameterParser(object):
                 backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
                 for config in self.dynamicConfigsFromCRP:
                     if CommonVariables.key in config and CommonVariables.value in config:
-                        if((config[CommonVariables.key]).lower() in self.settingKeysMapping):
-                            self.wellKnownSettingFlags[self.settingKeysMapping[config[CommonVariables.key].lower()]] = config[CommonVariables.value]
+                        if((config[CommonVariables.key]).lower() in settingKeysMapping):
+                            self.wellKnownSettingFlags[settingKeysMapping[config[CommonVariables.key].lower()]] = config[CommonVariables.value]
                         else:
                             backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
                     else:
