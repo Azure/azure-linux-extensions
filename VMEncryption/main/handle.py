@@ -1437,6 +1437,14 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
                 else:
                     crypt_item_to_update.mount_point = mount_point
 
+                if mount_point:
+                    logger.log(msg="removing entry for unencrypted drive from fstab",
+                               level=CommonVariables.InfoLevel)
+                    crypt_mount_config_util.modify_fstab_entry_encrypt(mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
+                else:
+                    logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
+                               level=CommonVariables.InfoLevel)
+
                 if crypt_item_to_update.mount_point != "None":
                     disk_util.mount_filesystem(device_mapper_path, ongoing_item_config.get_mount_point())
                     backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
@@ -1447,14 +1455,6 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
 
                 if not update_crypt_item_result:
                     logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
-
-                if mount_point:
-                    logger.log(msg="removing entry for unencrypted drive from fstab",
-                               level=CommonVariables.InfoLevel)
-                    crypt_mount_config_util.modify_fstab_entry_encrypt(mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
-                else:
-                    logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
-                               level=CommonVariables.InfoLevel)
 
                 if os.path.exists(encryption_environment.copy_header_slice_file_path):
                     os.remove(encryption_environment.copy_header_slice_file_path)
@@ -1599,6 +1599,14 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
                     else:
                         crypt_item_to_update.mount_point = mount_point
 
+                    if mount_point:
+                        logger.log(msg="removing entry for unencrypted drive from fstab",
+                                   level=CommonVariables.InfoLevel)
+                        crypt_mount_config_util.modify_fstab_entry_encrypt(mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
+                    else:
+                        logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
+                                   level=CommonVariables.InfoLevel)
+
                     if crypt_item_to_update.mount_point != "None":
                         disk_util.mount_filesystem(device_mapper_path, mount_point)
                         backup_folder = os.path.join(crypt_item_to_update.mount_point, ".azure_ade_backup_mount_info/")
@@ -1609,14 +1617,6 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
 
                     if not update_crypt_item_result:
                         logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
-
-                    if mount_point:
-                        logger.log(msg="removing entry for unencrypted drive from fstab",
-                                   level=CommonVariables.InfoLevel)
-                        crypt_mount_config_util.modify_fstab_entry_encrypt(mount_point, os.path.join(CommonVariables.dev_mapper_root, mapper_name))
-                    else:
-                        logger.log(msg=original_dev_name_path + " is not defined in fstab, no need to update",
-                                   level=CommonVariables.InfoLevel)
 
                     current_phase = CommonVariables.EncryptionPhaseDone
                     ongoing_item_config.phase = current_phase

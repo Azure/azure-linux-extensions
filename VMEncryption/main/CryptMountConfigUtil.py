@@ -111,6 +111,92 @@ class CryptMountConfigUtil(object):
         crypt_item.current_luks_slot = int(crypt_mount_item_properties[6]) if len(crypt_mount_item_properties) > 6 else -1
         return crypt_item
     
+    def _restore_backup_crypttab_info(self,crypt_item,passphrase_file):
+        '''This function restores crypttab information and mount info present in disk'''
+        ''''''
+        temp_mount_point = os.path.join("/mnt/", crypt_item.mapper_name)
+        azure_crypt_mount_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/azure_crypt_mount_line")
+        crypttab_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/crypttab_line")
+
+        if not self.disk_util.is_luks_device(crypt_item.dev_path,None):
+            self.logger.log("device {0} is not luks device".format(crypt_item.dev_path))
+            return False
+        if self.disk_util.is_device_locked(crypt_item.dev_path,None):
+            return_code = self.disk_util.luks_open(passphrase_file=passphrase_file,
+                                                   dev_path=crypt_item.dev_path,
+                                                   mapper_name=crypt_item.mapper_name,
+                                                   header_file=None,
+                                                   uses_cleartext_key=False)
+            if return_code != CommonVariables.process_success:
+                self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
+                return False
+
+        return_code = self.disk_util.mount_filesystem(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), temp_mount_point)
+        if return_code != CommonVariables.process_success:
+            self.logger.log(msg=('Mount failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
+            # this can happen with disks without file systems (lvm, raid or simply empty disks)
+            # in this case just add an entry to the azure_crypt_mount without a mount point (for lvm/raid scenarios)
+            self.add_crypt_item(crypt_item)
+            self.disk_util.luks_close(crypt_item.mapper_name)
+            return False
+
+        if not os.path.exists(azure_crypt_mount_backup_location) and not os.path.exists(crypttab_backup_location):
+            self.logger.log(msg=("MountPoint info not found for" + device_item_real_path), level=CommonVariables.ErrorLevel)
+            # Not sure when this happens..
+            # in this case also, just add an entry to the azure_crypt_mount without a mount point.
+            self.add_crypt_item(crypt_item)
+        elif os.path.exists(azure_crypt_mount_backup_location):
+            with open(azure_crypt_mount_backup_location, 'r') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                        # copy the crypt_item from the backup to the central os location
+                    parsed_crypt_item = self.parse_azure_crypt_mount_line(line)
+                    self.add_crypt_item(parsed_crypt_item)
+        elif os.path.exists(crypttab_backup_location):
+            with open(crypttab_backup_location, 'r') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                        # copy the crypt_item from the backup to the central os location
+                    parsed_crypt_item = self.parse_crypttab_line(line)
+                    if parsed_crypt_item is None:
+                        continue
+                    parsed_crypt_item.keyfile_path=passphrase_file
+                    self.add_crypt_item(parsed_crypt_item)
+
+            fstab_backup_location = os.path.join(temp_mount_point, ".azure_ade_backup_mount_info/fstab_line")
+            if os.path.exists(fstab_backup_location):
+                fstab_backup_line = None
+                with open(fstab_backup_location, 'r') as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        # copy the crypt_item from the backup to the central os location
+                        fstab_backup_line = line
+                if fstab_backup_line is not None:
+                    with open("/etc/fstab", 'a') as f:
+                        f.writelines([fstab_backup_line])
+                    device, mountpoint, fs, opts = self.parse_fstab_line(fstab_backup_line)
+                    parsed_crypt_item.mount_point=mountpoint
+                    if mountpoint is not None:
+                        self.disk_util.make_sure_path_exists(mountpoint)
+        # close the file and then unmount and close
+        self.disk_util.umount(temp_mount_point)
+        if parsed_crypt_item:
+            self.disk_util.luks_close(crypt_item.mapper_name)
+            #open luks with mapper stored in encrypted disk.
+            return_code = self.disk_util.luks_open(passphrase_file=parsed_crypt_item.keyfile_path,
+                                            dev_path=parsed_crypt_item.dev_path,
+                                            mapper_name=parsed_crypt_item.mapper_name,
+                                            header_file=None,
+                                            uses_cleartext_key=False)
+            if return_code != CommonVariables.process_success:
+                self.logger.log(msg=('cryptsetup luksOpen failed, return_code is:{0}'.format(return_code)), level=CommonVariables.ErrorLevel)
+                return False
+            self.disk_util.mount_crypt_item(parsed_crypt_item, parsed_crypt_item.keyfile_path)
+        return True
+
     def _device_unlock_using_luks2_header(self,device_name,device_item_path,azure_device_path):
         device_item_real_path = os.path.realpath(device_item_path)
         if self.disk_util.is_device_locked(device_item_real_path,None):
@@ -142,9 +228,7 @@ class CryptMountConfigUtil(object):
             if return_code != CommonVariables.process_success:
                 self.logger.log(msg='device_unlock_using_luks2_header device {0} cryptsetup luksOpen failed return code {1}'.format(device_name,return_code),level=CommonVariables.ErrorLevel)
                 return
-            self.add_crypt_item(crypt_item=crypt_item,
-                                backup_folder=None)
-            #TODO: look at "for added crypted device there will not be any mount points."
+            self._restore_backup_crypttab_info(crypt_item,passphrase_file)
 
     def device_unlock_using_luks2_header(self):
         """Reads vm setting properties of blcock devices that have wrapped passphrase in tokens in LUKS header."""
@@ -789,5 +873,3 @@ class CryptMountConfigUtil(object):
             self.add_bek_to_default_cryptdisks()
             with open('/etc/fstab', 'w') as f:
                 f.writelines(lines)
-
-
