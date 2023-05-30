@@ -36,6 +36,7 @@ class ParameterParser(object):
         self.includedDisks = None
         self.dynamicConfigsFromCRP = None
         self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
+        self.settingkeys = {"issnapshotttlenabled": CommonVariables.isSnapshotTtlEnabled, "usemccftofetchdsasforalldisks": CommonVariables.useMccfToFetchDsasForAllDisks, "usemccfforlad": CommonVariables.useMccfForLad}
         self.includeLunList = []    #To be shared with HP
 
         """
@@ -112,9 +113,9 @@ class ParameterParser(object):
                 for config in self.dynamicConfigsFromCRP:
                     if CommonVariables.key in config and CommonVariables.value in config:
                         found = False
-                        for flag in self.wellKnownSettingFlags:
-                            if((config[CommonVariables.key]).lower() == flag.lower()):
-                                self.wellKnownSettingFlags[flag] = config[CommonVariables.value]
+                        for flag in self.settingkeys:
+                            if((config[CommonVariables.key]).lower() == flag):
+                                self.wellKnownSettingFlags[self.settingkeys[flag]] = config[CommonVariables.value]
                                 found = True
                                 break
                         if(found != True):
