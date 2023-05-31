@@ -23,9 +23,9 @@
 
 #define LOG_DIRETORY "/tmp"
 #define LOG_FILE_TEMPLATE "%s/ade_vol_notif-%s.log"
-#define ADE_EVENT_THRESHOLD 4
+#define ADE_EVENT_THRESHOLD 15
 #define ADE_MAX_ATTEMPT_FOR_DEVICE 2
-#define ADE_COUNT_WAIT_TIME_SEC 30
+#define ADE_COUNT_WAIT_TIME_SEC 3
 #define ADE_WAIT_TIME_SEC 900
 
 enum class AdeStatus{ADE_NOT_STARTED,ADE_RUNNING,ADE_FINISHED};
