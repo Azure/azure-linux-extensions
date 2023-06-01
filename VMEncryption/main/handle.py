@@ -82,7 +82,8 @@ def uninstall():
         vns_service = VolumeNotificationService(logger=logger)
         vns_service.stop()
         vns_service.disable()
-        vns_service.unregister()
+        vns_service.unregister()#deleting service file. 
+        vns_service.unmask() #to make sure service will be removed from /etc/ location - sucessfully unregistered.  
     hutil.do_exit(0, 'Uninstall', CommonVariables.extension_success_status, '0', 'Uninstall succeeded')
 
 
@@ -665,7 +666,9 @@ def mark_encryption(command, volume_type, disk_format_query, encryption_mode=Non
     return encryption_marker
 
 def should_perform_online_encryption(disk_util, encryption_command, volume_type):
-    if not DistroPatcher.support_online_encryption:
+    if security_Type != CommonVariables.ConfidentialVM and not DistroPatcher.support_online_encryption:
+        return False
+    if security_Type == CommonVariables.ConfidentialVM and not DistroPatcher.validate_online_encryption_support():
         return False
     DistroPatcher.install_cryptsetup()
     if disk_util.get_luks_header_size() != CommonVariables.luks_header_size_v2:
@@ -725,26 +728,18 @@ def enable():
         security_Type = imds_Stored_Results.get_security_type()
         logger.log('security type stored result {0}'.format(security_Type))
         
-        #register/enable and start vns service for CVM
+        #register/enable vns service for CVM
         if not vns_call and security_Type == CommonVariables.ConfidentialVM:
             vns_service = VolumeNotificationService(logger=logger)
             if not vns_service.is_enabled():
-                vns_service.register()   
-            #run unmask enable and start in all cases. 
-            vns_service.unmask() 
-            vns_service.enable()
-            vns_service.start()
-            #logger.log(msg="service {0} is-active status {1} is-enabled status {2}".format())
-            if vns_service.is_active():
-                logger.log('Volume notification is active!.')
-                hutil.do_status_report(operation='VNS_registration',
-                              status=CommonVariables.extension_success_status,
-                              status_code=str(CommonVariables.success),
-                              message='VNS service is registered sucessfully!')
-            else:
-                logger.log('Volume notification is not active!.',level=CommonVariables.WarningLevel) 
+                ret = vns_service.register()  
+                if ret: 
+                    logger.log('Volume notification service registartion is successful!')
+                else:
+                    logger.log('Volume notification service registration is unsuccessful!.',level=CommonVariables.WarningLevel) 
+            #making sure that azguestattestation package is installed for SKR.
+            DistroPatcher.install_azguestattestation()
                 
-
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
@@ -823,6 +818,13 @@ def enable():
             logger.log(traceback.format_exc())
 
         if encryption_operation in [CommonVariables.EnableEncryption, CommonVariables.EnableEncryptionFormat, CommonVariables.EnableEncryptionFormatAll]:
+            #for CVM if not called from VNS-> unmask, enable and start the VNS service.
+            if not vns_call and security_Type == CommonVariables.ConfidentialVM and not vns_service.is_active():
+                vns_service.unmask() 
+                vns_service.enable()
+                vns_service.start()
+                if vns_service.is_active():
+                    logger.log("VNS service is started sucessfully!")
             if is_migrate_operation:
                 perform_migration(encryption_config, crypt_mount_config_util)
                 return  # Control should not reach here but added return just to be safe
@@ -851,8 +853,13 @@ def enable():
 
         elif encryption_operation == CommonVariables.DisableEncryption:
             logger.log("handle.py found disable encryption operation")
+            #for CVM if not called from VNS-> stop and mask the VNS service. 
+            if not vns_call and security_Type ==CommonVariables.ConfidentialVM and vns_service.is_active():
+                vns_service.stop()
+                vns_service.mask()
+                if not vns_service.is_active():
+                    logger.log("VNS service is stopped sucessfully!")
             disable_encryption()
-
         else:
             msg = "Encryption operation {0} is not supported".format(encryption_operation)
             logger.log(msg)
@@ -2022,17 +2029,30 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     return None
 
 
-def daemon_encrypt():
-    #TODO: TEMP disk encryption, remove this portion of code to unblock Data disk encryption. 
-    logger.log("security type is {0}".format(security_Type))
+def daemon_encrypt(): 
+    logger.log("daemon_encrypt security type is {0}".format(security_Type))
     if security_Type == CommonVariables.ConfidentialVM:
-        msg = "Currently for CVM, Data disk encryption is not supported."
-        logger.log(msg)
+        confidential_encryption_datadisk = public_settings.get("PrivatePreview.ConfidentialEncryptionDataDisk")
+        confidential_encryption_datadisk_flag = False
+        msg = ""
+        if confidential_encryption_datadisk.__class__.__name__ in ['str','bool']:
+            if confidential_encryption_datadisk.__class__.__name__ == 'str' and confidential_encryption_datadisk.lower() == "true":
+                confidential_encryption_datadisk_flag=True
+            else:
+                confidential_encryption_datadisk_flag=confidential_encryption_datadisk
+            msg="PrivatePreview.ConfidentialEncryptionDataDisk: {0}".format(confidential_encryption_datadisk)
+        else:
+            msg="non-valid input {0} for PrivatePreview.ConfidentialEncryptionDataDisk.".format(confidential_encryption_datadisk)
+
+        if not confidential_encryption_datadisk_flag:
+            msg = "Currently for this CVM, Data disk encryption is not supported. {0}".format(msg)
+            logger.log(msg=msg,level=CommonVariables.ErrorLevel)
+            return
         hutil.do_status_report(operation="EnableEncryption",
                        status=CommonVariables.extension_success_status,
                        status_code=str(CommonVariables.success),
                        message=msg)
-        #return
+
     # Ensure the same configuration is executed only once
     # If the previous enable failed, we do not have retry logic here.
     # TODO Remount all

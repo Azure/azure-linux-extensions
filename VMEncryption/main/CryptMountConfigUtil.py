@@ -181,7 +181,7 @@ class CryptMountConfigUtil(object):
                         device, mountpoint, fs, opts = self.parse_fstab_line(line)
                         if not device:
                             continue
-                        fstab_backup_line = line
+                        fstab_backup_line = line.strip()
                         break
                 fstab_path="/etc/fstab"
                 if fstab_backup_line is not None:
@@ -189,12 +189,12 @@ class CryptMountConfigUtil(object):
                         fstab_lines=rf.readlines()
                     index = 0
                     for line in fstab_lines:
-                        if crypt_item.mapper_name in line:
+                        if parsed_crypt_item.mapper_name in line:
                             break
                         index +=1
                     if index == len(fstab_lines):
                         with open(fstab_path, "a" ) as wf:
-                            wf.write([fstab_backup_line])
+                            wf.write(fstab_backup_line)
                     else:
                         fstab_lines[index]=fstab_backup_line+"\n"
                         with open(fstab_path, "w") as wf:
@@ -520,7 +520,7 @@ class CryptMountConfigUtil(object):
                 scsi_controller, lun_number = scsi_lun_numbers[0]
                 key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))                  
             
-        crypttab_line = "\n{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
+        crypttab_line = "{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
         if crypt_item.luks_header_path and str(crypt_item.luks_header_path) != "None":
             crypttab_line += ",header=" + crypt_item.luks_header_path
         crypttab_path="/etc/crypttab"
