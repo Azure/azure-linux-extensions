@@ -2031,6 +2031,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
 
 def daemon_encrypt(): 
     logger.log("daemon_encrypt security type is {0}".format(security_Type))
+    public_settings = get_public_settings()
     if security_Type == CommonVariables.ConfidentialVM:
         confidential_encryption_datadisk = public_settings.get("PrivatePreview.ConfidentialEncryptionDataDisk")
         confidential_encryption_datadisk_flag = False
@@ -2042,7 +2043,7 @@ def daemon_encrypt():
                 confidential_encryption_datadisk_flag=confidential_encryption_datadisk
             msg="PrivatePreview.ConfidentialEncryptionDataDisk: {0}".format(confidential_encryption_datadisk)
         else:
-            msg="non-valid input {0} for PrivatePreview.ConfidentialEncryptionDataDisk.".format(confidential_encryption_datadisk)
+            msg="Invalid input {0} for PrivatePreview.ConfidentialEncryptionDataDisk.".format(confidential_encryption_datadisk)
 
         if not confidential_encryption_datadisk_flag:
             msg = "Currently for this CVM, Data disk encryption is not supported. {0}".format(msg)
@@ -2121,7 +2122,7 @@ def daemon_encrypt():
             # If Encryption is already in resume phase then we can return success state
             status = CommonVariables.extension_success_status
             message = 'Encryption succeeded for data volumes'
-            if volume_type == CommonVariables.VolumeTypeAll.lower():
+            if volume_type == CommonVariables.VolumeTypeAll.lower() and encryption_marker.config_file_exists():
                 encryption_mode = encryption_marker.get_encryption_mode()
                 encryption_phase = encryption_marker.get_encryption_phase()
                 encryption_cmd = encryption_marker.get_current_command().lower()
