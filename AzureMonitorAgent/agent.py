@@ -1207,8 +1207,8 @@ def generate_localsyslog_configs():
         f.close()
         
     useSyslogTcp = False
-    if public_settings is not None and "features" in public_settings:
-        features = public_settings.get("features")
+    if public_settings is not None and "previewFeatures" in public_settings:
+        features = public_settings.get("previewFeatures")
         if features is not None and "useSyslogTcp" in features:            
             useSyslogTcp = features.get("useSyslogTcp")    
     
