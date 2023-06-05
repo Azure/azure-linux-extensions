@@ -412,13 +412,6 @@ def enable():
 
     public_settings, protected_settings = get_settings()
 
-    # start the metrics watcher if its not already running
-    if ((protected_settings is None or len(protected_settings) == 0) or
-        (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application") or
-        (public_settings is not None and public_settings.get(AzureMonitorConfigKey) is not None and public_settings.get(AzureMonitorConfigKey).get("ensure") == True)):
-        start_metrics_process()
-        start_syslogconfig_process()
-
     exit_if_vm_not_supported('Enable')
 
     ensure = OrderedDict([
@@ -518,6 +511,10 @@ def enable():
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
         start_amacoreagent()
         restart_launcher()
+        # start the metrics and syslog watcher only in 3P mode
+        start_metrics_process()
+        start_syslogconfig_process()
+
 
     hutil_log_info('Handler initiating onboarding.')
 
