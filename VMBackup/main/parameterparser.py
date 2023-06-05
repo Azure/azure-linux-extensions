@@ -35,7 +35,8 @@ class ParameterParser(object):
         self.snapshotTaskToken = ''
         self.includedDisks = None
         self.dynamicConfigsFromCRP = None
-        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
+        wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
+        self.settings = []
         settingKeysMapping= {}
         settingKeysMapping[CommonVariables.isSnapshotTtlEnabled.lower()] = CommonVariables.isSnapshotTtlEnabled
         settingKeysMapping[CommonVariables.useMccfToFetchDsasForAllDisks.lower()] = CommonVariables.useMccfToFetchDsasForAllDisks
@@ -116,12 +117,17 @@ class ParameterParser(object):
                 for config in self.dynamicConfigsFromCRP:
                     if CommonVariables.key in config and CommonVariables.value in config:
                         if((config[CommonVariables.key]).lower() in settingKeysMapping):
-                            self.wellKnownSettingFlags[settingKeysMapping[config[CommonVariables.key].lower()]] = config[CommonVariables.value]
+                            wellKnownSettingFlags[settingKeysMapping[config[CommonVariables.key].lower()]] = config[CommonVariables.value]
                         else:
                             backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
                     else:
                         backup_logger.log("The received dynamicConfigsFromCRP is not in expected format.", True)
-                backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
             except Exception as e:
                 errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
                 backup_logger.log(errorMsg, True)
+        for flag in wellKnownSettingFlags:
+            temp_dict = {}
+            temp_dict[CommonVariables.key] = flag
+            temp_dict[CommonVariables.value] = wellKnownSettingFlags[flag]
+            self.settings.append(temp_dict)
+        backup_logger.log("settings to be sent " + str(self.settings), True)
