@@ -1160,6 +1160,10 @@ class DiskUtil(object):
                 self.logger.log(msg=("there's sub items for the device:{0} , so skip it.".format(device_item.name)), level=CommonVariables.WarningLevel)
                 return True
 
+            if device_item.file_system == "crypto_LUKS":
+                self.logger.log(msg ="device {0} fs type is crypto_LUKS, so skip it.".format(device_item.name),level=CommonVariables.WarningLevel)
+                return True
+
             if device_item.type == "crypt":
                 self.logger.log(msg=("device_item.type is:{0}, so skip it.".format(device_item.type)), level=CommonVariables.WarningLevel)
                 return True

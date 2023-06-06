@@ -732,7 +732,9 @@ def enable():
         if not vns_call and security_Type == CommonVariables.ConfidentialVM:
             vns_service = VolumeNotificationService(logger=logger)
             if not vns_service.is_enabled():
-                ret = vns_service.register()  
+                handler_env = hutil.get_handler_env()
+                log_dir = handler_env['handlerEnvironment']['logFolder']
+                ret = vns_service.register(log_dir)  
                 if ret: 
                     logger.log('Volume notification service registartion is successful!')
                 else:
@@ -2448,6 +2450,9 @@ def daemon():
     if DistroPatcher is not None and DistroPatcher.support_online_encryption:
         sleep_time = 5  #Reduce sleep time for online encryption
     
+    if security_Type == CommonVariables.ConfidentialVM and DistroPatcher is not None and DistroPatcher.validate_online_encryption_support():
+        sleep_time = 5 #Reduce sleep time for online encryption
+
     logger.log("waiting for {0} seconds before continuing the daemon".format(sleep_time))
     time.sleep(sleep_time)
 

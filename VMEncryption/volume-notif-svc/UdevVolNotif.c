@@ -12,10 +12,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <deque>
-#include<vector>
-#include <string>
-#include<sstream>
-#include<algorithm>
+#include <vector>
+#include <sstream>
+#include <algorithm>
 
 #define LOG_PRIORITY 3
 #define LOG_LEVEL 3
@@ -86,14 +85,17 @@ void sigint_handler(int signum) {
     exit(0);
 }
 
-void prepare_log_file() {
+void prepare_log_file(std::string log_directory) {
     // Create log file with date time in UTC.
+    if (log_directory==""){
+        log_directory=LOG_DIRETORY;
+    }
     time_t now = time(NULL);
     struct tm *timeinfo;
     timeinfo = gmtime(&now);
     char current_time[80];
     strftime(current_time, sizeof(current_time), "%Y-%m-%dT%H-%M-%S", timeinfo);
-    snprintf(log_file_path, sizeof(log_file_path), LOG_FILE_TEMPLATE, LOG_DIRETORY, current_time);
+    snprintf(log_file_path, sizeof(log_file_path), LOG_FILE_TEMPLATE, log_directory.c_str(), current_time);
 }
 
 void daemonize(int argc, char *argv[])
@@ -235,32 +237,41 @@ void printdq(std::deque<device>&dq){
 
 int main(int argc, char *argv[]) {
 
-    prepare_log_file();
+    // Command line options: -d for daemon mode
+    //-l is for log path.
+    int c = 0;
+    int daemon_mode = 0;
+    std::string log_path="";
+    bool invalid_option=false;
+    while ((c = getopt(argc, argv, "dl:")) != -1) {
+        switch (c) {
+            case 'd':
+                daemon_mode = 1;
+                break;
+            case 'l':
+                 log_path=optarg;
+                 break;
+            default:
+                invalid_option=true;
+                break;
+        }
+    }
 
+    prepare_log_file(log_path);
+    if(invalid_option==true){
+        custom_log("Unknown option %c", c);
+        exit(1);
+    }
     custom_log("\n\n### Azure Disk Encryption volume notification service ###");
     custom_log("Starting udev volume notification program (%s) with %d args", argv[0], argc);
     signal(SIGINT, sigint_handler);
     custom_log("Registered SIGINT handler");
 
-    // Command line options: -d for daemon mode
-    int c = 0;
-    int daemon_mode = 0;
-    while ((c = getopt(argc, argv, "d")) != -1) {
-        switch (c) {
-            case 'd':
-                custom_log("Option for switching to daemon mode provided");
-                daemon_mode = 1;
-                break;
-            default:
-                custom_log("Unknown option %c", c);
-                exit(1);
-        }
-    }
-
     char current_working_directory[1024];
     getcwd(current_working_directory,1024);
-    
+
     if (daemon_mode) {
+        custom_log("Option for switching to daemon mode provided");
         daemonize(argc, argv);
     }
 

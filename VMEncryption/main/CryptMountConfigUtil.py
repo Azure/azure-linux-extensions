@@ -194,7 +194,7 @@ class CryptMountConfigUtil(object):
                         index +=1
                     if index == len(fstab_lines):
                         with open(fstab_path, "a" ) as wf:
-                            wf.write(fstab_backup_line)
+                            wf.write(fstab_backup_line+"\n")
                     else:
                         fstab_lines[index]=fstab_backup_line+"\n"
                         with open(fstab_path, "w") as wf:
