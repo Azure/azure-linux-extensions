@@ -142,10 +142,10 @@ name_map = {
 "LogicalDisk\\WritesPerSecond" : {"plugin":"diskio_vmi", "field":"LogicalDisk\\\\\\\\WritesPerSecond", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 
 # Process plugin
-"Pct User Time" : {"plugin":"procstat", "field":"cpu_time_user", "module":"procstat"},
-"Pct Privileged Time" : {"plugin":"procstat", "field":"cpu_time_system", "module":"procstat"},
-"Used Memory" : {"plugin":"procstat", "field":"memory_rss", "module":"procstat"},
-"Virtual Shared Memory" : {"plugin":"procstat", "field":"memory_vms", "module":"procstat"},
+"Pct User Time" : {"plugin":"procstat", "field":"cpu_time_user", "module":"process"},
+"Pct Privileged Time" : {"plugin":"procstat", "field":"cpu_time_system", "module":"process"},
+"Used Memory" : {"plugin":"procstat", "field":"memory_rss", "module":"process"},
+"Virtual Shared Memory" : {"plugin":"procstat", "field":"memory_vms", "module":"process"},
   
 # System plugin
 "Uptime" : {"plugin":"system", "field":"uptime", "module":"system"},
