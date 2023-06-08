@@ -7,6 +7,10 @@
   ],
   "redhat": [
         {
+          "Version" : "9",
+          "MinSupportedVersion" : "9.0"
+        },   
+        {
           "Version" : "8",
           "MinSupportedVersion" : "8.1"
         },   
