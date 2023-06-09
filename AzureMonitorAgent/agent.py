@@ -113,6 +113,7 @@ MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricC
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
 AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
+ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -697,7 +698,20 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
         else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+    
+    # is this Arc? If so, check for proxy     
+    if os.path.isfile(ArcSettingsFile):
+        f = open(ArcSettingsFile, "r")
+        data = f.read()
 
+        if (data != ''):
+            json_data = json.loads(data)
+            if "proxy.url" in json_data:
+                url = json_data["proxy_url"]
+                if url != "":
+                    default_configs["MDSD_PROXY_ADDRESS"] = url
+                    set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+                    
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
 
