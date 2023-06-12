@@ -1275,6 +1275,40 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
             logger.log(msg="encryption failed with code {0}".format(encrypt_result), level=CommonVariables.ErrorLevel)
             return device_item
 
+def mapper_update_for_resume_operation( disk_util,
+                                        bek_util,
+                                        crypt_mount_config_util,
+                                        ongoing_item_config):
+    '''If mapper opened by consolidation code then close it and re-open using mapper present in ongoing_item_config'''
+    #If mapper opened by consolidation code then close it and re-open using mapper present in ongoing_item_config
+    mapper_name=ongoing_item_config.original_dev_path[5:].replace("/", "-") + "-unlocked"
+    close_result=disk_util.luks_close(mapper_name)
+    if close_result != CommonVariables.process_success:
+        logger.log("mapper {0} can't closed.".format(mapper_name))
+        return close_result
+    #luksOpen
+    encryption_config = EncryptionConfig(encryption_environment, logger)
+    passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+    open_result = disk_util.luks_open(passphrase_file=passphrase_file,
+                                      dev_path=ongoing_item_config.original_dev_path,
+                                      mapper_name=ongoing_item_config.mapper_name,
+                                      header_file=ongoing_item_config.luks_header_file_path,
+                                      uses_cleartext_key=False)
+    if open_result != CommonVariables.process_success:
+        logger.log("device {0} can't opened using {1} passphrase".format(ongoing_item_config.original_dev_name_path,passphrase_file))
+        #try with passphrase based on lun and part id
+        key_file_dir = None
+        if security_Type == CommonVariables.ConfidentialVM:
+            key_file_dir="/var/lib/azure_disk_encryption_config"
+        passphrase_file = crypt_mount_config_util.get_key_file_path(ongoing_item_config.original_dev_name_path,key_file_dir)
+        open_result = disk_util.luks_open(passphrase_file=passphrase_file,
+                                          dev_path=ongoing_item_config.original_dev_path,
+                                          mapper_name=ongoing_item_config.mapper_name,
+                                          header_file=ongoing_item_config.luks_header_file_path,
+                                          uses_cleartext_key=False)
+        if open_result != CommonVariables.process_success:
+            logger.log("device {0} can't opened using {1} passphrase".format(ongoing_item_config.original_dev_name_path,passphrase_file))
+    return open_result
 
 def encrypt_inplace_without_separate_header_file(passphrase_file,
                                                  device_item,
@@ -1300,15 +1334,19 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
         ongoing_item_config.mount_point = device_item.mount_point
         if os.path.exists(os.path.join('/dev/', device_item.name)):
             ongoing_item_config.original_dev_name_path = os.path.join('/dev/', device_item.name)
-            ongoing_item_config.original_dev_path = os.path.join('/dev/', device_item.name)
         else:
             ongoing_item_config.original_dev_name_path = os.path.join(CommonVariables.dev_mapper_root, device_item.name)
-            ongoing_item_config.original_dev_path = os.path.join(CommonVariables.dev_mapper_root, device_item.name)
+        ongoing_item_config.original_dev_path=disk_util.get_persistent_path_by_sdx_path(ongoing_item_config.original_dev_name_path)
         ongoing_item_config.phase = CommonVariables.EncryptionPhaseBackupHeader
         ongoing_item_config.commit()
     else:
         logger.log(msg="ongoing item config is not none, this is resuming, info: {0}".format(ongoing_item_config),
                    level=CommonVariables.WarningLevel)
+        #update mapper as mentioned in ongoing_item_config for data copy.
+        mapper_update_for_resume_operation(disk_util = disk_util,
+                                           bek_util = bek_util,
+                                           crypt_mount_config_util=crypt_mount_config_util,
+                                           ongoing_item_config=ongoing_item_config)
 
     logger.log(msg=("encrypting device item: {0}".format(ongoing_item_config.get_original_dev_path())))
     # we only support ext file systems.
@@ -1375,18 +1413,24 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
         elif current_phase == CommonVariables.EncryptionPhaseEncryptDevice:
             logger.log(msg="the current phase is {0}".format(CommonVariables.EncryptionPhaseEncryptDevice),
                        level=CommonVariables.InfoLevel)
-
-            encrypt_result = disk_util.encrypt_disk(dev_path=original_dev_path,
-                                                    passphrase_file=passphrase_file,
-                                                    mapper_name=mapper_name,
-                                                    header_file=None)
-
+            encrypt_result = CommonVariables.process_success
+            #in case of resume -> if disk is not luks
+            if not disk_util.is_luks_device(device_path=original_dev_path,device_header_path = None):
+                encrypt_result = disk_util.encrypt_disk(dev_path=original_dev_path,
+                                                        passphrase_file=passphrase_file,
+                                                        mapper_name=mapper_name,
+                                                        header_file=None)
             # after the encrypt_disk without seperate header, then the uuid
             # would change.
             if encrypt_result != CommonVariables.process_success:
                 logger.log(msg="encrypt file system failed.", level=CommonVariables.ErrorLevel)
                 return current_phase
             else:
+                #update luks2 header token field
+                if security_Type == CommonVariables.ConfidentialVM:
+                    disk_util.import_token(device_path=ongoing_item_config.original_dev_path,
+                                           passphrase_file=passphrase_file,
+                                           public_settings=get_public_settings())
                 ongoing_item_config.current_slice_index = 0
                 ongoing_item_config.phase = CommonVariables.EncryptionPhaseCopyData
                 ongoing_item_config.commit()
@@ -1431,7 +1475,7 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
                 crypt_item_to_update = CryptItem()
                 crypt_item_to_update.mapper_name = mapper_name
                 original_dev_name_path = ongoing_item_config.get_original_dev_name_path()
-                crypt_item_to_update.dev_path = disk_util.get_persistent_path_by_sdx_path(original_dev_name_path)
+                crypt_item_to_update.dev_path = ongoing_item_config.get_original_dev_path()
                 crypt_item_to_update.luks_header_path = "None"
                 crypt_item_to_update.file_system = ongoing_item_config.get_file_system()
                 crypt_item_to_update.uses_cleartext_key = False
@@ -1543,6 +1587,7 @@ def encrypt_inplace_with_separate_header_file(passphrase_file,
                                level=CommonVariables.ErrorLevel)
                     return current_phase
                 else:
+                    #TODO update token here.
                     ongoing_item_config.phase = CommonVariables.EncryptionPhaseCopyData
                     ongoing_item_config.commit()
                     current_phase = CommonVariables.EncryptionPhaseCopyData
@@ -1936,12 +1981,6 @@ def enable_encryption_all_in_place(passphrase_file, encryption_marker, disk_util
                                                                                    status_prefix=status_prefix)
 
             if encryption_result_phase == CommonVariables.EncryptionPhaseDone:
-                #update luks2 header token field 
-                if security_Type == CommonVariables.ConfidentialVM:
-                    device_path=os.path.join("/dev",device_item.name)
-                    disk_util.import_token(device_path=device_path,
-                                           passphrase_file=passphrase_file,
-                                           public_settings=get_public_settings())
                 continue
             else:
                 # do exit to exit from this round
