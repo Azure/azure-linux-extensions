@@ -75,6 +75,7 @@ def GetDistroPatcher(logger):
     Distro = Distro.strip('"')
     Distro = Distro.strip(' ')
     Distro = Distro.replace('ubuntu','Ubuntu') # to upper if needed
+    distro_name = distro_name.replace('rhel','redhat') # fix for RHEL 9 distro name change 
 
     patching_class_name = Distro + 'Patching'
 

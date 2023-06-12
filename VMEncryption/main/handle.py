@@ -2050,7 +2050,8 @@ def daemon_encrypt():
         # import OSEncryption here instead of at the top because it relies
         # on pre-req packages being installed (specifically, python-six on Ubuntu)
         distro_name = DistroPatcher.distro_info[0]
-        distro_name = distro_name.replace('ubuntu', 'Ubuntu')  # to upper if needed
+        distro_name = distro_name.replace('ubuntu','Ubuntu')  # to upper if needed
+        distro_name = distro_name.replace('rhel','redhat') # fix for RHEL 9 distro name change 
         distro_version = DistroPatcher.distro_info[1]
 
         os_encryption = None
