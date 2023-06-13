@@ -116,8 +116,9 @@ class ParameterParser(object):
                 backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
                 for config in self.dynamicConfigsFromCRP:
                     if CommonVariables.key in config and CommonVariables.value in config:
-                        if((config[CommonVariables.key]).lower() in settingKeysMapping):
-                            wellKnownSettingFlags[settingKeysMapping[config[CommonVariables.key].lower()]] = config[CommonVariables.value]
+                        config_key = config[CommonVariables.key].lower()
+                        if(config_key in settingKeysMapping):
+                            wellKnownSettingFlags[settingKeysMapping[config_key]] = config[CommonVariables.value]
                         else:
                             backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
                     else:
