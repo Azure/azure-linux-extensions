@@ -208,7 +208,7 @@ class GuestSnapshotter(object):
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
                     try:
-                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.settings, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.wellKnownSettingFlags, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
                     except Exception as e:
                         self.logger.log("multiprocess queue creation failed")
                         all_snapshots_failed = True
@@ -297,7 +297,7 @@ class GuestSnapshotter(object):
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
-                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.settings, paras.backup_metadata)
+                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.wellKnownSettingFlags, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
                     # update blob_snapshot_info_array element properties from snapshot_info_indexer object
