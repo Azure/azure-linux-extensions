@@ -22,6 +22,7 @@ import os.path
 import traceback
 import sys
 from AbstractBekUtilImpl import AbstractBekUtilImpl,BekMissingException
+from IntefaceBekUtilImpl import IntefaceBekUtilImpl
 
 
 class BekUtilVolumeImpl(AbstractBekUtilImpl):
