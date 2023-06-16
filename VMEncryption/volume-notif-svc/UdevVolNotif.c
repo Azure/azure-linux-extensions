@@ -8,13 +8,17 @@
 #include <signal.h>
 #include <getopt.h>
 #include <fcntl.h>
+#include <mntent.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <libmount/libmount.h>
 #include <deque>
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <thread>
+#include <chrono>
 
 #define LOG_PRIORITY 3
 #define LOG_LEVEL 3
@@ -30,11 +34,58 @@
 enum class AdeStatus{ADE_NOT_STARTED,ADE_RUNNING,ADE_FINISHED};
 AdeStatus ade_status = AdeStatus::ADE_NOT_STARTED;
 time_t ade_finished;
-
+bool thread_running_mnt=true;
+bool unencrypted_fs_mounted = false;
 
 // TODO: Make this a parameter to the program
 static char log_file_path[1024];
 void custom_log(const char *format, ...);
+
+void thread_proc_mnt()
+{
+    //this is coped from ADE code
+    std::vector<std::string> format_supported_file_systems{"ext4", "ext3", "ext2", "xfs", "btrfs"};
+    const char *filename;
+    struct libmnt_monitor *mn = mnt_new_monitor();
+    mnt_monitor_enable_kernel(mn, true);
+    custom_log("waiting for changes...\n");
+    while (mnt_monitor_wait(mn, -1) > 0)
+    {
+        while(mnt_monitor_next_change(mn, &filename, NULL) == 0) {
+        custom_log("mount change event logged for %s",filename);
+        unencrypted_fs_mounted = false;
+        FILE *fp = setmntent("/proc/self/mounts", "r");
+        if (fp == NULL)
+        {
+            perror("Failed to open /proc/self/mounts");
+            return;
+        }
+
+        struct mntent *mnt;
+        while ((mnt = getmntent(fp)) != NULL)
+        {
+            std::string mnt_type(mnt->mnt_type);
+            if (find(format_supported_file_systems.begin(),format_supported_file_systems.end(),mnt_type) != format_supported_file_systems.end())
+            {
+                // if mounted ext4 filesystem is not encrypted, set unencrypted_ext4_mounted to true
+                // device name that doesn't contain mapper in the name and mnt_dir is not empty and not /boot
+                std::string device_name(mnt->mnt_fsname);
+                std::string mnt_dir(mnt->mnt_dir);
+                if (device_name.find("mapper") == std::string::npos &&
+                    !mnt_dir.empty() &&
+                    mnt_dir != "/boot")
+                {
+                    unencrypted_fs_mounted= true;
+                    custom_log("Unencrypted %s filesystem %s mounted on %s\n",mnt->mnt_type,mnt->mnt_fsname,mnt->mnt_dir);
+                }
+            }
+        }
+        endmntent(fp);
+     }
+    }
+    mnt_unref_monitor(mn);
+}
+
 
 struct device{
         std::string syspath;
@@ -132,7 +183,7 @@ void invoke_ade(const char* path,std::deque<device>&dq){
     ade_status = AdeStatus::ADE_RUNNING;
     //update counter in dq
     for(auto item = dq.begin(); item!=dq.end(); item++){
-       item->ade_attempt_count+=1; 
+       item->ade_attempt_count+=1;
     }
     pid_t pAde = fork();
     if(pAde==0){
@@ -198,7 +249,7 @@ bool is_devnode_added(std::deque<device>&dq, const char* syspath, const char* ac
 void cleanCryptedDevFromList(std::deque<device>&dq){
         using itdeque=std::deque<device>::iterator;
         std::vector<itdeque> cryptedDevices;
-        //removing crypted changed devices, or attempt count is more than 
+        //removing crypted changed devices, or attempt count is more than
         //ADE_MAX_ATTEMPT_FOR_DEVICE
         for(itdeque it=dq.begin(); it!=dq.end(); it++){
                 if(             it->action =="change" &&
@@ -312,6 +363,9 @@ int main(int argc, char *argv[]) {
         custom_log("ERROR: Can't get udev monitor fd (error no=%d)\n", errno);
         exit(1);
         }
+    custom_log("Entering thread to check mounts");
+    std::atexit([]() { thread_running_mnt = false;});
+    std::thread mnt_thread(thread_proc_mnt);
     custom_log("Entering main event loop");
     time_t first_dev_node;
     first_dev_node = time(NULL);
@@ -394,7 +448,14 @@ int main(int argc, char *argv[]) {
             custom_log("diff_for_ade_loop: %d, diff_for_dev_nodes: %d",diff_for_ade_loop,diff_for_dev_nodes);
             invoke_ade(current_working_directory,dq);
             ade_invoked=true;
-        }else{
+        }
+        else if(ade_status!=AdeStatus::ADE_RUNNING && unencrypted_fs_mounted == true){
+            custom_log("running ADE, a volume is mounted!");
+            invoke_ade(current_working_directory,dq);
+            ade_invoked=true;
+            unencrypted_fs_mounted=false;
+        }
+        else{
             printf("...");
         }
         if(ade_invoked){
@@ -405,5 +466,6 @@ int main(int argc, char *argv[]) {
     }
     udev_monitor_unref(mon);
     udev_unref(udev);
+    mnt_thread.join();
     return 0;
 }
