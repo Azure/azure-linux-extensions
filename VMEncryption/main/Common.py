@@ -135,6 +135,7 @@ class CommonVariables:
     MigrateKey = 'MigrateFlag'
     MigrateValue = 'Migrate'
     PassphraseLengthInBytes = 127
+    EncryptionManagedIdentity = 'EncryptionManagedIdentity'
 
     """
     value for KeyStoreTypeKey could be ManagedHSM

@@ -789,11 +789,13 @@ def enable():
         logger.log('OS Disk Status: {0}'.format(encryption_status['os']))
 
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
-            
+        check_release_rsa_or_ec_key = False
+        if security_Type == CommonVariables.ConfidentialVM:
+            check_release_rsa_or_ec_key = True
         # run fatal prechecks, report error if exceptions are caught
         try:
             if not is_migrate_operation:
-                check_Util.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type)
+                check_Util.precheck_for_fatal_failures(public_settings, encryption_status, DistroPatcher, existing_volume_type,check_release_rsa_or_ec_key)
         except Exception as e:
             logger.log("PRECHECK: Fatal Exception thrown during precheck")
             logger.log(traceback.format_exc())
