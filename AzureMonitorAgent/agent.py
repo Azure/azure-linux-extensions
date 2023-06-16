@@ -706,8 +706,9 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
 
         if (data != ''):
             json_data = json.loads(data)
-            if "proxy.url" in json_data:
+            if json_data is not None and "proxy.url" in json_data:
                 url = json_data["proxy.url"]
+                # only non-authenticated proxy config is supported
                 if url != '':
                     default_configs["MDSD_PROXY_ADDRESS"] = url
                     set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
