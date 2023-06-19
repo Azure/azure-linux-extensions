@@ -18,8 +18,10 @@
 
 import os
 import shutil
-
-from configparser import ConfigParser
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 from Common import CommonVariables
 from CommandExecutor import CommandExecutor,ProcessCommunicator
 
