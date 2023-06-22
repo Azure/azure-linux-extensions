@@ -58,7 +58,7 @@ class VolumeNotificationService(object):
     def _edit_service_config(self,log_path):
         '''edit WorkingDirectory and ExecStart path of config file'''
         if self._service_file_exists():
-            config = ConfigParser()
+            config = ConfigParsers.ConfigParser()
             config.optionxform = lambda option:option
             #update workingdirectory and execution path in service file. 
             config.read(self._service_file())

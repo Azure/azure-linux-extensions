@@ -371,7 +371,9 @@ class CheckUtil(object):
         executor = CommandExecutor(self.logger)
         result = executor.Execute(cmd)
         if result != CommonVariables.process_success:
-            msg='Identity used in VM can not do wrapKey/unwrapKey operations.'
+            msg='The managed identity provided in public settings is not correct or \
+not authorized to do secure key release operation in your key vault/HSM. \
+Please verify and re-run ADE install after fixing the issue.'
             if imds_res_id:
                 raise Exception ('{0} Encryption managed identity: {1}'.format(msg,imds_res_id))
             raise Exception(msg)
