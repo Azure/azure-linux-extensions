@@ -741,14 +741,26 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     if "resourceId" not in data["compute"]:
         raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup Telegraf.")
 
+    # resource id is needed for ME to show metrics on the metrics blade of the VM/VMSS
+    # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
+    # or /subscriptions/20ff167c-9f4b-4a73-9fd6-0dbe93fa778a/resourceGroups/sidama/providers/Microsoft.Compute/virtualMachines/syslogReliability_1ec84a39
     az_resource_id = data["compute"]["resourceId"]
 
-    # If the instance is VMSS then trim the last two values from the resource id ie - "/virtualMachines/0"
+    # If the instance is VMSS instance resource id of a uniform VMSS then trim the last two values from the resource id ie - "/virtualMachines/0"
     # Since ME expects the resource id in a particular format. For egs -
     # IMDS returned ID - /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>/virtualMachines/0
     # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
     if "virtualMachineScaleSets" in az_resource_id: 
         az_resource_id = "/".join(az_resource_id.split("/")[:-2])
+
+    virtual_machine_name = ""
+    if "vmScaleSetName" in data["compute"] and data["compute"]["vmScaleSetName"] != "":
+        virtual_machine_name = data["compute"]["name"]
+        # for flexible VMSS above resource id is instance specific and won't have virtualMachineScaleSets
+        # for e.g., /subscriptions/20ff167c-9f4b-4a73-9fd6-0dbe93fa778a/resourceGroups/sidama/providers/Microsoft.Compute/virtualMachines/syslogReliability_1ec84a39
+        # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
+        if "virtualMachineScaleSets" not in az_resource_id: 
+            az_resource_id = "/".join(az_resource_id.split("/")[:-2]) + "/virtualMachineScaleSets/" + data["compute"]["vmScaleSetName"]
 
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup Telegraf.")
@@ -764,10 +776,6 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
         raise Exception("Unable to find 'location' key in imds query response. Failed to setup Telegraf.")
 
     region = data["compute"]["location"]
-
-    virtual_machine_name = ""
-    if "vmScaleSetName" in data["compute"] and data["compute"]["vmScaleSetName"] != "":
-        virtual_machine_name = data["compute"]["name"]
 
     #call the method to first parse the configs
     output, namespaces = parse_config(config_data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name)
