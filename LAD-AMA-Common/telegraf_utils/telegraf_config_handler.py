@@ -741,6 +741,9 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     if "resourceId" not in data["compute"]:
         raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup Telegraf.")
 
+    # resource id is needed for ME to show metrics on the metrics blade of the VM/VMSS
+    # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
+    # or /subscriptions/20ff167c-9f4b-4a73-9fd6-0dbe93fa778a/resourceGroups/sidama/providers/Microsoft.Compute/virtualMachines/syslogReliability_1ec84a39
     az_resource_id = data["compute"]["resourceId"]
 
     # If the instance is VMSS then trim the last two values from the resource id ie - "/virtualMachines/0"
