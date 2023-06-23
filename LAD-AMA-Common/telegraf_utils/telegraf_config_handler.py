@@ -759,7 +759,8 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
         # for flexible VMSS above resource id is instance specific and won't have virtualMachineScaleSets
         # for e.g., /subscriptions/20ff167c-9f4b-4a73-9fd6-0dbe93fa778a/resourceGroups/sidama/providers/Microsoft.Compute/virtualMachines/syslogReliability_1ec84a39
         # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
-        az_resource_id = "/".join(az_resource_id.split("/")[:-2]) + "/virtualMachineScaleSets/" + data["compute"]["vmScaleSetName"]
+        if "virtualMachineScaleSets" not in az_resource_id: 
+            az_resource_id = "/".join(az_resource_id.split("/")[:-2]) + "/virtualMachineScaleSets/" + data["compute"]["vmScaleSetName"]
 
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup Telegraf.")
