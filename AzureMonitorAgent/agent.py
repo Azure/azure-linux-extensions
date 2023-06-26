@@ -1245,7 +1245,8 @@ def generate_localsyslog_configs():
                 if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
                     os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
                 syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
-                os.makedir(syslog_ng_confpath)
+                if not os.path.exists(syslog_ng_confpath):
+                    os.makedirs(syslog_ng_confpath)
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
                 os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
                 restartRequired = True
@@ -1283,7 +1284,8 @@ def generate_localsyslog_configs():
             if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
                 os.remove("/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
             syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
-            os.makedir(syslog_ng_confpath)
+            if not os.path.exists(syslog_ng_confpath):
+                os.makedirs(syslog_ng_confpath)
             copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
             os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
             run_command_and_log(get_service_command("syslog-ng", "restart"))
