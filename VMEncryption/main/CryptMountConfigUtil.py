@@ -524,6 +524,9 @@ class CryptMountConfigUtil(object):
         if crypt_item.luks_header_path and str(crypt_item.luks_header_path) != "None":
             crypttab_line += ",header=" + crypt_item.luks_header_path
         crypttab_path="/etc/crypttab"
+        if not os.path.exists(crypttab_path):
+            self.logger.log("crypttab is not exists.")
+            return
         with open(crypttab_path, 'r') as rf:
             crypttab_lines=rf.readlines()
         index = 0
