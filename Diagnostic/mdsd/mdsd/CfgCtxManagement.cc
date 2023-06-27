@@ -145,7 +145,7 @@ void CfgCtxIdentityComponent::Enter(const xmlattr_t& properties)
 	_ctxidentity = dynamic_cast<CfgCtxIdentity*>(ParentContext);
 	if (!_ctxidentity) {
 		FATAL("Found <IdentityComponent> in <" + ParentContext->Name() + ">; that can't happen");
-		IsValid = false;	// Bummer; invalid
+		IsValid = false;
 		return;
 	}
 
