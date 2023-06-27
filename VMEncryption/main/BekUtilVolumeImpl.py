@@ -102,8 +102,8 @@ class BekUtilVolumeImpl(AbstractBekUtilImpl):
                     return True, ""
                 else:
                     self.logger.log("BEK has unexpected filesystem "+mount_item["fs"])
-                    return False, IntefaceBekUtilImpl.wrong_fs_msg
-        return False, self.not_mounted_msg
+                    return False, AbstractBekUtilImpl.wrong_fs_msg
+        return False, AbstractBekUtilImpl.not_mounted_msg
 
     def is_bek_disk_attached_and_partitioned(self):
         possible_bek_locations = [
@@ -115,8 +115,8 @@ class BekUtilVolumeImpl(AbstractBekUtilImpl):
                 if os.path.exists(os.path.join(location, "-part1")):
                     return True, ""
                 else:
-                    return False, IntefaceBekUtilImpl.partition_missing_msg
-        return False, IntefaceBekUtilImpl.bek_missing_msg
+                    return False, AbstractBekUtilImpl.partition_missing_msg
+        return False, AbstractBekUtilImpl.bek_missing_msg
 
     def umount_azure_passhprase(self, encryption_config, force=False):
         passphrase_file = self.get_bek_passphrase_file(encryption_config)
