@@ -15,7 +15,7 @@ WorkingDirectory=WorkingDirectory
 ExecStart=WorkingDirectory/ade-volume-notif-svc -d
 #ExecStop=/bin/bash -c '$$(which kill) -15 $MAINPID'
 Delegate=yes
-MemoryMax=50MB
+#MemoryMax=50M
 
 [Install]
 WantedBy=multi-user.target
