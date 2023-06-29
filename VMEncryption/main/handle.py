@@ -1632,7 +1632,7 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
 
     luks_header_size = disk_util.get_luks_header_size(crypt_item.dev_path)
 
-    if raw_device_item.size - mapper_device_item.size != luks_header_size:
+    if raw_device_item.size - mapper_device_item.size < luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
                    level=CommonVariables.ErrorLevel)
         logger.log(msg="raw_device_item: {0}".format(raw_device_item),
