@@ -15,6 +15,8 @@ WorkingDirectory=WorkingDirectory
 ExecStart=WorkingDirectory/ade-volume-notif-svc -d
 #ExecStop=/bin/bash -c '$$(which kill) -15 $MAINPID'
 Delegate=yes
+#ADE is added to the service and running as a child process, 
+#so We dont want to add a limit here 
 #MemoryMax=50M
 
 [Install]

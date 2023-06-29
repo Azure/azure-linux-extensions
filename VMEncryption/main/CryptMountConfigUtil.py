@@ -526,9 +526,11 @@ class CryptMountConfigUtil(object):
         crypttab_path="/etc/crypttab"
 
         if not os.path.exists(crypttab_path):
-            self.logger.log("crypttab is not exists. create crypttab file.")
-            with open("/etc/crypttab", "a") as wf:
+            self.logger.log("crypttab does not exists. Creating crypttab file.")
+            with open(crypttab_path, "a") as wf:
                 pass
+            os.chmod(path=crypttab_path,
+                         mode=0o644)
         with open(crypttab_path, 'r') as rf:
             crypttab_lines=rf.readlines()
         index = 0

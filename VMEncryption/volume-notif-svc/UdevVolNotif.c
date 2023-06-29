@@ -26,10 +26,10 @@
 
 #define LOG_DIRETORY "/tmp"
 #define LOG_FILE_TEMPLATE "%s/ade_vol_notif-%s.log"
-#define ADE_EVENT_THRESHOLD 15
-#define ADE_MAX_ATTEMPT_FOR_DEVICE 2
+#define ADE_MAX_EVENT_THRESHOLD_COUNT 15
+#define ADE_MAX_ATTEMPT_FOR_DEVICE 3
 #define ADE_COUNT_WAIT_TIME_SEC 3
-#define ADE_WAIT_TIME_SEC 900
+#define ADE_PERIODIC_SCAN_SECONDS 900
 
 enum class AdeStatus{ADE_NOT_STARTED,ADE_RUNNING,ADE_FINISHED};
 AdeStatus ade_status = AdeStatus::ADE_NOT_STARTED;
@@ -431,14 +431,14 @@ int main(int argc, char *argv[]) {
         int diff_for_dev_nodes = dev_node_count>0?(int)difftime(time(NULL),first_dev_node):0;
         bool ade_invoked = false;
         //Logic to invoke ADE.
-        if (dev_node_count >= ADE_EVENT_THRESHOLD){
+        if (dev_node_count >= ADE_MAX_EVENT_THRESHOLD_COUNT){
                     custom_log("dev node count %d max to trigger %d for running ADE!"
-                    ,dev_node_count,ADE_EVENT_THRESHOLD);
+                    ,dev_node_count,ADE_MAX_EVENT_THRESHOLD_COUNT);
                     invoke_ade(current_working_directory,dq);
                     ade_invoked=true;
-        }else if(diff_for_ade_loop>=ADE_WAIT_TIME_SEC){
+        }else if(diff_for_ade_loop>=ADE_PERIODIC_SCAN_SECONDS){
             custom_log("running ADE in every %d sec, last ade run was at %s, diff: %d, dev nodes in list %d"
-            ,ADE_WAIT_TIME_SEC,ctime(&ade_finished),diff_for_ade_loop,dev_node_count);
+            ,ADE_PERIODIC_SCAN_SECONDS,ctime(&ade_finished),diff_for_ade_loop,dev_node_count);
             custom_log("diff_for_ade_loop: %d, diff_for_dev_nodes: %d",diff_for_ade_loop,diff_for_dev_nodes);
             invoke_ade(current_working_directory,dq);
             ade_invoked=true;
