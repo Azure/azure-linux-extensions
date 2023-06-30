@@ -360,7 +360,26 @@ class CheckUtil(object):
             return
         raise Exception('Moving from volume type {0} to volume type {1} is not allowed'.format(existing_volume_type, volume_type))
 
-    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher, existing_volume_type):
+    def validate_skr_release_rsa_or_ec_key(self,public_settings,check_release_rsa_or_ec_key):
+        if not check_release_rsa_or_ec_key:
+            return
+        imds_res_id = public_settings.get(CommonVariables.EncryptionManagedIdentity)
+        KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
+        if imds_res_id:
+            os.environ["IMDS_MSI_RES_ID"]=imds_res_id
+        cmd = './AzureAttestSKR -n 123456 -k {0} -c imds -r'.format(KeyEncryptionKeyUrl)
+        executor = CommandExecutor(self.logger)
+        result = executor.Execute(cmd)
+        if result != CommonVariables.process_success:
+            msg='The managed identity provided in public settings is not correct or \
+not authorized to do secure key release operation in your key vault/HSM. \
+Please verify and re-run ADE install after fixing the issue.'
+            if imds_res_id:
+                raise Exception ('{0} Encryption managed identity: {1}'.format(msg,imds_res_id))
+            raise Exception(msg)
+        return
+
+    def precheck_for_fatal_failures(self, public_settings, encryption_status, DistroPatcher, existing_volume_type,check_release_rsa_or_ec_key=False):
         """ run all fatal prechecks, they should throw an exception if anything is wrong """
         self.validate_key_vault_params(public_settings)
         self.validate_volume_type(public_settings, DistroPatcher)
@@ -369,6 +388,7 @@ class CheckUtil(object):
         self.validate_memory_os_encryption(public_settings, encryption_status)
         self.is_supported_os(public_settings, DistroPatcher, encryption_status)
         self.validate_volume_type_for_enable(public_settings, existing_volume_type)
+        self.validate_skr_release_rsa_or_ec_key(public_settings,check_release_rsa_or_ec_key)
 
     def is_non_fatal_precheck_failure(self):
         """ run all prechecks """

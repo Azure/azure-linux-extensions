@@ -18,8 +18,10 @@
 
 import os
 import shutil
-
-from configparser import ConfigParser
+try:
+    import ConfigParser as ConfigParsers
+except ImportError:
+    import configparser as ConfigParsers
 from Common import CommonVariables
 from CommandExecutor import CommandExecutor,ProcessCommunicator
 
@@ -53,10 +55,10 @@ class VolumeNotificationService(object):
         serviceFilePath = self._service_file()
         return os.path.exists(serviceFilePath)
 
-    def _edit_service_config(self):
+    def _edit_service_config(self,log_path):
         '''edit WorkingDirectory and ExecStart path of config file'''
         if self._service_file_exists():
-            config = ConfigParser()
+            config = ConfigParsers.ConfigParser()
             config.optionxform = lambda option:option
             #update workingdirectory and execution path in service file. 
             config.read(self._service_file())
@@ -67,7 +69,10 @@ class VolumeNotificationService(object):
             if 'ExecStart' in config['Service']:
                 vnsservice = os.path.join(self.workingDirectory,CommonVariables.vns_service_name)
                 if os.path.exists(vnsservice):
-                     config['Service']['ExecStart'] =vnsservice+' -d'
+                    if log_path:
+                        config['Service']['ExecStart'] ='{0} -d -l {1}'.format(vnsservice,log_path)
+                    else:
+                        config['Service']['ExecStart'] ='{0} -d'.format(vnsservice)
             #save config file
             with open(self._temp_service_file(), 'w') as configfile:
                 config.write(configfile) 
@@ -109,11 +114,11 @@ class VolumeNotificationService(object):
         return ret
         
 
-    def register(self):
+    def register(self,log_path=None):
         '''update service config file in systemd and load it'''
         return_code=1
         self.logger.log("service file path: {0}".format(self._service_file()))
-        if self._edit_service_config():
+        if self._edit_service_config(log_path):
             runningservicefilepath = os.path.join(CommonVariables.vns_service_placeholder_path,
                                                    CommonVariables.vns_service_file)
             if os.path.exists(runningservicefilepath):

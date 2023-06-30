@@ -47,7 +47,8 @@ class UbuntuPatching(AbstractPatching):
         self.umount_path = '/bin/umount'
         self.touch_path = '/usr/bin/touch'
         self.min_version_online_encryption='22.04'
-        self.support_online_encryption=self.validate_online_encryption_support()
+        #support_online_encryption is false in base class. 
+        #self.support_online_encryption=self.validate_online_encryption_support()
 
     def packages_installed(self, packages):
         ''' return true if all packages in list are already installed '''
@@ -58,6 +59,26 @@ class UbuntuPatching(AbstractPatching):
                 installed = False
                 self.logger.log("{1} package not yet installed".format(package))
         return installed
+
+    def install_azguestattestation(self):
+        '''installtion for azguestattestation1 package.'''
+        cmd = 'dpkg -s azguestattestation1'
+        ret = self.command_executor.Execute(cmd,timeout=30)
+        if ret == CommonVariables.process_success:
+            self.logger.log("azguestattestation1 package is already available!")
+            return True
+        cmd = 'wget https://packages.microsoft.com/repos/azurecore/pool/main/a/azguestattestation1/azguestattestation1_1.0.5_amd64.deb'
+        #download the package
+        ret = self.command_executor.Execute(cmd,timeout=30)
+        if ret == CommonVariables.process_success:
+            #install package
+            cmd = 'dpkg -i azguestattestation1_1.0.5_amd64.deb'
+            ret = self.command_executor.Execute(cmd,timeout=30)
+            if ret == CommonVariables.process_success:
+                self.logger.log("azguestattestation1 package installation is successful!")
+                return True
+        return False
+
 
     def install_cryptsetup(self):
         packages = ['cryptsetup-bin']
