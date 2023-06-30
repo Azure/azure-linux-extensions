@@ -277,7 +277,7 @@ def find_dce():
                         configuration_endpoint_url = channel['tokenEndpointUri']
                         configuration_endpoint = configuration_endpoint_url.split('https://')[1].split('/')[0]
                         dce.add(configuration_endpoint)
-    except (FileNotFoundError, AttributeError, KeyError) as e:
+    except Exception as e:
         return (None, None, e)
 
     general_info['DCE'] = dce
