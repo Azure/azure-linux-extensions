@@ -738,7 +738,7 @@ def enable():
                 if ret: 
                     logger.log('Volume notification service registartion is successful!')
                 else:
-                    logger.log('Volume notification service registration is unsuccessful!.',level=CommonVariables.WarningLevel) 
+                    logger.log('Volume notification service registration is unsuccessful!.',level=CommonVariables.ErrorLevel) 
             #making sure that azguestattestation package is installed for SKR.
             DistroPatcher.install_azguestattestation()
                 
@@ -1282,7 +1282,6 @@ def mapper_update_for_resume_operation( disk_util,
                                         crypt_mount_config_util,
                                         ongoing_item_config):
     '''If mapper opened by consolidation code then close it and re-open using mapper present in ongoing_item_config'''
-    #If mapper opened by consolidation code then close it and re-open using mapper present in ongoing_item_config
     mapper_name=ongoing_item_config.original_dev_path[5:].replace("/", "-") + "-unlocked"
     close_result=disk_util.luks_close(mapper_name)
     if close_result != CommonVariables.process_success:

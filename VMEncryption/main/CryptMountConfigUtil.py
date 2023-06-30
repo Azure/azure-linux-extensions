@@ -238,8 +238,8 @@ class CryptMountConfigUtil(object):
             passphrase_file = self.get_key_file_path(device_item_real_path,"/var/lib/azure_disk_encryption_config")
             with open(passphrase_file, 'w') as f:
                 f.writelines(protector)
-            os.chmod(path=passphrase_file,
-                         mode=0o400)
+            os.chmod(passphrase_file,
+                         0o400)
             crypt_item.keyfile_path = passphrase_file
 
             return_code = self.disk_util.luks_open(passphrase_file=passphrase_file,
@@ -529,8 +529,8 @@ class CryptMountConfigUtil(object):
             self.logger.log("crypttab does not exists. Creating crypttab file.")
             with open(crypttab_path, "a") as wf:
                 pass
-            os.chmod(path=crypttab_path,
-                         mode=0o644)
+            os.chmod(crypttab_path,
+                         0o644)
         with open(crypttab_path, 'r') as rf:
             crypttab_lines=rf.readlines()
         index = 0
