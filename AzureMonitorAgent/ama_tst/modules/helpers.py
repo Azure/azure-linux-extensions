@@ -249,7 +249,7 @@ def find_dcr_workspace():
                         endpoint_url = channel['endpoint']
                         region = endpoint_url.split('https://')[1].split('.monitoring')[0]
                         me_region.add(region)
-    except (FileNotFoundError, AttributeError, KeyError) as e:
+    except Exception as e:
         return (None, None, e)
 
     general_info['DCR_WORKSPACE_ID'] = dcr_workspace
