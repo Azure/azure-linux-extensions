@@ -689,7 +689,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
         else:
             log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
 
-        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == true:
+        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == True:
             if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
                 default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                 default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
