@@ -68,8 +68,8 @@ class Backuplogger(object):
                 self.msg += log_msg
             else:
                 self.hutil.log(str(msg),level)
-        else:
-            self.hutil.log("WriteLog is neither None nor 'True'.")
+        #else:
+            #self.hutil.log("WriteLog is neither None nor 'True'.")
 
     def log_to_con(self, msg):
         try:
