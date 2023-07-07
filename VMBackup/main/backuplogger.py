@@ -36,7 +36,7 @@ class Backuplogger(object):
 
     def enforce_local_flag(self, enforced_local):
         if (self.hutil.get_intvalue_from_configfile('LoggingOff', 0) == 1):
-            self.hutil.log("Logging is off")
+            #self.hutil.log("Logging is off")
             self.logging_off = True
         if (self.enforced_local_flag_value != False and enforced_local == False and self.logging_off == True):
             pass
@@ -51,7 +51,7 @@ class Backuplogger(object):
     def log(self, msg, local=False, level='Info'):
         #self.hutil.log("Started backuplogger log function")
         if(self.enforced_local_flag_value == False and self.logging_off == True):
-            self.hutil.log("enforced_local_flag_value is False and logging_off is true")
+            #self.hutil.log("enforced_local_flag_value is False and logging_off is true")
             return
         WriteLog = self.hutil.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
