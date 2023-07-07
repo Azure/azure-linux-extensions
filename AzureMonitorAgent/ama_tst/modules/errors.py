@@ -18,7 +18,7 @@ err_summary = []
 
 
 # set of all errors which are actually warnings
-warnings = set([WARN_INTERNET_CONN, WARN_INTERNET, WARN_OPENSSL_PROXY, WARN_MDSD_ERR_FILE, WARN_RESTART_LOOP])
+warnings = set([WARN_INTERNET_CONN, WARN_INTERNET, WARN_OPENSSL_PROXY, WARN_MDSD_ERR_FILE, WARN_RESTART_LOOP, WARN_LOGROTATE])
 
 # dictionary correlating error codes to error messages
 error_messages = {
@@ -69,16 +69,26 @@ error_messages = {
     ERR_ACCESS_TOKEN : "Couldn't use managed identities to acquire an access token when executing command\n $ {0}\n\nError Details:\n{1}",
     ERR_ENDPT_PROXY : "Machine couldn't connect to {0} with proxy: curl/openssl command failed. Please check your proxy configuration."\
           "\n\nError Details:\n $ {1} \n\n{2}",
+    ERR_DCE : "Couldn't parse DCE information on this VM. Please check your DCE configuration.\n\nError Details:{0}",
     WARN_OPENSSL_PROXY : "Skip SSL handshake checks because AMA is configured with authenticated proxy.",
     WARN_MDSD_ERR_FILE : "Found errors in log file {0}, displaying last few lines of error messages:\n {1}",
     WARN_RESTART_LOOP : "Subcomponents might be in a restart loop. Details:\n\n{0}",
     ERR_FILE_MISSING : "{0} {1} doesn't exist.",
     ERR_LOGROTATE_SIZE : "Logrotate size limit for log {0} has invalid formatting. Please see {1} for more "\
           "information.",
-    ERR_LOGROTATE : "Logrotate isn't rotating log {0}: its current size is {1}, and it should have "\
+    WARN_LOGROTATE : "Logrotate isn't rotating log {0}: its current size is {1}, and it should have "\
           "been rotated at {2}. Please see {3} for more information.",
     ERR_FILE_ACCESS : "Couldn't access or run {0} due to the following reason: {1}.",
-    
+    ERR_SYSLOG : "Couldn't find either 'rsyslog' or 'syslog-ng' on machine. Please download "\
+          "one of the two services and try again.",
+    ERR_SERVICE_STATUS : "{0} current status is the following: '{1}'. Please check the status of {0} "\
+          "using {2} for more information.",
+    ERR_FILE_EMPTY : "File {0} is empty.",
+    ERR_CONF_FILE_PERMISSION : "{0} {1} is not accesible by syslog user. Please grant syslog user {2} permission.",
+    ERR_CL_CONF : "Custom logs configuration file /etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf "\
+                        "cannot be parsed.\n\nError Details:\n{0}",
+    ERR_CL_INPUT : "Custom logs input file path is either empty or invalid. Please check your input path in "\
+                        "/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf.\n\nError Details:\n{0}"
 }
 
 

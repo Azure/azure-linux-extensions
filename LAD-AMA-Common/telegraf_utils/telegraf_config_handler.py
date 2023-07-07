@@ -511,7 +511,7 @@ def stop_telegraf_service(is_lad):
         telegraf_service_name = get_telegraf_service_name(is_lad)
 
         if os.path.isfile(telegraf_service_path):
-            code = os.system("sudo systemctl stop {0}".format(telegraf_service_name))
+            code = os.system("systemctl stop {0}".format(telegraf_service_name))              
         else:
             return False, "Telegraf service file does not exist. Failed to stop telegraf service: {0}.service.".format(telegraf_service_name)
 
@@ -587,9 +587,9 @@ def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_a
             os.system(r"sed -i 's+%TELEGRAF_AGENT_CONFIG%+{1}+' {0}".format(telegraf_service_path, telegraf_agent_conf))
             os.system(r"sed -i 's+%TELEGRAF_CONFIG_DIR%+{1}+' {0}".format(telegraf_service_path, telegraf_d_conf_dir))
 
-            daemon_reload_status = os.system("sudo systemctl daemon-reload")
+            daemon_reload_status = os.system("systemctl daemon-reload")
             if daemon_reload_status != 0:
-                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service. Exit code:" + str(daemon_reload_status)
+                message = "Unable to reload systemd after Telegraf service file change. Failed to setup telegraf service. Check system for hardening. Exit code:" + str(daemon_reload_status)
                 if HUtilObj is not None:
                     HUtilObj.log(message)
                 else:
@@ -629,9 +629,9 @@ def start_telegraf(is_lad):
     # If the VM has systemd, telegraf will be managed as a systemd service
     telegraf_service_name = get_telegraf_service_name(is_lad)
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart {0}".format(telegraf_service_name))
+        service_restart_status = os.system("systemctl restart {0}".format(telegraf_service_name))        
         if service_restart_status != 0:
-            log_messages += "Unable to start Telegraf service. Failed to start telegraf service."
+            log_messages += "Unable to start Telegraf service using systemctl. Failed to start telegraf service. Check system for hardening."
             return False, log_messages
 
     # Otherwise, start telegraf as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
@@ -741,14 +741,26 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     if "resourceId" not in data["compute"]:
         raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup Telegraf.")
 
+    # resource id is needed for ME to show metrics on the metrics blade of the VM/VMSS
+    # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
+    # or /subscriptions/20ff167c-9f4b-4a73-9fd6-0dbe93fa778a/resourceGroups/sidama/providers/Microsoft.Compute/virtualMachines/syslogReliability_1ec84a39
     az_resource_id = data["compute"]["resourceId"]
 
-    # If the instance is VMSS then trim the last two values from the resource id ie - "/virtualMachines/0"
+    # If the instance is VMSS instance resource id of a uniform VMSS then trim the last two values from the resource id ie - "/virtualMachines/0"
     # Since ME expects the resource id in a particular format. For egs -
     # IMDS returned ID - /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>/virtualMachines/0
     # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
     if "virtualMachineScaleSets" in az_resource_id: 
         az_resource_id = "/".join(az_resource_id.split("/")[:-2])
+
+    virtual_machine_name = ""
+    if "vmScaleSetName" in data["compute"] and data["compute"]["vmScaleSetName"] != "":
+        virtual_machine_name = data["compute"]["name"]
+        # for flexible VMSS above resource id is instance specific and won't have virtualMachineScaleSets
+        # for e.g., /subscriptions/20ff167c-9f4b-4a73-9fd6-0dbe93fa778a/resourceGroups/sidama/providers/Microsoft.Compute/virtualMachines/syslogReliability_1ec84a39
+        # ME expected ID- /subscriptions/<sub-id>/resourceGroups/<rg_name>/providers/Microsoft.Compute/virtualMachineScaleSets/<VMSSName>
+        if "virtualMachineScaleSets" not in az_resource_id: 
+            az_resource_id = "/".join(az_resource_id.split("/")[:-2]) + "/virtualMachineScaleSets/" + data["compute"]["vmScaleSetName"]
 
     if "subscriptionId" not in data["compute"]:
         raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup Telegraf.")
@@ -764,10 +776,6 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
         raise Exception("Unable to find 'location' key in imds query response. Failed to setup Telegraf.")
 
     region = data["compute"]["location"]
-
-    virtual_machine_name = ""
-    if "vmScaleSetName" in data["compute"] and data["compute"]["vmScaleSetName"] != "":
-        virtual_machine_name = data["compute"]["name"]
 
     #call the method to first parse the configs
     output, namespaces = parse_config(config_data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id, resource_group, region, virtual_machine_name)

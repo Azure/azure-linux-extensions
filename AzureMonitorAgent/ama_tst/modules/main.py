@@ -9,6 +9,8 @@ from install.install import check_installation
 from connect.connect import check_connection
 from general_health.general_health  import check_general_health
 from high_cpu_mem.high_cpu_mem      import check_high_cpu_memory
+from syslog_tst.syslog                  import check_syslog
+from custom_logs.custom_logs        import check_custom_logs
 
 # check to make sure the user is running as root
 def check_sudo():
@@ -53,6 +55,21 @@ def check_all(interactive):
     else:
         all_success = checked_highcpumem
 
+    print("================================================================================")
+    # 5: Syslog
+    checked_syslog = check_syslog(interactive)
+    if (is_error(checked_syslog)):
+        return checked_syslog
+    else:
+        all_success = checked_syslog
+    
+    print("================================================================================")
+    # 6: Custom logs
+    checked_custom_logs = check_custom_logs(interactive)
+    if (is_error(checked_custom_logs)):
+        return checked_custom_logs
+    else:
+        all_success = checked_custom_logs
     return all_success
 
 def collect_logs():
@@ -139,6 +156,8 @@ def run_troubleshooter():
               "2: Agent doesn't start or cannot connect to Log Analytics service.\n"\
               "3: Agent in unhealthy state. \n"\
               "4: Agent consuming high CPU/memory. \n"\
+              "5: Syslog not flowing. \n"\
+              "6: Custom logs not flowing. \n"\
               "================================================================================\n"\
               "A: Run through all scenarios.\n"\
               "L: Collect the logs for AMA.\n"\
@@ -149,12 +168,14 @@ def run_troubleshooter():
             '2': check_connection,
             '3': check_general_health,
             '4': check_high_cpu_memory,
+            '5': check_syslog,
+            '6': check_custom_logs,
             'A': check_all
         }
     
         issue = get_input("Please select an option",\
-                        (lambda x : x.lower() in ['1','2','3','4','q','quit','l','a']),\
-                        "Please enter an integer corresponding with your issue (1-4) to\n"\
+                        (lambda x : x.lower() in ['1','2','3','4','5','6','q','quit','l','a']),\
+                        "Please enter an integer corresponding with your issue (1-6) to\n"\
                         "continue, 'A' to run through all scenarios, 'L' to run the log collector, or 'Q' to quit.")
         # quit troubleshooter
         if (issue.lower() in ['q','quit']):
@@ -193,7 +214,7 @@ def run_troubleshooter():
         print_results(success)
 
         # if user ran single scenario, ask if they want to run again
-        if (issue in ['1', '2', '3', '4']):
+        if (issue in ['1', '2', '3', '4', '5', '6']):
             run_again = get_input("Do you want to run another scenario? (y/n)",\
                                   (lambda x : x.lower() in ['y','yes','n','no']),\
                                   "Please type either 'y'/'yes' or 'n'/'no' to proceed.")

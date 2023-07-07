@@ -42,6 +42,12 @@ class CommonVariables:
     statusBlobUploadError = 'statusBlobUploadError'
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
+    isSnapshotTtlEnabled = 'isSnapshotTtlEnabled'
+    useMccfForLad = 'useMccfForLad'
+    useMccfToFetchDsasForAllDisks = 'useMccfToFetchDsasForAllDisks'
+    key = 'Key'
+    value = 'Value'
+    snapshotTtlHeader = 'x-ms-snapshot-ttl-expiry-hours'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
@@ -104,6 +110,7 @@ class CommonVariables:
     PrePost_ScriptStatus_Success = 0
     PrePost_ScriptStatus_Error = 1
     PrePost_ScriptStatus_Warning = 2
+    FailedInvalidDataDiskLunList = 17
 
     FailedPrepostPreScriptFailed = 300
     FailedPrepostPostScriptFailed = 301

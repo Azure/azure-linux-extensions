@@ -47,6 +47,7 @@ import crypt
 import xml.dom.minidom
 import re
 import hashlib
+import fileinput
 from collections import OrderedDict
 from distutils.version import LooseVersion
 from hashlib import sha256
@@ -111,6 +112,8 @@ PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
+AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
+ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -410,13 +413,6 @@ def enable():
 
     public_settings, protected_settings = get_settings()
 
-    # start the metrics watcher if its not already running
-    if ((protected_settings is None or len(protected_settings) == 0) or
-        (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application") or
-        (public_settings is not None and public_settings.get(AzureMonitorConfigKey) is not None and public_settings.get(AzureMonitorConfigKey).get("ensure") == True)):
-        start_metrics_process()
-        start_syslogconfig_process()
-
     exit_if_vm_not_supported('Enable')
 
     ensure = OrderedDict([
@@ -464,6 +460,8 @@ def enable():
         if geneva_configuration and geneva_configuration.get("enable") == True:
             hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
             ensure["azuremonitoragentmgr"] = True
+            # Note that internally AMCS with geneva config path can be used in which case syslog should be handled same way as default 1P
+            generate_localsyslog_configs()
 
         if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
             hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
@@ -476,6 +474,8 @@ def enable():
     elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
         ensure["azuremonitoragentmgr"] = True
+        # generate local syslog configuration files as in auto config syslog is not driven from DCR
+        generate_localsyslog_configs()
 
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
@@ -512,6 +512,10 @@ def enable():
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
         start_amacoreagent()
         restart_launcher()
+        # start the metrics and syslog watcher only in 3P mode
+        start_metrics_process()
+        start_syslogconfig_process()
+
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -685,7 +689,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
         else:
             log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
 
-        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
+        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == True:
             if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
                 default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                 default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
@@ -694,7 +698,21 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
         else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+    
+    # is this Arc? If so, check for proxy     
+    if os.path.isfile(ArcSettingsFile):
+        f = open(ArcSettingsFile, "r")
+        data = f.read()
 
+        if (data != ''):
+            json_data = json.loads(data)
+            if json_data is not None and "proxy.url" in json_data:
+                url = json_data["proxy.url"]
+                # only non-authenticated proxy config is supported
+                if url != '':
+                    default_configs["MDSD_PROXY_ADDRESS"] = url
+                    set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+                    
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
 
@@ -1192,34 +1210,120 @@ def generate_localsyslog_configs():
     """
     Install local syslog configuration files if not present and restart syslog
     """
-    if os.path.exists('/etc/rsyslog.d/') and not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent.conf","/etc/rsyslog.d/10-azuremonitoragent.conf")
-        os.chmod('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        os.chmod('/etc/rsyslog.d/10-azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        run_command_and_log(get_service_command("rsyslog", "restart"))
-        hutil_log_info("Installed local syslog configuration files and restarted syslog")
 
-    if os.path.exists('/etc/syslog-ng/syslog-ng.conf') and not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
-        syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
-        os.makedir(syslog_ng_confpath)
-        copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
-        os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
-        run_command_and_log(get_service_command("syslog-ng", "restart"))
-        hutil_log_info("Installed local syslog configuration files and restarted syslog")
+    public_settings, _ = get_settings()
+    syslog_port = ''
+    if os.path.isfile(AMASyslogPortFilePath):
+        f = open(AMASyslogPortFilePath, "r")
+        syslog_port = f.read()
+        f.close()
+        
+    useSyslogTcp = False
+    if public_settings is not None and "previewFeatures" in public_settings:
+        features = public_settings.get("previewFeatures")
+        if features is not None and "useSyslogTcp" in features:            
+            useSyslogTcp = features.get("useSyslogTcp")    
+    
+    if useSyslogTcp == True and syslog_port != '':
+        if os.path.exists('/etc/rsyslog.d/'):            
+            restartRequired = False
+            if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+                    os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                    os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+                os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True                
+            
+            portSetting = 'Port="' + syslog_port + '"'
+            defaultPortSetting = 'Port="28330"'
+            portUpdated = False
+            with open('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf') as f:
+                if portSetting not in f.read():
+                    portUpdated = True
+
+            if portUpdated == True:
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+                with fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak') as file:
+                    for line in file:
+                        print(line.replace(defaultPortSetting, portSetting), end='')
+                os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+            
+            if restartRequired == True:
+                run_command_and_log(get_service_command("rsyslog", "restart"))
+                hutil_log_info("Installed local syslog configuration files and restarted syslog")
+
+        if os.path.exists('/etc/syslog-ng/syslog-ng.conf'):
+            restartRequired = False
+            if not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+                if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+                    os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+                syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
+                if not os.path.exists(syslog_ng_confpath):
+                    os.makedirs(syslog_ng_confpath)
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+                os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+
+            portSetting = "port(" + syslog_port + ")"
+            defaultPortSetting = "port(28330)"
+            portUpdated = False
+            with open('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf') as f:
+                if portSetting not in f.read():
+                    portUpdated = True
+
+            if portUpdated == True:
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+                with fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak') as file:
+                    for line in file:
+                        print(line.replace(defaultPortSetting, portSetting), end='')
+                os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+            
+            if restartRequired == True:
+                run_command_and_log(get_service_command("syslog-ng", "restart"))
+                hutil_log_info("Installed local syslog configuration files and restarted syslog")    
+    else:
+        if os.path.exists('/etc/rsyslog.d/') and not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+            if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+                os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent.conf","/etc/rsyslog.d/10-azuremonitoragent.conf")
+            os.chmod('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            os.chmod('/etc/rsyslog.d/10-azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            run_command_and_log(get_service_command("rsyslog", "restart"))
+            hutil_log_info("Installed local syslog configuration files and restarted syslog")
+
+        if os.path.exists('/etc/syslog-ng/syslog-ng.conf') and not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+            if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+                os.remove("/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+            syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
+            if not os.path.exists(syslog_ng_confpath):
+                os.makedirs(syslog_ng_confpath)
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+            os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            run_command_and_log(get_service_command("syslog-ng", "restart"))
+            hutil_log_info("Installed local syslog configuration files and restarted syslog")
 
 def remove_localsyslog_configs():
     """
     Remove local syslog configuration files if present and restart syslog
-    """
-    if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
-        os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
-        os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
+    """    
+    if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf') or os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+            os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+            os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+            os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
         run_command_and_log(get_service_command("rsyslog", "restart"))
         hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
 
-    if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
-        os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+    if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf') or os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+        if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+            os.remove("/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+        if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+            os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
         run_command_and_log(get_service_command("syslog-ng", "restart"))
         hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
 
