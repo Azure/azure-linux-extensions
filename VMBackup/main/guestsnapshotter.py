@@ -95,7 +95,7 @@ class GuestSnapshotter(object):
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
                 if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
-                    headers[CommonVariables.snapshotTtlHeader] = '1'
+                    headers[CommonVariables.snapshotTtlHeader] = '0'
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
