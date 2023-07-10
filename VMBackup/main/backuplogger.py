@@ -35,8 +35,10 @@ class Backuplogger(object):
         self.logging_off = False
 
     def enforce_local_flag(self, enforced_local):
+        #Pause file logging during I/O freeze period by setting Enforced_local_flag_value to False
+        #Enforced_local_flag_value is turned to False from True when Freeze Starts
+        #Enforced_local_flag_value is turned to True from False when Freeze Ends
         if (self.hutil.get_intvalue_from_configfile('LoggingOff', 0) == 1):
-            self.hutil.log("Logging is off")
             self.logging_off = True
         if (self.enforced_local_flag_value != False and enforced_local == False and self.logging_off == True):
             pass
@@ -51,7 +53,7 @@ class Backuplogger(object):
     def log(self, msg, local=False, level='Info'):
         #self.hutil.log("Started backuplogger log function")
         if(self.enforced_local_flag_value == False and self.logging_off == True):
-            self.hutil.log("enforced_local_flag_value is False and logging_off is true")
+            #self.hutil.log("enforced_local_flag_value is False and logging_off is true")
             return
         WriteLog = self.hutil.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
@@ -66,8 +68,8 @@ class Backuplogger(object):
                 self.msg += log_msg
             else:
                 self.hutil.log(str(msg),level)
-        else:
-            self.hutil.log("WriteLog is neither None nor 'True'.")
+        #else:
+            #self.hutil.log("WriteLog is neither None nor 'True'.")
 
     def log_to_con(self, msg):
         try:
