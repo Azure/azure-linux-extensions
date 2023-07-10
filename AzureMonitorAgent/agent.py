@@ -699,22 +699,6 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
         else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
     
-    
-    # is this Arc? If so, check for proxy     
-    if os.path.isfile(ArcSettingsFile):
-        f = open(ArcSettingsFile, "r")
-        data = f.read()
-
-        if (data != ''):
-            json_data = json.loads(data)
-            if json_data is not None and "proxy.url" in json_data:
-                url = json_data["proxy.url"]
-                # only non-authenticated proxy config is supported
-                if url != '':
-                    default_configs["MDSD_PROXY_ADDRESS"] = url
-                    set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
-                    
-
     # is this Arc? If so, check for proxy     
     if os.path.isfile(ArcSettingsFile):
         f = open(ArcSettingsFile, "r")
