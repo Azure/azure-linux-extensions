@@ -619,6 +619,7 @@ def enable():
         status_report_to_file(file_report_msg)
 
         start_daemon()
+        backup_logger.log('Initiated daemon process. Extension set to transitioning state. Exiting enable() thread by sys.exit(0).', True)
         sys.exit(0)
     except Exception as e:
         hutil.update_settings_file()
