@@ -52,7 +52,6 @@ class Backuplogger(object):
     """description of class"""
     def log(self, msg, local=False, level='Info'):
         if(self.enforced_local_flag_value == False and self.logging_off == True):
-            #self.hutil.log("enforced_local_flag_value is False and logging_off is true")
             return
         WriteLog = self.hutil.get_strvalue_from_configfile('WriteLog','True')
         if (WriteLog == None or WriteLog == 'True'):
@@ -67,8 +66,6 @@ class Backuplogger(object):
                 self.msg += log_msg
             else:
                 self.hutil.log(str(msg),level)
-        #else:
-            #self.hutil.log("WriteLog is neither None nor 'True'.")
 
     def log_to_con(self, msg):
         try:

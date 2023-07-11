@@ -144,7 +144,6 @@ class HandlerUtility:
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             self.update_settings_file()
-            self.log("Exiting current execution. This could be the enable() called by guest agent upon VM/waagent restart.")
             sys.exit(0)
 
     def log(self, message,level='Info'):
@@ -177,8 +176,7 @@ class HandlerUtility:
             msg = str(msg, errors="backslashreplace")
         msg = str(datetime.datetime.utcnow()) + " " + str(self._get_log_prefix()) + msg + "\n"
         try:
-            #Open the file only in Append mode as only write operation is performed at the end of the file
-            with open(self.logging_file, "a") as C :
+            with open(self.logging_file, "a+") as C :
                 C.write(msg)
         except IOError:
             pass
@@ -240,7 +238,7 @@ class HandlerUtility:
         else:
             self.log("waagent new path is used")
         if not _context:
-            self.log("maybe no new settings file found. Exiting current execution.")
+            self.log("maybe no new settings file found")
             sys.exit(0)
         return _context
 
@@ -349,7 +347,7 @@ class HandlerUtility:
                 config = ConfigParsers.ConfigParser()
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)
+                    value = config.get('SnapshotThread',key)  
         except Exception as e:
             pass
 
@@ -644,7 +642,7 @@ class HandlerUtility:
         try:
             tempStatusFile =  os.path.join(self._context._status_dir, CommonVariables.TempStatusFileName)
             if self._context._status_file:
-                with open(tempStatusFile,'w') as f:
+                with open(tempStatusFile,'w+') as f:
                     f.write(stat_rept_file)
                 os.rename(tempStatusFile, self._context._status_file)
         except Exception as e:
