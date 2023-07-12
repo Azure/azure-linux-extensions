@@ -264,6 +264,7 @@ class CommonVariables:
     unmount_oldroot_error = 22
     operation_lookback_failed = 23
     unknown_error = 100
+    e2fsck_fserrors_correctedode = 1
 
     """
     Success Message

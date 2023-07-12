@@ -327,7 +327,7 @@ class CheckUtil(object):
             return
 
         distro_name = DistroPatcher.distro_info[0]
-        distro_name = distro_name.replace('ubuntu','Ubuntu') # to upper if needed\
+        distro_name = distro_name.replace('ubuntu','Ubuntu') # to upper if needed
         distro_name = distro_name.replace('rhel','redhat') # fix for RHEL 9 distro name change 
         distro_version = DistroPatcher.distro_info[1]
         supported_os_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'SupportedOS.json')
