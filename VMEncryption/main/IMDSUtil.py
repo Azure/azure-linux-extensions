@@ -66,7 +66,7 @@ class IMDSUtil(object):
     
     def _get_security_type_IMDS_helper(self,http_util):
         '''helper function to read VM's security type from IMDS'''
-        retry_count_max = 5
+        retry_count_max = 7
         retry_count = 0
         imds_endpoint_uri = self.getUri(CommonVariables.IMDS_API_Version,CommonVariables.IMDS_SecurityProfile_subDir)   
         self.logger.log("IMDS end point url: {0}".format(imds_endpoint_uri))
@@ -94,7 +94,9 @@ class IMDSUtil(object):
                 retry_count += 1
                 self.logger.log("Encountered exception from IMDS GET request to IMDS (attempt #{0}) \n{1}".format(str(retry_count),str(ex)))
                 if retry_count<retry_count_max:
-                    sleeping_time = math.pow(2,retry_count)
+                    #execution:  1 2 3 4 5  6  7
+                    #postrunwait:6 6 6 8 16 32 no_wait i.e. wait for 7th execution 74sec
+                    sleeping_time = max(math.pow(2,retry_count-1),retry_count_max-1)
                     self.logger.log("sleeping for {0}s.".format(sleeping_time))
                     time.sleep(sleeping_time) 
                 else:

@@ -103,7 +103,7 @@ class BekUtilVolumeImpl(AbstractBekUtilImpl):
                 else:
                     self.logger.log("BEK has unexpected filesystem "+mount_item["fs"])
                     return False, AbstractBekUtilImpl.wrong_fs_msg
-        return False, self.not_mounted_msg
+        return False, AbstractBekUtilImpl.not_mounted_msg
 
     def is_bek_disk_attached_and_partitioned(self):
         possible_bek_locations = [

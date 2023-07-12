@@ -559,47 +559,61 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         from Common import CommonVariables
         mockimdsStoredResults = mock.Mock()
         mockimdsUtil = mock.Mock()
+        publicsettings = mock.Mock()
+        publicsettings.get.return_value = 'OS'
         mockimdsStoredResults.config_file_exists.return_value=False
         #valid inputs
         mockimdsUtil.get_vm_security_type.return_value=CommonVariables.ConfidentialVM
         with self.assertRaises(Exception):
-           self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+           self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
         self.assertEqual(mockimdsStoredResults.security_type,CommonVariables.ConfidentialVM)
         mockimdsUtil.get_vm_security_type.return_value=""
-        self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+        self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
         self.assertEqual(mockimdsStoredResults.security_type,CommonVariables.Standard)
         mockimdsUtil.get_vm_security_type.return_value="TrustedLaunch"
-        self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+        self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
         self.assertEqual(mockimdsStoredResults.security_type,CommonVariables.TrustedLaunch)
-    
+        publicsettings.get.return_value = 'Data'
+        mockimdsUtil.get_vm_security_type.return_value=CommonVariables.ConfidentialVM
+        self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
+        self.assertEqual(mockimdsStoredResults.security_type,CommonVariables.ConfidentialVM)
+        publicsettings.get.return_value = 'All'
+        mockimdsUtil.get_vm_security_type.return_value=CommonVariables.ConfidentialVM
+        self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
+        self.assertEqual(mockimdsStoredResults.security_type,CommonVariables.ConfidentialVM)
+
     def test_pre_initialization_checkIn_Valid_Inputs(self):
         from Common import CommonVariables
         mockimdsStoredResults = mock.Mock()
         mockimdsUtil = mock.Mock()
+        publicsettings = mock.Mock()
+        publicsettings.get.return_value = 'Data'
         mockimdsStoredResults.config_file_exists.return_value=False
         #non valid inputs
         mockimdsUtil.get_vm_security_type.return_value="ConfidentialVM1"
         with self.assertRaises(Exception):
-           self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+           self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
         mockimdsUtil.get_vm_security_type.return_value="ad"
         with self.assertRaises(Exception):
-            self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)
+            self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
         mockimdsUtil.get_vm_security_type.return_value="TrustedLaunch2"
         with self.assertRaises(Exception):
-            self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil)      
+            self.cutil.pre_Initialization_Check(imdsStoredResults=mockimdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)      
 
     def test_pre_initialization_checkIn_Valid_Inputs_Registry_Check(self):
         from Common import CommonVariables
         import os
         mockencryption_environment = mock.Mock()
         mockimdsUtil = mock.Mock()
+        publicsettings = mock.Mock()
+        publicsettings.get.return_value = 'Data'
         current_path = os.getcwd()
         mockencryption_environment.imds_stored_results_file_path = os.path.join(current_path,'imds_stored_results')
         imdsStoredResults = IMDSStoredResults(logger=self.logger,encryption_environment=mockencryption_environment)
         #non valid inputs
         mockimdsUtil.get_vm_security_type.return_value="ConfidentialVM1"
         with self.assertRaises(Exception):
-           self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil)
+           self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
         self.assertEqual(imdsStoredResults.config_file_exists(),False)
         self.assertEqual(imdsStoredResults.security_type,None)
 
@@ -608,6 +622,8 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         import os
         mockencryption_environment = mock.Mock()
         mockimdsUtil = mock.Mock()
+        publicsettings = mock.Mock()
+        publicsettings.get.return_value = 'OS'
         current_path = os.getcwd()
         mockencryption_environment.imds_stored_results_file_path = os.path.join(current_path,'imds_stored_results')
         imdsStoredResults = IMDSStoredResults(logger=self.logger,encryption_environment=mockencryption_environment)
@@ -617,12 +633,12 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         #confidential VM
         mockimdsUtil.get_vm_security_type.return_value=CommonVariables.ConfidentialVM
         with self.assertRaises(Exception):
-            self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil)
+            self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
         self.assertEqual(imdsStoredResults.get_security_type(),CommonVariables.ConfidentialVM)
         #2nd call to pre initialization, reading data from stored file
         mockimdsUtil.get_vm_security_type.return_value=CommonVariables.Standard
         with self.assertRaises(Exception):
-            self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil)
+            self.cutil.pre_Initialization_Check(imdsStoredResults=imdsStoredResults,iMDSUtil=mockimdsUtil,public_settings=publicsettings)
         self.assertEqual(imdsStoredResults.get_security_type(),CommonVariables.ConfidentialVM)
         #remove file
         os.remove(mockencryption_environment.imds_stored_results_file_path)

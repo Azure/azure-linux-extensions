@@ -259,10 +259,10 @@ class TransactionalCopyTask(object):
                                   + ' of=' + self.encryption_environment.copy_slice_item_backup_file \
                                   + ' bs=' + str(int(block_size)) \
                                   + ' count=' + str(int(count))
-            backup_slice_args = shlex.split(backup_slice_item_cmd)
-            backup_process = Popen(backup_slice_args)
+            return_code = self.command_executer.Execute(backup_slice_item_cmd)
             self.logger.log("backup_slice_item_cmd is:{0}".format(backup_slice_item_cmd))
-
+            if return_code != CommonVariables.process_success:
+                self.logger.log(msg=("{0} is: {1}".format(backup_slice_item_cmd, return_code)), level = CommonVariables.ErrorLevel)
             """
             third, copy the data in the middle cache to the target device.
             """
@@ -272,7 +272,6 @@ class TransactionalCopyTask(object):
                 self.logger.log(msg=("{0} is: {1}".format(dd_cmd, return_code)), level = CommonVariables.ErrorLevel)
             else:
                 #the copy done correctly, so clear the backup slice file item.
-                backup_process.kill()
                 if os.path.exists(self.encryption_environment.copy_slice_item_backup_file):
                     self.logger.log(msg = "clean up the backup file")
                     os.remove(self.encryption_environment.copy_slice_item_backup_file)

@@ -5,7 +5,7 @@ except ImportError:
     import mock  # python2
 
 from BekUtil import BekUtil
-from AbstractBekUtilImpl import AbstractBekUtilImpl,BekMissingException
+from AbstractBekUtilImpl import BekMissingException,AbstractBekUtilImpl
 from DiskUtil import DiskUtil
 from Common import CommonVariables
 from .console_logger import ConsoleLogger
