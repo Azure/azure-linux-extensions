@@ -293,7 +293,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     # Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt:
         # support for SSH2-compatible format for public keys in addition to OpenSSH-compatible format
-        if (cert_txt.strip().startswith(BeginSSHTag)):
+        if cert_txt.strip().startswith(BeginSSHTag):
             ext_utils.set_file_contents("temp.pub", cert_txt.strip())
             retcode, output = ext_utils.run_command_get_output(['ssh-keygen', '-i', '-f', 'temp.pub'])
             if retcode > 0:
@@ -302,7 +302,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
             cert_txt = output
             os.remove("temp.pub")
 
-        if cert_txt and cert_txt.strip().lower().startswith("ssh-rsa"):
+        if cert_txt.strip().lower().startswith("ssh-rsa") or cert_txt.strip().lower().startswith("ssh-ed25519"):
             no_convert = True
         try:
             pub_path = os.path.join('/home/', user_name, '.ssh',
