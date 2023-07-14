@@ -302,7 +302,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
             cert_txt = output
             os.remove("temp.pub")
 
-        if cert_txt and cert_txt.strip().lower().startswith("ssh-rsa"):
+        if cert_txt and (cert_txt.strip().lower().startswith("ssh-rsa") or cert_txt.strip().lower().startswith("ssh-ed25519")):
             no_convert = True
         try:
             pub_path = os.path.join('/home/', user_name, '.ssh',
