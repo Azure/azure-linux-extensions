@@ -1,36 +1,29 @@
 #!/usr/bin/env bash
 
-# This is the main driver file for LAD 4 extension. This file first checks if Python 3 or 2 is available on the VM 
-# and if yes then uses that Python (if both are available then, default is set to python3) to run extension operations in agent.py
-# Control arguments passed to the shim are redirected to agent.py without validation.
+# This is the main driver file for LAD extension. This file first checks if Python 2 is available on the VM and exits early if not
+# Control arguments passed to the shim are redirected to diagnostic.py without validation.
 
 COMMAND="./diagnostic.py"
 PYTHON=""
-FUTURE_PATH=""
 ARG="$@"
 
 function find_python() {
     local python_exec_command=$1
-    local future_path=$2
 
-    if command -v python3 >/dev/null 2>&1 ; then
-        eval ${python_exec_command}="python3"
-        # do not set future_path; future seems to cause interference with preexisting packages in python 3 environment
-    elif command -v python2 >/dev/null 2>&1 ; then
+    if command -v python2 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python2"
-        eval ${future_path}="${PWD}/ext/future:"
     fi
 }
 
-find_python PYTHON FUTURE_PATH
+find_python PYTHON
 
-if [ -z "$PYTHON" ] # If python is not installed, we will fail the install with the following error, requiring cx to have python pre-installed
+if [ -z "$PYTHON" ] # If python2 is not installed, we will fail the install with the following error, requiring cx to have python pre-installed
 then
-    echo "No Python interpreter found, which is a LAD 4 extension dependency. Please install Python 3, or Python 2 if the former is unavailable." >&2
+    echo "No Python 2 interpreter found, which is an LAD extension dependency. Please install Python 2 before retrying LAD extension deployment." >&2
     exit 52 # Missing Dependency
 else
     ${PYTHON} --version 2>&1
 fi
 
-PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}
+${PYTHON} ${COMMAND} ${ARG}
 exit $?
