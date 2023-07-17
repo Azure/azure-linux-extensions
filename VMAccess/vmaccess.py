@@ -38,6 +38,7 @@ EndCertificateTag = '-----END CERTIFICATE-----'
 BeginSSHTag = '---- BEGIN SSH2 PUBLIC KEY ----'
 OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
+ExtensionCacheDir = '/var/cache/vmaccess'
 
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
@@ -467,14 +468,20 @@ def _reset_sshd_config(sshd_file_path):
         ext_utils.run(['coreos-cloudinit', '-from-file', cfg_tempfile], chk_err=False)
         os.remove(cfg_tempfile)
     else:
+        backup_config_file_name = f"{ExtensionCacheDir}/backup"
+        if os.path.exists(backup_config_file_name):
+            ssh_default_config_file_path = backup_config_file_name
         shutil.copyfile(ssh_default_config_file_path, sshd_file_path)
         MyDistro.restart_ssh_service()
 
 
 def _backup_sshd_config(sshd_file_path):
-    if os.path.exists(sshd_file_path):
-        backup_file_name = '%s_%s' % (
-            sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    backup_file_name = f"{ExtensionCacheDir}/backup"
+    if os.path.exists(sshd_file_path) and not os.path.exists(backup_file_name):
+        # backup_file_name = '%s_%s' % (
+        #     sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+
+        # Backup doesn't exist, create one
         # When copying, make sure to preserve permissions and ownership.
         ownership = os.stat(sshd_file_path)
         shutil.copy2(sshd_file_path, backup_file_name)
