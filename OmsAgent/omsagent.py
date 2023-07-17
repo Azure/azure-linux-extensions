@@ -931,9 +931,9 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['6', '7', '8'], 'red hat' : ['6', '7', '8'], 'rhel' : ['6', '7', '8'], # Red Hat
-                       'centos' : ['6', '7', '8'], # CentOS
-                       'oracle' : ['6', '7', '8'], 'ol': ['6', '7', '8'], # Oracle
+    supported_dists = {'redhat' : ['7', '8'], 'red hat' : ['7', '8'], 'rhel' : ['7', '8'], # Red Hat
+                       'centos' : ['7', '8'], # CentOS
+                       'oracle' : ['7', '8'], 'ol': ['7', '8'], # Oracle
                        'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES

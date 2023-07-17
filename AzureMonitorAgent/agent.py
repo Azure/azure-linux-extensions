@@ -113,6 +113,7 @@ MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricC
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
 AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
+ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -412,13 +413,6 @@ def enable():
 
     public_settings, protected_settings = get_settings()
 
-    # start the metrics watcher if its not already running
-    if ((protected_settings is None or len(protected_settings) == 0) or
-        (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application") or
-        (public_settings is not None and public_settings.get(AzureMonitorConfigKey) is not None and public_settings.get(AzureMonitorConfigKey).get("ensure") == True)):
-        start_metrics_process()
-        start_syslogconfig_process()
-
     exit_if_vm_not_supported('Enable')
 
     ensure = OrderedDict([
@@ -518,6 +512,10 @@ def enable():
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
         start_amacoreagent()
         restart_launcher()
+        # start the metrics and syslog watcher only in 3P mode
+        start_metrics_process()
+        start_syslogconfig_process()
+
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -691,7 +689,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
         else:
             log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
 
-        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
+        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == True:
             if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
                 default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                 default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
@@ -700,7 +698,21 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
         else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+    
+    # is this Arc? If so, check for proxy     
+    if os.path.isfile(ArcSettingsFile):
+        f = open(ArcSettingsFile, "r")
+        data = f.read()
 
+        if (data != ''):
+            json_data = json.loads(data)
+            if json_data is not None and "proxy.url" in json_data:
+                url = json_data["proxy.url"]
+                # only non-authenticated proxy config is supported
+                if url != '':
+                    default_configs["MDSD_PROXY_ADDRESS"] = url
+                    set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+                    
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
 
@@ -1248,7 +1260,8 @@ def generate_localsyslog_configs():
                 if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
                     os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
                 syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
-                os.makedir(syslog_ng_confpath)
+                if not os.path.exists(syslog_ng_confpath):
+                    os.makedirs(syslog_ng_confpath)
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
                 os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
                 restartRequired = True
@@ -1286,7 +1299,8 @@ def generate_localsyslog_configs():
             if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
                 os.remove("/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
             syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
-            os.makedir(syslog_ng_confpath)
+            if not os.path.exists(syslog_ng_confpath):
+                os.makedirs(syslog_ng_confpath)
             copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
             os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
             run_command_and_log(get_service_command("syslog-ng", "restart"))
@@ -1413,7 +1427,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
+    rpm_set = set(["oracle", 'ol', "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1485,6 +1499,7 @@ def is_vm_supported_for_extension(operation):
                        'centos' : ['7', '8'], # CentOS
                        'red hat' : ['7', '8', '9'], # Oracle, RHEL
                        'oracle' : ['7', '8'], # Oracle
+                       'ol' : ['7', '8'], # Oracle Linux
                        'debian' : ['9', '10', '11'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'], # SLES
@@ -1571,7 +1586,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma', 'amzn']:
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'ol', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma', 'amzn']:
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 

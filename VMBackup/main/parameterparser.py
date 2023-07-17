@@ -115,13 +115,14 @@ class ParameterParser(object):
                 backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
                 for config in self.dynamicConfigsFromCRP:
                     if CommonVariables.key in config and CommonVariables.value in config:
-                        if((config[CommonVariables.key]).lower() in settingKeysMapping):
-                            self.wellKnownSettingFlags[settingKeysMapping[config[CommonVariables.key].lower()]] = config[CommonVariables.value]
+                        config_key = config[CommonVariables.key].lower()
+                        if(config_key in settingKeysMapping):
+                            self.wellKnownSettingFlags[settingKeysMapping[config_key]] = config[CommonVariables.value]
                         else:
                             backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
                     else:
                         backup_logger.log("The received dynamicConfigsFromCRP is not in expected format.", True)
-                backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
             except Exception as e:
                 errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
                 backup_logger.log(errorMsg, True)
+        backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
