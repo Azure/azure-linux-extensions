@@ -482,7 +482,7 @@ def _backup_sshd_config(sshd_file_path):
         #     sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
 
         # Backup doesn't exist, create one
-        open(backup_file_name, 'a').close()
+        open(backup_file_name, 'w+').close()
         # When copying, make sure to preserve permissions and ownership.
         ownership = os.stat(sshd_file_path)
         shutil.copy2(sshd_file_path, backup_file_name)
