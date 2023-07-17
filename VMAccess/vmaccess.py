@@ -261,6 +261,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
     expiration = protect_settings.get('expiration')
+    remove_prior_keys = protect_settings.get('remove_prior_keys')
     no_convert = False
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
         raise Exception("No password or ssh_key is specified.")
@@ -314,7 +315,13 @@ def _set_user_account_pub_key(protect_settings, hutil):
                     final_cert_txt = cert_txt
                     if not cert_txt.endswith("\n"):
                         final_cert_txt = final_cert_txt + "\n"
-                    ext_utils.append_file_contents(pub_path, final_cert_txt)
+
+                    if remove_prior_keys == True:
+                        ext_utils.set_file_contents(pub_path, final_cert_txt)
+                        hutil.log("Removed prior ssh keys for user %s" % user_name)
+                    else:
+                        ext_utils.append_file_contents(pub_path, final_cert_txt)
+        
                     MyDistro.set_se_linux_context(
                         pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
                     ext_utils.change_owner(pub_path, user_name)
