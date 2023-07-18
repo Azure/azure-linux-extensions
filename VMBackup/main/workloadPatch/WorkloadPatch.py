@@ -63,6 +63,7 @@ class WorkloadPatch:
         self.post_database_status = ""
         self.post_log_mode = ""
         self.instance_list = []
+        self.sudo_off = Utils.HandlerUtil.HandlerUtility.get_intvalue_from_configfile("sudo_off",0)
 
     def readOracleList(self,filePath):
         re_db = re.compile(r'^(?P<DB>(\w+)):(?P<PATH>(/|\w+|\.)+)(:(\w*))?')
@@ -147,7 +148,9 @@ class WorkloadPatch:
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
                 return None
             prescript = os.path.join(self.temp_script_folder, self.scriptpath + "/preMysqlMaster.sql")
-            arg = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
+            arg = self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
+            if self.sudo_off == 0:
+                arg = self.sudo_user+" "+ arg
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
@@ -260,8 +263,12 @@ class WorkloadPatch:
         if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post master")
             postscript = os.path.join(self.temp_script_folder, self.scriptpath + "/postMysqlMaster.sql")
-            args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
-            self.logger.log("WorkloadPatch: command to execute: "+str(self.sudo_user)+"  "+str(self.command))
+            args = self.command+self.name+" "+self.cred_string+" < "+postscript
+            if self.sudo_off == 0:
+                args = self.sudo_user+" "+ args
+                self.logger.log("WorkloadPatch: command to execute: "+str(self.sudo_user)+"  "+str(self.command))
+            else:
+                self.logger.log("WorkloadPatch: command to execute: "+str(self.command))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         elif 'oracle' in self.name.lower():
             self.logger.log("WorkloadPatch: Post- Inside oracle post")
@@ -349,7 +356,9 @@ class WorkloadPatch:
                 self.error_details.append(ErrorDetail(CommonVariables.FailedWorkloadIPCDirectoryMissing, "IPC directory missing"))
                 return None
             prescript = os.path.join(self.temp_script_folder, self.scriptpath + "/preMysqlSlave.sql")
-            arg = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
+            arg = self.command+self.name+" "+self.cred_string+" -e\"set @timeout="+self.timeout+";set @outfile=\\\"\\\\\\\""+self.outfile+"\\\\\\\"\\\";source "+prescript+";\""
+            if self.sudo_off == 0:
+                arg = self.sudo_user+" "+ arg
             binary_thread = threading.Thread(target=self.thread_for_sql, args=[arg])
             binary_thread.start()
             self.waitForPreScriptCompletion()
@@ -384,7 +393,9 @@ class WorkloadPatch:
         if 'mysql' in self.name.lower() or 'mariadb' in self.name.lower():
             self.logger.log("WorkloadPatch: Create connection string for post slave")
             postscript = os.path.join(self.temp_script_folder, self.scriptpath + "/postMysqlSlave.sql")
-            args = self.sudo_user+" "+self.command+self.name+" "+self.cred_string+" < "+postscript
+            args = self.command+self.name+" "+self.cred_string+" < "+postscript
+            if self.sudo_off == 0:
+                args = self.sudo_user+" "+ args
             self.logger.log("WorkloadPatch: command to execute: "+str(args))
             post_child = subprocess.Popen(args,stdout=subprocess.PIPE,stdin=subprocess.PIPE,shell=True,stderr=subprocess.PIPE)
         #Add new workload support here
@@ -610,7 +621,9 @@ class WorkloadPatch:
                     if config.has_option("workload", 'linux_user'):
                         self.linux_user = config.get("workload", 'linux_user')
                         self.logger.log("WorkloadPatch: config linux user of pre script "+ self.linux_user)
-                        self.sudo_user = "sudo -u "+self.linux_user
+                        self.sudo_user = self.linux_user
+                        if self.sudo_off == 0:
+                            self.sudo_user = "sudo -u" + self.sudo_user
                     if config.has_option("workload", 'dbnames'):
                         dbnames_list = config.get("workload", 'dbnames') #mydb1;mydb2;mydb3
                         self.dbnames = dbnames_list.split(';')
