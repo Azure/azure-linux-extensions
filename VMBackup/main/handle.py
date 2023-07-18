@@ -44,6 +44,7 @@ from fsfreezer import FsFreezer
 from common import CommonVariables
 from parameterparser import ParameterParser
 from Utils import HandlerUtil
+from Utils import EventLoggerUtil
 from Utils import SizeCalculation
 from Utils import Status
 from freezesnapshotter import FreezeSnapshotter
@@ -60,7 +61,7 @@ from workloadPatch import WorkloadPatch
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro, configSeqNo
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro, configSeqNo, event_logger
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -72,6 +73,7 @@ def main():
         HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
+        event_logger = None
         MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
         hutil.patching = MyPatching
         configSeqNo = -1
@@ -587,10 +589,11 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
-    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo
+    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo,event_logger
     try:
-        hutil.do_parse_context('Enable', configSeqNo)
 
+        hutil.do_parse_context('Enable', configSeqNo)
+        event
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
 
@@ -603,6 +606,7 @@ def enable():
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
+            event_logger.update_properties(para_parser.taskId)
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             randomSleepTime = random.randint(500, 5000)
             backup_logger.log('Sleeping for milliseconds: ' + str(randomSleepTime), True)
@@ -610,7 +614,7 @@ def enable():
             exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
-
+            
         temp_status= 'success'
         temp_result=CommonVariables.ExtensionTempTerminalState
         temp_msg='Transitioning state in extension'

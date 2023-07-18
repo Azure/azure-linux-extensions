@@ -24,6 +24,7 @@ HandlerEnvironment.json
   "version": "1.0",
   "handlerEnvironment": {
     "logFolder": "<your log folder location>",
+    "eventFolder": "<your event folder location>",
     "configFolder": "<your config folder location>",
     "statusFolder": "<your status folder location>",
     "heartbeatFile": "<your heartbeat file location>",
@@ -78,6 +79,7 @@ import platform
 import subprocess
 import datetime
 import Utils.Status
+from Utils.EventLoggerUtil import EventLogger
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -106,6 +108,9 @@ class HandlerUtility:
         self.partitioncount = 0
         self.logging_file = None
         self.pre_post_enabled = False
+        self.eventlogger =  EventLogger.GetInstance(r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")
+        #self.eventlogger = EventLogger(r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")
+        #self.eventlogger.update_properties("44444")
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -178,6 +183,7 @@ class HandlerUtility:
         try:
             with open(self.logging_file, "a+") as C :
                 C.write(msg)
+
         except IOError:
             pass
 
@@ -277,6 +283,7 @@ class HandlerUtility:
             self.logging_file=self._context._log_file
             self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
             self._change_log_file()
+            self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
             if seqNo != -1:
