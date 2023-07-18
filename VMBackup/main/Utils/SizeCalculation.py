@@ -69,15 +69,14 @@ class SizeCalculation(object):
             self.logger.log("As the LunList is empty including all disks")
     
     def get_lsscsi_list(self):
-        if (self.sudo_off == 1):
-            command = "lsscsi"
-        else:
-            command = "sudo lsscsi"
+        command = "lsscsi"
+        if (self.sudo_off == 0):
+            command = "sudo " + command
         try:
             self.logger.log("executing command  {0}".format(command))
             self.lsscsi_list = (os.popen(command).read()).splitlines()
         except Exception as e:
-            error_msg = "Failed to execute the command %s because of error %s , stack trace: %s" % (command, str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command \"%s\" because of error %s , stack trace: %s" % (command, str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.lsscsi_list = []
 
@@ -91,14 +90,13 @@ class SizeCalculation(object):
 
     def get_pvs_list(self):
         try:
-            if (self.sudo_off == 1):
-                command = "pvs"
-            else:
-                command = "sudo pvs"
+            command = "pvs"
+            if (self.sudo_off == 0):
+                command = "sudo " + command
             self.pvs_output = os.popen(command).read().strip().split("\n")
             self.pvs_output = self.pvs_output[1:]
         except Exception as e:
-            error_msg = "Failed to execute the command %s because of error %s , stack trace: %s" % (command, str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command \"%s\" because of error %s , stack trace: %s" % (command, str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.pvs_output = []
 
