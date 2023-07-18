@@ -318,7 +318,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
                     if remove_prior_keys == True:
                         ext_utils.set_file_contents(pub_path, final_cert_txt)
-                        hutil.log("Removed prior ssh keys for user %s" % user_name)
+                        hutil.log("Removed prior ssh keys and added new key for user %s" % user_name)
                     else:
                         ext_utils.append_file_contents(pub_path, final_cert_txt)
         
