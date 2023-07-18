@@ -107,6 +107,8 @@ class PatchBootSystemState(OSEncryptionState):
             sleep(5)
             # the restarted vm shall see the marker and advance the state machine
             self.command_executor.Execute('reboot')
+            # reboot race condition sleep
+            sleep(5)
         else:
             self.context.logger.log("Second call to stripdown state (pid={0}), continuing process".format(os.getpid()))
             return True

@@ -53,7 +53,7 @@ class OnlineEncryptionHandler:
             chk_shrink_result = disk_util.check_shrink_fs(dev_path=device_dev_path, size_shrink_to=size_shrink_to)
 
             if chk_shrink_result != CommonVariables.process_success:
-                self.logger.log(msg="check shrink fs failed with code {0} for {1}".format(chk_shrink_result, original_dev_path),
+                self.logger.log(msg="check shrink fs failed with code {0} for {1}".format(chk_shrink_result, device_dev_path),
                            level=CommonVariables.ErrorLevel)
                 self.logger.log(msg="Your file system may not have enough space to do the encryption or file System may not support resizing")
                 return device_item

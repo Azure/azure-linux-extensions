@@ -372,14 +372,13 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         # test exception is not raised for redhat 8.15
         self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
                                     MockDistroPatcher('redhat', '8.15', '4.4'), {"os" : "NotEncrypted"})
+        # test exception is not raised for redhat 9.0
+        self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"}, 
+                                   MockDistroPatcher('redhat', '9.0', '4.4'), {"os" : "NotEncrypted"})
         # test exception is raised for redhat 8.0
         self.assertRaises(Exception, self.cutil.is_supported_os, {
             CommonVariables.VolumeTypeKey: "ALL"
             }, MockDistroPatcher('redhat', '8.0', '4.4'), {"os" : "NotEncrypted"})
-        # test exception is raised for redhat 9.0
-        self.assertRaises(Exception, self.cutil.is_supported_os, {
-            CommonVariables.VolumeTypeKey: "ALL"
-            }, MockDistroPatcher('redhat', '9.0', '4.4'), {"os" : "NotEncrypted"})
         # test exception is not raised for oracle 8.5
         self.cutil.is_supported_os({CommonVariables.VolumeTypeKey: "ALL"},
                                     MockDistroPatcher('oracle', '8.5', '4.4'), {"os" : "NotEncrypted"})

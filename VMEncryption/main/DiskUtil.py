@@ -293,7 +293,8 @@ class DiskUtil(object):
 
     def check_shrink_fs(self, dev_path, size_shrink_to):
         return_code = self.check_fs(dev_path)
-        if return_code == CommonVariables.process_success:
+        # e2fsck return code means fs errors corrected. We should be good in that case.
+        if return_code in [CommonVariables.process_success, CommonVariables.e2fsck_fserrors_correctedode]:
             return_code = self.shrink_fs(dev_path=dev_path, size_shrink_to=size_shrink_to)
             return return_code
         else:

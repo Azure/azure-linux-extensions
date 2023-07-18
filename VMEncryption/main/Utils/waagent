@@ -6514,6 +6514,8 @@ def GetMyDistro(dist_class_name=''):
 
     # transform to case sensitive Ubuntu class name if needed
     dist_class_name = dist_class_name.replace("ubuntu","Ubuntu")
+    # transform rhel to redhat for RHEL 9 change
+    dist_class_name = dist_class_name.replace("rhel","redhat")
 
     if dist_class_name not in globals():
         print(Distro + ' is not a supported distribution.')

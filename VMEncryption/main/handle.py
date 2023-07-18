@@ -751,7 +751,11 @@ def enable():
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
         if encryption_config.config_file_exists():
             existing_volume_type = encryption_config.get_volume_type()
-
+        #log to capture lsblk before encryption view.
+        disk_util.log_lsblk_output()
+        if public_settings.get(CommonVariables.EncryptionEncryptionOperationKey) == CommonVariables.EnableEncryptionFormatAll:
+            #in case of stop start unmount /mnt to avoid resource disk encryption issues.
+            disk_util.umount('/mnt')
         is_migrate_operation = False
         if CommonVariables.MigrateKey in public_settings:
             if public_settings.get(CommonVariables.MigrateKey) == CommonVariables.MigrateValue:
@@ -1753,7 +1757,7 @@ def decrypt_inplace_without_separate_header_file(passphrase_file,
 
     luks_header_size = disk_util.get_luks_header_size(crypt_item.dev_path)
 
-    if raw_device_item.size - mapper_device_item.size != luks_header_size:
+    if raw_device_item.size - mapper_device_item.size < luks_header_size:
         logger.log(msg="mismatch between raw and mapper device found for crypt_item {0}".format(crypt_item),
                    level=CommonVariables.ErrorLevel)
         logger.log(msg="raw_device_item: {0}".format(raw_device_item),
@@ -2192,7 +2196,8 @@ def daemon_encrypt():
         # import OSEncryption here instead of at the top because it relies
         # on pre-req packages being installed (specifically, python-six on Ubuntu)
         distro_name = DistroPatcher.distro_info[0]
-        distro_name = distro_name.replace('ubuntu', 'Ubuntu')  # to upper if needed
+        distro_name = distro_name.replace('ubuntu','Ubuntu')  # to upper if needed
+        distro_name = distro_name.replace('rhel','redhat') # fix for RHEL 9 distro name change 
         distro_version = DistroPatcher.distro_info[1]
 
         os_encryption = None
