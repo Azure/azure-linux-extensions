@@ -41,6 +41,8 @@ def get_my_distro(config, os_name=None):
             return SuSEDistro(config)
         if re.search("ubuntu", os_name, re.IGNORECASE):
             return UbuntuDistro(config)
+        if re.search("mariner", os_name, re.IGNORECASE):
+            return MarinerDistro(config)
     return GenericDistro(config)
 
 
@@ -535,3 +537,10 @@ class SuSEDistro(GenericDistro):
         super(SuSEDistro, self).__init__(config)
         self.ssh_service_name = 'sshd'
         self.distro_name = "SuSE"
+
+class MarinerDistro(GenericDistro):
+    def __init__(self, config):
+        super(MarinerDistro, self).__init__(config)
+        self.ssh_service_name = 'sshd'
+        self.service_cmd = '/usr/bin/systemctl'
+        self.distro_name = 'Mariner'
