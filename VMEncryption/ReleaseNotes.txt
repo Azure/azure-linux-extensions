@@ -1,3 +1,8 @@
+1.4.0.1
+- Add official support for RHEL 9.x
+- Resource Disk + EFA Stop Start issue fix
+- Data Disk Disable Bug Fix
+
 1.4.0.0
 -CVM Linux data disk encryption
 -highlights:
@@ -13,6 +18,7 @@
 1.3.0.0
 -Add private support for ADE with ManagedHSM
 -Add flow for encrypting temp disks in a CVM
+
 1.2.0.97
 -Using no proxy, IMDS failure as non terminal.
 -Add Ubuntu 22.04 support. 
