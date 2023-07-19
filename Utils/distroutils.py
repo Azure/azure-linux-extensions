@@ -538,6 +538,7 @@ class SuSEDistro(GenericDistro):
         self.ssh_service_name = 'sshd'
         self.distro_name = "SuSE"
 
+
 class MarinerDistro(GenericDistro):
     def __init__(self, config):
         super(MarinerDistro, self).__init__(config)
