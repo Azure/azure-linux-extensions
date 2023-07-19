@@ -544,3 +544,13 @@ class MarinerDistro(GenericDistro):
         self.ssh_service_name = 'sshd'
         self.service_cmd = '/usr/bin/systemctl'
         self.distro_name = 'Mariner'
+    
+    def restart_ssh_service(self):
+        """
+        Service call to re(start) the SSH service
+        """
+        ssh_restart_cmd = [self.service_cmd, self.ssh_service_restart_option, self.ssh_service_name]
+        retcode = ext_utils.run(ssh_restart_cmd)
+        if retcode > 0:
+            logger.error("Failed to restart SSH service with return code:" + str(retcode))
+        return retcode
