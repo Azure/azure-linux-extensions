@@ -80,6 +80,7 @@ import subprocess
 import datetime
 import Utils.Status
 from Utils.EventLoggerUtil import EventLogger
+from Utils.LogHelper import LoggingLevel,LoggingConstants
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -108,6 +109,7 @@ class HandlerUtility:
         self.partitioncount = 0
         self.logging_file = None
         self.pre_post_enabled = False
+        self.severity_level = self.get_severity_level()
         self.eventlogger =  EventLogger.GetInstance(r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")
         #self.eventlogger = EventLogger(r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")
         #self.eventlogger.update_properties("44444")
@@ -169,6 +171,7 @@ class HandlerUtility:
             if sys.version_info > (3,):
                 if self.logging_file is not None:
                     self.log_py3(message)
+                    self.eventlogger.trace_message_new(level, message)
                 else:
                     pass
             else:
@@ -786,6 +789,21 @@ class HandlerUtility:
         out = process_out.stdout.read().decode()
         out = str(out)
         return out
+
+    def get_severity_level(self):
+        #logging_level = LoggingLevel(LoggingConstants.AllLogEnabledLevel, LoggingConstants.DefaultEventLogLevel)
+        logging_level = LoggingLevel(LoggingConstants.DefaultEventLogLevel)
+        try:
+            log_setting_file_path = os.path.join(os.getcwd(), LoggingConstants.LogLevelSettingFile)
+            if os.path.exists(log_setting_file_path):
+                with open(log_setting_file_path, 'r') as file:
+                    logging_level_input = json.load(file)
+                    logging_level.__dict__.update(logging_level_input)
+            else:
+                print("Logging level setting file is not present.")
+        except Exception as ex:
+            print(ex)
+        return logging_level
 
     @staticmethod
     def split(logger,txt):

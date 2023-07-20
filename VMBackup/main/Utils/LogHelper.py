@@ -20,8 +20,9 @@ class LoggingConstants:
     AllLogEnabledLevel = "Verbose"
 
 class LoggingLevel:
-    def __init__(self, file_log_level, event_log_level):
-        self.FileLogLevel = file_log_level
+    #def __init__(self, file_log_level, event_log_level):
+    def __init__(self, event_log_level):
+        #self.FileLogLevel = file_log_level
         self.EventLogLevel = event_log_level
 
 class FileHelpers:

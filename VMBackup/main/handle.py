@@ -44,7 +44,7 @@ from fsfreezer import FsFreezer
 from common import CommonVariables
 from parameterparser import ParameterParser
 from Utils import HandlerUtil
-from Utils import EventLoggerUtil
+#from Utils import EventLoggerUtil
 from Utils import SizeCalculation
 from Utils import Status
 from freezesnapshotter import FreezeSnapshotter
@@ -593,7 +593,6 @@ def enable():
     try:
 
         hutil.do_parse_context('Enable', configSeqNo)
-        event
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
 
