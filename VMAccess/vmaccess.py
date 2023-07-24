@@ -144,7 +144,7 @@ def enable():
         protect_settings = hutil.get_protected_settings()
         if protect_settings:
             reset_ssh = protect_settings.get('reset_ssh', False)
-            remove_user = protect_settings.get('remove_user', False)
+            remove_user = protect_settings.get('remove_user')
             restore_backup_ssh = protect_settings.get('restore_backup_ssh', False)
 
         if remove_user and _is_sshd_config_modified(protect_settings):
@@ -376,6 +376,7 @@ def _backup_and_update_sshd_config(hutil, attr_name, attr_value):
 
     for i in range(0, len(config)):
         if config[i].startswith(attr_name) and attr_value in config[i].lower():
+            hutil.log(f"{attr_name} already set to {attr_value} in sshd_config, skip update.")
             return
 
     hutil.log(f"Setting {attr_name} to {attr_value} in sshd_config.")
