@@ -5,19 +5,20 @@ import datetime
 import time
 import queue
 import shutil
-from LogHelper import FileHelpers,LoggingConstants
-from StringHelper import StringHelper
-from Event import Event
+from Utils.LogHelper import FileHelpers,LoggingConstants
+from Utils.StringHelper import StringHelper
+from Utils.Event import Event
 
 class EventLogger:
     _instance = None
     _lock = threading.Lock()
     
     
-    def __init__(self, event_directory, severity_level):
+    def __init__(self, log, event_directory, severity_level):
         self.temporary_directory = os.path.join(event_directory, 'Temp')
         self.space_available_in_event_directory = 0
         self.event_processing_interval = 0
+        self.logger = log
         self.disposed = False
         self.event_processing_task = None  
         self.current_message_len = 0
@@ -47,7 +48,7 @@ class EventLogger:
             print(f"Information: Space available in event directory : {self.space_available_in_event_directory}B")
             
             self.event_processing_interval = LoggingConstants.MinEventProcesingInterval
-            print(f"Information: Setting event reporting interval to {self.event_processing_interval}ms")
+            print(f"Information: Setting event reporting interval to {self.event_processing_interval}s")
             
             self.begin_event_queue_polling()
             #self.trace_message("Hello...")
@@ -55,11 +56,12 @@ class EventLogger:
             print("Warning: EventsFolder parameter is empty. Guest Agent does not support event logging.")
             
     @staticmethod
-    def GetInstance(event_directory, severity_level):
+    def GetInstance(log, event_directory, severity_level):
         if EventLogger._instance is None:
             with EventLogger._lock:
                 if EventLogger._instance is None:
-                    EventLogger._instance = EventLogger(event_directory, severity_level)
+
+                    EventLogger._instance = EventLogger(log, event_directory, severity_level)
         return EventLogger._instance
         
     def update_properties(self, task_id):
@@ -73,25 +75,42 @@ class EventLogger:
         if self.event_logging_enabled:
             if message_logs:
                 for message_log in message_logs:
-                    self.trace_message(Verbose, message_log)
+                    self.trace_message("Verbose", message_log)
 
     def trace_message_new(self, severity_level, message, *args):
+        level = 0
         print("inside trace_message_new")
-        if self.event_logging_enabled and severity_level >= self.log_severity_level:
-            message = StringHelper.resolve_string(severity_level, message, args)
+        if (severity_level == "Info"):
+            level = 0
+        if (severity_level == "Warning"):
+            level = 1
+        if(severity_level == "Error"):
+            level = 2
+
+        if self.event_logging_enabled and level >= self.log_severity_level:
+            stringhelper = StringHelper()
+            message = stringhelper.resolve_string(severity_level, message)
             try:
                 message_len = len(message)
                 message_max_len = LoggingConstants.MaxMessageLenLimit
+                print(type(message_max_len))
+                print(type(message_len))
                 print("message length ",message_len," message_max_len ", message_max_len)
+                #self.logger.log("******message length ", message_len)
+                #self.logger.log("******max msesgae length ", message_max_len)
                 
                 if message_len > message_max_len:
                     num_chunks = (message_len + message_max_len - 1) // message_max_len
                     msg_date_time = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+                    print(num_chunks)
+                    #self.logger.log(num_chunks)
                     
+                    #self.logger.log("logging parts of messages..........")
                     for string_part in range(num_chunks):
                         start_index = string_part * message_max_len
                         length = min(message_max_len, message_len - start_index)
                         message_part = f'{msg_date_time} [{string_part + 1}/{num_chunks}] {message[start_index:start_index+length]}'
+                        #self.logger.log(message_part)
                         self.log_event(message_part)
                 else:
                     print("calling log_event")
@@ -106,7 +125,9 @@ class EventLogger:
     def log_event(self, message):
         try:
             print("inside log_event")
+            #self.logger.log("inside log event...")
             if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
+                #self.logger.log("inside if part of log_event")
                 self.event_queue.put(Event("Info",
                                            self.current_message, LoggingConstants.DefaultEventTaskName,
                                            self.operation_id, self.extension_version).convertToDictionary())
@@ -115,10 +136,13 @@ class EventLogger:
                 # Reset the current message
                 self.current_message = message
                 self.current_message_len = len(message)
+                #self.logger.log("add to q_________")
                 print("******************added to event queue")
             else:
+                #self.logger.log("insid else part of log_event")
                 self.current_message += "\n" + message
                 self.current_message_len += len(message)
+                #self.logger.log(self.current_message)
         except Exception as ex:
             print("Warning: Error adding extension event to queue. Exception: " + str(ex))
 
@@ -147,10 +171,11 @@ class EventLogger:
                 print("Information: Event directory has space for new event files. Resuming event reporting.")
             else:
                 return
-
+        #self.logger.log("inside process eventsss")
         if not self.event_queue.empty():
+            #self.logger.log("insid if part of processing event and q is not empty")
             print("event queue not empty")
-            event_file_path = os.path.join(self.temporary_directory, f"{datetime.datetime.utcnow().timestamp()}.json")
+            event_file_path = os.path.join(self.temporary_directory, f"{int(datetime.datetime.utcnow().timestamp() * 10000000)}.json")
             with self._create_event_file(event_file_path) as file:
                 if file is None:
                     print("Warning: Could not create the event file in the path mentioned.")
@@ -167,7 +192,8 @@ class EventLogger:
         success_msg = f"Successfully created new event file: {event_file_path}"
         retry_msg = f"Failed to write events to file: {event_file_path}. Retrying..."
         err_msg = f"Failed to write events to file {event_file_path} after {LoggingConstants.MaxAttemptsForEventFileCreationWriteMove} attempts. No longer retrying. Events for this iteration will not be reported."
-        
+        #self.logger.log("inside create event file......")
+
         stream_writer = FileHelpers.execute_with_retries(
             LoggingConstants.MaxAttemptsForEventFileCreationWriteMove,
             LoggingConstants.ThreadSleepDuration,
@@ -192,6 +218,7 @@ class EventLogger:
             data_list.append(data)
         json_data = json.dumps(data_list)
         print("inside write_events", json_data)
+        #self.logger.log("write events inside '''''")
         if not json_data:
             print("Warning: Unable to serialize events. Events for this iteration will not be reported.")
             return

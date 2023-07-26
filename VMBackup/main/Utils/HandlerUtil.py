@@ -110,7 +110,9 @@ class HandlerUtility:
         self.logging_file = None
         self.pre_post_enabled = False
         self.severity_level = self.get_severity_level()
-        self.eventlogger =  EventLogger.GetInstance(r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")
+        self.event_dir = None
+        self.eventlogger = None
+        #self.eventlogger =  None#EventLogger.GetInstance(r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")
         #self.eventlogger = EventLogger(r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")
         #self.eventlogger.update_properties("44444")
 
@@ -153,15 +155,23 @@ class HandlerUtility:
             self.update_settings_file()
             sys.exit(0)
 
+    def set_event_logger(self, eventlogger):
+        self.eventlogger = eventlogger
+
     def log(self, message,level='Info'):
         try:
+            print(message,"***")
             self.log_with_no_try_except(message, level)
+            if self.eventlogger != None:
+                self.eventlogger.trace_message_new(level, message)
         except IOError:
             pass
         except Exception as e:
             try:
+                print(e)
                 errMsg='Exception in hutil.log'
                 self.log_with_no_try_except(errMsg, 'Warning')
+                #self.log_with_no_try_except(e, 'Warning')
             except Exception as e:
                 pass
 
@@ -171,7 +181,10 @@ class HandlerUtility:
             if sys.version_info > (3,):
                 if self.logging_file is not None:
                     self.log_py3(message)
-                    self.eventlogger.trace_message_new(level, message)
+                    #self.log_py3("strting trace msg")
+                    #if self.eventlogger != None:
+                        #self.eventlogger.trace_message_new(level, message)
+                    #self.log_py3("completed trace msg")
                 else:
                     pass
             else:
@@ -287,6 +300,8 @@ class HandlerUtility:
             self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
             self._change_log_file()
             self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
+            self.event_dir = self._context._event_dir
+            #self.eventlogger = EventLogger.GetInstance(self.event_dir, self.severity_level)
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
             if seqNo != -1:
@@ -795,6 +810,7 @@ class HandlerUtility:
         logging_level = LoggingLevel(LoggingConstants.DefaultEventLogLevel)
         try:
             log_setting_file_path = os.path.join(os.getcwd(), LoggingConstants.LogLevelSettingFile)
+            print(log_setting_file_path)
             if os.path.exists(log_setting_file_path):
                 with open(log_setting_file_path, 'r') as file:
                     logging_level_input = json.load(file)
@@ -803,7 +819,7 @@ class HandlerUtility:
                 print("Logging level setting file is not present.")
         except Exception as ex:
             print(ex)
-        return logging_level
+        return logging_level.EventLogLevel
 
     @staticmethod
     def split(logger,txt):

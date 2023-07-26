@@ -11,8 +11,8 @@ class LoggingConstants:
     ThreadSleepDuration = 10000  # 10 seconds
     MaxEventDirectorySize = 39981250  # ~= 39Mb
     MaxEventsPerRun = 300
-    MaxMessageLenLimit = 32#2900  # 3072 to be precise
-    MaxMessageLengthPerEvent = 34#3000  # 3072 to be precise
+    MaxMessageLenLimit = 2900  # 3072 to be precise
+    MaxMessageLengthPerEvent = 3000  # 3072 to be precise
     DefaultEventTaskName = "Enable"
     # ToDo: The third param-TaskName is by default set to "Enable". We can add a mechanism to send the program file name
     LogLevelSettingFile = "LogSeverity.json"

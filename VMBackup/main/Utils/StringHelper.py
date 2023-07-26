@@ -7,14 +7,14 @@ class StringHelper:
             for i in range(0, len(name_value_args) - 1, 2):
                 msg_body += f"{start_delimiter}{name_value_args[i]} = {name_value_args[i + 1]}{end_delimiter}"
     
-    def resolve_string(self,severity_level, message, *args):
+    def resolve_string(self,severity_level, message):
         msg_body = datetime.datetime.utcnow().isoformat() + "\t" + "[" + severity_level + "]:\t"
 
         if message and message.strip():
             msg_body += message + " "
 
-        if args:
-            self.format_params(msg_body, "{", "}", *args)
+        #if args:
+            #self.format_params(msg_body, "{", "}", *args)
 
         msg_body += "\n"
         return msg_body
