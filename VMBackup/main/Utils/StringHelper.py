@@ -13,9 +13,6 @@ class StringHelper:
         if message and message.strip():
             msg_body += message + " "
 
-        #if args:
-            #self.format_params(msg_body, "{", "}", *args)
-
         msg_body += "\n"
         return msg_body
 

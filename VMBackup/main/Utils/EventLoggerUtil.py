@@ -51,7 +51,6 @@ class EventLogger:
             print(f"Information: Setting event reporting interval to {self.event_processing_interval}s")
             
             self.begin_event_queue_polling()
-            #self.trace_message("Hello...")
         else:
             print("Warning: EventsFolder parameter is empty. Guest Agent does not support event logging.")
             
@@ -93,27 +92,17 @@ class EventLogger:
             try:
                 message_len = len(message)
                 message_max_len = LoggingConstants.MaxMessageLenLimit
-                print(type(message_max_len))
-                print(type(message_len))
-                print("message length ",message_len," message_max_len ", message_max_len)
-                #self.logger.log("******message length ", message_len)
-                #self.logger.log("******max msesgae length ", message_max_len)
                 
                 if message_len > message_max_len:
                     num_chunks = (message_len + message_max_len - 1) // message_max_len
                     msg_date_time = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-                    print(num_chunks)
-                    #self.logger.log(num_chunks)
                     
-                    #self.logger.log("logging parts of messages..........")
                     for string_part in range(num_chunks):
                         start_index = string_part * message_max_len
                         length = min(message_max_len, message_len - start_index)
                         message_part = f'{msg_date_time} [{string_part + 1}/{num_chunks}] {message[start_index:start_index+length]}'
-                        #self.logger.log(message_part)
                         self.log_event(message_part)
                 else:
-                    print("calling log_event")
                     self.log_event(message)
             except Exception as ex:
                 self.event_logging_error_count += 1
@@ -124,25 +113,16 @@ class EventLogger:
 
     def log_event(self, message):
         try:
-            print("inside log_event")
-            #self.logger.log("inside log event...")
             if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
-                #self.logger.log("inside if part of log_event")
                 self.event_queue.put(Event("Info",
                                            self.current_message, LoggingConstants.DefaultEventTaskName,
                                            self.operation_id, self.extension_version).convertToDictionary())
-                print("written to Queue",self.current_message)
-
                 # Reset the current message
                 self.current_message = message
                 self.current_message_len = len(message)
-                #self.logger.log("add to q_________")
-                print("******************added to event queue")
             else:
-                #self.logger.log("insid else part of log_event")
                 self.current_message += "\n" + message
                 self.current_message_len += len(message)
-                #self.logger.log(self.current_message)
         except Exception as ex:
             print("Warning: Error adding extension event to queue. Exception: " + str(ex))
 
@@ -158,7 +138,6 @@ class EventLogger:
                 self._process_events()
             except Exception as ex:
                 print("Warning: Event processing has failed. Exception: " + str(ex))
-        #self.event_processing_signal.clear()
         print("Information: Exiting function polling...")
 
     def _process_events(self):
@@ -171,10 +150,7 @@ class EventLogger:
                 print("Information: Event directory has space for new event files. Resuming event reporting.")
             else:
                 return
-        #self.logger.log("inside process eventsss")
         if not self.event_queue.empty():
-            #self.logger.log("insid if part of processing event and q is not empty")
-            print("event queue not empty")
             event_file_path = os.path.join(self.temporary_directory, f"{int(datetime.datetime.utcnow().timestamp() * 10000000)}.json")
             with self._create_event_file(event_file_path) as file:
                 if file is None:
@@ -192,7 +168,6 @@ class EventLogger:
         success_msg = f"Successfully created new event file: {event_file_path}"
         retry_msg = f"Failed to write events to file: {event_file_path}. Retrying..."
         err_msg = f"Failed to write events to file {event_file_path} after {LoggingConstants.MaxAttemptsForEventFileCreationWriteMove} attempts. No longer retrying. Events for this iteration will not be reported."
-        #self.logger.log("inside create event file......")
 
         stream_writer = FileHelpers.execute_with_retries(
             LoggingConstants.MaxAttemptsForEventFileCreationWriteMove,
@@ -217,8 +192,6 @@ class EventLogger:
             data = events.get()
             data_list.append(data)
         json_data = json.dumps(data_list)
-        print("inside write_events", json_data)
-        #self.logger.log("write events inside '''''")
         if not json_data:
             print("Warning: Unable to serialize events. Events for this iteration will not be reported.")
             return
@@ -274,7 +247,6 @@ class EventLogger:
             if not self.disposed:
                 if disposing and self.event_logging_enabled:
                     self.event_processing_signal.set()
-                    #self.event_processing_task.join(self.event_processing_interval)
                     self.event_processing_task.join()
                     self.event_processing_signal.clear()
                     if (self.current_message != ''):
@@ -284,7 +256,6 @@ class EventLogger:
                             self._process_events()
                             self.current_message = ''
                             self.dispose()
-                            #self.event_processing_task.
                         except Exception as ex:
                             print("Warning: Unable to process events before termination of extension. Exception: " + str(ex))
                 self.disposed = True
@@ -304,6 +275,4 @@ class EventLogger:
         else:
             print(f"Error: Attempted to delete non-existent file: {file_path}")
 
-#EventLogger( r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")          
-#EventLogger.GetInstance(r"D:\MSLInux\azure-linux-extensions\VMBackup\temp\events", "Info")
 

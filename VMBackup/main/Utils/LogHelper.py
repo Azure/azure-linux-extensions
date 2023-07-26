@@ -1,6 +1,7 @@
 import os
 import datetime
 import shutil
+import time
 
 class LoggingConstants:
     MaxDayAgeOfStaleFiles = -1  # We don't store unprocessed files beyond 1 day from current processing time
@@ -20,9 +21,7 @@ class LoggingConstants:
     AllLogEnabledLevel = "Verbose"
 
 class LoggingLevel:
-    #def __init__(self, file_log_level, event_log_level):
     def __init__(self, event_log_level):
-        #self.FileLogLevel = file_log_level
         self.EventLogLevel = event_log_level
 
 class FileHelpers:

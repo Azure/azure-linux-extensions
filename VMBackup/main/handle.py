@@ -321,9 +321,6 @@ def daemon():
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
         hutil.update_settings_file()
 
-        #flush out any prev data
-        #eventlogger.dispose()
-
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             eventlogger.update_properties(para_parser.taskId)
         hutil.set_event_logger(eventlogger)
@@ -611,14 +608,11 @@ def enable():
 
         hutil.save_seq()
 
-        #eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
-
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
-            #eventlogger.update_properties(para_parser.taskId)
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             randomSleepTime = random.randint(500, 5000)
             backup_logger.log('Sleeping for milliseconds: ' + str(randomSleepTime), True)
@@ -626,8 +620,6 @@ def enable():
             exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
             taskIdentity.save_identity(para_parser.taskId)
-
-        #hutil.set_event_logger(eventlogger)
             
         temp_status= 'success'
         temp_result=CommonVariables.ExtensionTempTerminalState
@@ -635,8 +627,6 @@ def enable():
         blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
 
         status_report_to_file(file_report_msg)
-
-        #eventlogger.dispose()
 
         start_daemon()
         sys.exit(0)
