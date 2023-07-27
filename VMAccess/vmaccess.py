@@ -371,6 +371,7 @@ def _allow_password_auth(hutil):
             _set_sshd_config(config, name, "yes")
             ext_utils.replace_file_with_contents_atomic(cloudInitConfigPath, "\n".join(config))
 
+
 def _backup_and_update_sshd_config(hutil, attr_name, attr_value):
     config = ext_utils.get_file_contents(SshdConfigPath).split("\n")
 
