@@ -79,12 +79,14 @@ class EventLogger:
     def trace_message_new(self, severity_level, message, *args):
         level = 0
         print("inside trace_message_new")
-        if (severity_level == "Info"):
+        if (severity_level == "Verbose"):
             level = 0
-        if (severity_level == "Warning"):
+        elif (severity_level == "Info"):
             level = 1
-        if(severity_level == "Error"):
+        elif (severity_level == "Warning"):
             level = 2
+        elif(severity_level == "Error"):
+            level = 3
 
         if self.event_logging_enabled and level >= self.log_severity_level:
             stringhelper = StringHelper()
@@ -151,7 +153,7 @@ class EventLogger:
             else:
                 return
         if not self.event_queue.empty():
-            event_file_path = os.path.join(self.temporary_directory, f"{int(datetime.datetime.utcnow().timestamp() * 10000000)}.json")
+            event_file_path = os.path.join(self.temporary_directory, f"{int(datetime.datetime.utcnow().timestamp() * 1000000000)}.json")
             with self._create_event_file(event_file_path) as file:
                 if file is None:
                     print("Warning: Could not create the event file in the path mentioned.")
