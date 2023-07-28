@@ -1427,7 +1427,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", 'ol', "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
+    rpm_set = set(["oracle", "ol", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1498,15 +1498,15 @@ def is_vm_supported_for_extension(operation):
                        'rhel' : ['7', '8', '9'], # Rhel
                        'centos' : ['7', '8'], # CentOS
                        'red hat' : ['7', '8', '9'], # Oracle, RHEL
-                       'oracle' : ['7', '8'], # Oracle
-                       'ol' : ['7', '8'], # Oracle Linux
+                       'oracle' : ['7', '8', '9'], # Oracle
+                       'ol' : ['7', '8', '9'], # Oracle Linux
                        'debian' : ['9', '10', '11'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12'], 'sles' : ['15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
                        'mariner' : ['2'], # Mariner 2.0
-                       'rocky' : ['8'], # Rocky
-                       'alma' : ['8'], # Alma
+                       'rocky' : ['8', '9'], # Rocky
+                       'alma' : ['8', '9'], # Alma
                        'opensuse' : ['15'], # openSUSE
                        'amzn' : ['2'] # Amazon Linux 2
     }
