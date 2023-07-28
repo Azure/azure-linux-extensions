@@ -161,7 +161,7 @@ def enable():
             hutil.log("Succeeded in check and open ssh port.")
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="reset-ssh")
             _reset_sshd_config(hutil, restore_backup_ssh)
-            hutil.log("Succeeded in resetting/restoring sshd_config.")
+            hutil.log("Succeeded in {0} sshd_config.".format("resetting" if reset_ssh else "restoring"))
 
         if remove_user:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="remove-user")
