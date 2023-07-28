@@ -160,7 +160,7 @@ def enable():
             _open_ssh_port()
             hutil.log("Succeeded in check and open ssh port.")
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="reset-ssh")
-            _reset_sshd_config(restore_backup_ssh)
+            _reset_sshd_config(hutil, restore_backup_ssh)
             hutil.log("Succeeded in resetting/restoring sshd_config.")
 
         if remove_user:
@@ -423,7 +423,7 @@ def _get_default_ssh_config_filename():
     return "default"
 
 
-def _reset_sshd_config(restore_backup_ssh):
+def _reset_sshd_config(hutil, restore_backup_ssh):
     ssh_default_config_filename = _get_default_ssh_config_filename()
     ssh_default_config_file_path = os.path.join(os.getcwd(), 'resources', ssh_default_config_filename)
 
@@ -479,6 +479,7 @@ def _reset_sshd_config(restore_backup_ssh):
     else:
         shutil.copyfile(ssh_default_config_file_path, SshdConfigPath)
         if ssh_default_config_file_path == backup_config_file_name:
+            hutil.log("sshd_config restored from backup, remove backup file.")
             # Remove backup config once sshd_config restored
             os.remove(ssh_default_config_file_path)
         MyDistro.restart_ssh_service()
