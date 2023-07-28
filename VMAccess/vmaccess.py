@@ -478,6 +478,9 @@ def _reset_sshd_config(restore_backup_ssh):
         os.remove(cfg_tempfile)
     else:
         shutil.copyfile(ssh_default_config_file_path, SshdConfigPath)
+        if ssh_default_config_file_path == backup_config_file_name:
+            # Remove backup config once sshd_config restored
+            os.remove(ssh_default_config_file_path)
         MyDistro.restart_ssh_service()
 
 
