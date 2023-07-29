@@ -77,6 +77,9 @@ def main():
         MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
         hutil.patching = MyPatching
         configSeqNo = -1
+        hutil.try_parse_context(configSeqNo)
+        eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
+        hutil.set_event_logger(eventlogger)
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
                 disable()
@@ -242,8 +245,6 @@ def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch, configSeqNo, eventlogger
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing', configSeqNo)
-
-    eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
 
     try:
         backup_logger.log('starting daemon initially', True)
@@ -576,7 +577,7 @@ def daemon():
     else:
         backup_logger.log("the logs blob uri is not there, so do not upload log.")
         backup_logger.commit_to_local()
-
+    
     eventlogger.dispose()
 
     sys.exit(0)
@@ -613,6 +614,8 @@ def enable():
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
+            eventlogger.update_properties(para_parser.taskId)
+            hutil.set_event_logger(eventlogger)
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             randomSleepTime = random.randint(500, 5000)
             backup_logger.log('Sleeping for milliseconds: ' + str(randomSleepTime), True)
@@ -627,6 +630,7 @@ def enable():
         blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
 
         status_report_to_file(file_report_msg)
+        eventlogger.dispose()
 
         start_daemon()
         sys.exit(0)

@@ -112,6 +112,7 @@ class HandlerUtility:
         self.severity_level = self.get_severity_level()
         self.event_dir = None
         self.eventlogger = None
+        self.operation = None
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -158,8 +159,6 @@ class HandlerUtility:
     def log(self, message,level='Info'):
         try:
             self.log_with_no_try_except(message, level)
-            if self.eventlogger != None:
-                self.eventlogger.trace_message_new(level, message)
         except IOError:
             pass
         except Exception as e:
@@ -176,6 +175,8 @@ class HandlerUtility:
             if sys.version_info > (3,):
                 if self.logging_file is not None:
                     self.log_py3(message)
+                    if self.eventlogger != None:
+                        self.eventlogger.trace_message_new(level, message)
                 else:
                     pass
             else:
