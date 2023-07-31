@@ -1224,6 +1224,29 @@ def generate_localsyslog_configs():
         if features is not None and "useSyslogTcp" in features:            
             useSyslogTcp = features.get("useSyslogTcp")    
     
+    # always use syslog tcp port, unless 
+    # - the distro is Red Hat based and doesn't have semanage
+    #   these distros seem to have SELinux on by default and we shouldn't be installing semanage ourselves
+    distro, version = find_vm_distro('Enable')
+    for name in ['ubuntu', 'debian']:
+        if distro.startswith(name):
+            useSyslogTcp = True      
+    
+    for name in ['suse', 'sles', 'opensuse']:
+        if distro.startswith(name):
+            useSyslogTcp = True   
+          
+    for name in ['centos', 'redhat', 'red hat', 'rhel', 'oracle', 'ol', 'cbl-mariner', 'mariner', 'rocky', 'alma', 'amzn']:
+        if distro.startswith(name):
+            path = shutil.which("semanage") 
+
+            if path is None:
+                hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
+            elif syslog_port != '':
+                # allow the syslog port in SELinux
+                run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
+                useSyslogTcp = True   
+        
     if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
