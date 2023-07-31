@@ -165,7 +165,6 @@ class HandlerUtility:
             try:
                 errMsg='Exception in hutil.log'
                 self.log_with_no_try_except(errMsg, 'Warning')
-                #self.log_with_no_try_except(e, 'Warning')
             except Exception as e:
                 pass
 
@@ -191,7 +190,6 @@ class HandlerUtility:
         try:
             with open(self.logging_file, "a+") as C :
                 C.write(msg)
-
         except IOError:
             pass
 
@@ -805,9 +803,9 @@ class HandlerUtility:
                     logging_level_input = json.load(file)
                     logging_level.__dict__.update(logging_level_input)
             else:
-                print("Logging level setting file is not present.")
-        except Exception as ex:
-            print(ex)
+                self.log("Logging level setting file is not present.")
+        except Exception as e:
+            self.log("error in fetching the severity of logs " + str(e))
         return logging_level.EventLogLevel
 
     @staticmethod

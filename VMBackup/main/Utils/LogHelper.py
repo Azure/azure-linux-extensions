@@ -9,7 +9,7 @@ class LoggingConstants:
     LogFileWriteRetryTime = 500  # milliseconds
     MaxAttemptsForEventFileCreationWriteMove = 3
     MinEventProcesingInterval = 10  # 10 seconds
-    ThreadSleepDuration = 10000  # 10 seconds
+    ThreadSleepDuration = 10  # 10 seconds
     MaxEventDirectorySize = 39981250  # ~= 39Mb
     MaxEventsPerRun = 300
     MaxMessageLenLimit = 2900  # 3072 to be precise

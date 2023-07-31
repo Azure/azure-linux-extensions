@@ -622,8 +622,7 @@ def enable():
             time.sleep(randomSleepTime / 1000)
             exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
-            taskIdentity.save_identity(para_parser.taskId)
-            
+            taskIdentity.save_identity(para_parser.taskId)       
         temp_status= 'success'
         temp_result=CommonVariables.ExtensionTempTerminalState
         temp_msg='Transitioning state in extension'
