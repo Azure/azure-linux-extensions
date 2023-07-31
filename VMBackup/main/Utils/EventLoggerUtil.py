@@ -66,19 +66,8 @@ class EventLogger:
     def update_properties(self, task_id):
         self.operation_id = task_id
 
-    def trace_message(self, message):
-        if self.event_logging_enabled:
-            self.trace_message_new("Info", message)
-
-    def trace_message_logs(self, message_logs):
-        if self.event_logging_enabled:
-            if message_logs:
-                for message_log in message_logs:
-                    self.trace_message("Verbose", message_log)
-
-    def trace_message_new(self, severity_level, message, *args):
+    def trace_message(self, severity_level, message, *args):
         level = 0
-        print("inside trace_message_new")
         if (severity_level == "Verbose"):
             level = 0
         elif (severity_level == "Info"):
@@ -123,7 +112,7 @@ class EventLogger:
                 self.current_message = message
                 self.current_message_len = len(message)
             else:
-                self.current_message += "\n" + message
+                self.current_message += message
                 self.current_message_len += len(message)
         except Exception as ex:
             print("Warning: Error adding extension event to queue. Exception: " + str(ex))
@@ -185,11 +174,6 @@ class EventLogger:
     @staticmethod
     def _write_events_to_event_file(file, events, event_file_path):
         data_list = []
-        '''while not events.empty():
-            data = events.get()
-            data_list.append(data)
-        json_data = json.dumps(data_list)
-        '''
         while not events.empty():
             data = events.get()
             data_list.append(data)

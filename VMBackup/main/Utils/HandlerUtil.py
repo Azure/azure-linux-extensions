@@ -176,7 +176,7 @@ class HandlerUtility:
                 if self.logging_file is not None:
                     self.log_py3(message)
                     if self.eventlogger != None:
-                        self.eventlogger.trace_message_new(level, message)
+                        self.eventlogger.trace_message(level, message)
                 else:
                     pass
             else:
