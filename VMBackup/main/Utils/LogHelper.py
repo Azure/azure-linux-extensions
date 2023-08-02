@@ -39,22 +39,22 @@ class FileHelpers:
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-                print(f"Information: Successfully deleted file: {file_path}")
+                print("Information: Successfully deleted file: {0}".format(file_path))
             except Exception as ex:
-                print(f"Warning: Failed to delete file {file_path}. Exception: {ex}")
+                print("Warning: Failed to delete file {0}. Exception: {1}".format(file_path, str(ex)))
         else:
-            print(f"Error: Attempted to delete non-existent file: {file_path}")
+            print("Error: Attempted to delete non-existent file: {0}".format(file_path))
 
     @staticmethod
     def deleteDirectory(directory_path):
         if os.path.exists(directory_path):
             try:
                 shutil.rmtree(directory_path)
-                print(f"Information: Successfully deleted directory: {directory_path}")
+                print("Information: Successfully deleted directory: {0}".format(directory_path))
             except Exception as ex:
-                print(f"Warning: Failed to delete directory {directory_path}. Exception: {ex}")
+                print("Warning: Failed to delete directory {0}. Exception: {1}".format(directory_path, str(ex)))
         else:
-            print(f"Error: Attempted to delete non-existent directory: {directory_path}")
+            print("Error: Attempted to delete non-existent directory: {0}".format(directory_path))
 
     @staticmethod
     def clearOldJsonFilesInDirectory(file_path):
@@ -71,10 +71,10 @@ class FileHelpers:
                             os.remove(file_path)
                             files_deleted += 1
                         except Exception as ex:
-                            print(f"Warning: Failed to delete old JSON file {file_path}. Exception: {ex}")
-            print(f"Information: Cleared {LoggingConstants.MaxDayAgeOfStaleFiles} day old JSON files in directory at path {file_path}, NumberOfFilesRemoved/NumberOfJSONFilesPresent = {files_deleted}/{len(files)}")
+                            print("Warning: Failed to delete old JSON file {0}. Exception: {1}".format(file_path))
+            print("Information: Cleared {0} day old JSON files in directory at path {1}, NumberOfFilesRemoved/NumberOfJSONFilesPresent = {2}/{3}".format(LoggingConstants.MaxDayAgeOfStaleFiles, file_path, files_deleted, len(files)))
         except Exception as ex:
-            print(f"Warning: Failed to delete old JSON files at path {file_path}. Exception: {str(ex)}")
+            print("Warning: Failed to delete old JSON files at path {0}. Exception: {1}".format(file_path, str(ex)))
 
     def execute_with_retries(max_attempts, delay, success_msg, retry_msg, err_msg, operation):
         attempts = 0
@@ -85,7 +85,7 @@ class FileHelpers:
                 return result
             except Exception as ex:
                 attempts += 1
-                print(f"Warning: {retry_msg}, Exception: {str(ex)}")
+                print("Warning: {0}, Exception: {1}".format(retry_msg, str(ex)))
                 if attempts < max_attempts:
                     time.sleep(delay)
     

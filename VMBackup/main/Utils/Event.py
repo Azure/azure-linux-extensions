@@ -8,7 +8,7 @@ class Event:
          Rest of the characters would be discarded from the messages
     '''
 
-    def __init__(self, level: str, message: str, task_name: str, operation_id: str, version: str):
+    def __init__(self, level, message, task_name, operation_id, version):
         self.version = version
         self.timestamp = datetime.utcnow().isoformat()
         self.task_name = task_name

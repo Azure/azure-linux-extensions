@@ -164,6 +164,7 @@ class HandlerUtility:
         except Exception as e:
             try:
                 errMsg='Exception in hutil.log'
+                self.log_with_no_try_except(e, 'Warning')
                 self.log_with_no_try_except(errMsg, 'Warning')
             except Exception as e:
                 pass
