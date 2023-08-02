@@ -76,7 +76,7 @@ class FileHelpers:
         except Exception as ex:
             print("Warning: Failed to delete old JSON files at path {0}. Exception: {1}".format(file_path, str(ex)))
 
-    def execute_with_retries(max_attempts, delay, success_msg, retry_msg, err_msg, operation):
+    def execute_with_retries(self, max_attempts, delay, success_msg, retry_msg, err_msg, operation):
         attempts = 0
         while attempts < max_attempts:
             try:

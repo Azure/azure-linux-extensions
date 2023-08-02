@@ -30,6 +30,7 @@ class EventLogger:
         self.event_logging_error_count = 0
         self.events_folder = event_directory
         self.event_logging_enabled = bool(self.events_folder)
+        self.filehelper = FileHelpers()
 
         if self.event_logging_enabled:
             self.extension_version = os.path.basename(os.getcwd())
@@ -91,7 +92,7 @@ class EventLogger:
                 
                 if message_len > message_max_len:
                     num_chunks = (message_len + message_max_len - 1) // message_max_len
-                    msg_date_time = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+                    msg_date_time = datetime.datetime.utcnow().strftime(u'%Y-%m-%dT%H:%M:%S.%fZ')
                     
                     for string_part in range(num_chunks):
                         start_index = string_part * message_max_len
@@ -147,7 +148,10 @@ class EventLogger:
             else:
                 return
         if not self.event_queue.empty():
-            event_file_path = os.path.join(self.temporary_directory, "{}.json".format(int(datetime.datetime.utcnow().timestamp() * 1000000000)))
+            if sys.version_info[0] == 2:
+                event_file_path = os.path.join(self.temporary_directory, "{}.json".format(int(time.time() * 1000000000)))
+            else:
+                event_file_path = os.path.join(self.temporary_directory, "{}.json".format(int(datetime.datetime.utcnow().timestamp() * 1000000000)))
             with self._create_event_file(event_file_path) as file:
                 if file is None:
                     print("Warning: Could not create the event file in the path mentioned.")
@@ -165,7 +169,7 @@ class EventLogger:
         retry_msg = "Failed to write events to file: %s. Retrying..." % event_file_path
         err_msg = "Failed to write events to file %s after %d attempts. No longer retrying. Events for this iteration will not be reported." % (event_file_path, LoggingConstants.MaxAttemptsForEventFileCreationWriteMove)
 
-        stream_writer = FileHelpers.execute_with_retries(
+        stream_writer = self.filehelper.execute_with_retries(
             LoggingConstants.MaxAttemptsForEventFileCreationWriteMove,
             LoggingConstants.ThreadSleepDuration,
             success_msg,
@@ -176,8 +180,7 @@ class EventLogger:
         
         return stream_writer
 
-    @staticmethod
-    def _write_events_to_event_file(file, events, event_file_path):
+    def _write_events_to_event_file(self, file, events, event_file_path):
         data_list = []
         while not events.empty():
             data = events.get()
@@ -191,7 +194,7 @@ class EventLogger:
         retry_msg = "Failed to write events to file: %s. Retrying..." % event_file_path
         err_msg = "Failed to write events to file %s after %d attempts. No longer retrying. Events for this iteration will not be reported." % (event_file_path, LoggingConstants.MaxAttemptsForEventFileCreationWriteMove)
 
-        FileHelpers.execute_with_retries(
+        self.filehelper.execute_with_retries(
             LoggingConstants.MaxAttemptsForEventFileCreationWriteMove,
             LoggingConstants.ThreadSleepDuration,
             success_msg,
@@ -200,8 +203,7 @@ class EventLogger:
             lambda: file.write(json_data)
         )
 
-    @staticmethod
-    def _send_event_file_to_event_directory(file_path, events_folder, space_available_in_event_directory):
+    def _send_event_file_to_event_directory(self, file_path, events_folder, space_available_in_event_directory):
         file_info = os.stat(file_path)
         file_size = file_info.st_size
 
@@ -211,7 +213,7 @@ class EventLogger:
             retry_msg = "Unable to move event file to event directory: %s. Retrying..." % file_path
             err_msg = "Unable to move event file to event directory: %s . No longer retrying. Events for this iteration will not be reported." % file_path
 
-            was_file_created = FileHelpers.execute_with_retries(
+            self.filehelper.execute_with_retries(
                 LoggingConstants.MaxAttemptsForEventFileCreationWriteMove,
                 LoggingConstants.ThreadSleepDuration,
                 success_msg,
@@ -220,13 +222,10 @@ class EventLogger:
                 lambda: shutil.move(file_path, new_path_for_event_file)
             )
 
-            if not was_file_created:
-                FileHelpers.delete_file(file_path)
-            else:
-                space_available_in_event_directory -= file_size
+            space_available_in_event_directory -= file_size
         else:
             space_available_in_event_directory = 0
-            FileHelpers.delete_file(file_path)
+            FileHelpers.deleteFile(file_path)
             print("Information: Event reporting has paused due to reaching maximum capacity in the Event directory. Reporting will resume once space is available. Events for this iteration will not be reported.")
 
     def dispose(self):
@@ -254,16 +253,4 @@ class EventLogger:
                 self.event_logging_enabled = False
         except Exception as ex:
             print("Warning: Processing Dispose() of EventLogger resulted in Exception: " + str(ex))
-    
-    @staticmethod
-    def delete_file(file_path):
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-                print("Information: Successfully deleted file: %s" % file_path)
-            except Exception as ex:
-                print("Warning: Failed to delete file %s. Exception: %s" % (file_path, str(ex)))
-        else:
-            print("Error: Attempted to delete non-existent file: %s" % file_path)
-
 

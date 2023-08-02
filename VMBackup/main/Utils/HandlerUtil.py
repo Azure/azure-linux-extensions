@@ -181,6 +181,8 @@ class HandlerUtility:
                     pass
             else:
                 self._log(self._get_log_prefix() + message)
+                if self.eventlogger != None:
+                    self.eventlogger.trace_message(level, message)
             message = "{0}  {1}  {2} \n".format(str(datetime.datetime.utcnow()) , level , message)
         self.log_message = self.log_message + message
 

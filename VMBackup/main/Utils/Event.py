@@ -1,6 +1,10 @@
 from datetime import datetime
 import os
-import threading
+import sys
+if sys.version_info[0] == 3:
+    import threading
+else:
+    import thread as threading
 
 class Event:
     '''
