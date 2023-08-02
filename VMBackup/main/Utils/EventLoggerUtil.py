@@ -96,7 +96,6 @@ class EventLogger:
                     for string_part in range(num_chunks):
                         start_index = string_part * message_max_len
                         length = min(message_max_len, message_len - start_index)
-                        #message_part = f'{msg_date_time} [{string_part + 1}/{num_chunks}] {message[start_index:start_index+length]}'
                         message_part = '%s [%d/%d] %s' % (msg_date_time, string_part + 1, num_chunks, message[start_index:start_index+length])
                         self.log_event(message_part)
                 else:
@@ -148,7 +147,6 @@ class EventLogger:
             else:
                 return
         if not self.event_queue.empty():
-            #event_file_path = os.path.join(self.temporary_directory, f"{int(datetime.datetime.utcnow().timestamp() * 1000000000)}.json")
             event_file_path = os.path.join(self.temporary_directory, "{}.json".format(int(datetime.datetime.utcnow().timestamp() * 1000000000)))
             with self._create_event_file(event_file_path) as file:
                 if file is None:
@@ -163,9 +161,6 @@ class EventLogger:
 
     def _create_event_file(self, event_file_path):
         print("Information: Attempting to create a new event file...")
-        #success_msg = f"Successfully created new event file: {event_file_path}"
-        #retry_msg = f"Failed to write events to file: {event_file_path}. Retrying..."
-        #err_msg = f"Failed to write events to file {event_file_path} after {LoggingConstants.MaxAttemptsForEventFileCreationWriteMove} attempts. No longer retrying. Events for this iteration will not be reported."
         success_msg = "Successfully created new event file: %s" % event_file_path
         retry_msg = "Failed to write events to file: %s. Retrying..." % event_file_path
         err_msg = "Failed to write events to file %s after %d attempts. No longer retrying. Events for this iteration will not be reported." % (event_file_path, LoggingConstants.MaxAttemptsForEventFileCreationWriteMove)
