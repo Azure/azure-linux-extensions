@@ -4,12 +4,15 @@ import sys
 if sys.version_info[0] == 3:
     import threading
 else:
+    # to make it compatible with python version less than 3
     import thread as threading
 
 class Event:
     '''
          The agent will only pick the first 3K - 3072 characters.
-         Rest of the characters would be discarded from the messages
+         Rest of the characters would be discarded from the messages.
+         To ensure this we Check the message length and divide them accordingly
+         into chunks of characters less than 3K.
     '''
 
     def __init__(self, level, message, task_name, operation_id, version):

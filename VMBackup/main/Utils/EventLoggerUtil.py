@@ -7,9 +7,10 @@ import time
 if sys.version_info[0] == 2:
     import Queue as queue
 else:
+    # if python version is > 3
     import queue
 import shutil
-from Utils.LogHelper import FileHelpers,LoggingConstants
+from Utils.LogHelper import FileHelpers,LoggingConstants,Severity
 from Utils.StringHelper import StringHelper
 from Utils.Event import Event
 
@@ -73,16 +74,8 @@ class EventLogger:
         self.operation_id = task_id
 
     def trace_message(self, severity_level, message, *args):
-        level = 0
-        if (severity_level == "Verbose"):
-            level = 0
-        elif (severity_level == "Info"):
-            level = 1
-        elif (severity_level == "Warning"):
-            level = 2
-        elif(severity_level == "Error"):
-            level = 3
-
+      
+        level = Severity[severity_level].value
         if self.event_logging_enabled and level >= self.log_severity_level:
             stringhelper = StringHelper()
             message = stringhelper.resolve_string(severity_level, message)

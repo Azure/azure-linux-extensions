@@ -80,7 +80,7 @@ import subprocess
 import datetime
 import Utils.Status
 from Utils.EventLoggerUtil import EventLogger
-from Utils.LogHelper import LoggingLevel,LoggingConstants
+from Utils.LogHelper import LoggingLevel, LoggingConstants
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -163,8 +163,7 @@ class HandlerUtility:
             pass
         except Exception as e:
             try:
-                errMsg='Exception in hutil.log'
-                self.log_with_no_try_except(e, 'Warning')
+                errMsg = str(e) + 'Exception in hutil.log'
                 self.log_with_no_try_except(errMsg, 'Warning')
             except Exception as e:
                 pass

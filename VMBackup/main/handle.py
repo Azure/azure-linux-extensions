@@ -324,7 +324,7 @@ def daemon():
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             eventlogger.update_properties(para_parser.taskId)
-        hutil.set_event_logger(eventlogger)
+            hutil.set_event_logger(eventlogger)
 
         if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
@@ -577,7 +577,6 @@ def daemon():
     else:
         backup_logger.log("the logs blob uri is not there, so do not upload log.")
         backup_logger.commit_to_local()
-    
     eventlogger.dispose()
 
     sys.exit(0)
@@ -629,8 +628,6 @@ def enable():
         blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
 
         status_report_to_file(file_report_msg)
-        eventlogger.dispose()
-
         start_daemon()
         sys.exit(0)
     except Exception as e:
@@ -643,6 +640,8 @@ def enable():
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
         error_msg = 'Failed to call the daemon'
         exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+    finally:
+        eventlogger.dispose()
 
 def thread_for_log_upload():
     global para_parser,backup_logger
