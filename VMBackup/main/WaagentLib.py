@@ -2255,18 +2255,21 @@ def RunGetOutput(cmd, chk_err=True, log_cmd=True):
         LogIfVerbose(cmd)
     try:
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
+        if isinstance(output, bytes):
+            output = output.decode('latin-1')
     except subprocess.CalledProcessError as e:
         if chk_err and log_cmd:
             Error('CalledProcessError.  Error Code is ' + str(e.returncode))
             Error('CalledProcessError.  Command string was ' + e.cmd)
-            Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
+            if isinstance(e.output[:-1], bytes):
+                Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
+            else:
+                Error('CalledProcessError.  Command result was ' + (e.output[:-1]))
         if isinstance(e.output, bytes):
             return_value = e.output.decode('latin-1')
         else:
             return_value = e.output
         return e.returncode, return_value
-    if isinstance(output, bytes):
-        output = output.decode('latin-1')
     
     return 0, output
 
