@@ -4,6 +4,7 @@ import json
 import sys
 import datetime
 import time
+import uuid
 if sys.version_info[0] == 2:
     import Queue as queue
 else:
@@ -35,7 +36,7 @@ class EventLogger:
 
         if self.event_logging_enabled:
             self.extension_version = os.path.basename(os.getcwd())
-            self.operation_id = ''
+            self.operation_id = uuid.UUID(int=0)
             self.log_severity_level = severity_level
             print("Information: EventLogging severity level setting is ",self.log_severity_level)
 			# creating a temp directory
