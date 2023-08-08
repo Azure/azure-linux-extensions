@@ -1230,7 +1230,7 @@ def generate_localsyslog_configs():
     if not os.path.exists('/etc/selinux/config'):
         useSyslogTcp = True
     else:        
-        sedisabled = run_command_and_log('getenforce | grep -i "Disabled"')
+        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"')
         if sedisabled == 0:
             useSyslogTcp = True
         else:
