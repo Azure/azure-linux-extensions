@@ -835,4 +835,3 @@ class ComplexEncoder(json.JSONEncoder):
             return obj.convertToDictionary()
         else:
             return obj.__dict__
-

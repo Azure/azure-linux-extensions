@@ -20,11 +20,10 @@ class EventLogger:
     _lock = threading.Lock()
     
     
-    def __init__(self, log, event_directory, severity_level):
+    def __init__(self, event_directory, severity_level):
         self.temporary_directory = os.path.join(event_directory, 'Temp')
         self.space_available_in_event_directory = 0
         self.event_processing_interval = 0
-        self.logger = log
         self.disposed = False
         self.event_processing_task = None  
         self.current_message_len = 0
@@ -63,18 +62,18 @@ class EventLogger:
             print("Warning: EventsFolder parameter is empty. Guest Agent does not support event logging.")
             
     @staticmethod
-    def GetInstance(log, event_directory, severity_level):
+    def GetInstance(event_directory, severity_level):
         if EventLogger._instance is None:
             with EventLogger._lock:
                 if EventLogger._instance is None:
 
-                    EventLogger._instance = EventLogger(log, event_directory, severity_level)
+                    EventLogger._instance = EventLogger(event_directory, severity_level)
         return EventLogger._instance
         
     def update_properties(self, task_id):
         self.operation_id = task_id
 
-    def trace_message(self, severity_level, message, *args):
+    def trace_message(self, severity_level, message):
       
         level = Severity[severity_level].value
         if self.event_logging_enabled and level >= self.log_severity_level:
@@ -247,4 +246,3 @@ class EventLogger:
                 self.event_logging_enabled = False
         except Exception as ex:
             print("Warning: Processing Dispose() of EventLogger resulted in Exception: " + str(ex))
-

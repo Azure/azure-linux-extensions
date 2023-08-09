@@ -7,5 +7,3 @@ class StringHelper:
             msg_body += message + " "
         msg_body += "\n"
         return msg_body
-
-    

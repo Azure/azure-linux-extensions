@@ -78,8 +78,7 @@ def main():
         hutil.patching = MyPatching
         configSeqNo = -1
         hutil.try_parse_context(configSeqNo)
-        eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
-        hutil.set_event_logger(eventlogger)
+        eventlogger = EventLogger.GetInstance(hutil.event_dir, hutil.severity_level)
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
                 disable()
@@ -245,7 +244,7 @@ def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch, configSeqNo, eventlogger
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing', configSeqNo)
-
+    hutil.set_event_logger(eventlogger)
     try:
         backup_logger.log('starting daemon initially', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
@@ -324,7 +323,7 @@ def daemon():
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             eventlogger.update_properties(para_parser.taskId)
-            hutil.set_event_logger(eventlogger)
+        #hutil.set_event_logger(eventlogger)
 
         if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
@@ -599,7 +598,7 @@ def update():
 def enable():
     global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo,eventlogger
     try:
-
+        hutil.set_event_logger(eventlogger)
         hutil.do_parse_context('Enable', configSeqNo)
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
@@ -614,7 +613,6 @@ def enable():
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             eventlogger.update_properties(para_parser.taskId)
-            hutil.set_event_logger(eventlogger)
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             randomSleepTime = random.randint(500, 5000)
             backup_logger.log('Sleeping for milliseconds: ' + str(randomSleepTime), True)
@@ -628,6 +626,7 @@ def enable():
         blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
 
         status_report_to_file(file_report_msg)
+        eventlogger.dispose()
         start_daemon()
         sys.exit(0)
     except Exception as e:
@@ -640,8 +639,6 @@ def enable():
         hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.error)
         error_msg = 'Failed to call the daemon'
         exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
-    finally:
-        eventlogger.dispose()
 
 def thread_for_log_upload():
     global para_parser,backup_logger
