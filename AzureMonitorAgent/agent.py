@@ -351,7 +351,7 @@ def install():
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
     if exit_code == 0:
         vm_dist, _ = find_vm_distro('Install')
-        if vm_dist.startswith('suse'):
+        if (vm_dist.startswith('suse') or vm_dist.startswith('sles')):
             try:
                 suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
                 if suse_exit_code != 0:
@@ -1520,7 +1520,7 @@ def is_vm_supported_for_extension(operation):
                        'ol' : ['7', '8', '9'], # Oracle Linux
                        'debian' : ['9', '10', '11'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'], # SLES
+                       'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
                        'mariner' : ['2'], # Mariner 2.0
                        'rocky' : ['8', '9'], # Rocky
