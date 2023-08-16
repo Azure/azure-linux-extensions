@@ -12,6 +12,28 @@
       "reportHeartbeat": false,
       "updateMode": "UpdateWithInstall",
       "continueOnUpdateFailure": "true"
+    },
+    "resourceLimits": {
+      "services": [
+        {
+          "name": "azuremonitoragent"
+        },
+        {
+          "name": "azuremonitoragentmgr"
+        },
+        {
+          "name": "azuremonitor-agentlauncher"
+        },
+        {
+          "name": "azuremonitor-coreagent"
+        },
+        {
+          "name": "metrics-extension"
+        },
+        {
+          "name": "metrics-sourcer"
+        }
+      ]
     }
   }
 ]
