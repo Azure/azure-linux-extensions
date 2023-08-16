@@ -33,8 +33,8 @@ cp -r  ../LAD-AMA-Common/telegraf_utils .
 cp -r  ../Diagnostic/services .
 
 # cleanup packages, ext
-rm -rf packages MetricsExtensionBin ext/future amaCoreAgentBin agentLauncherBin
-mkdir -p packages MetricsExtensionBin ext/future amaCoreAgentBin agentLauncherBin
+rm -rf packages MetricsExtensionBin amaCoreAgentBin agentLauncherBin
+mkdir -p packages MetricsExtensionBin amaCoreAgentBin agentLauncherBin
 
 # copy shell bundle to packages/
 cp $input_path/azuremonitoragent_$AGENT_VERSION* packages/
@@ -43,8 +43,6 @@ cp $input_path/MetricsExtension* MetricsExtensionBin/
 cp $input_path/amacoreagent amaCoreAgentBin/
 cp $input_path/agentlauncher agentLauncherBin/
 
-# copy just the source of python-future
-cp -r ext/python-future/src/* ext/future
 
 # make the shim.sh file executable
 chmod +x shim.sh
@@ -59,7 +57,7 @@ fi
 
 echo "Packaging extension $PACKAGE_NAME to $output_path"
 excluded_files="agent.version packaging.sh apply_version.sh update_version.sh"
-zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./ext/python-future/*" "./ext/future/future/backports/test/*"
+zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references"
 
 # cleanup newly added dir or files
 rm -rf Utils/ waagent

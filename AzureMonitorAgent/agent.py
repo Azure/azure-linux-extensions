@@ -16,15 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
 import sys
-# future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
-if sys.version_info[0] < 3:
-    from future import standard_library
-    standard_library.install_aliases()
-    from builtins import str
-
 import os
 import os.path
 import datetime
@@ -41,7 +33,6 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib.request, urllib.parse, urllib.error
 import shutil
 import crypt
 import xml.dom.minidom
@@ -58,6 +49,16 @@ import telegraf_utils.telegraf_config_handler as telhandler
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
 import metrics_ext_utils.metrics_common_utils as metrics_utils
+
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+    from urllib.parse import urlparse
+    import urllib.error as urlerror
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    from urlparse import urlparse
+    import urllib2 as urlerror
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -1669,20 +1670,20 @@ def get_azure_environment_and_region():
     Retreive the Azure environment and region from Azure or Arc IMDS
     """
     imds_endpoint = get_imds_endpoint()
-    req = urllib.request.Request(imds_endpoint)
+    req = urllib.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     environment = region = None
 
     try:
-        response = json.loads(urllib.request.urlopen(req).read())
+        response = json.loads(urllib.urlopen(req).read())
 
         if ('compute' in response):
             if ('azEnvironment' in response['compute']):
                 environment = response['compute']['azEnvironment']
             if ('location' in response['compute']):
                 region = response['compute']['location'].lower()
-    except urllib.error.HTTPError as e:
+    except urllib.HTTPError as e:
         hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
         hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
     except:
