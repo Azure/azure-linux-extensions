@@ -577,7 +577,7 @@ def daemon():
     else:
         backup_logger.log("the logs blob uri is not there, so do not upload log.")
         backup_logger.commit_to_local()
-        if(eventlogger is not None) 
+        if(eventlogger is not None): 
             eventlogger.dispose()
 
     sys.exit(0)
