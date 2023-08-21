@@ -749,13 +749,15 @@ def enable():
         existing_passphrase_file = None
         existing_volume_type = None
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
-        if encryption_config.config_file_exists():
-            existing_volume_type = encryption_config.get_volume_type()
         #log to capture lsblk before encryption view.
         disk_util.log_lsblk_output()
-        if public_settings.get(CommonVariables.EncryptionEncryptionOperationKey) == CommonVariables.EnableEncryptionFormatAll:
-            #in case of stop start unmount /mnt to avoid resource disk encryption issues.
-            disk_util.umount('/mnt')
+        if encryption_config.config_file_exists():
+            existing_volume_type = encryption_config.get_volume_type()
+            if public_settings.get(CommonVariables.EncryptionEncryptionOperationKey) == CommonVariables.EnableEncryptionFormatAll:
+                #in case of stop start unmount /mnt to avoid resource disk encryption issues.
+                #dont unmount for reimage cases.
+                disk_util.umount('/mnt')
+
         is_migrate_operation = False
         if CommonVariables.MigrateKey in public_settings:
             if public_settings.get(CommonVariables.MigrateKey) == CommonVariables.MigrateValue:
