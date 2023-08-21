@@ -62,12 +62,15 @@ class EventLogger:
             print("Warning: EventsFolder parameter is empty. Guest Agent does not support event logging.")
             
     @staticmethod
-    def GetInstance(event_directory, severity_level):
-        if EventLogger._instance is None:
-            with EventLogger._lock:
-                if EventLogger._instance is None:
-
-                    EventLogger._instance = EventLogger(event_directory, severity_level)
+    def GetInstance(self, backup_logger, event_directory, severity_level):
+        try:
+            self.logger = backup_logger
+            if EventLogger._instance is None:
+                with EventLogger._lock:
+                    if EventLogger._instance is None:
+                        EventLogger._instance = EventLogger(event_directory, severity_level)
+        except Exception as e:
+            self.logger.log("Exception has occurred {0}".format(str(e)))
         return EventLogger._instance
         
     def update_properties(self, task_id):

@@ -78,7 +78,7 @@ def main():
         hutil.patching = MyPatching
         configSeqNo = -1
         hutil.try_parse_context(configSeqNo)
-        eventlogger = EventLogger.GetInstance(hutil.event_dir, hutil.severity_level)
+        eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
         hutil.set_event_logger(eventlogger)
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
@@ -322,7 +322,7 @@ def daemon():
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
         hutil.update_settings_file()
 
-        if(para_parser.taskId is not None and para_parser.taskId != ""):
+        if(para_parser.taskId is not None and para_parser.taskId != "" and eventlogger is not None):
             eventlogger.update_properties(para_parser.taskId)
         hutil.set_event_logger(eventlogger)
 
@@ -576,8 +576,9 @@ def daemon():
         backup_logger.commit(para_parser.logsBlobUri)
     else:
         backup_logger.log("the logs blob uri is not there, so do not upload log.")
-        backup_logger.commit_to_local() 
-    eventlogger.dispose()
+        backup_logger.commit_to_local()
+        if(eventlogger is not None) 
+            eventlogger.dispose()
 
     sys.exit(0)
 
@@ -612,7 +613,8 @@ def enable():
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
-            eventlogger.update_properties(para_parser.taskId)
+            if(eventlogger is not None):
+                eventlogger.update_properties(para_parser.taskId)
             hutil.set_event_logger(eventlogger)
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             randomSleepTime = random.randint(500, 5000)
@@ -627,7 +629,8 @@ def enable():
         blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
 
         status_report_to_file(file_report_msg)
-        eventlogger.dispose()
+        if(eventlogger is not None):
+            eventlogger.dispose()
         start_daemon()
         sys.exit(0)
     except Exception as e:
