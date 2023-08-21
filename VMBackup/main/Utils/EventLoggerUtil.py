@@ -11,7 +11,7 @@ else:
     # if python version is > 3
     import queue
 import shutil
-from Utils.LogHelper import FileHelpers,LoggingConstants
+from Utils.LogHelper import FileHelpers,LoggingConstants,Severity
 from Utils.StringHelper import StringHelper
 from Utils.Event import Event
 
@@ -75,14 +75,7 @@ class EventLogger:
 
     def severity(self, severity_level):
         level = 0
-        if (severity_level == "Verbose"):
-            level = 0
-        elif (severity_level == "Info"):
-            level = 1
-        elif (severity_level == "Warning"):
-            level = 2
-        elif(severity_level == "Error"):
-            level = 3
+        level = Severity[severity_level].value
         return level
 
     def trace_message(self, severity_level, message):
