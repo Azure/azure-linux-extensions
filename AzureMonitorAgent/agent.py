@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import sys
 import os
 import os.path
@@ -1683,7 +1684,7 @@ def get_azure_environment_and_region():
                 environment = response['compute']['azEnvironment']
             if ('location' in response['compute']):
                 region = response['compute']['location'].lower()
-    except urllib.HTTPError as e:
+    except urlerror.HTTPError as e:
         hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
         hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
     except:

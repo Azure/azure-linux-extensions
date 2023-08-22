@@ -625,7 +625,7 @@ def setup_me(is_lad, HUtilObj=None):
 
         res = urllib.urlopen(req)
 
-    except urllib.HTTPError as e:
+    except urlerror.HTTPError as e:
         err_res = e.headers["WWW-Authenticate"]
         for line in err_res.split(","):
                 if "Bearer authorization_uri" in line:
