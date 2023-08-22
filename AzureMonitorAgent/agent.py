@@ -1233,9 +1233,9 @@ def generate_localsyslog_configs():
         sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"')
         if sedisabled == 0:
             useSyslogTcp = True
-        else:
-            path = shutil.which("semanage") 
-            if path is None:
+        else:            
+            check_semanage, _ = run_command_and_log("which semanage")
+            if check_semanage != 0:            
                 hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
             elif syslog_port != '':
                 # allow the syslog port in SELinux
