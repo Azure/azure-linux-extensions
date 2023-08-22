@@ -61,7 +61,7 @@ from workloadPatch import WorkloadPatch
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro, configSeqNo, eventlogger
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro, configSeqNo, eventlogger, disable_event_logging
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -78,7 +78,11 @@ def main():
         hutil.patching = MyPatching
         configSeqNo = -1
         hutil.try_parse_context(configSeqNo)
-        eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
+        disable_event_logging = hutil.get_intvalue_from_configfile("disable_logging", 0)
+        if disable_event_logging == 0:
+            eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
+        else:
+            eventlogger = None
         hutil.set_event_logger(eventlogger)
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
@@ -598,12 +602,13 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
-    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo,eventlogger
+    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo,eventlogger,disable_event_logging
     try:
         hutil.do_parse_context('Enable', configSeqNo)
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
-
+        if(disable_event_logging != 0):
+            backup_logger.log("logging via guest agent is turned off")
         hutil.exit_if_same_seq()
 
         hutil.save_seq()

@@ -21,6 +21,7 @@ class EventLogger:
     
     
     def __init__(self, event_directory, severity_level):
+        global logger
         self.temporary_directory = os.path.join(event_directory, 'Temp')
         self.space_available_in_event_directory = 0
         self.event_processing_interval = 0
@@ -37,8 +38,8 @@ class EventLogger:
             self.extension_version = os.path.basename(os.getcwd())
             self.operation_id = uuid.UUID(int=0)
             self.log_severity_level = severity_level
-            print("Information: EventLogging severity level setting is ",self.log_severity_level)
-			# creating a temp directory
+            logger.log("Information: EventLogging severity level setting is {0}".format(self.log_severity_level))
+            # creating a temp directory
             if not os.path.exists(self.temporary_directory):
                 os.makedirs(self.temporary_directory)
             FileHelpers.clearOldJsonFilesInDirectory(self.temporary_directory)
@@ -48,8 +49,7 @@ class EventLogger:
             self.event_processing_signal = threading.Event() # an event object that runs continuously until signal is set
             self.current_message = ''
             self.event_queue = queue.Queue()
-            
-			
+            			
             space_available = LoggingConstants.MaxEventDirectorySize - FileHelpers.getSizeOfDir(self.events_folder)
             self.space_available_in_event_directory = max(0, space_available)
             print("Information: Space available in event directory : %sB" %(self.space_available_in_event_directory))
@@ -59,18 +59,19 @@ class EventLogger:
             
             self.begin_event_queue_polling()
         else:
-            print("Warning: EventsFolder parameter is empty. Guest Agent does not support event logging.")
+            logger.log("Warning: EventsFolder parameter is empty. Guest Agent does not support event logging.")
             
     @staticmethod
-    def GetInstance(self, backup_logger, event_directory, severity_level):
+    def GetInstance(backup_logger, event_directory, severity_level):
+        global logger
         try:
-            self.logger = backup_logger
+            logger = backup_logger
             if EventLogger._instance is None:
                 with EventLogger._lock:
                     if EventLogger._instance is None:
                         EventLogger._instance = EventLogger(event_directory, severity_level)
         except Exception as e:
-            self.logger.log("Exception has occurred {0}".format(str(e)))
+            logger.log("Exception has occurred {0}".format(str(e)))
         return EventLogger._instance
         
     def update_properties(self, task_id):
@@ -82,7 +83,7 @@ class EventLogger:
         return level
 
     def trace_message(self, severity_level, message):
-      
+        global logger
         level = self.severity(severity_level)
         if self.event_logging_enabled and level >= self.log_severity_level:
             stringhelper = StringHelper()
@@ -106,10 +107,11 @@ class EventLogger:
                 self.event_logging_error_count += 1
                 if self.event_logging_error_count > 10:
                     self.event_logging_enabled = False
-                    print("Warning: Count(EventLoggingErrors) > 10. Disabling eventLogging. Continue with execution")
-                    print("Exception: %s" %(str(ex)))
+                    logger.log("Warning: Count(EventLoggingErrors) > 10. Disabling eventLogging. Continue with execution")
+                    logger.log("Exception: {0}" .format(str(ex)))
 
     def log_event(self, message):
+        global logger
         try:
             if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
                 self.event_queue.put(Event("Info",
@@ -122,47 +124,53 @@ class EventLogger:
                 self.current_message += message
                 self.current_message_len += len(message)
         except Exception as ex:
-            print("Warning: Error adding extension event to queue. Exception: " + str(ex))
+            logger.log("Warning: Error adding extension event to queue. Exception: {0}" .format(str(ex)))
 
     def begin_event_queue_polling(self):
+        global logger
         print("Event polling is starting...")
-        self.event_processing_task = threading.Thread(target=self._event_processing_loop)
-        self.event_processing_task.start()
-        
+        try:
+            self.event_processing_task = threading.Thread(target=self._event_processing_loop)
+            self.event_processing_task.start()
+        except Exception as e:
+            logger.log("Exception in begin_event_queue_polling {0}".format(str(e)))
 
     def _event_processing_loop(self):
+        global logger
         while not self.event_processing_signal.wait(self.event_processing_interval):
             try:
                 self._process_events()
             except Exception as ex:
-                print("Warning: Event processing has failed. Exception: " + str(ex))
+                logger.log("Warning: Event processing has failed. Exception: {0}" .format(str(ex)))
         print("Information: Exiting function polling...")
 
     def _process_events(self):
-        print("in process event")
-        if self.space_available_in_event_directory == 0:
-            # There is no space available in the events directory then a check is made to see if space has been
-            # created (no files). If there is space available we reset our flags and proceed with processing.
-            if not os.listdir(self.events_folder):
-                self.space_available_in_event_directory = LoggingConstants.MaxEventDirectorySize
-                print("Information: Event directory has space for new event files. Resuming event reporting.")
-            else:
-                return
-        if not self.event_queue.empty():
-            if sys.version_info[0] == 2:
-                event_file_path = os.path.join(self.temporary_directory, "{}.json".format(int(time.time() * 1000000000)))
-            else:
-                event_file_path = os.path.join(self.temporary_directory, "{}.json".format(int(datetime.datetime.utcnow().timestamp() * 1000000000)))
-            with self._create_event_file(event_file_path) as file:
-                if file is None:
-                    print("Warning: Could not create the event file in the path mentioned.")
+        global logger
+        try:
+            if self.space_available_in_event_directory == 0:
+                # There is no space available in the events directory then a check is made to see if space has been
+                # created (no files). If there is space available we reset our flags and proceed with processing.
+                if not os.listdir(self.events_folder):
+                    self.space_available_in_event_directory = LoggingConstants.MaxEventDirectorySize
+                    logger.log("Event directory has space for new event files. Resuming event reporting.")
+                else:
                     return
-                print("Information: Clearing out event queue for processing...")
-                old_queue = self.event_queue
-                self.event_queue = queue.Queue()
-                self._write_events_to_event_file(file, old_queue, event_file_path)
-
-            self._send_event_file_to_event_directory(event_file_path, self.events_folder, self.space_available_in_event_directory)
+            if not self.event_queue.empty():
+                if sys.version_info[0] == 2:
+                    event_file_path = os.path.join(self.temporary_directory, "{}.json".format(int(time.time() * 1000000000)))
+                else:
+                    event_file_path = os.path.join(self.temporary_directory, "{}.json".format(int(datetime.datetime.utcnow().timestamp() * 1000000000)))
+                with self._create_event_file(event_file_path) as file:
+                    if file is None:
+                        logger.log("Warning: Could not create the event file in the path mentioned.")
+                        return
+                    logger.log("Clearing out event queue for processing...")
+                    old_queue = self.event_queue
+                    self.event_queue = queue.Queue()
+                    self._write_events_to_event_file(file, old_queue, event_file_path)
+                self._send_event_file_to_event_directory(event_file_path, self.events_folder, self.space_available_in_event_directory)
+        except Exception as e:
+            logger.log("Exception occurred in _process_events {0}".format(str(e)))
 
     def _create_event_file(self, event_file_path):
         print("Information: Attempting to create a new event file...")
@@ -248,9 +256,9 @@ class EventLogger:
                             self.current_message = ''
                             self.dispose()
                         except Exception as ex:
-                            print("Warning: Unable to process events before termination of extension. Exception: " + str(ex))
+                            logger.log("Warning: Unable to process events before termination of extension. Exception: {0}" .format(str(ex)))
                 self.disposed = True
                 print("Information: Event Logger has terminated")
                 self.event_logging_enabled = False
         except Exception as ex:
-            print("Warning: Processing Dispose() of EventLogger resulted in Exception: " + str(ex))
+            logger.log("Warning: Processing Dispose() of EventLogger resulted in Exception: {0}" .format(str(ex)))

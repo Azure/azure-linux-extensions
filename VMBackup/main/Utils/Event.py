@@ -26,4 +26,4 @@ class Event:
         self.operation_id = operation_id
     
     def convertToDictionary(self):
-        return dict(Version = self.version, Timestamp = self.timestamp, TaskName = self.task_name, EventLevel = self.event_level, Message = self.message, EventPid = self.event_pid, EventTid = self.event_tid, OperationId = self.operation_id)
+        return dict(Version = self.version, Timestamp = self.timestamp, TaskName = self.task_name, EventLevel = self.event_level, Message = self.message, EventPid = self.event_pid, EventTid = self.event_tid, OperationId = str(self.operation_id))
