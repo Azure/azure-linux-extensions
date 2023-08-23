@@ -113,6 +113,7 @@ MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricC
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
 AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
+PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/previewFeatures/'
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
 SupportedArch = set(['x86_64', 'aarch64'])
@@ -1219,10 +1220,9 @@ def generate_localsyslog_configs():
         f.close()
         
     useSyslogTcp = False
-    if public_settings is not None and "previewFeatures" in public_settings:
-        features = public_settings.get("previewFeatures")
-        if features is not None and "useSyslogTcp" in features:            
-            useSyslogTcp = features.get("useSyslogTcp")    
+    syslogTcpPreviewFlagPath = PreviewFeaturesDirectory + 'useSyslogTcp'
+    if os.path.exists(syslogTcpPreviewFlagPath):
+        useSyslogTcp = True
     
     # always use syslog tcp port, unless 
     # - the distro is Red Hat based and doesn't have semanage
@@ -1419,7 +1419,11 @@ def set_os_arch(operation):
 
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
-
+        
+        dynamicSSLPreviewFlagPath = PreviewFeaturesDirectory + 'useDynamicSSL'
+        if os.path.exists(dynamicSSLPreviewFlagPath):
+            BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
+        
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
