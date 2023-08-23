@@ -154,6 +154,7 @@ class EventLogger:
                     self.space_available_in_event_directory = LoggingConstants.MaxEventDirectorySize
                     logger.log("Event directory has space for new event files. Resuming event reporting.")
                 else:
+                    self.event_queue = queue.Queue()
                     return
             if not self.event_queue.empty():
                 if sys.version_info[0] == 2:
@@ -164,11 +165,11 @@ class EventLogger:
                     if file is None:
                         logger.log("Warning: Could not create the event file in the path mentioned.")
                         return
-                    logger.log("Clearing out event queue for processing...")
+                    print("Clearing out event queue for processing...")
                     old_queue = self.event_queue
                     self.event_queue = queue.Queue()
                     self._write_events_to_event_file(file, old_queue, event_file_path)
-                self._send_event_file_to_event_directory(event_file_path, self.events_folder, self.space_available_in_event_directory)
+                self._send_event_file_to_event_directory(event_file_path, self.events_folder)
         except Exception as e:
             logger.log("Exception occurred in _process_events {0}".format(str(e)))
 
@@ -212,11 +213,11 @@ class EventLogger:
             lambda: file.write(json_data)
         )
 
-    def _send_event_file_to_event_directory(self, file_path, events_folder, space_available_in_event_directory):
+    def _send_event_file_to_event_directory(self, file_path, events_folder):
         file_info = os.stat(file_path)
         file_size = file_info.st_size
 
-        if space_available_in_event_directory - file_size >= 0:
+        if self.space_available_in_event_directory - file_size >= 0:
             new_path_for_event_file = os.path.join(events_folder, os.path.basename(file_path))
             success_msg = "Successfully moved event file to event directory: %s" % new_path_for_event_file
             retry_msg = "Unable to move event file to event directory: %s. Retrying..." % file_path
@@ -231,9 +232,9 @@ class EventLogger:
                 lambda: shutil.move(file_path, new_path_for_event_file)
             )
 
-            space_available_in_event_directory -= file_size
+            self.space_available_in_event_directory -= file_size
         else:
-            space_available_in_event_directory = 0
+            self.space_available_in_event_directory = 0
             FileHelpers.deleteFile(file_path)
             print("Information: Event reporting has paused due to reaching maximum capacity in the Event directory. Reporting will resume once space is available. Events for this iteration will not be reported.")
 
@@ -242,6 +243,7 @@ class EventLogger:
         self._dispose(True)
 
     def _dispose(self, disposing):
+        global logger
         try:
             if not self.disposed:
                 if disposing and self.event_logging_enabled:
