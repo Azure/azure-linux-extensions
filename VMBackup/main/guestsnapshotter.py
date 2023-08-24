@@ -96,7 +96,6 @@ class GuestSnapshotter(object):
                         headers["x-ms-meta-" + key] = value
                 if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
                     self.logger.log("Not passing the TTL header via Guest path though it is enabled")
-                    #headers[CommonVariables.snapshotTtlHeader] = '0'
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
@@ -153,7 +152,6 @@ class GuestSnapshotter(object):
                         headers["x-ms-meta-" + key] = value
                 if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
                     self.logger.log("Not passing the TTL header via Guest path though it is enabled")
-                    #headers[CommonVariables.snapshotTtlHeader] = '0'
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
