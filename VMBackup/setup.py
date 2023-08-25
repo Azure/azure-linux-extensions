@@ -138,7 +138,6 @@ while(process_wait_time >0 and chil.poll() is None):
 os.chdir(cur_dir)
 
 
-
 """
 setup script, to package the files up
 """
