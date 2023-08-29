@@ -8,6 +8,11 @@ from helpers           import general_info, is_metrics_configured, find_dcr_work
 from .check_endpts     import check_internet_connect, check_ama_endpts
 from .check_imds       import check_imds_api
 
+try:
+    FileNotFoundError
+except NameError:
+    FileNotFoundError = IOError
+
 def check_parameters():
     global general_info
     try:
