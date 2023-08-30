@@ -56,6 +56,7 @@ from PluginHost import PluginHost
 from PluginHost import PluginHostResult
 import platform
 from workloadPatch import WorkloadPatch
+from signal import SIGTERM;
 
 #Main function is the only entrence to this extension handler
 
@@ -236,6 +237,23 @@ def can_take_crash_consistent_snapshot(para_parser):
         backup_logger.log("isManagedVm=" + str(isManagedVm) + ", canTakeCrashConsistentSnapshot=" + str(canTakeCrashConsistentSnapshot) + ", backupRetryCount=" + str(backupRetryCount) + ", numberOfDisks=" + str(numberOfDisks) + ", takeCrashConsistentSnapshot=" + str(takeCrashConsistentSnapshot), True, 'Info')
     return takeCrashConsistentSnapshot
 
+def spawn_monitor(strace_pid = 0):
+    d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    d = os.path.join(d, "debughelper")
+    bd = os.path.join(d, "msft_snap_monit")
+    try:
+        args = [bd, "--wd", d]
+        if (strace_pid > 0):
+            args = [bd, "--wd", d, "--strace", "--tracepid", str(strace_pid)]
+
+        backup_logger.log("[spawn_monitor] -> command: %s" % (" ".join(args)))
+        p = subprocess.Popen(args)
+        backup_logger.log("[spawn_monitor] -> monitoring started")
+        return p
+    except Exception as e:
+        backup_logger.log("[spawn_monitor] -> subprocess Popen failed: %s" % (e));
+    return None
+
 def daemon():
     global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch, configSeqNo
     #this is using the most recent file timestamp.
@@ -268,6 +286,8 @@ def daemon():
     thread_timeout=str(60)
     OnAppFailureDoFsFreeze = True
     OnAppSuccessDoFsFreeze = True
+    MonitorRun = False
+    MonitorEnableStrace = False
     #Adding python version to the telemetry
     try:
         python_version_info = sys.version_info
@@ -297,11 +317,22 @@ def daemon():
             OnAppFailureDoFsFreeze= config.get('SnapshotThread','OnAppFailureDoFsFreeze')
         if config.has_option('SnapshotThread','OnAppSuccessDoFsFreeze'):
             OnAppSuccessDoFsFreeze= config.get('SnapshotThread','OnAppSuccessDoFsFreeze')
+        if config.has_option("Monitor", "Run"):
+            MonitorRun = config.getboolean("Monitor", "Run")
+            if config.has_option("Monitor", "Strace"):
+                MonitorEnableStrace = config.getboolean("Monitor", "Strace")
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
     backup_logger.log("final thread timeout" + thread_timeout, True)
     
+    # Start the monitor process if enabled
+    monitor_process = None
+    if MonitorRun:
+        if MonitorEnableStrace:
+            monitor_process = spawn_monitor(os.getpid())
+        else:
+            monitor_process = spawn_monitor()
     snapshot_info_array = None
 
     try:
@@ -536,6 +567,9 @@ def daemon():
         backup_logger.log(errMsg, True, 'Error')
         global_error_result = e
 
+    if monitor_process is not None:
+        os.kill(monitor_process.pid, SIGTERM)
+
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
     """
@@ -568,7 +602,8 @@ def daemon():
     else:
         backup_logger.log("the logs blob uri is not there, so do not upload log.")
         backup_logger.commit_to_local()
-
+    if monitor_process is not None:
+        monitor_process.terminate()
     sys.exit(0)
 
 def uninstall():
@@ -583,7 +618,7 @@ def disable():
 
 def update():
     global configSeqNo
-    hutil.do_parse_context('Upadate', configSeqNo)
+    hutil.do_parse_context('Update', configSeqNo)
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():

@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/oklog/ulid/v2"
 )
@@ -44,7 +46,7 @@ func checkBinExistence(c string) bool {
 	if len(c) == 0 {
 		return false
 	}
-	cmd := exec.Command("command", "-v", c)
+	cmd := exec.Command("which", c)
 	bs, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Println(wrapErr(err, "CombinedOutput failed"))
@@ -158,7 +160,20 @@ func main() {
 	}()
 
 	inter := make(chan os.Signal, 1)
-	signal.Notify(inter, os.Interrupt)
+	// Auto kill after 20 minutes
+	go func(inter chan os.Signal) {
+		i := 0
+		ticker := time.NewTicker(time.Second)
+		for range ticker.C {
+			i++
+			if i >= (20 * 60) {
+				break
+			}
+		}
+		ticker.Stop()
+		inter <- syscall.SIGINT
+	}(inter)
+	signal.Notify(inter, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-inter
 	cancel()
 	wg.Wait()

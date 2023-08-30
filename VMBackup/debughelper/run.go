@@ -105,10 +105,12 @@ func (r Run) diagnose() string {
 
 	f.WriteString(l)
 	f.WriteString("\n")
-	return logFile
+	r.persistInMemDir()
+	return path.Join(r.wd, r.opID, LF_DIAG)
 }
 
 type LoadAvg struct {
+	TS         int64  `json:"timestamp_millis"`
 	One        string `json:"one"`
 	Five       string `json:"five"`
 	Fifteen    string `json:"fifteen"`
@@ -145,6 +147,7 @@ outer:
 							Fifteen:    fields[2],
 							SchedRatio: fields[3],
 							LP:         fields[4],
+							TS:         time.Now().UnixMilli(),
 						}
 						log.Println("[monitorCPU] -> sending new metric")
 						cpuStream <- &la
@@ -184,6 +187,7 @@ outer:
 }
 
 type Mem struct {
+	TS           int64 `json:"timestamp_millis"`
 	TotalKb      int64 `json:"total_kb"`
 	AvailKb      int64 `json:"avail_kb"`
 	FreeKb       int64 `json:"free_kb"`
@@ -211,7 +215,9 @@ outer:
 			if err != nil {
 				log.Println(wrapErr(err, "CombinedOutput failed"))
 			} else {
-				m := Mem{}
+				m := Mem{
+					TS: time.Now().UnixMilli(),
+				}
 				flag := false
 				for _, line := range strings.Split(string(bs), "\n") {
 					if len(line) == 0 {
@@ -330,6 +336,15 @@ func (r Run) persistInMemDir() {
 func (r Run) monitor(ctx context.Context) {
 	log.Println("[monitor] -> Fired")
 	wg := sync.WaitGroup{}
+
+	// save pid file
+	pf, err := os.Create(path.Join(r.workDir(), "monitor.pid"))
+	if err != nil {
+		r.log.Println("error creating pid file")
+		return
+	}
+
+	pf.WriteString(fmt.Sprintf("%d", os.Getpid()))
 
 	// strace
 	tctx, tcancel := context.WithCancel(ctx)
