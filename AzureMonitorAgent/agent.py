@@ -446,7 +446,7 @@ def enable():
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
         Next-Generation: allows MCS, GCS multi tenant, or both
     """
-
+    is_gcs_single_tenant = False
     # Next-generation schema
     if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):
 
@@ -485,6 +485,7 @@ def enable():
     else:
         hutil_log_info("Detected Geneva mode; azuremonitoragent service will be started to handle Geneva configuration")
         ensure["azuremonitoragent"] = True
+        is_gcs_single_tenant = True
         handle_gcs_config(public_settings, protected_settings, default_configs)
         # generate local syslog configuration files as in 1P syslog is not driven from DCR
         generate_localsyslog_configs()
@@ -515,7 +516,9 @@ def enable():
         # start the metrics and syslog watcher only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
-
+    elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
+        # In GCS scenarios, ensure that AMACoreAgent is running
+        start_amacoreagent()
 
     hutil_log_info('Handler initiating onboarding.')
 
