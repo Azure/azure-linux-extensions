@@ -246,7 +246,7 @@ def can_take_crash_consistent_snapshot(para_parser):
     return takeCrashConsistentSnapshot
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch, configSeqNo, eventlogger
+    global MyPatching, backup_logger, hutil, run_result, run_status, error_msg, freezer, para_parser, snapshot_done, snapshot_info_array, g_fsfreeze_on, total_used_size, patch_class_name, orig_distro, workload_patch, configSeqNo, eventlogger
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing', configSeqNo)
 
@@ -328,7 +328,6 @@ def daemon():
 
         if(para_parser.taskId is not None and para_parser.taskId != "" and eventlogger is not None):
             eventlogger.update_properties(para_parser.taskId)
-        hutil.set_event_logger(eventlogger)
 
         if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
@@ -620,7 +619,6 @@ def enable():
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             if(eventlogger is not None):
                 eventlogger.update_properties(para_parser.taskId)
-            hutil.set_event_logger(eventlogger)
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             randomSleepTime = random.randint(500, 5000)
             backup_logger.log('Sleeping for milliseconds: ' + str(randomSleepTime), True)
