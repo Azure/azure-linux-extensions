@@ -97,6 +97,8 @@ VMBackup/MANIFEST
 VMBackup/*.pyproj.user
 VMBackup/*.suo
 VMBackup/main/safefreeze/bin/*
+# VMBackup debughelper builds
+VMBackup/debughelper/msft_snap_monit
 
 # CustomScript ignors
 CustomScript/test/download/0/stdout
