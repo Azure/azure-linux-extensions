@@ -1,6 +1,12 @@
 import re
+import sys
 import xml.dom.minidom
-import urllib
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    
 try:
     import requests
 except ImportError:
