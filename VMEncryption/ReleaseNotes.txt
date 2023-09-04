@@ -1,3 +1,6 @@
+1.4.0.2
+- hotfix for EFA reimage scenario.
+
 1.4.0.1
 - Add official support for RHEL 9.x
 - Resource Disk + EFA Stop Start issue fix
