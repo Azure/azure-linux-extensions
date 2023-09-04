@@ -13,6 +13,11 @@ try:
     input = raw_input
 except NameError:
     pass
+    
+try:
+    FileNotFoundError
+except NameError:
+    FileNotFoundError = IOError
 
 # backwards compatible devnull variable for Python 3.3 vs earlier
 try:
