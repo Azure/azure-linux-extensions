@@ -116,6 +116,14 @@ while(process_wait_time >0 and chil.poll() is None):
 
 os.chdir(cur_dir)
 
+
+'''
+due to the lack of cross-compilation support in Mariner.
+It would not be able to get the binaries, so will be using the older binaries
+To Do : Once Mariner starts supporting cross-compilation, 
+will have to modify any necessary scripts to
+enable the generation of safefreezeARM64 binaries.
+'''
 """
 generate the ARM64 safe freeze binary
 """

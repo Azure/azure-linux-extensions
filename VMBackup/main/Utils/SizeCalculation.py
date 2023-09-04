@@ -57,6 +57,7 @@ class SizeCalculation(object):
         self.isAnyDiskExcluded = False
         self.LunListEmpty = False
         self.logicalVolume_to_bill = []
+        self.sudo_off = 0 # run the commands using sudo
         if(para_parser.includedDisks != None and para_parser.includedDisks != '' and CommonVariables.isAnyDiskExcluded in para_parser.includedDisks.keys() and para_parser.includedDisks[CommonVariables.isAnyDiskExcluded] != None ):
             self.isAnyDiskExcluded = para_parser.includedDisks[CommonVariables.isAnyDiskExcluded]
             self.logger.log("isAnyDiskExcluded {0}".format(self.isAnyDiskExcluded))
@@ -68,11 +69,14 @@ class SizeCalculation(object):
             self.logger.log("As the LunList is empty including all disks")
     
     def get_lsscsi_list(self):
-        command = "sudo lsscsi"
+        command = "lsscsi"
+        if (self.sudo_off == 0):
+            command = "sudo " + command
         try:
+            self.logger.log("executing command  {0}".format(command))
             self.lsscsi_list = (os.popen(command).read()).splitlines()
         except Exception as e:
-            error_msg = "Failed to execute the command lsscsi because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command \"%s\" because of error %s , stack trace: %s" % (command, str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.lsscsi_list = []
 
@@ -86,10 +90,13 @@ class SizeCalculation(object):
 
     def get_pvs_list(self):
         try:
-            self.pvs_output = os.popen("sudo pvs").read().strip().split("\n")
+            command = "pvs"
+            if (self.sudo_off == 0):
+                command = "sudo " + command
+            self.pvs_output = os.popen(command).read().strip().split("\n")
             self.pvs_output = self.pvs_output[1:]
         except Exception as e:
-            error_msg = "Failed to execute the command sudo pvs because of error %s , stack trace: %s" % (str(e), traceback.format_exc())
+            error_msg = "Failed to execute the command \"%s\" because of error %s , stack trace: %s" % (command, str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.pvs_output = []
 
@@ -128,7 +135,7 @@ class SizeCalculation(object):
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         else:
             self.size_calc_failed = True
-            self.logger.log("There is some glitch in executing the command 'sudo lsscsi' and therefore size calculation is marked as failed.")
+            self.logger.log("There is some glitch in executing the command 'lsscsi' and therefore size calculation is marked as failed.")
 
     def get_logicalVolumes_for_billing(self):
         try:
@@ -176,6 +183,10 @@ class SizeCalculation(object):
             [('sysfs', 'sysfs', '/sys'), ('proc', 'proc', '/proc'), ('udev', 'devtmpfs', '/dev'),..]
             Since root devices are at mount points '/' and '/boot/efi' we use file_system_info to find the root_devices based on the mount points.
         '''
+
+        # check if user off the sudo usage in commands
+        self.sudo_off = self.hutil.get_intvalue_from_configfile("sudo_off", self.sudo_off)
+        self.logger.log("sudo flag is {0}".format(self.sudo_off))
 
         # The command lsscsi is used for mapping the LUN numbers to the disk_names
         self.get_lsscsi_list() #populates self.lsscsi_list 
