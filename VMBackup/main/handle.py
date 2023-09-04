@@ -583,7 +583,7 @@ def disable():
 
 def update():
     global configSeqNo
-    hutil.do_parse_context('Upadate', configSeqNo)
+    hutil.do_parse_context('Update', configSeqNo)
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
