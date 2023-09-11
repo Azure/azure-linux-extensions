@@ -1080,18 +1080,10 @@ def enable_encryption():
 
                     bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
-                #If PrivatePreview.ConfidentialEncryptionTempDisk is set to True in public settings
-                #then temp disk encryption will happen for CVM type
-                  
-                public_settings = get_public_settings()
-                confidential_encryption_tempdisk = public_settings.get("PrivatePreview.ConfidentialEncryptionTempDisk")
+                #Temp disk encryption will happen for CVM type                 
                 encryptResourceDisk = False
                 if security_Type==CommonVariables.ConfidentialVM:
-                    if confidential_encryption_tempdisk:
                         encryptResourceDisk = True
-                    else: 
-                        message = "Resource disk not encrypted. It is confidential VMs, but PrivatePreview.ConfidentialEncryptionTempDisk is not set"
-                        logger.log(msg=message)
                 elif extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
                     encryptResourceDisk = True
 
