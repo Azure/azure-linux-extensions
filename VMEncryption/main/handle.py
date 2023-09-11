@@ -1082,10 +1082,8 @@ def enable_encryption():
 
                 #Temp disk encryption will happen for CVM type                 
                 encryptResourceDisk = False
-                if security_Type==CommonVariables.ConfidentialVM:
+                if extension_parameter.command == CommonVariables.EnableEncryptionFormatAll or security_Type==CommonVariables.ConfidentialVM:
                         encryptResourceDisk = True
-                elif extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
-                    encryptResourceDisk = True
 
                 if encryptResourceDisk:
                     current_volume_type = extension_parameter.VolumeType.lower()
