@@ -361,22 +361,44 @@ class CheckUtil(object):
             return
         raise Exception('Moving from volume type {0} to volume type {1} is not allowed'.format(existing_volume_type, volume_type))
 
+    def _read_managed_id_value(self,type,managed_id):
+        if "client_id" in managed_id or "object_id" in managed_id:
+            id_split = managed_id.split("=")
+            if len(id_split)!=2:
+                return None
+            return id_split[1]
+        return None
+
     def validate_skr_release_rsa_or_ec_key(self,public_settings,check_release_rsa_or_ec_key):
+        msg='The managed identity provided in public settings is not correct or \
+not authorized to do secure key release operation in your key vault/HSM. \
+Please verify and re-run ADE install after fixing the issue.'
         if not check_release_rsa_or_ec_key:
             return
-        imds_res_id = public_settings.get(CommonVariables.EncryptionManagedIdentity)
+        manage_id = public_settings.get(CommonVariables.EncryptionManagedIdentity)
         KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
-        if imds_res_id:
-            os.environ["IMDS_MSI_RES_ID"]=imds_res_id
+        if manage_id:
+            #if manage id parameter contains /, then it is ARM resource id
+            if "/" in manage_id:
+                os.environ["IMDS_MSI_RES_ID"]=manage_id
+            elif "client_id=" in manage_id:
+                client_id = self._read_managed_id_value("client_id",manage_id)
+                if not client_id:
+                    raise Exception(msg)
+                os.environ["IMDS_CLIENT_ID"]=client_id
+            elif "object_id" in manage_id:
+                object_id = self._read_managed_id_value("object_id",manage_id)
+                if not object_id:
+                    raise Exception(msg)
+                os.environ["IMDS_OBJECT_ID"]=object_id
+            else:
+                raise Exception(msg)
         cmd = './AzureAttestSKR -n 123456 -k {0} -c imds -r'.format(KeyEncryptionKeyUrl)
         executor = CommandExecutor(self.logger)
         result = executor.Execute(cmd)
         if result != CommonVariables.process_success:
-            msg='The managed identity provided in public settings is not correct or \
-not authorized to do secure key release operation in your key vault/HSM. \
-Please verify and re-run ADE install after fixing the issue.'
-            if imds_res_id:
-                raise Exception ('{0} Encryption managed identity: {1}'.format(msg,imds_res_id))
+            if manage_id:
+                raise Exception ('{0} Encryption managed identity: {1}'.format(msg,manage_id))
             raise Exception(msg)
         return
 
