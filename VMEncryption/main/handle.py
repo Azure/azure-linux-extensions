@@ -1080,10 +1080,25 @@ def enable_encryption():
 
                     bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
 
-                #Temp disk encryption will happen for CVM type                 
+                #Temp disk encryption will happen for CVM type               
                 encryptResourceDisk = False
-                if extension_parameter.command == CommonVariables.EnableEncryptionFormatAll or security_Type==CommonVariables.ConfidentialVM:
-                        encryptResourceDisk = True
+                if security_Type==CommonVariables.ConfidentialVM:
+                    public_settings = get_public_settings()
+                    no_confidential_encryption_tempdisk = public_settings.get("NoConfidentialEncryptionTempDisk")
+                    no_confidential_encryption_tempdisk_flag = False
+                    msg = ""
+                    if no_confidential_encryption_tempdisk.__class__.__name__ in ['str','bool']:
+                        if no_confidential_encryption_tempdisk.__class__.__name__ == 'str' and no_confidential_encryption_tempdisk.lower() == "true":
+                            no_confidential_encryption_tempdisk_flag=True
+                        else:
+                            no_confidential_encryption_tempdisk_flag=no_confidential_encryption_tempdisk
+                            msg="NoConfidentialEncryptionTempDisk: {0}".format(no_confidential_encryption_tempdisk_flag)
+                    else:
+                        msg="Invalid input {0} for NoConfidentialEncryptionTempDisk.".format(no_confidential_encryption_tempdisk)
+                    encryptResourceDisk = not no_confidential_encryption_tempdisk_flag
+                elif extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
+                    encryptResourceDisk = True
+                
 
                 if encryptResourceDisk:
                     current_volume_type = extension_parameter.VolumeType.lower()
