@@ -1094,7 +1094,8 @@ def enable_encryption():
                             no_confidential_encryption_tempdisk_flag=no_confidential_encryption_tempdisk
                             msg="NoConfidentialEncryptionTempDisk: {0}".format(no_confidential_encryption_tempdisk_flag)
                     else:
-                        msg="Invalid input {0} for NoConfidentialEncryptionTempDisk.".format(no_confidential_encryption_tempdisk)
+                        msg="Invalid input {0}. NoConfidentialEncryptionTempDisk is set to True by customer.".format(no_confidential_encryption_tempdisk)
+                    logger.log(msg=msg)
                     encryptResourceDisk = not no_confidential_encryption_tempdisk_flag
                 elif extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
                     encryptResourceDisk = True
