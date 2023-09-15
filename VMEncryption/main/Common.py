@@ -53,7 +53,7 @@ class CommonVariables:
     secure_key_release_wrap="-w"
     secure_key_release_unwrap="-u"
     secure_key_release_app = "AzureAttestSKR"
-
+    valid_managed_id_types=["client_id","object_id"]
     """
     CVM LUKS2 header token
     """

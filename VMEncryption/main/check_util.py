@@ -362,7 +362,9 @@ class CheckUtil(object):
         raise Exception('Moving from volume type {0} to volume type {1} is not allowed'.format(existing_volume_type, volume_type))
 
     def _read_managed_id_value(self,type,managed_id):
-        if "client_id" in managed_id or "object_id" in managed_id:
+        if type not in CommonVariables.valid_managed_id_types:
+            return None
+        if type in managed_id:
             id_split = managed_id.split("=")
             if len(id_split)!=2:
                 return None
