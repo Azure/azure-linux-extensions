@@ -58,6 +58,8 @@ class StripdownState(OSEncryptionState):
         self.command_executor.ExecuteInBash('for i in lib local lock opt run spool tmp; do cp -ax /var/$i /tmp/tmproot/var/; done', True)
         self.command_executor.ExecuteInBash('mkdir /tmp/tmproot/var/log', True)
         self.command_executor.ExecuteInBash('cp -ax /var/log/azure /tmp/tmproot/var/log/', True)
+        # Disable login as root in the stipdown state
+        self.command_executor.ExecuteInBash('sed -i "s@root:x:0:0:root:/root:/bin/bash@root:x:0:0:root:/root:/usr/sbin/nologin@g" /tmp/tmproot/etc/passwd')
         self.command_executor.Execute('mount --make-rprivate /', True)
         self.command_executor.ExecuteInBash('[ -e "/tmp/tmproot/var/lib/azure_disk_encryption_config/azure_crypt_request_queue.ini" ]', True)
         self.command_executor.Execute('systemctl stop walinuxagent', True)
