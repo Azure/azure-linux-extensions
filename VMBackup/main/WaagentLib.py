@@ -2704,7 +2704,7 @@ class Util(object):
         try:
             if secure:
                 port = 443 if port is None else port
-                if proxyHost is not None and proxyPort is not None:
+                if proxyHost != None and proxyPort != None:
                     conn = httplibs.HTTPSConnection(proxyHost, proxyPort, timeout=10)
                     conn.set_tunnel(host, port)
                     # If proxy is used, full url is needed.
@@ -2713,7 +2713,7 @@ class Util(object):
                     conn = httplibs.HTTPSConnection(host, port, timeout=10)
             else:
                 port = 80 if port is None else port
-                if proxyHost is not None and proxyPort is not None:
+                if proxyHost != None and proxyPort != None:
                     conn = httplibs.HTTPConnection(proxyHost, proxyPort, timeout=10)
                     # If proxy is used, full url is needed.
                     path = "http://{0}:{1}{2}".format(host, port, path)
@@ -2759,8 +2759,8 @@ class Util(object):
 
         # If httplib module doesn't support https tunnelling. Fallback to http
         if secure and \
-                        proxyHost is not None and \
-                        proxyPort is not None and \
+                        proxyHost != None and \
+                        proxyPort != None and \
                 not hasattr(httplibs.HTTPSConnection, "set_tunnel"):
             Warn("httplib doesn't support https tunnelling(new in python 2.7)")
             secure = False
@@ -2770,13 +2770,13 @@ class Util(object):
                                  secure=secure, headers=headers,
                                  proxyHost=proxyHost, proxyPort=proxyPort)
         for retry in range(0, maxRetry):
-            if resp is not None and \
+            if resp != None and \
                     (resp.status == httplibs.OK or \
                                  resp.status == httplibs.CREATED or \
                                  resp.status == httplibs.ACCEPTED):
                 return resp
 
-            if resp is not None and resp.status == httplibs.GONE:
+            if resp != None and resp.status == httplibs.GONE:
                 raise HttpResourceGoneError("Http resource gone.")
 
             Error("Retry={0}".format(retry))
@@ -4731,10 +4731,10 @@ def main():
     Config = ConfigurationProvider(conf_file)
 
     logfile = Config.get("Logs.File")
-    if logfile is not None:
+    if logfile != None:
         myLogger.file_path = logfile
     logconsole = Config.get("Logs.Console")
-    if logconsole is not None and logconsole.lower().startswith("n"):
+    if logconsole != None and logconsole.lower().startswith("n"):
         myLogger.con_path = None
     verbose = Config.get("Logs.Verbose")
     if verbose != None and verbose.lower().startswith("y"):
