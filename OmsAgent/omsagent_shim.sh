@@ -6,23 +6,19 @@
 
 COMMAND="./omsagent.py"
 PYTHON=""
-FUTURE_PATH=""
 ARG="$@"
 
 function find_python() {
     local python_exec_command=$1
-    local future_path=$2
 
     if command -v python2 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python2"
-        eval ${future_path}="${PWD}/ext/future:"
     elif command -v python3 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python3"
-        # do not set future_path; future seems to cause interference with preexisting packages in python 3 environment
     fi
 }
 
-find_python PYTHON FUTURE_PATH
+find_python PYTHON
 
 if [ -z "$PYTHON" ]
 then
@@ -32,5 +28,5 @@ else
     ${PYTHON} --version 2>&1
 fi
 
-PYTHONPATH=${FUTURE_PATH}${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}
+PYTHONPATH=${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}
 exit $?

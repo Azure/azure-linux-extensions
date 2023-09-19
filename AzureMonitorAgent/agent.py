@@ -113,6 +113,7 @@ MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricC
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
 AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
+PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/previewFeatures/'
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
 SupportedArch = set(['x86_64', 'aarch64'])
@@ -351,7 +352,7 @@ def install():
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
     if exit_code == 0:
         vm_dist, _ = find_vm_distro('Install')
-        if vm_dist.startswith('suse'):
+        if (vm_dist.startswith('suse') or vm_dist.startswith('sles')):
             try:
                 suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
                 if suse_exit_code != 0:
@@ -446,7 +447,7 @@ def enable():
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
         Next-Generation: allows MCS, GCS multi tenant, or both
     """
-
+    is_gcs_single_tenant = False
     # Next-generation schema
     if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):
 
@@ -485,6 +486,7 @@ def enable():
     else:
         hutil_log_info("Detected Geneva mode; azuremonitoragent service will be started to handle Geneva configuration")
         ensure["azuremonitoragent"] = True
+        is_gcs_single_tenant = True
         handle_gcs_config(public_settings, protected_settings, default_configs)
         # generate local syslog configuration files as in 1P syslog is not driven from DCR
         generate_localsyslog_configs()
@@ -515,7 +517,9 @@ def enable():
         # start the metrics and syslog watcher only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
-
+    elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
+        # In GCS scenarios, ensure that AMACoreAgent is running
+        start_amacoreagent()
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -1219,11 +1223,28 @@ def generate_localsyslog_configs():
         f.close()
         
     useSyslogTcp = False
-    if public_settings is not None and "previewFeatures" in public_settings:
-        features = public_settings.get("previewFeatures")
-        if features is not None and "useSyslogTcp" in features:            
-            useSyslogTcp = features.get("useSyslogTcp")    
+    syslogTcpPreviewFlagPath = PreviewFeaturesDirectory + 'useSyslogTcp'
+    if os.path.exists(syslogTcpPreviewFlagPath):
+        useSyslogTcp = True
     
+    # always use syslog tcp port, unless 
+    # - the distro is Red Hat based and doesn't have semanage
+    #   these distros seem to have SELinux on by default and we shouldn't be installing semanage ourselves
+    if not os.path.exists('/etc/selinux/config'):
+        useSyslogTcp = True
+    else:        
+        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"')
+        if sedisabled == 0:
+            useSyslogTcp = True
+        else:            
+            check_semanage, _ = run_command_and_log("which semanage")
+            if check_semanage != 0:            
+                hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
+            elif syslog_port != '':
+                # allow the syslog port in SELinux
+                run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
+                useSyslogTcp = True   
+        
     if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
@@ -1401,7 +1422,11 @@ def set_os_arch(operation):
 
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
-
+        
+        dynamicSSLPreviewFlagPath = PreviewFeaturesDirectory + 'useDynamicSSL'
+        if os.path.exists(dynamicSSLPreviewFlagPath):
+            BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
+        
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
@@ -1427,7 +1452,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", 'ol', "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
+    rpm_set = set(["oracle", "ol", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1498,15 +1523,15 @@ def is_vm_supported_for_extension(operation):
                        'rhel' : ['7', '8', '9'], # Rhel
                        'centos' : ['7', '8'], # CentOS
                        'red hat' : ['7', '8', '9'], # Oracle, RHEL
-                       'oracle' : ['7', '8'], # Oracle
-                       'ol' : ['7', '8'], # Oracle Linux
+                       'oracle' : ['7', '8', '9'], # Oracle
+                       'ol' : ['7', '8', '9'], # Oracle Linux
                        'debian' : ['9', '10', '11'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'], # SLES
+                       'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
                        'mariner' : ['2'], # Mariner 2.0
-                       'rocky' : ['8'], # Rocky
-                       'alma' : ['8'], # Alma
+                       'rocky' : ['8', '9'], # Rocky
+                       'alma' : ['8', '9'], # Alma
                        'opensuse' : ['15'], # openSUSE
                        'amzn' : ['2'] # Amazon Linux 2
     }
