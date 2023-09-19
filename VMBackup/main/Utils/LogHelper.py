@@ -97,4 +97,4 @@ class FileHelpers:
                     time.sleep(delay)
     
         print("Warning: " + err_msg)
-        return None:q
+        return None
