@@ -799,7 +799,7 @@ class HandlerUtility:
     def get_severity_level(self):
         logging_level = LoggingLevel(LoggingConstants.DefaultEventLogLevel)
         try:
-            log_setting_file_path = os.path.join(os.getcwd(), LoggingConstants.LogLevelSettingFile)
+            log_setting_file_path = os.path.join(os.getcwd(), "main", LoggingConstants.LogLevelSettingFile)
             if os.path.exists(log_setting_file_path):
                 with open(log_setting_file_path, 'r') as file:
                     logging_level_input = json.load(file)

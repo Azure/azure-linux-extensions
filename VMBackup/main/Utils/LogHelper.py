@@ -2,7 +2,6 @@ import os
 import datetime
 import shutil
 import time
-from enum import Enum
 
 class LoggingConstants:
     MaxDayAgeOfStaleFiles = -1  # We don't store unprocessed files beyond 1 day from current processing time
@@ -25,12 +24,6 @@ class LoggingLevel:
     def __init__(self, event_log_level):
         self.EventLogLevel = event_log_level
         
-class Severity(Enum):
-    Verbose = 0
-    Info = 1
-    Warning = 2
-    Error = 3
-
 class FileHelpers:
     @staticmethod
     def getSizeOfDir(path):
