@@ -50,6 +50,7 @@ packages_array.append(main_folder)
 
 plugin_folder = main_folder + '/tempPlugin'
 plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
+severity_json =  main_folder + '/LogSeverity.json'
 
 
 patch_folder = main_folder + '/patch'
@@ -210,10 +211,12 @@ copybinary(workloadscripts_folder, final_workloadscripts_path)
 copybinary(workload_customscripts_folder, final_workload_customscripts_path)
 copybinary(workloadutils_folder, final_workloadutils_path)
 final_plugin_conf_path = final_folder_path + '/main'
+final_severity_json_path = final_folder_path + '/main'
 copybinary(binary_entry, final_binary_path)
 copybinary(arm64_binary_entry, final_Arm64binary_path)
 copybinary(plugin_folder, final_plugin_path)
 copy(plugin_conf, final_plugin_conf_path)
+copy(severity_json, final_severity_json_path)
 copy(manifest,final_folder_path)
 copy(main_entry,final_plugin_conf_path)
 zip(final_folder_path, target_zip_file_path)
