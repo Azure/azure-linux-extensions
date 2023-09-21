@@ -518,6 +518,9 @@ def enable():
         start_metrics_process()
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
+        # Delete the PA.json file to ensure that it isn't picked up by amacoreagent causing a TCP port 13000 listener which is not needed and may conflict with other software. It is only used for 3P custom logs.
+        if os.path.exists("/etc/opt/microsoft/azuremonitoragent/amacoreagent/PA.json"):
+            os.remove("/etc/opt/microsoft/azuremonitoragent/amacoreagent/PA.json")
         # In GCS scenarios, ensure that AMACoreAgent is running
         start_amacoreagent()
 
