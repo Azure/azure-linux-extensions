@@ -561,7 +561,7 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, bek_util, passphra
                 resource_disk_util.automount()
             else:
                 logger.log("Format resource disk if unusable. security type {0}".format(security_Type))
-                resource_disk_util.automount(True)
+                resource_disk_util.automount(self._is_confidential_temp_disk_encryption(logger))
             logger.log("mounted resource disk")
     else:
         # Probably a re-image scenario: Just do a best effort
@@ -971,6 +971,22 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
                 logger.log('Calling enable for volume type {0}.'.format(volume_type))
                 enable_encryption()
 
+def _is_confidential_temp_disk_encryption(self,logger):
+    public_settings = get_public_settings()
+    no_confidential_encryption_tempdisk = public_settings.get("NoConfidentialEncryptionTempDisk")
+    no_confidential_encryption_tempdisk_flag = False
+    msg = ""
+    if no_confidential_encryption_tempdisk.__class__.__name__ in ['str','bool']:
+        if no_confidential_encryption_tempdisk.__class__.__name__ == 'str' and no_confidential_encryption_tempdisk.lower() == "true":
+            no_confidential_encryption_tempdisk_flag=True
+        else:
+            no_confidential_encryption_tempdisk_flag=no_confidential_encryption_tempdisk
+        msg="NoConfidentialEncryptionTempDisk: {0}".format(no_confidential_encryption_tempdisk_flag)
+    else:
+        msg="Invalid input {0}. NoConfidentialEncryptionTempDisk is set an invalid value by customer.".format(no_confidential_encryption_tempdisk)
+    logger.log(msg=msg)
+    return not no_confidential_encryption_tempdisk_flag
+
 
 def enable_encryption():
     hutil.do_parse_context('EnableEncryption')
@@ -1083,20 +1099,7 @@ def enable_encryption():
                 #Temp disk encryption will happen for CVM type               
                 encryptResourceDisk = False
                 if security_Type==CommonVariables.ConfidentialVM:
-                    public_settings = get_public_settings()
-                    no_confidential_encryption_tempdisk = public_settings.get("NoConfidentialEncryptionTempDisk")
-                    no_confidential_encryption_tempdisk_flag = False
-                    msg = ""
-                    if no_confidential_encryption_tempdisk.__class__.__name__ in ['str','bool']:
-                        if no_confidential_encryption_tempdisk.__class__.__name__ == 'str' and no_confidential_encryption_tempdisk.lower() == "true":
-                            no_confidential_encryption_tempdisk_flag=True
-                        else:
-                            no_confidential_encryption_tempdisk_flag=no_confidential_encryption_tempdisk
-                            msg="NoConfidentialEncryptionTempDisk: {0}".format(no_confidential_encryption_tempdisk_flag)
-                    else:
-                        msg="Invalid input {0}. NoConfidentialEncryptionTempDisk is set an invalid value by customer.".format(no_confidential_encryption_tempdisk)
-                    logger.log(msg=msg)
-                    encryptResourceDisk = not no_confidential_encryption_tempdisk_flag
+                    encryptResourceDisk = self._is_confidential_temp_disk_encryption(logger)
                 elif extension_parameter.command == CommonVariables.EnableEncryptionFormatAll:
                     encryptResourceDisk = True
                 
