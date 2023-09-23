@@ -972,6 +972,8 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
                 enable_encryption()
 
 def _is_confidential_temp_disk_encryption(self,logger):
+    '''this function reads cvm public setting NoConfidentialEncryptionTempDisk for cvm temp disk encryption.
+    function returns true/false for for temp disk encryption. by default return is True.'''
     public_settings = get_public_settings()
     no_confidential_encryption_tempdisk = public_settings.get("NoConfidentialEncryptionTempDisk")
     no_confidential_encryption_tempdisk_flag = False
