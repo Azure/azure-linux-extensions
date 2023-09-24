@@ -554,6 +554,48 @@ systemd /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,name=syste
         self.assertRaises(Exception, self.cutil.check_kv_name, { None, kv_url, "" })
         self.assertRaises(Exception, self.cutil.check_kv_name, { kv_id, None, "" })
 
+    @mock.patch("CommandExecutor.CommandExecutor.Execute", return_value=0)
+    def test_validate_skr_release_rsa_or_ec_key(self,mocked_exec):
+        from Common import CommonVariables
+        check_release_rsa_or_ec_key = True
+        publicsettings = mock.Mock()
+        #client id test
+        publicsettings.get.return_value = "client_id=client72n-1b37-456a-q153572na53"
+        self.cutil.validate_skr_release_rsa_or_ec_key(public_settings=publicsettings,check_release_rsa_or_ec_key=check_release_rsa_or_ec_key)
+        env_client_id = "client_id={0}".format(os.environ["IMDS_CLIENT_ID"])
+        self.assertEqual(publicsettings.get.return_value,env_client_id)
+        with self.assertRaises(Exception):
+            print(os.environ["IMDS_MSI_RES_ID"])
+        with self.assertRaises(Exception):
+            print(os.environ["IMDS_OBJECT_ID"])
+
+        #object id test
+        os.environ.pop("IMDS_CLIENT_ID")
+        publicsettings.get.return_value = "object_id=object72n-1b37-456a-q153572na53"
+        self.cutil.validate_skr_release_rsa_or_ec_key(public_settings=publicsettings,check_release_rsa_or_ec_key=check_release_rsa_or_ec_key)
+        env_object_id = "object_id={0}".format(os.environ["IMDS_OBJECT_ID"])
+        self.assertEqual(publicsettings.get.return_value,env_object_id)
+        with self.assertRaises(Exception):
+            print(os.environ["IMDS_MSI_RES_ID"])
+        with self.assertRaises(Exception):
+            print(os.environ["IMDS_CLIENT_ID"])
+
+        #sanity check of userAssignedIdentities is not done.
+        #resource id test
+        os.environ.pop("IMDS_OBJECT_ID")
+        publicsettings.get.return_value = "/subscriptions/testsubid/resourcegroups/testrg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/testidentity"
+        self.cutil.validate_skr_release_rsa_or_ec_key(public_settings=publicsettings,check_release_rsa_or_ec_key=check_release_rsa_or_ec_key)
+        #strictly following client_id and object_id as EncryptionManagedIdentity public setting. these ids are alphanumeric with - char.
+        env_res_id = os.environ["IMDS_MSI_RES_ID"]
+        self.assertEqual(publicsettings.get.return_value,env_res_id)
+        with self.assertRaises(Exception):
+            print(os.environ["IMDS_OBJECT_ID"])
+        with self.assertRaises(Exception):
+            print(os.environ["IMDS_CLIENT_ID"])
+
+        publicsettings.get.return_value = "Client_id=3"
+        with self.assertRaises(Exception):
+            self.cutil.validate_skr_release_rsa_or_ec_key(public_settings=publicsettings,check_release_rsa_or_ec_key=check_release_rsa_or_ec_key)
 
     def test_pre_initialization_check_Valid_Inputs(self):
         from Common import CommonVariables

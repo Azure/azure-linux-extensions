@@ -361,22 +361,56 @@ class CheckUtil(object):
             return
         raise Exception('Moving from volume type {0} to volume type {1} is not allowed'.format(existing_volume_type, volume_type))
 
+    def _update_imds_managed_id_env_variable(self,enc_manage_id):
+        '''This function updates env variables used by AzureAttestSKR tool for imds skr.
+        enc_manage_id is valid then update any one of [IMDS_MSI_RES_ID,IMDS_CLIENT_ID,IMDS_OBJECT_ID] env variable.
+        otherwise update result is false.'''
+        ret = False
+        if not enc_manage_id:
+            return True
+        managed_id_type=None
+        managed_id = None
+        if "/" in enc_manage_id:
+            managed_id_type = CommonVariables.managed_res_id
+            managed_id = enc_manage_id
+        else:
+            for type in CommonVariables.valid_managed_id_types:
+                if type in enc_manage_id:
+                    managed_id_type = type
+            if not managed_id_type:
+                return ret
+            id_split = enc_manage_id.split("=")
+            if len(id_split)!=2:
+                return ret
+            managed_id = id_split[1]
+        if managed_id_type == CommonVariables.managed_res_id:
+            os.environ["IMDS_MSI_RES_ID"]=managed_id
+        elif managed_id_type == CommonVariables.managed_client_id:
+            os.environ["IMDS_CLIENT_ID"]=managed_id
+        elif managed_id_type == CommonVariables.managed_object_id:
+            os.environ["IMDS_OBJECT_ID"]=managed_id
+        else:
+            return ret
+        return True
+
     def validate_skr_release_rsa_or_ec_key(self,public_settings,check_release_rsa_or_ec_key):
+        msg='The managed identity provided in public settings is not correct or \
+not authorized to do secure key release operation in your key vault/HSM. \
+Please verify and re-run ADE install after fixing the issue.'
         if not check_release_rsa_or_ec_key:
             return
-        imds_res_id = public_settings.get(CommonVariables.EncryptionManagedIdentity)
+        manage_id = public_settings.get(CommonVariables.EncryptionManagedIdentity)
         KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
-        if imds_res_id:
-            os.environ["IMDS_MSI_RES_ID"]=imds_res_id
+        if manage_id:
+            ret = self._update_imds_managed_id_env_variable(manage_id)
+            if not ret:
+                raise Exception(msg)
         cmd = './AzureAttestSKR -n 123456 -k {0} -c imds -r'.format(KeyEncryptionKeyUrl)
         executor = CommandExecutor(self.logger)
         result = executor.Execute(cmd)
         if result != CommonVariables.process_success:
-            msg='The managed identity provided in public settings is not correct or \
-not authorized to do secure key release operation in your key vault/HSM. \
-Please verify and re-run ADE install after fixing the issue.'
-            if imds_res_id:
-                raise Exception ('{0} Encryption managed identity: {1}'.format(msg,imds_res_id))
+            if manage_id:
+                raise Exception ('{0} Encryption managed identity: {1}'.format(msg,manage_id))
             raise Exception(msg)
         return
 
