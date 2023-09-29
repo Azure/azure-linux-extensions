@@ -1241,8 +1241,12 @@ def generate_localsyslog_configs():
             if check_semanage != 0:            
                 hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
             elif syslog_port != '':
-                # allow the syslog port in SELinux
-                run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
+                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"')
+                if syslogPortEnabled == 0:
+                    hutil_log_info("Skipping semanage call as port is present")
+                else:
+                    # allow the syslog port in SELinux
+                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
                 useSyslogTcp = True   
         
     if useSyslogTcp == True and syslog_port != '':
