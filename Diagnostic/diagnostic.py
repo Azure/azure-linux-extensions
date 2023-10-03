@@ -711,7 +711,7 @@ def start_mdsd(configurator):
 
 def report_new_mdsd_errors(err_file_path, last_error_time):
     """
-    Monitors if there's any new stuff in mdsd.err and report it if any through the agent/ext status report mechanism.
+    Monitors if there's any new stuff in mdsd.err and logs it.
     :param err_file_path: Path of the mdsd.err file
     :param last_error_time: Time when last error was reported.
     :return: Time when the last error was reported. Same as the argument if there's no error reported in this call.
@@ -728,8 +728,6 @@ def report_new_mdsd_errors(err_file_path, last_error_time):
     if len(last_error) > 0 and (datetime.datetime.now() - last_error_time) < datetime.timedelta(minutes=30):
         # Only recent error logs (within 30 minutes) are reported.
         hutil.log("Error in MDSD:" + last_error)
-        hutil.do_status_report(g_ext_op_type, "success", '1',
-                               "message in mdsd.err:" + str(last_error_time) + ":" + last_error)
     return last_error_time
 
 
