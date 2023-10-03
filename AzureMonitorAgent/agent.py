@@ -1249,8 +1249,9 @@ def generate_localsyslog_configs():
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
-                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+                if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
                     os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
                     os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
                 os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
