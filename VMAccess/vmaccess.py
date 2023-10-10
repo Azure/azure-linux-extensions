@@ -388,7 +388,7 @@ def _backup_and_update_sshd_config(hutil, attr_name, attr_value):
 
     hutil.log(f"Setting {attr_name} to {attr_value} in sshd_config.")
     
-    _backup_sshd_config()
+    _backup_sshd_config(hutil)
     _set_sshd_config(config, attr_name, attr_value)
     ext_utils.replace_file_with_contents_atomic(SshdConfigPath, "\n".join(config))
 
@@ -491,14 +491,14 @@ def _reset_sshd_config(hutil, restore_backup_ssh):
         MyDistro.restart_ssh_service()
 
 
-def _backup_sshd_config():
+def _backup_sshd_config(hutil):
     backup_file_name = f"{ExtensionCacheDir}/backup"
     if os.path.exists(SshdConfigPath) and not os.path.exists(backup_file_name):
         # Create VMAccess cache folder if doesn't exist
         if not os.path.exists(os.path.dirname(backup_file_name)):
             os.makedirs(os.path.dirname(backup_file_name))
 
-        # Create backup config file
+        hutil.log("Create backup ssh config file")
         open(backup_file_name, 'a').close()
         
         # When copying, make sure to preserve permissions and ownership.
