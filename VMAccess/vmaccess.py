@@ -370,13 +370,12 @@ def _allow_password_auth(hutil):
     name = "PasswordAuthentication"
     _backup_and_update_sshd_config(hutil, name, "yes")
 
-    if isinstance(MyDistro, dist_utils.UbuntuDistro): #handle ubuntu 22.04 (sshd_config.d directory)
-        cloudInitConfigPath = "/etc/ssh/sshd_config.d/50-cloud-init.conf"
-        config = ext_utils.get_file_contents(cloudInitConfigPath)
-        if config is not None: #other versions of ubuntu don't contain this file
-            config = config.split("\n")
-            _set_sshd_config(config, name, "yes")
-            ext_utils.replace_file_with_contents_atomic(cloudInitConfigPath, "\n".join(config))
+    cloudInitConfigPath = "/etc/ssh/sshd_config.d/50-cloud-init.conf"
+    config = ext_utils.get_file_contents(cloudInitConfigPath)
+    if config is not None:
+        config = config.split("\n")
+        _set_sshd_config(config, name, "yes")
+        ext_utils.replace_file_with_contents_atomic(cloudInitConfigPath, "\n".join(config))
 
 
 def _backup_and_update_sshd_config(hutil, attr_name, attr_value):

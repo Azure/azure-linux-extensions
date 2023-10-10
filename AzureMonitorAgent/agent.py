@@ -1241,16 +1241,21 @@ def generate_localsyslog_configs():
             if check_semanage != 0:            
                 hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
             elif syslog_port != '':
-                # allow the syslog port in SELinux
-                run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
+                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"')
+                if syslogPortEnabled == 0:
+                    hutil_log_info("Skipping semanage call as port is present")
+                else:
+                    # allow the syslog port in SELinux
+                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
                 useSyslogTcp = True   
         
     if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
-                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+                if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
                     os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
                     os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
                 os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
@@ -1480,19 +1485,25 @@ def find_vm_distro(operation):
     """
     vm_dist = vm_id = vm_ver =  None
     parse_manually = False
-    try:
-        vm_dist, vm_ver, vm_id = platform.linux_distribution()
-    except AttributeError:
+
+    # platform commands used below aren't available after Python 3.6
+    if sys.version_info < (3,7):
         try:
-            vm_dist, vm_ver, vm_id = platform.dist()
+            vm_dist, vm_ver, vm_id = platform.linux_distribution()
         except AttributeError:
-            hutil_log_info("Falling back to /etc/os-release distribution parsing")
-    # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
-    # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
-    try:
-        temp_vm_ver = int(vm_ver.split('.')[0])
-    except:
-        parse_manually = True
+            try:
+                vm_dist, vm_ver, vm_id = platform.dist()
+            except AttributeError:
+                hutil_log_info("Falling back to /etc/os-release distribution parsing")
+
+        # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
+        # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
+        try:
+            temp_vm_ver = int(vm_ver.split('.')[0])
+        except:
+            parse_manually = True
+    else:
+        parse_manually = True    
 
     if (not vm_dist and not vm_ver) or parse_manually: # SLES 15 and others
         try:
