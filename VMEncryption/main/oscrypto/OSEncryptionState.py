@@ -102,6 +102,14 @@ class OSEncryptionState(object):
             bootfs_uuid = self._parse_uuid_from_fstab('/boot')
             self.context.logger.log("bootfs_uuid: {0}".format(bootfs_uuid))
             self.bootfs_block_device = self.disk_util.query_dev_sdx_path_by_uuid(bootfs_uuid)
+        elif self.rootfs_sdx_path.startswith(CommonVariables.nvme_device_identifier):
+            self.rootfs_disk = self.rootfs_sdx_path[:self.rootfs_sdx_path.index("p")]
+            self.rootfs_block_device = self.rootfs_sdx_path
+            bootfs_uuid = self._get_boot_uuid()
+            if bootfs_uuid:
+                self.bootfs_block_device = self.disk_util.query_dev_sdx_path_by_uuid(bootfs_uuid)
+            else:
+                self.bootfs_block_device = self.rootfs_disk + "p2" #No seperate boot partition
         else:
             self.rootfs_block_device = self.disk_util.get_persistent_path_by_sdx_path(self.rootfs_sdx_path)
             if not self.rootfs_block_device.startswith('/dev/disk/'):
@@ -192,17 +200,20 @@ class OSEncryptionState(object):
             if os.path.exists(mp_item["dest"]):
                 if dev == os.lstat(mp_item["dest"]).st_dev:
                     bootfs_dev_path = mp_item["src"]
-                    self.context.logger.log("Found bootfs dev path {0}".format(bootfs_dev_path))
-                    boot_device_items = self.disk_util.get_device_items(bootfs_dev_path)
-                    if len(boot_device_items) > 1:
-                        self.context.logger.log("boot device cannot have more than one partition")
-                        continue
-                    boot_item = boot_device_items[0]
-                    self.context.logger.log("Finding uuid for {0}".format(boot_item.name))
-                    boot_uuid = self.disk_util.get_device_items_property(boot_item.name, "UUID")
+                    if bootfs_dev_path != 'none':
+                        self.context.logger.log("Found bootfs dev path {0}".format(bootfs_dev_path))
+                        boot_device_items = self.disk_util.get_device_items(bootfs_dev_path)
+                        if len(boot_device_items) > 1:
+                            self.context.logger.log("boot device cannot have more than one partition")
+                            continue
+                        boot_item = boot_device_items[0]
+                        self.context.logger.log("Finding uuid for {0}".format(boot_item.name))
+                        boot_uuid = self.disk_util.get_device_items_property(boot_item.name, "UUID")
         if not boot_uuid:
             self.context.logger.log("Cannot get boot UUID from device properties. Falling back to fstab") 
             boot_uuid = self._parse_uuid_from_fstab('/boot')
+        if not boot_uuid:
+            self.context.logger.log("Cannot get boot UUID. Probably running in Mem FS with no seperate boot partition.")
         return boot_uuid
 
 

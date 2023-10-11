@@ -37,6 +37,9 @@ from distutils.version import LooseVersion
 
 class DiskUtil(object):
     os_disk_lvm = None
+    # TBD Add support for custom VG and LV with online encryption
+    os_lvm_vg = 'rootvg'
+    os_lvm_lv = 'rootlv'
     sles_cache = {}
 
     def __init__(self, hutil, patching, logger, encryption_environment):
@@ -887,10 +890,15 @@ class DiskUtil(object):
         """
         Return the controller ids and lun numbers for data disks that show up in the dev_items
         """
+        list_devices = []
+        is_os_nvme, root_device_path_nvme = self.is_os_disk_nvme()
 
+        if is_os_nvme:
+            list_devices = self.get_all_nvme_controllers_and_namespaces(root_device_path_nvme, dev_items_real_paths)
+            return list_devices
+        
         all_controller_and_lun_numbers = self.get_all_azure_data_disk_controller_and_lun_numbers()
 
-        list_devices = []
         azure_links_dir = CommonVariables.azure_symlinks_dir
 
         for controller_id, lun_number in all_controller_and_lun_numbers:
@@ -900,6 +908,28 @@ class DiskUtil(object):
                 list_devices.append((controller_id, lun_number))
 
         return list_devices
+    
+    def get_all_nvme_controllers_and_namespaces(self, root_device_path_nvme, dev_items_real_paths):
+        list_devices = []
+        proc_comm = ProcessCommunicator()
+        self.command_executor.Execute('nvme list -o json', communicator=proc_comm, raise_exception_on_failure=True)
+        nvme_devices_json = json.loads(proc_comm.stdout)
+        self.logger.log("NVMe Devices: "+str(nvme_devices_json))
+        nvme_devices = nvme_devices_json['Devices']
+        for nvme_device in nvme_devices:
+            nvme_device_path = nvme_device['DevicePath']
+            if nvme_device_path == root_device_path_nvme:
+                self.logger.log("Skip NVMe OS disk")
+                continue
+            #Sample Device Path
+            #/dev/nvme0n2
+            slot_id = nvme_device['NameSpace'] - 2 # slot_id = Namspace - 2. It will be used to locate disk in CCF
+            if self.is_parent_of_any(os.path.realpath(nvme_device_path), dev_items_real_paths):
+                list_devices.append((1, slot_id)) # Hardcode conyroller to 1 to meet CCF check
+            
+        return list_devices
+
+
 
     def log_lsblk_output(self):
         lsblk_command = 'lsblk -o NAME,TYPE,FSTYPE,LABEL,SIZE,RO,MOUNTPOINT'
@@ -1102,6 +1132,50 @@ class DiskUtil(object):
 
         return DiskUtil.os_disk_lvm
 
+    def is_os_disk_nvme(self):
+        try:
+            os_block_device = None
+            proc_comm = ProcessCommunicator()
+            if self.is_os_disk_lvm():
+                self.command_executor.Execute('pvs', True, communicator=proc_comm)
+                
+                for line in proc_comm.stdout.split("\n"):
+                    if DiskUtil.os_lvm_vg in line:
+                        os_block_device = line.strip().split()[0]
+            else:
+                rootfs_mountpoint = '/'
+                mount_items = self.get_mount_items()
+                for mount_item in mount_items:
+                    if mount_item["dest"] == "/" or mount_item["dest"] == "/oldroot":
+                        os_block_device = mount_item["src"]
+                        if os_block_device == 'none':
+                            self.logger.log('In MemFS. Will check for /oldroot mountpoint')
+                            continue
+                        if mount_item["dest"] == "/oldroot":
+                            rootfs_mountpoint = '/oldroot'
+                        break
+            self.logger.log('Found OS block device: ' + os_block_device)
+            if os_block_device == '/dev/root':
+                self.command_executor.ExecuteInBash('findmnt -n -o SOURCE {}'.format(rootfs_mountpoint), True, communicator=proc_comm)
+                os_block_device = proc_comm.stdout
+            if os_block_device.startswith(CommonVariables.dev_mapper_root):
+                osmapper_name = self.get_osmapper_name()
+                if os_block_device == os.path.join(CommonVariables.dev_mapper_root, osmapper_name):
+                    self.command_executor.Execute('dmsetup deps -o blkdevname {0}'.format(os_block_device), True, communicator=proc_comm)
+                    # Sample output
+                    # 1 dependencies  : (nvme0n1p1)
+                    os_block_device = '/dev/' + proc_comm.stdout[proc_comm.stdout.index('(')+1:proc_comm.stdout.index(')')]
+            self.logger.log('Normalized OS block device: '+ os_block_device)
+            if os_block_device.startswith(CommonVariables.nvme_device_identifier):
+                self.logger.log('OS disk is NVMe. Treating the VM as ASAP')
+                return True, os_block_device[:os_block_device.index("p")]
+            else:
+                return False, ''
+        except Exception as ex:
+            self.logger.log("Exception {0} occured while trying to check for NVMe SKU".format(ex))
+            return False, '' # Treat expection as non fatal for now to avoid any regression
+
+
     def is_data_disk(self, device_item, special_azure_devices_to_skip):
         # Root disk
         if device_item.device_id.startswith('00000000-0000'):
@@ -1194,6 +1268,8 @@ class DiskUtil(object):
         # some machines use special root dir symlinks instead of scsi0 symlinks
         device_names += self.get_azure_symlinks_root_dir_devices()
 
+        device_names += self.get_azure_nvme_os_devices()
+
         # let us do some de-duping
         device_names_realpaths = set(map(os.path.realpath, device_names))
 
@@ -1203,6 +1279,18 @@ class DiskUtil(object):
                 blk_items.append(current_blk_item)
 
         return blk_items
+    
+    def get_azure_nvme_os_devices(self):
+        devices = []
+        is_os_nvme, os_block_device = self.is_os_disk_nvme()
+        if is_os_nvme:
+            proc_comm = ProcessCommunicator()
+            self.command_executor.ExecuteInBash('ls {0}*'.format(os_block_device), True, communicator=proc_comm)
+            os_devices = re.split('[ \n]', proc_comm.stdout)
+            for os_device in os_devices:
+                if os_device.startswith(os_block_device) and os.path.exists(os_device):
+                    devices.append(os_device)
+        return devices
 
     def get_azure_symlinks_root_dir_devices(self):
         """

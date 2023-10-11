@@ -122,7 +122,8 @@ class UbuntuPatching(AbstractPatching):
                     parted,
                     'python-six',
                     'procps',
-                    'psmisc']
+                    'psmisc',
+                    'nvme-cli']
 
         if self.packages_installed(packages):
             return
