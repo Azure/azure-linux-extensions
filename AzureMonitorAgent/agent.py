@@ -1226,28 +1226,29 @@ def generate_localsyslog_configs():
     syslogTcpPreviewFlagPath = PreviewFeaturesDirectory + 'useSyslogTcp'
     if os.path.exists(syslogTcpPreviewFlagPath):
         useSyslogTcp = True
-    
-    # always use syslog tcp port, unless 
-    # - the distro is Red Hat based and doesn't have semanage
-    #   these distros seem to have SELinux on by default and we shouldn't be installing semanage ourselves
-    if not os.path.exists('/etc/selinux/config'):
-        useSyslogTcp = True
-    else:        
-        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"')
-        if sedisabled == 0:
+
+    if useSyslogTcp == True:
+        # always use syslog tcp port, unless 
+        # - the distro is Red Hat based and doesn't have semanage
+        #   these distros seem to have SELinux on by default and we shouldn't be installing semanage ourselves
+        if not os.path.exists('/etc/selinux/config'):
             useSyslogTcp = True
-        else:            
-            check_semanage, _ = run_command_and_log("which semanage")
-            if check_semanage != 0:            
-                hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
-            elif syslog_port != '':
-                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"')
-                if syslogPortEnabled == 0:
-                    hutil_log_info("Skipping semanage call as port is present")
-                else:
-                    # allow the syslog port in SELinux
-                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
-                useSyslogTcp = True   
+        else:        
+            sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"')
+            if sedisabled == 0:
+                useSyslogTcp = True
+            else:            
+                check_semanage, _ = run_command_and_log("which semanage")
+                if check_semanage != 0:            
+                    hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
+                elif syslog_port != '':
+                    syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"')
+                    if syslogPortEnabled == 0:
+                        hutil_log_info("Skipping semanage call as port is present")
+                    else:
+                        # allow the syslog port in SELinux
+                        run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
+                    useSyslogTcp = True   
         
     if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
