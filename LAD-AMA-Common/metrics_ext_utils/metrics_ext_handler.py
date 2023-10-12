@@ -735,12 +735,12 @@ def get_arm_domain(az_environment):
     """
 
     try:
-        if az_environment.lower() != ArcACloudName:
-            domain = ARMDomainMap[az_environment.lower()]
-        else:
+        if az_environment.lower() == ArcACloudName:
             arm_endpoint, _ = get_arca_endpoints_from_himds()
             arm_endpoint_parsed = urllib.parse.urlparse(arm_endpoint)
             domain = arm_endpoint_parsed.netloc
+        else:
+            domain = ARMDomainMap[az_environment.lower()]
 
     except KeyError:
         raise Exception("Unknown cloud environment \"{0}\". Failed to set up ME.".format(az_environment))
