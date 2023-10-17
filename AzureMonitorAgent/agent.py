@@ -1301,13 +1301,7 @@ def generate_localsyslog_configs():
                 if portSetting not in f.read():
                     portUpdated = True
 
-            flowControl = 'flow-control'
-            setFlowControl = False
-            with open('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf') as f:
-                if flowControl not in f.read():
-                    setFlowControl = True
-
-            if portUpdated == True or setFlowControl == True:
+            if portUpdated == True:
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
                 with fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak') as file:
                     for line in file:
