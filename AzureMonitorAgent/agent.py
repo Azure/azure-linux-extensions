@@ -1264,13 +1264,7 @@ def generate_localsyslog_configs():
                 if portSetting not in f.read():
                     portUpdated = True
 
-            workerThread = 'queue.workerThreads'
-            setWorkerThread = False
-            with open('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf') as f:
-                if workerThread not in f.read():
-                    setWorkerThread = True
-
-            if portUpdated == True or setWorkerThread == True:
+            if portUpdated == True:
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
                 with fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak') as file:
                     for line in file:
