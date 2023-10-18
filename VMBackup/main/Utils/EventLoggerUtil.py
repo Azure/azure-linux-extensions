@@ -31,6 +31,7 @@ class EventLogger:
         self.event_logging_enabled = False
         self.event_logging_error_count = 0
         self.events_folder = event_directory
+        self.semaphore = threading.Semaphore(1)
         self.event_logging_enabled = bool(self.events_folder)
         self.filehelper = FileHelpers()
 
@@ -118,20 +119,21 @@ class EventLogger:
                     logger.log("Exception: {0}" .format(str(ex)))
 
     def log_event(self, message):
-        global logger
-        try:
-            if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
-                self.event_queue.put(Event("Info",
+        with self.semaphore:
+            global logger
+            try:
+                if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
+                    self.event_queue.put(Event("Info",
                                            self.current_message, LoggingConstants.DefaultEventTaskName,
                                            self.operation_id, self.extension_version).convertToDictionary())
-                # Reset the current message
-                self.current_message = message
-                self.current_message_len = len(message)
-            else:
-                self.current_message += message
-                self.current_message_len += len(message)
-        except Exception as ex:
-            logger.log("Warning: Error adding extension event to queue. Exception: {0}" .format(str(ex)))
+                    # Reset the current message
+                    self.current_message = message
+                    self.current_message_len = len(message)
+                else:
+                    self.current_message += message
+                    self.current_message_len += len(message)
+            except Exception as ex:
+                logger.log("Warning: Error adding extension event to queue. Exception: {0}" .format(str(ex)))
 
     def begin_event_queue_polling(self):
         global logger
@@ -268,6 +270,9 @@ class EventLogger:
                             logger.log("Warning: Unable to process events before termination of extension. Exception: {0}" .format(str(ex)))
                 self.disposed = True
                 print("Information: Event Logger has terminated")
+                print("Clearing the temp directory")
+                if os.path.exists(self.temporary_directory):
+                    os.rmdir(self.temporary_directory)
                 self.event_logging_enabled = False
         except Exception as ex:
             logger.log("Warning: Processing Dispose() of EventLogger resulted in Exception: {0}" .format(str(ex)))
