@@ -2,20 +2,39 @@
 
 ## What?
 
-This is a very very POC stage program where we are figuring out how to log
-system level data that makes sense and can affect snapshot extensions.
-The longer term idea is to let it run during a snapshot operation, when needed, and
-collect system behavior data.
+This is a very experimental stage program to capture system level logs
+and metrics while a snapshot operation is in progress. This kind of data is often
+private to each customer and hence we have no plans right now of including this
+as part of the normal workflow. This tool will hopefully help us gather critical
+data to debug issues that are not solved with the normal logs we collect.
 
 ## Build
+Please install [Go](https://go.dev/doc/install) and then
 
 ```sh
-cd <repo>
+cd <extension_installation_dir>
 go build
 ```
 
-## How to run?
-Right now it will keep running till it receives an OS Interrupt (Ctrl+c) after
+## Run as part of a snapshot operation
+
+- Create or edit "/etc/azure/vmbackup.conf"
+- Add a new section `[Monitor]` to the file and 
+- under that add the following options
+- `Run=yes`
+- `Strace=no`
+- Of course if you want strace to also run while taking a snapshot enable the option
+- That's it. Now every time after a snapshot is taken a new folder will be created at
+`<extension installation path>/debughelper/<new folder>`.
+- The name of this new folder will be a `ULID` which can be sorted by time
+- Inside this directory you'll see several files called `cpu.log`, `mem.log`, `strace.log`
+- It is pretty self explanatory what metrics/logs each file contains.
+
+I'll add a more detailed section about how to read the data in each file soon.
+For the curious, it's pretty much the data in the `/proc/*` files.
+
+## Running manually
+When run manually, right now, it will keep running till it receives an OS Interrupt (Ctrl+c) after
 the binary has been executed.
 
 The default behavior (do `./debughelper --help` for all options) will log everything
