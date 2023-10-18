@@ -579,7 +579,6 @@ def daemon():
             if(hutil.is_status_file_exists()):
                 status_report_to_file(file_report_msg)
             status_report_to_blob(blob_report_msg)
-            raise ValueError("custom error message.")
         except Exception as e:
             errMsg = 'Failed to log status in extension'
             errMsg += str(e)
