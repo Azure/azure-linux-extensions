@@ -31,7 +31,6 @@ class EventLogger:
         self.event_logging_enabled = False
         self.event_logging_error_count = 0
         self.events_folder = event_directory
-        self.semaphore = threading.Semaphore(1)
         self.event_logging_enabled = bool(self.events_folder)
         self.filehelper = FileHelpers()
 
@@ -119,21 +118,20 @@ class EventLogger:
                     logger.log("Exception: {0}" .format(str(ex)))
 
     def log_event(self, message):
-        with self.semaphore:
-            global logger
-            try:
-                if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
-                    self.event_queue.put(Event("Info",
-                                           self.current_message, LoggingConstants.DefaultEventTaskName,
-                                           self.operation_id, self.extension_version).convertToDictionary())
-                    # Reset the current message
-                    self.current_message = message
-                    self.current_message_len = len(message)
-                else:
-                    self.current_message += message
-                    self.current_message_len += len(message)
-            except Exception as ex:
-                logger.log("Warning: Error adding extension event to queue. Exception: {0}" .format(str(ex)))
+        global logger
+        try:
+            if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
+                self.event_queue.put(Event("Info",
+                                        self.current_message, LoggingConstants.DefaultEventTaskName,
+                                        self.operation_id, self.extension_version).convertToDictionary())
+                # Reset the current message
+                self.current_message = message
+                self.current_message_len = len(message)
+            else:
+                self.current_message += message
+                self.current_message_len += len(message)
+        except Exception as ex:
+            logger.log("Warning: Error adding extension event to queue. Exception: {0}" .format(str(ex)))
 
     def begin_event_queue_polling(self):
         global logger
