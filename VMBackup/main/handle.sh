@@ -13,6 +13,9 @@ logfile=$logfolder'/shell.log'
 rc=3
 arc=0
 
+pythonProcess=$(ps -ef | grep waagent | grep python)
+pythonPath=$(echo "${pythonProcess}" | head -n1 | awk '{print $8;}')
+
 if [ "$1" = "install" ]
 then
     if [ -f "/etc/azure/workload.conf" ]
@@ -27,13 +30,39 @@ then
 				cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
 				echo "`date -u`- The command is $1, exiting with conf file copy" >> $logfile	
 		fi
-        exit $arc
     else
         mkdir -p /etc/azure
         cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
         echo "`date -u`- The command is $1, exiting with conf file copy" >> $logfile
-        exit $arc
     fi
+
+	python3Loc=`command -v python3`
+	if [ ! -z $python3Loc ]; then
+		echo "$(date -u) - Python3 found" >> $logfile
+		sed -i "s#ExecStart=/usr/bin/python.*#ExecStart=/usr/bin/python3 $(pwd)/main/handle.py lrdaemon#g" \
+			main/systemd/MsftAzureSnapshotExt.service
+	else
+		sed -i "s#ExecStart=/usr/bin/python.*#ExecStart=/usr/bin/python $(pwd)/main/handle.py lrdaemon#g" \
+			main/systemd/MsftAzureSnapshotExt.service
+	fi
+
+	mkdir -p "/etc/systemd/system"
+	if [ -f "/etc/systemd/system/MsftAzureSnapshotExt.service" ]; then
+		systemd stop MsftAzureSnapshotExt.service
+		cp "main/systemd/MsftAzureSnapshotExt.service" "/etc/systemd/system/MsftAzureSnapshotExt.service"
+		systemd daemon-reload
+	else
+		cp "main/systemd/MsftAzureSnapshotExt.service" "/etc/systemd/system/MsftAzureSnapshotExt.service"
+		systemd daemon-reload
+	fi
+    exit $arc
+
+elif [ "$1" = "lrdaemon" ]; then
+	systemctl stop MsftAzureSnapshotExt.service
+	systemctl start MsftAzureSnapshotExt.service
+	rc=$?
+	exit $rc
+
 elif [ "$1" != "enable"  ] && [ "$1" != "daemon" ]
 then
     echo "`date -u`- The command is $1, exiting" >> $logfile
@@ -66,9 +95,6 @@ do
 		break
 	fi
 done
-
-pythonProcess=$(ps -ef | grep waagent | grep python)
-pythonPath=$(echo "${pythonProcess}" | head -n1 | awk '{print $8;}')
 
 if [ $rc -ne 0 ] && [ -f "`which python`" ]
 then
