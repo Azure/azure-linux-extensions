@@ -937,7 +937,7 @@ def is_vm_supported_for_extension():
                        'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
-                       'rocky' : ['8'], # Rocky
+                       'rocky' : ['8', '9'], # Rocky
                        'alma' : ['8'], # Alma
                        'amzn' : ['2'] # AWS
     }
