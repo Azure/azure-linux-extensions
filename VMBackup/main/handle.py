@@ -44,6 +44,7 @@ from fsfreezer import FsFreezer
 from common import CommonVariables
 from parameterparser import ParameterParser
 from Utils import HandlerUtil
+from Utils.EventLoggerUtil import EventLogger
 from Utils import SizeCalculation
 from Utils import Status
 from freezesnapshotter import FreezeSnapshotter
@@ -61,7 +62,7 @@ from signal import SIGTERM;
 #Main function is the only entrence to this extension handler
 
 def main():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro, configSeqNo
+    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,freeze_result,snapshot_info_array,total_used_size,size_calculation_failed, patch_class_name, orig_distro, configSeqNo, eventlogger, disable_event_logging
     try:
         run_result = CommonVariables.success
         run_status = 'success'
@@ -70,12 +71,20 @@ def main():
         snapshot_info_array = None
         total_used_size = 0
         size_calculation_failed = False
+        eventlogger = None
         HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
         MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
         hutil.patching = MyPatching
         configSeqNo = -1
+        hutil.try_parse_context(configSeqNo)
+        disable_event_logging = hutil.get_intvalue_from_configfile("disable_logging", 0)
+        if disable_event_logging == 0:
+            eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
+        else:
+            eventlogger = None
+        hutil.set_event_logger(eventlogger)
         for a in sys.argv[1:]:
             if re.match("^([-/]*)(disable)", a):
                 disable()
@@ -255,7 +264,7 @@ def spawn_monitor(strace_pid = 0):
     return None
 
 def daemon():
-    global MyPatching,backup_logger,hutil,run_result,run_status,error_msg,freezer,para_parser,snapshot_done,snapshot_info_array,g_fsfreeze_on,total_used_size,patch_class_name,orig_distro, workload_patch, configSeqNo
+    global MyPatching, backup_logger, hutil, run_result, run_status, error_msg, freezer, para_parser, snapshot_done, snapshot_info_array, g_fsfreeze_on, total_used_size, patch_class_name, orig_distro, workload_patch, configSeqNo, eventlogger
     #this is using the most recent file timestamp.
     hutil.do_parse_context('Executing', configSeqNo)
 
@@ -347,6 +356,9 @@ def daemon():
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
         hutil.update_settings_file()
+
+        if(para_parser.taskId is not None and para_parser.taskId != "" and eventlogger is not None):
+            eventlogger.update_properties(para_parser.taskId)
 
         if(bool(public_settings) == False and not protected_settings):
             error_msg = "unable to load certificate"
@@ -602,6 +614,8 @@ def daemon():
     else:
         backup_logger.log("the logs blob uri is not there, so do not upload log.")
         backup_logger.commit_to_local()
+        if(eventlogger is not None): 
+            eventlogger.dispose()
     if monitor_process is not None:
         monitor_process.terminate()
     sys.exit(0)
@@ -622,13 +636,13 @@ def update():
     hutil.do_exit(0,'Update','success','0', 'Update Succeeded')
 
 def enable():
-    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo
+    global backup_logger,hutil,error_msg,para_parser,patch_class_name,orig_distro,configSeqNo,eventlogger,disable_event_logging
     try:
         hutil.do_parse_context('Enable', configSeqNo)
-
         backup_logger.log('starting enable', True)
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
-
+        if(disable_event_logging != 0):
+            backup_logger.log("logging via guest agent is turned off")
         hutil.exit_if_same_seq()
 
         hutil.save_seq()
@@ -638,21 +652,23 @@ def enable():
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
+            if(eventlogger is not None):
+                eventlogger.update_properties(para_parser.taskId)
             backup_logger.log('taskId: ' + str(para_parser.taskId), True)
             randomSleepTime = random.randint(500, 5000)
             backup_logger.log('Sleeping for milliseconds: ' + str(randomSleepTime), True)
             time.sleep(randomSleepTime / 1000)
             exit_if_same_taskId(para_parser.taskId)
             taskIdentity = TaskIdentity()
-            taskIdentity.save_identity(para_parser.taskId)
-
+            taskIdentity.save_identity(para_parser.taskId)       
         temp_status= 'success'
         temp_result=CommonVariables.ExtensionTempTerminalState
         temp_msg='Transitioning state in extension'
         blob_report_msg, file_report_msg = get_status_to_report(temp_status, temp_result, temp_msg, None)
 
         status_report_to_file(file_report_msg)
-
+        if(eventlogger is not None):
+            eventlogger.dispose()
         start_daemon()
         sys.exit(0)
     except Exception as e:

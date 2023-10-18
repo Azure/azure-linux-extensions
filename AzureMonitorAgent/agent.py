@@ -447,7 +447,7 @@ def enable():
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
         Next-Generation: allows MCS, GCS multi tenant, or both
     """
-
+    is_gcs_single_tenant = False
     # Next-generation schema
     if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):
 
@@ -486,6 +486,7 @@ def enable():
     else:
         hutil_log_info("Detected Geneva mode; azuremonitoragent service will be started to handle Geneva configuration")
         ensure["azuremonitoragent"] = True
+        is_gcs_single_tenant = True
         handle_gcs_config(public_settings, protected_settings, default_configs)
         # generate local syslog configuration files as in 1P syslog is not driven from DCR
         generate_localsyslog_configs()
@@ -516,7 +517,9 @@ def enable():
         # start the metrics and syslog watcher only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
-
+    elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
+        # In GCS scenarios, ensure that AMACoreAgent is running
+        start_amacoreagent()
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -1230,24 +1233,25 @@ def generate_localsyslog_configs():
     if not os.path.exists('/etc/selinux/config'):
         useSyslogTcp = True
     else:        
-        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"')
+        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
         if sedisabled == 0:
             useSyslogTcp = True
         else:            
-            check_semanage, _ = run_command_and_log("which semanage")
-            if check_semanage != 0:            
-                hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
-            elif syslog_port != '':
-                # allow the syslog port in SELinux
-                run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
+            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
+            if check_semanage == 0 and syslog_port != '':
+                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"',log_cmd=False)
+                if syslogPortEnabled != 0:                    
+                    # allow the syslog port in SELinux
+                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
                 useSyslogTcp = True   
         
     if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
-                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+                if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
                     os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
                     os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
                 os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
@@ -1331,8 +1335,9 @@ def remove_localsyslog_configs():
     if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf') or os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
         if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
             os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
-        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+        if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
             os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):            
             os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
         run_command_and_log(get_service_command("rsyslog", "restart"))
         hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
@@ -1477,19 +1482,25 @@ def find_vm_distro(operation):
     """
     vm_dist = vm_id = vm_ver =  None
     parse_manually = False
-    try:
-        vm_dist, vm_ver, vm_id = platform.linux_distribution()
-    except AttributeError:
+
+    # platform commands used below aren't available after Python 3.6
+    if sys.version_info < (3,7):
         try:
-            vm_dist, vm_ver, vm_id = platform.dist()
+            vm_dist, vm_ver, vm_id = platform.linux_distribution()
         except AttributeError:
-            hutil_log_info("Falling back to /etc/os-release distribution parsing")
-    # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
-    # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
-    try:
-        temp_vm_ver = int(vm_ver.split('.')[0])
-    except:
-        parse_manually = True
+            try:
+                vm_dist, vm_ver, vm_id = platform.dist()
+            except AttributeError:
+                hutil_log_info("Falling back to /etc/os-release distribution parsing")
+
+        # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
+        # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
+        try:
+            temp_vm_ver = int(vm_ver.split('.')[0])
+        except:
+            parse_manually = True
+    else:
+        parse_manually = True    
 
     if (not vm_dist and not vm_ver) or parse_manually: # SLES 15 and others
         try:
@@ -1534,7 +1545,7 @@ def is_vm_supported_for_extension(operation):
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
-                       'ubuntu' : ['18.04', '20.04'], # Ubuntu
+                       'ubuntu' : ['18.04', '20.04', '22.04'], # Ubuntu
                        'alma' : ['8'], # Alma
                        'centos' : ['7'], # CentOS
                        'mariner' : ['2'], # Mariner 2.0

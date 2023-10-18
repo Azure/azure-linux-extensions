@@ -119,7 +119,7 @@ type LoadAvg struct {
 }
 
 func (r Run) monitorCPU(ctx context.Context, cpuStream chan *LoadAvg) {
-	log.Println("[monitorCPU] -> Fired")
+	// log.Println("[monitorCPU] -> Fired")
 	ticker := time.NewTicker(time.Second)
 	ctx1, cancel := context.WithCancel(ctx)
 outer:
@@ -160,10 +160,9 @@ outer:
 }
 
 func (r Run) logCPU(ctx context.Context, cpuStream chan *LoadAvg) error {
-	log.Println("[logCPU] -> Fired")
 	f, err := os.Create(path.Join(r.workDir(), LF_CPU))
 	if err != nil {
-		return wrapErr(err, "OpenFile failed")
+		return wrapErr(err, "os.Create failed")
 	}
 	// logger := log.New(f, "", log.Ldate|log.Ltime|log.LUTC)
 	defer f.Close()
@@ -173,12 +172,12 @@ outer:
 		case <-ctx.Done():
 			break outer
 		case lav := <-cpuStream:
-			log.Println("[logCPU] -> new metric received")
+			// log.Println("[logCPU] -> new metric received")
 			bs, err := json.Marshal(lav)
 			if err != nil {
 				r.log.Println(wrapErr(err, "json.Marshal failed"))
 			} else {
-				log.Println("[logCPU] -> writing to log file")
+				// log.Println("[logCPU] -> writing to log file")
 				f.WriteString(fmt.Sprintf("%s\n", string(bs)))
 			}
 		}
@@ -198,7 +197,6 @@ type Mem struct {
 }
 
 func (r Run) monitorMem(ctx context.Context, memStream chan *Mem) {
-	log.Println("[monitorMem] -> Fired")
 	ticker := time.NewTicker(time.Second)
 	ctx1, cancel := context.WithCancel(context.TODO())
 outer:
@@ -287,7 +285,7 @@ outer:
 					}
 				}
 				if flag {
-					log.Println("[monitorMem] -> sending new metric")
+					// log.Println("[monitorMem] -> sending new metric")
 					memStream <- &m
 				}
 			}
@@ -296,7 +294,7 @@ outer:
 }
 
 func (r Run) logMem(ctx context.Context, memStream chan *Mem) error {
-	log.Println("[logMem] -> Fired")
+	// log.Println("[logMem] -> Fired")
 	f, err := os.Create(path.Join(r.workDir(), LF_MEM))
 	if err != nil {
 		return wrapErr(err, "OpenFile failed")
@@ -308,6 +306,9 @@ outer:
 		case <-ctx.Done():
 			break outer
 		case lav := <-memStream:
+			if lav == nil {
+				break outer
+			}
 			log.Println("[logMem] -> received new metric")
 			bs, err := json.Marshal(lav)
 			if err != nil {
@@ -321,8 +322,124 @@ outer:
 	return nil
 }
 
+type DiskLog struct {
+	TS                          int64  `json:"timestamp_millis"`
+	MajorNum                    string `json:"major_num"`
+	MinorNum                    string `json:"minor_num"`
+	DeviceName                  string `json:"device_name"`
+	ReadsCompleted              string `json:"reads_completed_successfully"`
+	ReadsMerged                 string `json:"reads_merged"`
+	SectorsRead                 string `json:"sectors_read"`
+	TimeSpentReadingMs          string `json:"time_spent_reading_ms"`
+	WritesCompleted             string `json:"writes_completed"`
+	WriteMerged                 string `json:"writes_merged"`
+	SectorsWritten              string `json:"sectors_written"`
+	TimeSpentWritingMs          string `json:"time_spent_writing"`
+	IosInProgress               string `json:"ios_currently_in_progress"`
+	TimeSpentIosMs              string `json:"time_spent_doing_ios_ms"`
+	WeightedTimeSpentDoingIosMs string `json:"weighted_time_spent_doing_ios_ms"`
+	DiscardsCompleted           string `json:"discards_completed_successfully"`
+	DiscardsMerged              string `json:"discards_merged"`
+	SectorsDiscarded            string `json:"sectors_discarded"`
+	TimeSpentDiscardingMs       string `json:"time_sspent_discarding"`
+	FlushRequestsCompleted      string `json:"flush_requests_completed_successfully"`
+	TimeSpentFlushingMs         string `json:"time_spent_flushing"`
+}
+
+func (r Run) monitorDisk(ctx context.Context, diskChan chan *DiskLog) {
+	ticker := time.NewTicker(time.Second)
+	ctx1, cancel := context.WithCancel(context.TODO())
+outer:
+	for {
+		select {
+		case <-ctx.Done():
+			cancel()
+			ticker.Stop()
+			diskChan <- nil
+			break outer
+		case <-ticker.C:
+			command := exec.CommandContext(ctx1, "cat", "/proc/diskstats")
+			bs, err := command.CombinedOutput()
+			if err != nil {
+				log.Println(wrapErr(err, "CombinedOutput failed"))
+				continue outer
+			}
+			for _, line := range strings.Split(string(bs), "\n") {
+				fields := strings.Fields(line)
+				// Get only sata or nvme disks
+				if !strings.Contains(fields[2], "sd") && !strings.Contains(fields[2], "nvme") {
+					continue
+				}
+
+				dl := DiskLog{
+					TS:                          time.Now().UnixMilli(),
+					MajorNum:                    fields[0],
+					MinorNum:                    fields[1],
+					DeviceName:                  fields[2],
+					ReadsCompleted:              fields[3],
+					ReadsMerged:                 fields[4],
+					SectorsRead:                 fields[5],
+					TimeSpentReadingMs:          fields[6],
+					WritesCompleted:             fields[7],
+					WriteMerged:                 fields[8],
+					SectorsWritten:              fields[9],
+					TimeSpentWritingMs:          fields[10],
+					IosInProgress:               fields[11],
+					TimeSpentIosMs:              fields[12],
+					WeightedTimeSpentDoingIosMs: fields[13],
+				}
+
+				lf := len(fields)
+				// Kernel 4.18+ will have the following fields
+				if lf >= 18 {
+					dl.DiscardsCompleted = fields[14]
+					dl.DiscardsMerged = fields[15]
+					dl.SectorsDiscarded = fields[16]
+					dl.TimeSpentDiscardingMs = fields[17]
+				}
+
+				// Kernel 5.5+ further have the following fields
+				if lf >= 20 {
+					dl.FlushRequestsCompleted = fields[18]
+					dl.TimeSpentFlushingMs = fields[19]
+				}
+
+				diskChan <- &dl
+			}
+		}
+	}
+}
+
+func (r Run) logDisk(ctx context.Context, diskChan chan *DiskLog) error {
+	f, err := os.Create(path.Join(r.workDir(), LF_DISK))
+	if err != nil {
+		return wrapErr(err, "os.Create failed")
+	}
+	defer f.Close()
+outer:
+	for {
+		select {
+		case <-ctx.Done():
+			break outer
+		case lav := <-diskChan:
+			if lav == nil {
+				break outer
+			}
+			log.Println("[logDisk] -> received new metric")
+			bs, err := json.Marshal(lav)
+			if err != nil {
+				r.log.Println(wrapErr(err, "json.Marshal failed"))
+			} else {
+				log.Println("[logDisk] -> writing to log file")
+				f.WriteString(fmt.Sprintf("%s\n", string(bs)))
+			}
+		}
+	}
+	return nil
+}
+
 func (r Run) persistInMemDir() {
-	log.Println("[persistInMemDir] -> Fired")
+	// log.Println("[persistInMemDir] -> Fired")
 	if !r.logToMem {
 		return
 	}
@@ -334,7 +451,7 @@ func (r Run) persistInMemDir() {
 }
 
 func (r Run) monitor(ctx context.Context) {
-	log.Println("[monitor] -> Fired")
+	// log.Println("[monitor] -> Fired")
 	wg := sync.WaitGroup{}
 
 	// save pid file
@@ -389,12 +506,32 @@ func (r Run) monitor(ctx context.Context) {
 		}
 	}()
 
+	// Disk
+	diskChan := make(chan *DiskLog, 20)
+	diskCtx, diskCancel := context.WithCancel(ctx)
+	logDiskCtx, logDiskCancel := context.WithCancel(ctx)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		r.monitorDisk(diskCtx, diskChan)
+
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := r.logDisk(logDiskCtx, diskChan); err != nil {
+			r.log.Println(wrapErr(err))
+		}
+	}()
+
 	<-ctx.Done()
 	tcancel()
 	cpuCancel()
 	logCpuCancel()
 	memCancel()
 	logMemCancel()
+	diskCancel()
+	logDiskCancel()
 
 	wg.Wait()
 
