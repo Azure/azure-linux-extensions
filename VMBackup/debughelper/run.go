@@ -367,6 +367,9 @@ outer:
 			for _, line := range strings.Split(string(bs), "\n") {
 				fields := strings.Fields(line)
 				// Get only sata or nvme disks
+				if len(fields) == 0 {
+					continue
+				}
 				if !strings.Contains(fields[2], "sd") && !strings.Contains(fields[2], "nvme") {
 					continue
 				}

@@ -246,9 +246,11 @@ def can_take_crash_consistent_snapshot(para_parser):
         backup_logger.log("isManagedVm=" + str(isManagedVm) + ", canTakeCrashConsistentSnapshot=" + str(canTakeCrashConsistentSnapshot) + ", backupRetryCount=" + str(backupRetryCount) + ", numberOfDisks=" + str(numberOfDisks) + ", takeCrashConsistentSnapshot=" + str(takeCrashConsistentSnapshot), True, 'Info')
     return takeCrashConsistentSnapshot
 
-def spawn_monitor(strace_pid = 0):
-    d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    d = os.path.join(d, "debughelper")
+def spawn_monitor(location = "", strace_pid = 0):
+    d = location
+    if d == "":
+        d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        d = os.path.join(d, "debughelper")
     bd = os.path.join(d, "msft_snap_monit")
     try:
         args = [bd, "--wd", d]
@@ -297,6 +299,7 @@ def daemon():
     OnAppSuccessDoFsFreeze = True
     MonitorRun = False
     MonitorEnableStrace = False
+    MonitorLocation = ""
     #Adding python version to the telemetry
     try:
         python_version_info = sys.version_info
@@ -330,6 +333,8 @@ def daemon():
             MonitorRun = config.getboolean("Monitor", "Run")
             if config.has_option("Monitor", "Strace"):
                 MonitorEnableStrace = config.getboolean("Monitor", "Strace")
+            if config.has_option("Monitor", "Location"):
+                MonitorLocation = config.get("Monitor", "Location")
     except Exception as e:
         errMsg='cannot read config file or file not present'
         backup_logger.log(errMsg, True, 'Warning')
@@ -339,9 +344,9 @@ def daemon():
     monitor_process = None
     if MonitorRun:
         if MonitorEnableStrace:
-            monitor_process = spawn_monitor(os.getpid())
+            monitor_process = spawn_monitor(location = MonitorLocation, strace_pid=os.getpid())
         else:
-            monitor_process = spawn_monitor()
+            monitor_process = spawn_monitor(location = MonitorLocation)
     snapshot_info_array = None
 
     try:
