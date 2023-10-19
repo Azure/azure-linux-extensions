@@ -53,7 +53,7 @@ Strace=no
 Location=/var/log/azure/Microsoft.Azure.RecoveryServices.VMSnapshotLinux/debughelper
 ```
 - I've not included other sections that the file might already include so donot delete if there are any.
-- That's it. Now every time after a snapshot is taken a new folder will be created at
+- That's it! Now every time after a snapshot/restore point is taken a new folder will be created at
 `/var/log/azure/Microsoft.Azure.RecoveryServices.VMSnapshotLinux/debughelper/<new folder>`.
 - The name of this new folder will be a `ULID` which can be sorted by time
 - Inside this directory you'll see several files called `cpu.log`, `mem.log`, `disk.log`, `strace.log`
