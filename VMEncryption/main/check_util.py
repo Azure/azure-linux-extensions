@@ -117,8 +117,8 @@ class CheckUtil(object):
 
     def check_mhsm_id(self, test_mhsm_id, message):
         """basic sanity check of the mhsm resource id"""
-        expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/managedHSM/{mhsmname}"
-        pattern = re.compile(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/managedHSM/([a-zA-Z0-9\-\_]+)(/)?$',re.IGNORECASE)
+        expected = "/subscriptions/{subid}/resourceGroups/{rgname}/providers/Microsoft.KeyVault/managedHSMs/{mhsmname}"
+        pattern = re.compile(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/managedHSMs/([a-zA-Z0-9\-\_]+)(/)?$',re.IGNORECASE)
         if not (test_mhsm_id and pattern.match(test_mhsm_id)):
             raise Exception('\n' + message + '\nActual: ' + test_mhsm_id + '\nExpected: ' + expected + "\n")
         return
