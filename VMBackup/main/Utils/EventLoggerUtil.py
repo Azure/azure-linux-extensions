@@ -122,8 +122,8 @@ class EventLogger:
         try:
             if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
                 self.event_queue.put(Event("Info",
-                                            self.current_message, LoggingConstants.DefaultEventTaskName,
-                                            self.operation_id, self.extension_version).convertToDictionary())
+                                           self.current_message, LoggingConstants.DefaultEventTaskName,
+                                           self.operation_id, self.extension_version).convertToDictionary())
                 # Reset the current message
                 self.current_message = message
                 self.current_message_len = len(message)
