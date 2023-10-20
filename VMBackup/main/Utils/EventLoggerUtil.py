@@ -122,8 +122,8 @@ class EventLogger:
         try:
             if self.current_message_len + len(message) > LoggingConstants.MaxMessageLengthPerEvent:
                 self.event_queue.put(Event("Info",
-                                        self.current_message, LoggingConstants.DefaultEventTaskName,
-                                        self.operation_id, self.extension_version).convertToDictionary())
+                                            self.current_message, LoggingConstants.DefaultEventTaskName,
+                                            self.operation_id, self.extension_version).convertToDictionary())
                 # Reset the current message
                 self.current_message = message
                 self.current_message_len = len(message)
@@ -245,6 +245,13 @@ class EventLogger:
             FileHelpers.deleteFile(file_path)
             print("Information: Event reporting has paused due to reaching maximum capacity in the Event directory. Reporting will resume once space is available. Events for this iteration will not be reported.")
 
+    def clear_temp_directory(self, directory_path):
+        try:
+            if os.path.exists(directory_path):
+                os.rmdir(directory_path)
+        except Exception as ex:
+            logger.log("Warning: Error clearing the temp directory. Exception: {0}".format(str(ex)))
+    
     def dispose(self):
         print("Information: Dispose(), called on EventLogger. Event processing is terminating...")
         self._dispose(True)
@@ -269,8 +276,7 @@ class EventLogger:
                 self.disposed = True
                 print("Information: Event Logger has terminated")
                 print("Clearing the temp directory")
-                if os.path.exists(self.temporary_directory):
-                    os.rmdir(self.temporary_directory)
+                self.clear_temp_directory(self.temporary_directory)
                 self.event_logging_enabled = False
         except Exception as ex:
             logger.log("Warning: Processing Dispose() of EventLogger resulted in Exception: {0}" .format(str(ex)))
