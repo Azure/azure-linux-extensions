@@ -231,7 +231,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 }
 ```
 
-The sample ARM template is [201-vmaccess-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-vmaccess-on-ubuntu).
+The sample ARM template is [demos/vmaccess-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/demos/vmaccess-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
