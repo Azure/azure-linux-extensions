@@ -1,3 +1,8 @@
+1.4.0.3
+- temp disk encryption for CVM is by default.
+- temp disk encryption for CVM can be controlled by flag NoConfidentialEncryptionTempDisk
+- supported managed ids are (resource id, client id and object id.)
+
 1.4.0.2
 - hotfix for EFA reimage scenario.
 
