@@ -1132,6 +1132,18 @@ class DiskUtil(object):
 
         return DiskUtil.os_disk_lvm
 
+    """
+    To check if OS disk is NVMe we try to get OS disk block device name.
+    If block device name starts with /dev/nvme then we consider it as NVMe.
+    Below are the steps to get OS disk block device name:
+    - If OS is LVM then get the backing physical volume using pvs command
+    - For RAW OS get the device for / mountpoint from /proc/mounts
+      -  For non online encryption OS could be mounted on /oldroot in stripdown state.
+      -  if device for / is none then it could be the stripdown state.
+      -  Use /oldroot mountpoint for such cases.
+    - Ubuntu /proc/mounts contains /dev/root as OS disk. Use findmnt to get the actual OS disk.
+    - If OS is encrypted, use dmsetup to get the backing block device for the device mapper.
+    """
     def is_os_disk_nvme(self):
         try:
             os_block_device = None
