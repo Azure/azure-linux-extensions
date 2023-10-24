@@ -134,7 +134,7 @@ class CheckUtil(object):
     def get_mhsm_id_name(self, mhsm_id):
         """extract MHSM name from MHSM ID"""
         if mhsm_id:
-            match = re.search(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/managedHSM/([a-zA-Z0-9\-\_]+)(/)?$', mhsm_id, re.IGNORECASE)
+            match = re.search(r'^/subscriptions/([a-zA-Z0-9\-]+)/resourceGroups/([-\w\._\(\)]+)/providers/Microsoft.KeyVault/managedHSMs/([a-zA-Z0-9\-\_]+)(/)?$', mhsm_id, re.IGNORECASE)
             if match:
                 return match.group(3)
         return
