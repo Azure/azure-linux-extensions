@@ -1357,7 +1357,10 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
             ongoing_item_config.original_dev_name_path = os.path.join('/dev/', device_item.name)
         else:
             ongoing_item_config.original_dev_name_path = os.path.join(CommonVariables.dev_mapper_root, device_item.name)
-        ongoing_item_config.original_dev_path=disk_util.get_persistent_path_by_sdx_path(ongoing_item_config.original_dev_name_path)
+        if device_item.name.startswith(CommonVariables.nvme_device_name_identifier):
+            ongoing_item_config.original_dev_path = ongoing_item_config.original_dev_name_path #nvme disks does not have /dev/disk/azure paths
+        else:
+            ongoing_item_config.original_dev_path=disk_util.get_persistent_path_by_sdx_path(ongoing_item_config.original_dev_name_path)
         ongoing_item_config.phase = CommonVariables.EncryptionPhaseBackupHeader
         ongoing_item_config.commit()
     else:
@@ -1909,7 +1912,7 @@ def find_all_devices_to_encrypt(encryption_marker, disk_util, bek_util, volume_t
             if device_item.mount_point is None or device_item.mount_point == "":
                 # Don't encrypt partitions that are not even mounted
                 continue
-            if os.path.join('/dev/', device_item.name) not in dev_path_reference_table:
+            if os.path.join('/dev/', device_item.name) not in dev_path_reference_table and not device_item.name.startswith(CommonVariables.nvme_device_name_identifier):
                 # Only format device_items that have an azure udev name
                 continue
         device_items_to_encrypt.append(device_item)

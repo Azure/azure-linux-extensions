@@ -118,6 +118,14 @@ class redhatPatching(AbstractPatching):
             packages.remove('procps-ng')
             packages.remove('util-linux')
 
+        if self.support_online_encryption:
+            packages.append('nvme-cli')
+            packages.remove('psmisc')
+            packages.remove('uuid')
+            packages.remove('at')
+            packages.remove('patch')
+            packages.remove('procps-ng')
+
         if self.command_executor.Execute("rpm -q " + " ".join(packages)):
             self.command_executor.Execute("yum install -y " + " ".join(packages))
 
