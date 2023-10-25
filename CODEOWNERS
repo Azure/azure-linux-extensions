@@ -23,7 +23,7 @@
 /LAD-AMA-Common/ @Azure/geneva-linux-agents
 
 # DSCForLinux Extension
-/DSC/ @Bhargava-Chary-Chollaty
+/DSC/ @Bhargava-Chary-Chollaty @kkarmakarMS
 
 # OMS Agent Extension
 /OmsAgent/ @Azure/geneva-linux-agents
