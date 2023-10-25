@@ -585,7 +585,7 @@ def daemon():
         global_error_result = e
 
     if monitor_process is not None:
-        os.kill(monitor_process.pid, SIGTERM)
+        monitor_process.terminate()
 
     """
     we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
