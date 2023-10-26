@@ -797,7 +797,9 @@ def enable():
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         check_release_rsa_or_ec_key = False
         if security_Type == CommonVariables.ConfidentialVM:
-            check_release_rsa_or_ec_key = True
+            if CommonVariables.KeyEncryptionKeyURLKey in public_settings:
+                logger.log('Confidential VM: KEK is provided, will attempt a secure key release check')
+                check_release_rsa_or_ec_key = True
         # run fatal prechecks, report error if exceptions are caught
         try:
             if not is_migrate_operation:
