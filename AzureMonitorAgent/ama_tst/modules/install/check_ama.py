@@ -1,6 +1,14 @@
 import re
+import sys
 import xml.dom.minidom
-import urllib
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+    import urllib.error as urlerror
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    import urllib2 as urlerror
+    
 try:
     import requests
 except ImportError:
@@ -19,7 +27,9 @@ def get_latest_ama_version(curr_version):
         r = urllib.urlopen(AMA_URL).read()
     except AttributeError:
         r = requests.get(AMA_URL).text
-        
+    except (urlerror.HTTPError, OSError) as e:
+        return(None, e)
+
     try:
         tbody = r.split("<tbody>")[1].split("</tbody>")[0]
         tbody = "<tbody>" + tbody + "</tbody>"

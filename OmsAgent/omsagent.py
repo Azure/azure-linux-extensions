@@ -18,14 +18,6 @@
 
 from __future__ import print_function
 import sys
-
-# future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
-if sys.version_info[0] < 3:
-    from future import standard_library
-    standard_library.install_aliases()
-    from builtins import str
-
 import os
 import os.path
 import signal
@@ -39,7 +31,6 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib.request, urllib.parse, urllib.error
 import watcherutil
 import shutil
 
@@ -51,6 +42,16 @@ try:
 except Exception as e:
     # These utils have checks around the use of them; this is not an exit case
     print('Importing utils failed with error: {0}'.format(e))
+
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+    from urllib.parse import urlparse
+    import urllib.error as urlerror
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    from urlparse import urlparse
+    import urllib2 as urlerror
 
 # This monkey patch duplicates the one made in the waagent import above.
 # It is necessary because on 2.6, the waagent monkey patch appears to be overridden
@@ -768,11 +769,11 @@ def get_imds_endpoint():
 
 def get_vmresourceid_from_metadata():
     imds_endpoint = get_imds_endpoint()
-    req = urllib.request.Request(imds_endpoint)
+    req = urllib.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     try:
-        response = json.loads(urllib.request.urlopen(req).read())
+        response = json.loads(urllib.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
             return None # classic vm
@@ -782,7 +783,7 @@ def get_vmresourceid_from_metadata():
         else:
             return '/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Compute/virtualMachines/{2}'.format(response['compute']['subscriptionId'],response['compute']['resourceGroupName'],response['compute']['name'])
 
-    except urllib.error.HTTPError as e:
+    except urlerror.HTTPError as e:
         hutil_log_error('Request to Metadata service URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from Metadata service: ' \
@@ -794,11 +795,11 @@ def get_vmresourceid_from_metadata():
 
 def get_azure_environment_from_imds():
     imds_endpoint = get_imds_endpoint()
-    req = urllib.request.Request(imds_endpoint)
+    req = urllib.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     try:
-        response = json.loads(urllib.request.urlopen(req).read())
+        response = json.loads(urllib.urlopen(req).read())
 
         if ('compute' not in response or response['compute'] is None):
             return None # classic vm
@@ -807,7 +808,7 @@ def get_azure_environment_from_imds():
             return None # classic vm
 
         return response['compute']['azEnvironment']
-    except urllib.error.HTTPError as e:
+    except urlerror.HTTPError as e:
         hutil_log_error('Request to Metadata service URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from Metadata service: ' \
@@ -935,10 +936,10 @@ def is_vm_supported_for_extension():
                        'centos' : ['7', '8'], # CentOS
                        'oracle' : ['7', '8'], 'ol': ['7', '8'], # Oracle
                        'debian' : ['8', '9', '10'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
-                       'rocky' : ['8'], # Rocky
-                       'alma' : ['8'], # Alma
+                       'rocky' : ['8', '9'], # Rocky
+                       'alma' : ['8', '9'], # Alma
                        'amzn' : ['2'] # AWS
     }
 
@@ -1811,15 +1812,15 @@ def get_tenant_id_from_metadata_api(vm_resource_id):
     """
     tenant_id = None
     metadata_endpoint = get_metadata_api_endpoint(vm_resource_id)
-    metadata_request = urllib.request.Request(metadata_endpoint)
+    metadata_request = urllib.Request(metadata_endpoint)
     try:
         # This request should fail with code 401
-        metadata_response = urllib.request.urlopen(metadata_request)
+        metadata_response = urllib.urlopen(metadata_request)
         hutil_log_info('Request to Metadata API did not fail as expected; ' \
                        'attempting to use headers from response to ' \
                        'determine Tenant ID')
         metadata_headers = metadata_response.headers
-    except urllib.error.HTTPError as e:
+    except urlerror.HTTPError as e:
         metadata_headers = e.headers
 
     if metadata_headers is not None and 'WWW-Authenticate' in metadata_headers:
@@ -1863,7 +1864,7 @@ def get_metadata_api_endpoint(vm_resource_id):
     metadata_url = 'https://management.azure.com/subscriptions/{0}' \
                    '/resourceGroups/{1}'.format(subscription_id,
                                                 resource_group)
-    metadata_data = urllib.parse.urlencode({'api-version' : '2016-09-01'})
+    metadata_data = urlparse.urlencode({'api-version' : '2016-09-01'})
     metadata_endpoint = '{0}?{1}'.format(metadata_url, metadata_data)
     return metadata_endpoint
 
@@ -1889,13 +1890,13 @@ def get_access_token(tenant_id, resource):
                                 '{0}'.format(tenant_id),
                   'resource' : resource
     }
-    oauth_request = urllib.request.Request(listening_url + '/oauth2/token',
-                                    urllib.parse.urlencode(oauth_data))
+    oauth_request = urllib.Request(listening_url + '/oauth2/token',
+                                    urlparse.urlencode(oauth_data))
     oauth_request.add_header('Metadata', 'true')
     try:
-        oauth_response = urllib.request.urlopen(oauth_request)
+        oauth_response = urllib.urlopen(oauth_request)
         oauth_response_txt = oauth_response.read()
-    except urllib.error.HTTPError as e:
+    except urlerror.HTTPError as e:
         hutil_log_error('Request to ManagedIdentity extension listening URL ' \
                         'failed with an HTTPError: {0}'.format(e))
         hutil_log_info('Response from ManagedIdentity extension: ' \
@@ -1930,7 +1931,7 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
                 'JwtToken' : access_token
     }
     oms_request_json = json.dumps(oms_data)
-    oms_request = urllib.request.Request(OMSServiceValidationEndpoint)
+    oms_request = urllib.Request(OMSServiceValidationEndpoint)
     oms_request.add_header('Content-Type', 'application/json')
 
     retries = 5
@@ -1943,9 +1944,9 @@ def get_workspace_info_from_oms(vm_resource_id, tenant_id, access_token):
     # provisioning has been accepted
     while try_count <= retries:
         try:
-            oms_response = urllib.request.urlopen(oms_request, oms_request_json)
+            oms_response = urllib.urlopen(oms_request, oms_request_json)
             oms_response_txt = oms_response.read()
-        except urllib.error.HTTPError as e:
+        except urlerror.HTTPError as e:
             hutil_log_error('Request to OMS threw HTTPError: {0}'.format(e))
             hutil_log_info('Response from OMS: {0}'.format(e.read()))
             raise OMSServiceOneClickException('ValidateMachineIdentity ' \

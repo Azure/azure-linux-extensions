@@ -38,6 +38,7 @@ EndCertificateTag = '-----END CERTIFICATE-----'
 BeginSSHTag = '---- BEGIN SSH2 PUBLIC KEY ----'
 OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
+SshdConfigBackupPath = '/var/cache/vmaccess/backup'
 
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
@@ -139,10 +140,12 @@ def enable():
 
         reset_ssh = None
         remove_user = None
+        restore_backup_ssh = None
         protect_settings = hutil.get_protected_settings()
         if protect_settings:
-            reset_ssh = protect_settings.get('reset_ssh')
+            reset_ssh = protect_settings.get('reset_ssh', False)
             remove_user = protect_settings.get('remove_user')
+            restore_backup_ssh = protect_settings.get('restore_backup_ssh', False)
 
         if remove_user and _is_sshd_config_modified(protect_settings):
             ext_utils.add_extension_event(name=hutil.get_name(),
@@ -153,15 +156,12 @@ def enable():
 
         _forcibly_reset_chap(hutil)
 
-        if _is_sshd_config_modified(protect_settings):
-            _backup_sshd_config(SshdConfigPath)
-
-        if reset_ssh:
+        if reset_ssh or restore_backup_ssh:
             _open_ssh_port()
             hutil.log("Succeeded in check and open ssh port.")
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="reset-ssh")
-            _reset_sshd_config(SshdConfigPath)
-            hutil.log("Succeeded in reset sshd_config.")
+            _reset_sshd_config(hutil, restore_backup_ssh)
+            hutil.log("Succeeded in {0} sshd_config.".format("resetting" if reset_ssh else "restoring"))
 
         if remove_user:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="remove-user")
@@ -182,23 +182,12 @@ def enable():
 
 def _forcibly_reset_chap(hutil):
     name = "ChallengeResponseAuthentication"
-    config = ext_utils.get_file_contents(SshdConfigPath).split("\n")
-    for i in range(0, len(config)):
-        if config[i].startswith(name) and "no" in config[i].lower():
-            ext_utils.add_extension_event(name=hutil.get_name(), op="sshd", is_success=True,
-                                          message="ChallengeResponseAuthentication no")
-            return
-
-    ext_utils.add_extension_event(name=hutil.get_name(), op="sshd", is_success=True,
-                                  message="ChallengeResponseAuthentication yes")
-    _backup_sshd_config(SshdConfigPath)
-    _set_sshd_config(config, name, "no")
-    ext_utils.replace_file_with_contents_atomic(SshdConfigPath, "\n".join(config))
+    _backup_and_update_sshd_config(hutil, name, "no")
     MyDistro.restart_ssh_service()
 
 
 def _is_sshd_config_modified(protected_settings):
-    result = protected_settings.get('reset_ssh') or protected_settings.get('password')
+    result = protected_settings.get('reset_ssh') or protected_settings.get('restore_backup_ssh') or protected_settings.get('password')
     return result is not None
 
 
@@ -289,7 +278,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     if user_pass is not None:
         ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                       message="create-user-with-password")
-        _allow_password_auth()
+        _allow_password_auth(hutil)
 
     # Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt:
@@ -377,18 +366,32 @@ def _save_other_sudoers(sudoers):
     os.chmod("/etc/sudoers.d/waagent", 0o440)
 
 
-def _allow_password_auth():
+def _allow_password_auth(hutil):
+    name = "PasswordAuthentication"
+    _backup_and_update_sshd_config(hutil, name, "yes")
+
+    cloudInitConfigPath = "/etc/ssh/sshd_config.d/50-cloud-init.conf"
+    config = ext_utils.get_file_contents(cloudInitConfigPath)
+    if config is not None:
+        config = config.split("\n")
+        _set_sshd_config(config, name, "yes")
+        ext_utils.replace_file_with_contents_atomic(cloudInitConfigPath, "\n".join(config))
+
+
+def _backup_and_update_sshd_config(hutil, attr_name, attr_value):
     config = ext_utils.get_file_contents(SshdConfigPath).split("\n")
-    _set_sshd_config(config, "PasswordAuthentication", "yes")
+
+    for i in range(0, len(config)):
+        if config[i].startswith(attr_name) and attr_value in config[i].lower():
+            hutil.log("%s already set to %s in sshd_config, skip update." % (attr_name, attr_value))
+            return
+
+    hutil.log("Setting %s to %s in sshd_config." % (attr_name, attr_value))
+    
+    _backup_sshd_config(hutil)
+    _set_sshd_config(config, attr_name, attr_value)
     ext_utils.replace_file_with_contents_atomic(SshdConfigPath, "\n".join(config))
 
-    if isinstance(MyDistro, dist_utils.UbuntuDistro): #handle ubuntu 22.04 (sshd_config.d directory)
-        cloudInitConfigPath = "/etc/ssh/sshd_config.d/50-cloud-init.conf"
-        config = ext_utils.get_file_contents(cloudInitConfigPath)
-        if config is not None: #other versions of ubuntu don't contain this file
-            config = config.split("\n")
-            _set_sshd_config(config, "PasswordAuthentication", "yes")
-            ext_utils.replace_file_with_contents_atomic(cloudInitConfigPath, "\n".join(config))
 
 def _set_sshd_config(config, name, val):
     notfound = True
@@ -426,11 +429,16 @@ def _get_default_ssh_config_filename():
     return "default"
 
 
-def _reset_sshd_config(sshd_file_path):
+def _reset_sshd_config(hutil, restore_backup_ssh):
     ssh_default_config_filename = _get_default_ssh_config_filename()
     ssh_default_config_file_path = os.path.join(os.getcwd(), 'resources', ssh_default_config_filename)
-    if not (os.path.exists(ssh_default_config_file_path)):
+
+    if not os.path.exists(ssh_default_config_file_path):
         ssh_default_config_file_path = os.path.join(os.getcwd(), 'resources', 'default')
+
+    if restore_backup_ssh:
+        if os.path.exists(SshdConfigBackupPath):
+            ssh_default_config_file_path = SshdConfigBackupPath
 
     # handle CoreOS differently
     if isinstance(MyDistro, dist_utils.CoreOSDistro):
@@ -452,7 +460,7 @@ def _reset_sshd_config(sshd_file_path):
 
         # Overwrite /etc/ssh/sshd_config
         cfg_content += "write_files:\n"
-        cfg_content += "  - path: {0}\n".format(sshd_file_path)
+        cfg_content += "  - path: {0}\n".format(SshdConfigPath)
         cfg_content += "    permissions: 0600\n"
         cfg_content += "    owner: root:root\n"
         cfg_content += "    content: |\n"
@@ -474,18 +482,27 @@ def _reset_sshd_config(sshd_file_path):
         ext_utils.run(['coreos-cloudinit', '-from-file', cfg_tempfile], chk_err=False)
         os.remove(cfg_tempfile)
     else:
-        shutil.copyfile(ssh_default_config_file_path, sshd_file_path)
+        shutil.copyfile(ssh_default_config_file_path, SshdConfigPath)
+        if ssh_default_config_file_path == SshdConfigBackupPath:
+            hutil.log("sshd_config restored from backup, remove backup file.")
+            # Remove backup config once sshd_config restored
+            os.remove(ssh_default_config_file_path)
         MyDistro.restart_ssh_service()
 
 
-def _backup_sshd_config(sshd_file_path):
-    if os.path.exists(sshd_file_path):
-        backup_file_name = '%s_%s' % (
-            sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+def _backup_sshd_config(hutil):
+    if os.path.exists(SshdConfigPath) and not os.path.exists(SshdConfigBackupPath):
+        # Create VMAccess cache folder if doesn't exist
+        if not os.path.exists(os.path.dirname(SshdConfigBackupPath)):
+            os.makedirs(os.path.dirname(SshdConfigBackupPath))
+
+        hutil.log("Create backup ssh config file")
+        open(SshdConfigBackupPath, 'a').close()
+        
         # When copying, make sure to preserve permissions and ownership.
-        ownership = os.stat(sshd_file_path)
-        shutil.copy2(sshd_file_path, backup_file_name)
-        os.chown(backup_file_name, ownership.st_uid, ownership.st_gid)
+        ownership = os.stat(SshdConfigPath)
+        shutil.copy2(SshdConfigPath, SshdConfigBackupPath)
+        os.chown(SshdConfigBackupPath, ownership.st_uid, ownership.st_gid)
 
 
 def _save_cert_str_as_file(cert_txt, file_name):

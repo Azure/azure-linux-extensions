@@ -24,6 +24,7 @@ HandlerEnvironment.json
   "version": "1.0",
   "handlerEnvironment": {
     "logFolder": "<your log folder location>",
+    "eventFolder": "<your event folder location>",
     "configFolder": "<your config folder location>",
     "statusFolder": "<your status folder location>",
     "heartbeatFile": "<your heartbeat file location>",
@@ -78,6 +79,8 @@ import platform
 import subprocess
 import datetime
 import Utils.Status
+from Utils.EventLoggerUtil import EventLogger
+from Utils.LogHelper import LoggingLevel, LoggingConstants
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -106,6 +109,10 @@ class HandlerUtility:
         self.partitioncount = 0
         self.logging_file = None
         self.pre_post_enabled = False
+        self.severity_level = self.get_severity_level()
+        self.event_dir = None
+        self.eventlogger = None
+        self.operation = None
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
@@ -146,6 +153,9 @@ class HandlerUtility:
             self.update_settings_file()
             sys.exit(0)
 
+    def set_event_logger(self, eventlogger):
+        self.eventlogger = eventlogger
+
     def log(self, message,level='Info'):
         try:
             self.log_with_no_try_except(message, level)
@@ -153,7 +163,7 @@ class HandlerUtility:
             pass
         except Exception as e:
             try:
-                errMsg='Exception in hutil.log'
+                errMsg = str(e) + 'Exception in hutil.log'
                 self.log_with_no_try_except(errMsg, 'Warning')
             except Exception as e:
                 pass
@@ -164,10 +174,14 @@ class HandlerUtility:
             if sys.version_info > (3,):
                 if self.logging_file is not None:
                     self.log_py3(message)
+                    if self.eventlogger != None:
+                        self.eventlogger.trace_message(level, message)
                 else:
                     pass
             else:
                 self._log(self._get_log_prefix() + message)
+                if self.eventlogger != None:
+                    self.eventlogger.trace_message(level, message)
             message = "{0}  {1}  {2} \n".format(str(datetime.datetime.utcnow()) , level , message)
         self.log_message = self.log_message + message
 
@@ -277,6 +291,8 @@ class HandlerUtility:
             self.logging_file=self._context._log_file
             self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
             self._change_log_file()
+            self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
+            self.event_dir = self._context._event_dir
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
             if seqNo != -1:
@@ -780,6 +796,20 @@ class HandlerUtility:
         out = str(out)
         return out
 
+    def get_severity_level(self):
+        logging_level = LoggingLevel(LoggingConstants.DefaultEventLogLevel)
+        try:
+            log_setting_file_path = os.path.join(os.getcwd(), "main", LoggingConstants.LogLevelSettingFile)
+            if os.path.exists(log_setting_file_path):
+                with open(log_setting_file_path, 'r') as file:
+                    logging_level_input = json.load(file)
+                    logging_level.__dict__.update(logging_level_input)
+            else:
+                self.log("Logging level setting file is not present.")
+        except Exception as e:
+            self.log("error in fetching the severity of logs " + str(e))
+        return logging_level.EventLogLevel
+
     @staticmethod
     def split(logger,txt):
         result = None
@@ -805,4 +835,3 @@ class ComplexEncoder(json.JSONEncoder):
             return obj.convertToDictionary()
         else:
             return obj.__dict__
-
