@@ -1233,20 +1233,16 @@ def generate_localsyslog_configs():
     if not os.path.exists('/etc/selinux/config'):
         useSyslogTcp = True
     else:        
-        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"')
+        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
         if sedisabled == 0:
             useSyslogTcp = True
         else:            
-            check_semanage, _ = run_command_and_log("which semanage")
-            if check_semanage != 0:            
-                hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
-            elif syslog_port != '':
-                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"')
-                if syslogPortEnabled == 0:
-                    hutil_log_info("Skipping semanage call as port is present")
-                else:
+            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
+            if check_semanage == 0 and syslog_port != '':
+                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"',log_cmd=False)
+                if syslogPortEnabled != 0:                    
                     # allow the syslog port in SELinux
-                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
+                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
                 useSyslogTcp = True   
         
     if useSyslogTcp == True and syslog_port != '':
@@ -1339,8 +1335,9 @@ def remove_localsyslog_configs():
     if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf') or os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
         if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
             os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
-        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+        if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
             os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):            
             os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
         run_command_and_log(get_service_command("rsyslog", "restart"))
         hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
@@ -1548,7 +1545,7 @@ def is_vm_supported_for_extension(operation):
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
-                       'ubuntu' : ['18.04', '20.04'], # Ubuntu
+                       'ubuntu' : ['18.04', '20.04', '22.04'], # Ubuntu
                        'alma' : ['8'], # Alma
                        'centos' : ['7'], # CentOS
                        'mariner' : ['2'], # Mariner 2.0
