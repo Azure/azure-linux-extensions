@@ -38,7 +38,7 @@ EndCertificateTag = '-----END CERTIFICATE-----'
 BeginSSHTag = '---- BEGIN SSH2 PUBLIC KEY ----'
 OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
-ExtensionCacheDir = '/var/cache/vmaccess'
+SshdConfigBackupPath = '/var/cache/vmaccess/backup'
 
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
@@ -383,10 +383,10 @@ def _backup_and_update_sshd_config(hutil, attr_name, attr_value):
 
     for i in range(0, len(config)):
         if config[i].startswith(attr_name) and attr_value in config[i].lower():
-            hutil.log(f"{attr_name} already set to {attr_value} in sshd_config, skip update.")
+            hutil.log("%s already set to %s in sshd_config, skip update." % (attr_name, attr_value))
             return
 
-    hutil.log(f"Setting {attr_name} to {attr_value} in sshd_config.")
+    hutil.log("Setting %s to %s in sshd_config." % (attr_name, attr_value))
     
     _backup_sshd_config(hutil)
     _set_sshd_config(config, attr_name, attr_value)
@@ -437,9 +437,8 @@ def _reset_sshd_config(hutil, restore_backup_ssh):
         ssh_default_config_file_path = os.path.join(os.getcwd(), 'resources', 'default')
 
     if restore_backup_ssh:
-        backup_config_file_name = f"{ExtensionCacheDir}/backup"
-        if os.path.exists(backup_config_file_name):
-            ssh_default_config_file_path = backup_config_file_name
+        if os.path.exists(SshdConfigBackupPath):
+            ssh_default_config_file_path = SshdConfigBackupPath
 
     # handle CoreOS differently
     if isinstance(MyDistro, dist_utils.CoreOSDistro):
@@ -484,7 +483,7 @@ def _reset_sshd_config(hutil, restore_backup_ssh):
         os.remove(cfg_tempfile)
     else:
         shutil.copyfile(ssh_default_config_file_path, SshdConfigPath)
-        if ssh_default_config_file_path == backup_config_file_name:
+        if ssh_default_config_file_path == SshdConfigBackupPath:
             hutil.log("sshd_config restored from backup, remove backup file.")
             # Remove backup config once sshd_config restored
             os.remove(ssh_default_config_file_path)
@@ -492,19 +491,18 @@ def _reset_sshd_config(hutil, restore_backup_ssh):
 
 
 def _backup_sshd_config(hutil):
-    backup_file_name = f"{ExtensionCacheDir}/backup"
-    if os.path.exists(SshdConfigPath) and not os.path.exists(backup_file_name):
+    if os.path.exists(SshdConfigPath) and not os.path.exists(SshdConfigBackupPath):
         # Create VMAccess cache folder if doesn't exist
-        if not os.path.exists(os.path.dirname(backup_file_name)):
-            os.makedirs(os.path.dirname(backup_file_name))
+        if not os.path.exists(os.path.dirname(SshdConfigBackupPath)):
+            os.makedirs(os.path.dirname(SshdConfigBackupPath))
 
         hutil.log("Create backup ssh config file")
-        open(backup_file_name, 'a').close()
+        open(SshdConfigBackupPath, 'a').close()
         
         # When copying, make sure to preserve permissions and ownership.
         ownership = os.stat(SshdConfigPath)
-        shutil.copy2(SshdConfigPath, backup_file_name)
-        os.chown(backup_file_name, ownership.st_uid, ownership.st_gid)
+        shutil.copy2(SshdConfigPath, SshdConfigBackupPath)
+        os.chown(SshdConfigBackupPath, ownership.st_uid, ownership.st_gid)
 
 
 def _save_cert_str_as_file(cert_txt, file_name):
