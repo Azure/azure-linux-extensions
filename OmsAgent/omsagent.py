@@ -936,10 +936,10 @@ def is_vm_supported_for_extension():
                        'centos' : ['7', '8'], # CentOS
                        'oracle' : ['7', '8'], 'ol': ['7', '8'], # Oracle
                        'debian' : ['8', '9', '10'], # Debian
-                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
+                       'ubuntu' : ['14.04', '16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
-                       'rocky' : ['8'], # Rocky
-                       'alma' : ['8'], # Alma
+                       'rocky' : ['8', '9'], # Rocky
+                       'alma' : ['8', '9'], # Alma
                        'amzn' : ['2'] # AWS
     }
 
