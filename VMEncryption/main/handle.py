@@ -2116,7 +2116,7 @@ def daemon_encrypt():
 
         if not confidential_encryption_datadisk_flag:
             msg = "Currently for this CVM, Data disk encryption is not supported. {0}".format(msg)
-            logger.log(msg=msg,level=CommonVariables.ErrorLevel)
+            logger.log(msg=msg,level=CommonVariables.WarningLevel)
             return
         hutil.do_status_report(operation="EnableEncryption",
                        status=CommonVariables.extension_success_status,
