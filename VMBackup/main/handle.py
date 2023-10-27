@@ -46,6 +46,7 @@ from parameterparser import ParameterParser
 from Utils import HandlerUtil
 from Utils.EventLoggerUtil import EventLogger
 from Utils import SizeCalculation
+from Utils import Test
 from Utils import Status
 from freezesnapshotter import FreezeSnapshotter
 from backuplogger import Backuplogger
@@ -97,6 +98,8 @@ def main():
                 update()
             elif re.match("^([-/]*)(daemon)", a):
                 daemon()
+            elif re.match("^([-/]*)(excludeTest)", a):
+                excludeTest()
             elif re.match("^([-/]*)(seqNo:)", a):
                 try:
                     configSeqNo = int(a.split(':')[1])
@@ -105,6 +108,14 @@ def main():
     except Exception as e:
         sys.exit(0)
 
+def excludeTest():
+    global MyPatching,backup_logger,hutil
+    sizeCalculation = Test.SizeCalculation(patching = MyPatching , hutil = hutil, logger = backup_logger)
+    total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
+    if(eventlogger != None):
+        eventlogger.dispose()
+    sys.exit(0)
+    
 def install():
     global hutil,configSeqNo
     hutil.do_parse_context('Install', configSeqNo)
