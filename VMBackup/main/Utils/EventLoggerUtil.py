@@ -248,7 +248,10 @@ class EventLogger:
     def clear_temp_directory(self, directory_path):
         try:
             if os.path.exists(directory_path):
-                os.rmdir(directory_path)
+                if len(os.listdir(directory_path)) == 0:
+                    os.rmdir(directory_path)
+                else:
+                    shutil.rmtree(directory_path)
         except Exception as ex:
             logger.log("Warning: Error clearing the temp directory. Exception: {0}".format(str(ex)))
     
