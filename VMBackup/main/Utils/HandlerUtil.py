@@ -151,6 +151,8 @@ class HandlerUtility:
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             self.update_settings_file()
+            if(self.eventlogger is not None):
+                self.eventlogger.dispose()
             sys.exit(0)
 
     def set_event_logger(self, eventlogger):
@@ -253,6 +255,8 @@ class HandlerUtility:
             self.log("waagent new path is used")
         if not _context:
             self.log("maybe no new settings file found")
+            if(self.eventlogger is not None):
+                self.eventlogger.dispose()
             sys.exit(0)
         return _context
 
@@ -701,6 +705,8 @@ class HandlerUtility:
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
+        if(self.eventlogger is not None):
+            self.eventlogger.dispose()
         sys.exit(exit_code)
 
     def get_handler_settings(self):
