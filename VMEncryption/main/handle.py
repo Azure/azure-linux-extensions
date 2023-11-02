@@ -797,7 +797,9 @@ def enable():
         encryption_operation = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
         check_release_rsa_or_ec_key = False
         if security_Type == CommonVariables.ConfidentialVM:
-            check_release_rsa_or_ec_key = True
+            if CommonVariables.KeyEncryptionKeyURLKey in public_settings:
+                logger.log('Confidential VM: KEK is provided, will attempt a secure key release check')
+                check_release_rsa_or_ec_key = True
         # run fatal prechecks, report error if exceptions are caught
         try:
             if not is_migrate_operation:
@@ -2114,7 +2116,7 @@ def daemon_encrypt():
 
         if not confidential_encryption_datadisk_flag:
             msg = "Currently for this CVM, Data disk encryption is not supported. {0}".format(msg)
-            logger.log(msg=msg,level=CommonVariables.ErrorLevel)
+            logger.log(msg=msg,level=CommonVariables.WarningLevel)
             return
         hutil.do_status_report(operation="EnableEncryption",
                        status=CommonVariables.extension_success_status,
