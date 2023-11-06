@@ -1287,7 +1287,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     if useSyslogTcp == True and syslog_port != '' and not uses_gcs:
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
-            if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):                
+            if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
                 if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
                     os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
                 if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
