@@ -935,7 +935,7 @@ def is_vm_supported_for_extension():
     supported_dists = {'redhat' : ['7', '8', '9'], 'red hat' : ['7', '8', '9'], 'rhel' : ['7', '8', '9'], # Red Hat
                        'centos' : ['7', '8'], # CentOS
                        'oracle' : ['7', '8'], 'ol': ['7', '8'], # Oracle
-                       'debian' : ['8', '9', '10'], # Debian
+                       'debian' : ['8', '9', '10', '11'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'opensuse' : ['15'], # openSUSE
