@@ -1,10 +1,10 @@
 # VMAccess Extension
 Provide several ways to allow owner of the VM to get the SSH access back and perform additional VM disk check tasks. 
 
-Current version is [1.5](https://github.com/Azure/azure-linux-extensions/releases/tag/VMAccess-1.5.1).
+Current version is [1.5](https://github.com/Azure/azure-linux-extensions/releases/tag/VMAccess-1.5.18).
 
 You can read the User Guide below.
-* [Using VMAccess Extension to Reset Login Credentials, Add New User and Add SSH Key for Linux VM](https://azure.microsoft.com/blog/2014/08/25/using-vmaccess-extension-to-reset-login-credentials-for-linux-vm/)
+* [Manage administrative users, SSH, and check or repair disks on Linux VMs by using the VMAccess extension](https://learn.microsoft.com/en-us/azure/virtual-machines/extensions/vmaccess)
 
 VMAccess Extension can:
 * Reset the password of the original sudo user 
@@ -243,7 +243,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 }
 ```
 
-The sample ARM template is [201-vmaccess-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-vmaccess-on-ubuntu).
+The sample ARM template is [vmaccess-on-ubuntu](https://github.com/azure/azure-quickstart-templates/tree/master/demos/vmaccess-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
