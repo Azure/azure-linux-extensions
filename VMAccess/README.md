@@ -47,7 +47,9 @@ Schema for the protected configuration file looks like this:
 * `ssh_key`: (optional, string) the public key of the user
 * `reset_ssh`: (optional, boolean) whether or not reset the ssh
 * `remove_user`: (optional, string) the user name to remove
-* `expiration`: (options, string) expiration of the account, defaults to never, e.g. 2016-01-01.
+* `expiration`: (optional, string) expiration of the account, defaults to never, e.g. 2016-01-01.
+* `remove_prior_keys`: (optional, boolean) whether or not to remove old SSH keys when adding a new one
+* `restore_backup_ssh`: (optional, boolean) whether or not to restore original backed-up sshd config
 
 ```json
 {
@@ -56,16 +58,24 @@ Schema for the protected configuration file looks like this:
   "ssh_key": "<cert-contents>",
   "reset_ssh": true,
   "remove_user": "<username-to-remove>",
-  "expiration": "<yyyy-mm-dd>"
+  "expiration": "<yyyy-mm-dd>",
+  "remove_prior_keys": true,
+  "restore_backup_ssh": true
 }
 ```
 
-`ssh_key` supports both `ssh-rsa` and `.pem` format.
+`ssh_key` supports `ssh-rsa`, `ssh-ed25519` and `.pem` formats.
 
 * If your public key is in `ssh-rsa` format, for example, `ssh-rsa XXXXXXXX`, you can use:
 
   ```
   "ssh_key": "ssh-rsa XXXXXXXX"
+  ```
+
+* If your public key is in `ssh-ed25519` format, for example, `ssh-ed25519 XXXXXXXX`, you can use:
+
+  ```
+  "ssh_key": "ssh-ed25519 XXXXXXXX"
   ```
 
 * If your public key is in `.pem` format, use the following UNIX command to convert the .pem file to a value that can be passed in a JSON string:
@@ -217,7 +227,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   "properties": {
     "publisher": "Microsoft.OSTCExtensions",
     "type": "VMAccessForLinux",
-    "typeHandlerVersion": "1.4",
+    "typeHandlerVersion": "1.5",
     "autoUpgradeMinorVersion": true,
     "settings": {},
     "protectedSettings": {
@@ -248,7 +258,7 @@ in the Public Settings
 
 > VMAccessForLinux resets and restarts the SSH server if a password is specified. This is necessary if the VM was deployed with public key authentication because the SSH server is not configured to accept passwords.  For this reason, the SSH server's configuration is reset to allow password authentication, and restarted to accept this new configuration.  This behavior can be disabled by setting the reset_ssh value to false.
 
-in the Protectect Settings
+in the Protected Settings
 ```json
 {
   "username": "currentusername",
@@ -336,6 +346,23 @@ in the Protectect Settings
     "disk_name": "userdisktofix"
 }
 ```
+
+### 3.10 Removing prior SSH keys (only when provided a new one)
+```json
+{
+    "username": "newusername",
+    "ssh_key": "contentofsshkey",
+    "remove_prior_keys": true
+}
+```
+
+### 3.11 Restoring old SSH configuration
+```json
+{
+    "restore_backup_ssh": true
+}
+```
+
 ## Supported Linux Distributions
 - Ubuntu 12.04 and higher
 - CentOS 6.5 and higher
