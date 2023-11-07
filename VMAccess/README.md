@@ -94,126 +94,56 @@ Schema for the protected configuration file looks like this:
 ## 2. Deploying the Extension to a VM
 
 You can deploy it using Azure CLI, Azure Powershell and ARM template.
-
-> **NOTE:** Creating VM in Azure has two deployment model: Classic and [Resource Manager][arm-overview].
-In diffrent models, the deploying commands have different syntaxes. Please select the right
-one in section 2.1 and 2.2 below.
  
 ### 2.1. Using [**Azure CLI**][azure-cli]
-Before deploying VMAccess Extension, you should configure your `protected.json`
-(in section 1.2 above).
 
-#### 2.1.1 Classic
-The Classic mode is also called Azure Service Management mode. You can change to it by running:
+Create a `settings.json` (optional) and a `protected_settings.json` and run:
 ```
-$ azure config mode asm
-```
-
-You can deploying VMAccess Extension by running:
-```
-$ azure vm extension set <vm-name> \
-VMAccessForLinux Microsoft.OSTCExtensions <version> \
---private-config-path protected.json
+$ azure vm extension set \
+--resource-group <resource-group> \
+--vm-name <vm-name> \
+--name VMAccessForLinux \
+--publisher Microsoft.OSTCExtensions \
+--version 1.5 \
+--settings settings.json
+--protected-settings protected_settings.json
 ```
 
-In the command above, you can change version with `"*"` to use latest
-version available, or `"1.*"` to get newest version that does not introduce non-
-breaking schema changes. To learn the latest version available, run:
+To retrieve the deployment state of extensions for a given VM, run:
 ```
-$ azure vm extension list
+$ azure vm extension list \
+--resource-group <resource-group> \
+--vm-name <vm-name> -o table
 ```
-
-#### 2.1.2 Resource Manager
-You can change to Azure Resource Manager mode by running:
-```
-$ azure config mode arm
-```
-
-You can deploying VMAccess Extension by running:
-```
-$ azure vm extension set <resource-group> <vm-name> \
-VMAccessForLinux Microsoft.OSTCExtensions <version> \
---private-config-path protected.json
-```
-
-> **NOTE:** In ARM mode, `azure vm extension list` is not available for now.
-
-In ARM mode, there is another specific and simple command to reset your password.
-
-```
-$ azure vm reset-access [options] <resource-group> <name>
-```
-
->**NOTE:** Currently, only public key PEM file is supported for `azure vm reset-access`. It's filed as an [issue](https://github.com/Azure/azure-xplat-cli/issues/2437).
 
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
-#### 2.2.1 Classic
-
-You can login to your Azure account (Azure Service Management mode) by running:
-
-```powershell
-Add-AzureAccount
-```
-
 You can deploying VMAccess Extension by running:
 
 ```powershell
-$VmName = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $VmName -Name $VmName
+$username = "<username>"
+$sshKey = "<cert-contents>"
 
-$ExtensionName = 'VMAccessForLinux'
-$Publisher = 'Microsoft.OSTCExtensions'
-$Version = '<version>'
+$settings = @{"check_disk" = $true};
+$protectedSettings = @{"username" = $username; "ssh_key" = $sshKey};
 
-$PublicConf = '{}'
-$PrivateConf = '{
-  "username": "<username>",
-  "password": "<password>",
-  "ssh_key": "<cert-contents>",
-  "reset_ssh": true|false,
-  "remove_user": "<username-to-remove>"
-}'
-
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
-  -Publisher $Publisher -Version $Version `
-  -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf |
-  Update-AzureVM
+Set-AzVMExtension -Publisher "Microsoft.OSTCExtensions" -ExtensionType "VMAccessForLinux" `
+-ResourceGroupName "<resource-group>" -VMName "<vm-name>" -Location "<location>" `
+-Name "VMAccessForLinux" -TypeHandlerVersion "1.5" -Settings $settings -ProtectedSettings $protectedSettings
 ```
 
-#### 2.2.2 Resource Manager
-
-You can login to your Azure account (Azure Resource Manager mode) by running:
+You can provide and modify extension settings by using strings:
 
 ```powershell
-Login-AzureRmAccount
-```
+$username = "<username>"
+$sshKey = "<cert-contents>"
 
-Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure PowerShell with Azure Resource Manager.
+$settingsString = '{"check_disk":true}';
+$protectedSettingsString = '{"username":"' + $username + '","ssh_key":"' + $sshKey + '"}';
 
-You can deploying VMAccess Extension by running:
-
-```powershell
-$RGName = '<resource-group-name>'
-$VmName = '<vm-name>'
-$Location = '<location>'
-
-$ExtensionName = 'VMAccessForLinux'
-$Publisher = 'Microsoft.OSTCExtensions'
-$Version = '<version>'
-
-$PublicConf = '{}'
-$PrivateConf = '{
-  "username": "<username>",
-  "password": "<password>",
-  "ssh_key": "<cert-contents>",
-  "reset_ssh": true|false,
-  "remove_user": "<username-to-remove>"
-}'
-
-Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
-  -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
-  -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
+Set-AzVMExtension -Publisher "Microsoft.OSTCExtensions" -ExtensionType "VMAccessForLinux" `
+-ResourceGroupName "<resource-group>" -VMName "<vm-name>" -Location "<location>" `
+-Name "VMAccessForLinux" -TypeHandlerVersion "1.5" -SettingString $settingsString -ProtectedSettingString $protectedSettingsString
 ```
 
 ### 2.3. Using [**ARM Template**][arm-template]
@@ -243,7 +173,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 }
 ```
 
-The sample ARM template is [vmaccess-on-ubuntu](https://github.com/azure/azure-quickstart-templates/tree/master/demos/vmaccess-on-ubuntu).
+Refer to the following sample [ARM template](https://github.com/azure/azure-quickstart-templates/tree/master/demos/vmaccess-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
