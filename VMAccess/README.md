@@ -30,13 +30,15 @@ VMAccess Extension can:
 
 Schema for the public configuration file looks like:
 
-* `check_disk`: (boolean) whether or not to check disk
-* `repair_disk`: (boolean, string) whether or not to repair disk, disk name
+* `check_disk`: (optional, boolean) whether or not to check disk
+* `repair_disk`: (optional, boolean) whether or not to repair disk
+* `disk_name`: (boolean) name of disk to repair (required when repair_disk is true)
 
 ```json
 {
   "check_disk": "true",
-  "repair_disk": "true, user-disk-name"
+  "repair_disk": "true",
+  "disk_name": "<disk-name>"
 }
 ```
 
@@ -127,9 +129,9 @@ $sshKey = "<cert-contents>"
 $settings = @{"check_disk" = $true};
 $protectedSettings = @{"username" = $username; "ssh_key" = $sshKey};
 
-Set-AzVMExtension -Publisher "Microsoft.OSTCExtensions" -ExtensionType "VMAccessForLinux" `
--ResourceGroupName "<resource-group>" -VMName "<vm-name>" -Location "<location>" `
--Name "VMAccessForLinux" -TypeHandlerVersion "1.5" -Settings $settings -ProtectedSettings $protectedSettings
+Set-AzVMExtension -ResourceGroupName "<resource-group>" -VMName "<vm-name>" -Location "<location>" `
+-Publisher "Microsoft.OSTCExtensions" -ExtensionType "VMAccessForLinux" -Name "VMAccessForLinux" `
+-TypeHandlerVersion "1.5" -Settings $settings -ProtectedSettings $protectedSettings
 ```
 
 You can provide and modify extension settings by using strings:
@@ -141,9 +143,9 @@ $sshKey = "<cert-contents>"
 $settingsString = '{"check_disk":true}';
 $protectedSettingsString = '{"username":"' + $username + '","ssh_key":"' + $sshKey + '"}';
 
-Set-AzVMExtension -Publisher "Microsoft.OSTCExtensions" -ExtensionType "VMAccessForLinux" `
--ResourceGroupName "<resource-group>" -VMName "<vm-name>" -Location "<location>" `
--Name "VMAccessForLinux" -TypeHandlerVersion "1.5" -SettingString $settingsString -ProtectedSettingString $protectedSettingsString
+Set-AzVMExtension -ResourceGroupName "<resource-group>" -VMName "<vm-name>" -Location "<location>" `
+-Publisher "Microsoft.OSTCExtensions" -ExtensionType "VMAccessForLinux" -Name "VMAccessForLinux" `
+-TypeHandlerVersion "1.5" -SettingString $settingsString -ProtectedSettingString $protectedSettingsString
 ```
 
 ### 2.3. Using [**ARM Template**][arm-template]
