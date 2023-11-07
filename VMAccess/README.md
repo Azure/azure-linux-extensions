@@ -11,10 +11,12 @@ VMAccess Extension can:
 * Create a new sudo user with the password specified
 * Set the public host key with the key given
 * Reset the public host key provided during VM provisioning if host key not provided
-* Open the SSH port(22) and restore the sshd_config if reset_ssh is set to true
+* Open the SSH port(22) and reset the sshd_config if reset_ssh is set to true
 * Remove the existing user
 * Check disks
-* Repair added disk.
+* Repair added disk
+* Remove prior public keys when a new public key is provided
+* Restore the original backup sshd_config if restore_backup_ssh is set to true
 
 # Security Notes:
 * VMAccess Extension is designed for regaining access to a VM in the event that access is lost. 
@@ -356,7 +358,7 @@ in the Protected Settings
 }
 ```
 
-### 3.11 Restoring old SSH configuration
+### 3.11 Restoring original SSH configuration
 ```json
 {
     "restore_backup_ssh": true
