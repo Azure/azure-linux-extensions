@@ -77,6 +77,7 @@ g_diagnostic_py_filepath = ''  # Full path of this script. g_ext_dir + '/diagnos
 RunGetOutput = None  # External command executor callable
 hutil = None  # Handler util object
 enable_metrics_ext = False #Flag to enable/disable MetricsExtension
+enable_telegraf = False #Flag to enable/disable Telegraf
 me_msi_token_expiry_epoch = None
 
 
@@ -234,11 +235,18 @@ def create_core_components_configs():
         return None
 
     global enable_metrics_ext
+    global enable_telegraf
     ladconfig = configurator._ladCfg()
+    # verify metrics extension should be enabled
     sink = configurator._sink_configs_public.get_sink_by_name("AzMonSink")
     if sink is not None:
         if sink['name'] == 'AzMonSink':
             enable_metrics_ext = True
+    # verify telegraf should be enabled (either metrics intervals or performance counters configured)
+    metrics_intervals = LadUtil.getAggregationPeriodsFromLadCfg(ladconfig)
+    perf_counter_config = LadUtil.getDiagnosticsMonitorConfigurationElement(ladconfig, 'performanceCounters')
+    if ((metrics_intervals != []) or (perf_counter_config)):
+        enable_telegraf = True
 
     return configurator
 
@@ -588,7 +596,7 @@ def start_mdsd(configurator):
                 # 3. Check if there's any new logs in mdsd.err and report
                 last_error_time = report_new_mdsd_errors(err_file_path, last_error_time)
                 # 4. Check if telegraf is running, if not, then restart
-                if not telhandler.is_running(is_lad=True):
+                if enable_telegraf and not telhandler.is_running(is_lad=True):
                     if telegraf_restart_retries < max_restart_retries:
                         telegraf_restart_retries += 1
                         hutil.log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
