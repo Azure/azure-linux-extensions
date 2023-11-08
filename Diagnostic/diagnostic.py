@@ -596,25 +596,24 @@ def start_mdsd(configurator):
                 # 3. Check if there's any new logs in mdsd.err and report
                 last_error_time = report_new_mdsd_errors(err_file_path, last_error_time)
                 # 4. Check if telegraf is running, if not, then restart
-                if enable_telegraf:
-                    if not telhandler.is_running(is_lad=True):
-                        if telegraf_restart_retries < max_restart_retries:
-                            telegraf_restart_retries += 1
-                            hutil.log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
-                            tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
-                            if tel_out:
-                                hutil.log(tel_msg)
-                            else:
-                                hutil.error(tel_msg)
-                            start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=True)
-                            if start_telegraf_res:
-                                hutil.log("Successfully started metrics-sourcer.")
-                            else:
-                                hutil.error(log_messages)
+                if enable_telegraf and not telhandler.is_running(is_lad=True):
+                    if telegraf_restart_retries < max_restart_retries:
+                        telegraf_restart_retries += 1
+                        hutil.log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
+                        tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=True)
+                        if tel_out:
+                            hutil.log(tel_msg)
                         else:
-                            hutil.error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log at {1}".format(max_restart_retries, log_dir))
+                            hutil.error(tel_msg)
+                        start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=True)
+                        if start_telegraf_res:
+                            hutil.log("Successfully started metrics-sourcer.")
+                        else:
+                            hutil.error(log_messages)
                     else:
-                        telegraf_restart_retries = 0
+                        hutil.error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log at {1}".format(max_restart_retries, log_dir))
+                else:
+                    telegraf_restart_retries = 0
                 # 5. Check if ME is running, if not, then restart
                 if enable_metrics_ext:
                     if not me_handler.is_running(is_lad=True):
