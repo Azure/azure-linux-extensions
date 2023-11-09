@@ -442,6 +442,14 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
+    _, _, _, az_environment, _ = me_handler.get_imds_values(is_lad=False)
+    if az_environment.lower() == me_handler.ArcACloudName:
+        _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
+        default_configs["customRegionalEndpoint"] = mcs_endpoint
+        default_configs["customGlobalEndpoint"] = mcs_endpoint
+        default_configs["customResourceEndpoint"] = "https://monitoring.azs"
+
+
     """
     Decide the mode and configuration. There are two supported configuration schema, mix-and-match between schemas is disallowed:
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
@@ -1140,7 +1148,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                         if generate_token:
                             generate_token = False
-                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value)
+                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value, is_lad=False)
                             if msi_token_generated:
                                 hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
                             else:
