@@ -104,11 +104,24 @@ def main():
                     configSeqNo = -1
     except Exception as e:
         sys.exit(0)
+def install_host_based_daemon():
+    args = [os.path.join(os.getcwd(), "main/handle_host_daemon.sh")]
+    devnull = open(os.devnull, 'w')
+    subprocess.Popen(args, stdout=devnull, stderr=devnull)
+    hutil.do_exit(
+        0, "Install Host Based Daemon", "success", "0", "Installing Host Based Daemon Succeeded"
+    )
 
 def install():
     global hutil,configSeqNo
+    try:
+        install_host_based_daemon()
+    except Exception as e:
+        backup_logger.log("Installing host based daemon failed:")
+        backup_logger.log(e)
     hutil.do_parse_context('Install', configSeqNo)
     hutil.do_exit(0, 'Install','success','0', 'Install Succeeded')
+    
 
 def status_report_to_file(file_report_msg):
     global backup_logger,hutil

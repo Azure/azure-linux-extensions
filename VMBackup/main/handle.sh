@@ -57,12 +57,6 @@ then
 	fi
     exit $arc
 
-elif [ "$1" = "lrdaemon" ]; then
-	systemctl stop MsftAzureSnapshotExt.service
-	systemctl start MsftAzureSnapshotExt.service
-	rc=$?
-	exit $rc
-
 elif [ "$1" != "enable"  ] && [ "$1" != "daemon" ]
 then
     echo "`date -u`- The command is $1, exiting" >> $logfile
