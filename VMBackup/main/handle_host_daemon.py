@@ -6,13 +6,11 @@ import threading
 import signal
 import sys
 import json
-# import xml.etree.ElementTree as ET
 from Utils.WAAgentUtil import waagent
 from Utils import HandlerUtil
 import datetime
 from common import CommonVariables
 import subprocess
-# import fcntl
 import traceback
 from datetime import datetime
 
@@ -23,9 +21,14 @@ else:
     import ConfigParser as ConfigParsers
 
 if IS_PYTHON3:
-    import urllib.request
+    from urllib import request
 else:
     import urllib2 as request
+
+if IS_PYTHON3:
+    from urllib.error import HTTPError
+else:
+    from urllib2 import HTTPError
 
 if IS_PYTHON3:
     import urllib.parse as urllib
@@ -35,6 +38,7 @@ else:
 
 SCRIPT_DIR=os.path.dirname(os.path.realpath(__file__))
 BASE_URI="http://168.63.129.16"
+STORAGE_DEVICE_PATH = '/sys/bus/vmbus/devices/'
 GEN2_DEVICE_ID = 'f8b3781a-1e82-4818-a1c3-63d806ec15bb'
 # LOCK_FILE_DIR="/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock"
 # LOCK_FILE="/etc/azure/MicrosoftRecoverySvcsSafeFreezeLock/SafeFreezeLockFile"
@@ -48,10 +52,19 @@ class HandlerContext:
         self._version = '0.0'
         return
 
+def read_file(filepath):
+    """
+    Read and return contents of 'filepath'.
+    """
+    mode = 'rb'
+    with open(filepath, mode) as in_file:
+        data = in_file.read().decode('utf-8')
+        return data
+
 class Handler:
     _log = None
     _error = None
-    def __init__(self, log, error, short_name) -> None:
+    def __init__(self, log, error, short_name):
         self._context = HandlerContext(short_name)
         self._log = log
         self._error = error
@@ -121,6 +134,7 @@ class Handler:
         return int(value)
 
     def log(self, message, level='Info'):
+        print("[Handler.log] -> Level: {} -> {}".format(level, message))
         try:
             self.log_with_no_try_except(message, level)
         except IOError:
@@ -175,32 +189,34 @@ class GetMountsError(Exception):
     def __init__(message = ""):
         super().__init__("[SnapshotRequest.get_mounts] -> failed: {}".format(message))
 
+def print_from_thread(msg):
+    os.write(sys.stdout.fileno(), msg.encode("utf-8"))
+
+def thread_for_binary(self,args):
+    print_from_thread("[FreezeHandler.thread_for_binary] -> Thread for binary is called: {}\n".format(args))
+    time.sleep(3)
+    print_from_thread("[FreezeHandler.thread_for_binary] -> Waited in thread for 3 seconds\n")
+    print_from_thread("[FreezeHandler.thread_for_binary] -> ****** 1. Starting Freeze Binary \n")
+    self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
+    print_from_thread("Binary subprocess Created\n")
 
 class FreezeHandler(object):
     def __init__(self,handler):
         # sig_handle valid values(0:nothing done,1: freezed successfully, 2:freeze failed)
         self.sig_handle = 0
         self.child = None
-        self.handler = handler
+        self.handler = handler 
 
-    def thread_for_binary(self,args):
-        self.handler.log("[FreezeHandler.thread_for_binary] -> Thread for binary is called")
-        time.sleep(3)
-        self.handler.log("[FreezeHandler.thread_for_binary] -> Waited in thread for 3 seconds",True)
-        self.handler.log("[FreezeHandler.thread_for_binary] -> ****** 1. Starting Freeze Binary ",True)
-        self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
-        self.handler.log("Binary subprocess Created",True)
-
-    def sigusr1_handler(self):
-        self.handler.log('[FreezeHandler.sigusr1_handler] -> freezed')
-        self.handler.log("[FreezeHandler.sigusr1_handler] -> ****** 4. Freeze Completed (Signal=1 received)")
+    def sigusr1_handler(self, signal, frame):
+        print_from_thread('[FreezeHandler.sigusr1_handler] -> freezed\n')
+        print_from_thread("[FreezeHandler.sigusr1_handler] -> ****** 4. Freeze Completed (Signal=1 received)\n")
         self.sig_handle=1
 
-    def sigchld_handler(self):
-        self.handler.log('[FreezeHandler.sigchld_handler] -> some child process terminated')
+    def sigchld_handler(self, signal, frame):
+        print_from_thread('[FreezeHandler.sigchld_handler] -> some child process terminated\n')
         if(self.child is not None and self.child.poll() is not None):
-            self.handler.log("[FreezeHandler.sigchld_handler] -> binary child terminated")
-            self.handler.log("[FreezeHandler.sigchld_handler] -> ****** 9. Binary Process completed (Signal=2 received)")
+            print_from_thread("[FreezeHandler.sigchld_handler] -> binary child terminated\n")
+            print_from_thread("[FreezeHandler.sigchld_handler] -> ****** 9. Binary Process completed (Signal=2 received)\n")
             self.sig_handle=2
 
     def reset_signals(self):
@@ -208,7 +224,7 @@ class FreezeHandler(object):
         self.child = None
 
     def startproc(self,args):
-        binary_thread = threading.Thread(target=self.thread_for_binary, args=[self, args])
+        binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
         binary_thread.start()
 
         SafeFreezeWaitInSecondsDefault = 66
@@ -217,11 +233,11 @@ class FreezeHandler(object):
         
         for i in range(0,(int(proc_sleep_time/2))):
             if(self.sig_handle==0):
-                self.handler.log("[FreezeHandler.startproc] -> inside loop with sig_handle "+str(self.sig_handle))
+                print("[FreezeHandler.startproc] -> inside loop with sig_handle "+str(self.sig_handle))
                 time.sleep(2)
             else:
                 break
-        self.handler.log("[FreezeHandler.startproc] -> Binary output for signal handled: "+str(self.sig_handle))
+        print("[FreezeHandler.startproc] -> Binary output for signal handled: "+str(self.sig_handle))
         return self.sig_handle
 
     def signal_receiver(self):
@@ -233,6 +249,7 @@ class SnapshotRequest:
         global SNAPSHOT_INPROGRESS, BASE_URI, GEN2_DEVICE_ID
         self.freeze_handler = FreezeHandler(handler)
         self.freeze_start = datetime.utcnow()
+        self.freeze_safe_active = False
         if isinstance(handler, Handler):
             self.handler = handler
             # MY_PATCHING, PATCH_CLASS_NAME, ORIG_DISTRO = GetMyPatching(handler)
@@ -314,7 +331,86 @@ class SnapshotRequest:
     #     except Exception as e:
     #         self.handler.log("[release_snapshot_lock] -> unexpected error occurred: ", e)
     #     return False
-            
+
+    # Ignores usb devices
+    # TODO: suppport lvm setup
+    def get_block_devices(self):
+        p1 = subprocess.Popen(["lsblk", "-dnl", "-o", "NAME"], stdout=subprocess.PIPE)
+        p2 = subprocess.check_output(["grep", "-E", "(sd|nvme)"], stdin=p1.stdout).decode("utf-8")
+        p1.stdout.close()
+        disks = []
+        for x in p2.split("\n"):
+            # print("device: {}".format(x))
+            if not x.strip():
+                continue
+            if not self.is_usb("/dev/{}".format(x)):
+                disks.append(x)
+        return disks
+    
+    def is_usb(self, device):
+        # lsblk -dnl -o NAME | grep 'sd'
+        # udevadm info /dev/sda --query=property | grep ID_BUS
+        p1 = subprocess.Popen(["udevadm", "info", device, "--query=property"], stdout=subprocess.PIPE)
+        p2 = subprocess.check_output(["grep", 'ID_BUS'], stdin=p1.stdout).decode("utf-8")
+        p1.stdout.close()
+        return p2.endswith("=usb")
+    
+    @staticmethod
+    def _enumerate_device_id():
+        """
+		Enumerate all storage device IDs.
+		Args:
+		None
+		Returns:
+		Iterator[Tuple[str, str]]: VmBus and storage devices.
+        """
+
+        if os.path.exists(STORAGE_DEVICE_PATH):
+            for vmbus in os.listdir(STORAGE_DEVICE_PATH):
+                deviceid = read_file(filepath=os.path.join(STORAGE_DEVICE_PATH, vmbus, "device_id"))
+                guid = deviceid.strip('{}\n')
+                yield vmbus, guid
+
+    @staticmethod
+    def search_for_resource_disk(gen1_device_prefix, gen2_device_id):
+        """
+        Search the filesystem for a device by ID or prefix.
+        Args:
+        gen1_device_prefix (str): Gen1 resource disk prefix.
+        gen2_device_id (str): Gen2 resource device ID.
+        Returns:
+        str: The found device.
+        """
+        device = None
+        # We have to try device IDs for both Gen1 and Gen2 VMs.
+        #ResourceDiskUtil.logger.log('Searching gen1 prefix {0} or gen2 {1}'.format(gen1_device_prefix, gen2_device_id),True)
+        try: # pylint: disable=R1702
+            for vmbus, guid in SnapshotRequest._enumerate_device_id():
+                if guid.startswith(gen1_device_prefix) or guid == gen2_device_id:
+                    for root, dirs, files in os.walk(STORAGE_DEVICE_PATH + vmbus): # pylint: disable=W0612
+                        root_path_parts = root.split('/')
+                        # For Gen1 VMs we only have to check for the block dir in the
+                        # current device. But for Gen2 VMs all of the disks (sda, sdb,
+                        # sr0) are presented in this device on the same SCSI controller.
+                        # Because of that we need to also read the LUN. It will be:
+                        #   0 - OS disk
+                        #   1 - Resource disk
+                        #   2 - CDROM
+                        if root_path_parts[-1] == 'block' and ( # pylint: disable=R1705
+                                guid != gen2_device_id or
+                                root_path_parts[-2].split(':')[-1] == '1'):
+                            device = dirs[0]
+                            return device
+                        else:
+                            # older distros
+                            for d in dirs: # pylint: disable=C0103
+                                if ':' in d and "block" == d.split(':')[0]:
+                                    device = d.split(':')[1]
+                                    return device
+        except (OSError, IOError) as exc:
+            err_msg='Error getting device for %s or %s: %s , Stack Trace: %s' % (gen1_device_prefix, gen2_device_id, str(exc),traceback.format_exc())
+        return None
+
     def device_for_ide_port(self):
         """
 		Return device name attached to ide port 'n'.
@@ -354,17 +450,18 @@ class SnapshotRequest:
             
             # find name of mount using:
             # grep -E "^/dev/sdb1" /proc/mounts | awk '{print $2}'
+            # print("Found partition: {}".format(partition))
             if partition is not None:
-                p1 = subprocess.Popen(["grep", "-E", "^{}".format(partition)], stdout=subprocess.PIPE)
+                p1 = subprocess.Popen(["grep", "-E", "^/dev/{}".format(partition), "/proc/mounts"], stdout=subprocess.PIPE)
                 p2 = subprocess.check_output(["awk", '{print $2}'], stdin=p1.stdout).decode("utf-8")
                 p1.stdout.close()
                 v = [x for x in p2.split("\n") if x.strip()]
                 if len(v) > 0:
+                    # print("Returning v[0]: {}".format(v[0]))
                     return v[0]
         except Exception as e:
             self.handler.log(
-                "[SnapshotRequest.get_resource_disk_mountpoint] -> unexpected error occured",
-                traceback.format_exc(e)
+                    "[SnapshotRequest.get_resource_disk_mountpoint] -> unexpected error occured: {}\n{}".format(e, traceback.format_exc())
             )
         return None
 
@@ -372,22 +469,47 @@ class SnapshotRequest:
         try:
             resource_mount = self.get_resource_disk_mount_point()
             p1 = subprocess.Popen(["mount", "-l"], stdout=subprocess.PIPE)
-            p2 = subprocess.Popen(["grep", "-E", '(ext4|ext3|btrfs|xfs)'], stdin=p1.stdout, stdout=subprocess.PIPE)
-            p3 = subprocess.check_output(["awk", '{print $3}'], stdin=p2.stdout).decode("utf-8")
+            p2 = subprocess.Popen(["grep", "-E", "(ext4|ext3|btrfs|xfs)"], stdin=p1.stdout, stdout=subprocess.PIPE)
+            p3 = subprocess.check_output(["awk", '{print $1" "$3}'], stdin=p2.stdout).decode("utf-8")
             p1.stdout.close()
             p2.stdout.close()
-            def is_valid_mount(m):
-                if not m.strip():
+            # print("p3: {}".format(p3))
+            disks = self.get_block_devices() 
+            # print("disks: {}".format(disks))
+            def is_valid_mount(partition,mount_point):
+                if resource_mount is not None and mount_point.strip() == resource_mount:
                     return False
-                if resource_mount is not None and m.strip() == resource_mount:
+                # lsblk -ndo pkname /dev/sda1
+                disk = subprocess.check_output(["lsblk", "-ndo", "pkname", partition]).decode("utf-8")
+                disk = " ".join(disk.split()) # removing any trailing or preceding newlines
+                # print("[is_valid_disk] -> if disk: {} exists in list: {}".format(disk, disks))
+                if disk not in disks:
                     return False
                 return True
-            return [x for x in p3.split("\n") if is_valid_mount(x)] 
+            mounts = []
+            for m in p3.split("\n"):
+                if not m.strip():
+                    continue
+                m = " ".join(m.split()) # removing any preceding or trailing new lines
+                v = m.split()
+                # print("Post split: {}".format(v))
+                if len(v) != 2:
+                    continue 
+                partition = v[0]
+                mount_point = v[1]
+                # print("[get_mounts] -> Checking mount: {}".format(mount_point))
+                # print("[get_mounts] -> Checking partition: {}".format(partition))
+                if not is_valid_mount(partition, mount_point):
+                    continue
+                mounts.append(mount_point)
+            print("Mounts: {}".format(mounts))
+            return mounts
         except Exception as e:
-            raise GetMountsError(traceback.format_exc(e))
+            self.handler.log("[SnapshotRequest.get_mounts] -> Unexpected error: {}".format(e))
+            raise GetMountsError(traceback.format_exc())
 
     def safefreeze_path(self):
-        p = "safefreeze/bin/safefreeze"
+        p = os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
         machine = os.uname()[-1]
         if IS_PYTHON3:
             machine = os.uname().machine
@@ -396,7 +518,7 @@ class SnapshotRequest:
         return p
     
     def log_binary_output(self):
-        self.handler.log(
+        print(
             "[SnapshotRequest.log_binary_output] -> ============== Binary output traces start ================= "
         )
         while True:
@@ -408,143 +530,286 @@ class SnapshotRequest:
             if("[SnapshotRequest.log_binary_output] -> Failed to open:" in line):
                 self.mount_open_failed = True
             if(line != ''):
-                self.logger.log(line.rstrip(), True)
+                self.handler.log(line.rstrip(), True)
             else:
                 break
-        self.handler.log(
+        print(
             "[SnapshotRequest.log_binary_output] -> ============== Binary output traces end ================= "
         )
 
     def freeze_safe(self, args):
         errors = []
+        error_codes = []
         timedout = False
         try:
             self.freeze_handler.reset_signals()
             self.freeze_handler.signal_receiver()
             sig_handle = self.freeze_handler.startproc(args)
-            self.handler.log(
-                "[SnapshotRequest.freeze_safe] -> freeze_safe after returning from startproc : sig_handle={}".format(str(sig_handle))
-            )
+            # self.handler.log(
+            #     "[SnapshotRequest.freeze_safe] -> freeze_safe after returning from startproc : sig_handle={}".format(str(sig_handle))
+            # )
+            print("[SnapshotRequest.freeze_safe] -> freeze_safe after returning from startproc : sig_handle={}".format(str(sig_handle)))
             if(sig_handle != 1):
                 if (self.freeze_handler.child is not None):
+                    print("[SnapshotRequest.freeze_safe] -> calling log_binary_output")
                     self.log_binary_output()
                 if (sig_handle == 0):
                     timedout = True
                     error_msg="freeze timed-out"
                     errors.append(error_msg)
+                    error_codes.append("FREEZE_TIMED_OUT")
                     self.handler.log(error_msg)
-                elif (self.mount_open_failed == True):
-                    error_msg=CommonVariables.unable_to_open_err_string
-                    errors.append(error_msg)
-                    self.handler.log(error_msg)
-                elif (self.isAquireLockSucceeded == False):
-                    error_msg="Mount Points already freezed by some other processor"
-                    errors.append(error_msg)
-                    self.handler.log(error_msg)
+                # elif (self.mount_open_failed == True):
+                #     error_msg=CommonVariables.unable_to_open_err_string
+                #     errors.append(error_msg)
+                #     self.handler.log(error_msg)
+                # elif (self.isAquireLockSucceeded == False):
+                #     error_msg="Mount Points already freezed by some other processor"
+                #     errors.append(error_msg)
+                #     self.handler.log(error_msg)
                 else:
                     error_msg="freeze failed for some mount"
                     errors.append(error_msg)
+                    error_codes.append("INCOMPLETE_FREEZE")
                     self.handler.log(error_msg)
         except Exception as e:
             # self.logger.enforce_local_flag(True)
             error_msg='freeze failed for some mount with exception, Exception %s, stack trace: %s' % (str(e), traceback.format_exc())
             errors.append(error_msg)
+            error_codes.append("UNEXPECTED_FREEZE_EXC")
             self.handler.log(error_msg)
-        return (errors, timedout)
+        finally:
+            self.freeze_start_time = datetime.utcnow()
+        return errors, error_codes, timedout
 
     def thaw_safe(self):
         errors = []
         unable_to_sleep = False
         try:
-            # thaw_result = FreezeResult()
-            if(self.skip_freeze == True):
-                return (errors, unable_to_sleep)
+            if not self.freeze_safe_active:
+                self.freeze_end_time = datetime.utcnow()
+                return errors, unable_to_sleep
             if(self.freeze_handler.child is None):
-                self.handler.log("[SnapshotRequest.thaw_safe] -> child already completed")
-                self.handler.log("[SnapshotRequest.thaw_safe] -> ****** 7. Error - Binary Process Already Completed")
+                print("[SnapshotRequest.thaw_safe] -> child already completed")
+                print("[SnapshotRequest.thaw_safe] -> ****** 7. Error - Binary Process Already Completed")
                 error_msg = 'snapshot result inconsistent'
                 errors.append(error_msg)
             elif(self.freeze_handler.child.poll() is None):
-                self.logger.log("child process still running")
-                self.logger.log("****** 7. Sending Thaw Signal to Binary")
+                print("[SnapshotRequest.thaw_safe] -> child process still running")
+                print("[SnapshotRequest.thaw_safe] -> ****** 7. Sending Thaw Signal to Binary")
                 self.freeze_handler.child.send_signal(signal.SIGUSR1)
+                
+                # Will try for 30 seconds to see if freeze process has stopped
                 for i in range(0,30):
                     if(self.freeze_handler.child.poll() is None):
-                        self.logger.log("child still running sigusr1 sent")
+                        print("child still running sigusr1 sent")
                         time.sleep(1)
                     else:
                         break
-                self.logger.enforce_local_flag(True)
+                print("[SnapshotRequest.thaw_safe] -> calling log_binary_output: 1")
                 self.log_binary_output()
-                if(self.freeze_handler.child.returncode!=0):
-                    error_msg = 'snapshot result inconsistent as child returns with failure'
-                    thaw_result.errors.append(error_msg)
-                    self.logger.log(error_msg, True, 'Error')
+                if(self.freeze_handler.child.returncode != 0):
+                    error_msg = '[SnapshotRequest.thaw_safe] -> snapshot result inconsistent as child returns with failure'
+                    errors.append(error_msg)
+                    print(error_msg, True, 'Error')
             else:
-                self.logger.log("Binary output after process end when no thaw sent: ", True)
-                if(self.freeze_handler.child.returncode==2):
-                    error_msg = 'Unable to execute sleep'
-                    thaw_result.errors.append(error_msg)
+                self.handler.log("[SnapshotRequest.thaw_safe] -> Binary output after process end when no thaw sent: ", True)
+                if(self.freeze_handler.child.returncode == 2):
+                    error_msg = '[SnapshotRequest.thaw_safe] -> Unable to execute sleep'
+                    errors.append(error_msg)
                     unable_to_sleep = True
                 else:
-                    error_msg = 'snapshot result inconsistent'
-                    thaw_result.errors.append(error_msg)
-                self.logger.enforce_local_flag(True)
+                    error_msg = '[SnapshotRequest.thaw_safe] -> snapshot result inconsistent'
+                    errors.append(error_msg)
+                print("[SnapshotRequest.thaw_safe] -> calling log_binary_output: 2")
                 self.log_binary_output()
-                self.logger.log(error_msg, True, 'Error')
-            self.logger.enforce_local_flag(True) 
+                print(error_msg, True, 'Error')
         finally:
-            self.releaseFileLock()
-        return thaw_result, unable_to_sleep
+            self.freeze_end_time = datetime.utcnow()
+        return errors, unable_to_sleep
 
+    # Uses safe_freeze binary which depends on fsfreeze
+    # TODO: support LVM when present
     def freeze_mounts(self):
+        errors = []
+        error_codes = []
         try:
-            args = [self.safefreeze_path(), self.handler.get_intvalue_from_configfile('timeout',60)]
+            timeout = self.handler.get_intvalue_from_configfile('timeout','60')
+            args = [self.safefreeze_path(), str(timeout)]
             mounts = self.get_mounts()
             if len(mounts) == 0:
                 self.handler.log("[SnapshotRequest.freeze_mounts] -> nothing to freeze")
                 return False
             for mount in mounts:
                 args.append(mount)
-            
-            # TODO: abhishek
+            errors, error_codes, timedout = self.freeze_safe(args)
+            if len(errors) == 0 and not timedout:
+                self.freeze_start_time = datetime.utcnow()
+                self.freeze_safe_active = True
         except GetMountsError as gme:
-            self.handler.log("[SnapshotRequest.freeze_mounts] -> get_mounts failed: {}".format(traceback.format_exc(gme)))
+            self.handler.log("[SnapshotRequest.freeze_mounts] -> get_mounts failed: {}\n{}".format(gme, traceback.format_exc()))
         except Exception as e:
-            self.handler.log("[SnapshotRequest.freeze_mounts] -> unexpected error occured: {}".format(traceback.format_exc(e)))
-        return False
+            self.handler.log("[SnapshotRequest.freeze_mounts] -> unexpected error occured: {}\n{}".format(e, traceback.format_exc()))
+        return errors, error_codes
 
-    # error: {"code": "errorCode", "message": "errorMessage"} or None
-    def take_snapshot(self, error = None):
-        SNAPSHOT_INPROGRESS = True 
-        self.freeze_start = datetime.utcnow()
-
-        payload = {
-            "snapshotId": self.snapshotId,
-            "error": error
-        }
-        r = request.Request(
-            url = "{}/machine/plugins?comp=xdisksvc&type=startsnaphsots".format(BASE_URI),
-            data = urllib.urlencode(json.dumps(payload)),
-            headers = {
-                "Content-Type": "application/json"
-            }
-        )
+    def start_snapshot(self, error_code = None, error_message = None):
+        print("[SnapshotRequest.start_snapshot] -> Fired")
+        errors = []
         try:
-            conn = request.urlopen(r, timeout = 10)
-            content = conn.read()
-            if conn.status == 500:
-                self.handler.log("[start_sanpshot] -> startsnapshot request failed with 500 error", content)
-                return
-            elif conn.status != 201:
-                self.handler.log("[start_snapshot] -> unexpected status code: ", conn.status)
-                return
+            payload = {
+                "snapshotId": self.snapshotId,
+                "errMsg": ""
+            }
+            if error_code is not None:
+                payload["error"] = {
+                    "code": error_code if isinstance(error_code, str) else "",
+                    "message": error_message if isinstance(error_message, str) else "",
+                }
+                payload["errMsg"] = error_message if isinstance(error_message, str) else ""
             
-            # TODO Abhishek
-            
-        except Exception as e:
-            self.handler.log("[start_snapshot] -> unexpected exception: ", e)
+            # if IS_PYTHON3:
+            #     data = urllib.urlencode(payload).encode("utf-8")
+            # else:
+            #     data = urllib.urlencode(payload)
+            # print("[SnapshotRequest.start_snapshot] -> Data:{}".format(data))
 
+            if IS_PYTHON3:
+                data = json.dumps(payload).encode("utf-8")
+                print("[SnapshotRequest.start_snapshot] -> Data: {}".format(data))
+                r = request.Request(
+                    url = "{}/machine/plugins?comp=xdisksvc&type=startsnapshot".format(BASE_URI),
+                    headers = {
+                        "Content-Type": "application/json; charset=utf-8",
+                        "Content-Length": len(data),
+                    }
+                )
+            else:
+                data = json.dumps(payload)
+                print("[SnapshotRequest.start_snapshot] -> Data: {}".format(data))
+                r = request.Request(
+                    url = "{}/machine/plugins?comp=xdisksvc&type=startsnapshot".format(BASE_URI),
+                    headers = {
+                        "Content-Type": "application/json; charset=utf-8"
+                    }
+                )
+            conn = request.urlopen(r, timeout = 10, data = data)
+            print("[SnapshotRequest.start_snapshot] -> Request: {}".format(r))
+            # if IS_PYTHON3:
+            #     conn = request.urlopen(r, timeout = 10, data = data)
+            # else:
+            #     conn = request.urlopen(r, timeout = 10)
+            if conn.status != 200:
+                resp = conn.read()
+                print("[SnapshotRequest.start_snapshot] -> unexpected status code:{}, Body: {}".format(conn.status, resp))
+                errors.append("STARTSNAP_UNEXPECTED_STATUS_{}".format(conn.status))
+        except HTTPError as herr:
+            print("[SnapshotRequest.start_snapshot] -> startsnapshot request failed with status: {}, reason: {}".format(herr.code, herr.reason))
+            errors.append("STARTSNAP_HTTP_ERR")
+        except Exception as e:
+            print("[SnapshotRequest.start_snapshot] -> unexpected error occured: {}\n{}".format(e, traceback.format_exc()))
+            errors.append("STARTSNAP_UNEXPECTED_EXC")
+        return errors
+
+    def end_snapshot(self, payload):
+        errors = []
+        try:
+
+            # if IS_PYTHON3:
+            #     data = urllib.urlencode(payload).encode("utf-8")
+            # else:
+            #     data = urllib.urlencode(payload)
+            # print("[SanpshotRequest.end_snapshot] -> Data:{}".format(data))
+            if IS_PYTHON3:
+                data = json.dumps(payload).encode("utf-8")
+                print("[SnapshotRequest.end_snapshot] -> Data: {}".format(data))
+                r = request.Request(
+                    url = "{}/machine/plugins?comp=xdisksvc&type=publishsnapshot".format(BASE_URI),
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Content-Length": len(data)
+                    }
+                )
+            else:
+                data = json.dumps(payload)
+                print("[SnapshotRequest.end_snapshot] -> Data: {}".format(data))
+                r = request.Request(
+                    url = "{}/machine/plugins?comp=xdisksvc&type=publishsnapshot".format(BASE_URI),
+                    headers = {
+                        "Content-Type": "application/json"
+                    }
+                )
+
+            conn = request.urlopen(r, timeout = 10, data = data)
+            # if IS_PYTHON3:
+            #     conn = request.urlopen(r, timeout = 10, data = data)
+            # else:
+            #     conn = request.urlopen(r, timeout = 10)
+            if conn.status != 200:
+                resp = conn.read()
+                print("[SnapshotRequest.end_snapshot] -> unexpected status code: {}, Body: {}".format(conn.status, resp))
+                errors.append("ENDSNAP_UNEXPECTED_STATUS_{}".format(conn.status))
+        except HTTPError as herr:
+            print("[SnapshotRequest.end_snapshot] -> unexpected status code: {}, reason: {}".format(herr.code, herr.reason))
+            errors.append("ENDSNAP_UNEXPECTED_STATUS_{}".format(herr.code))
+        except Exception as e:
+            print("[SnapshotRequest.end_snapshot] -> unexpected error occured: {}\n{}".format(e, traceback.format_exc()))
+            errors.append("ENDSNAP_UNEXPECTED_EXC")
+        return errors
+
+    def take_snapshot(self):
+        # self.freeze_start = datetime.utcnow()
+        print("[SnapshotRequest.take_snapshot] -> Fired")
+        frozen_at = 0
+        call_remote_end = 0
+        remote_call_success = False
+        snapshot_error_code = None
+        snapshot_error_msg = None
+
+        try:
+            errors, error_codes = self.freeze_mounts()
+            x_errors = []
+            if len(errors) > 0:
+                print("[Snapshot_Request.take_snapshot] -> self.freeze_mounts() failed")
+                print("{}".format("\n".join(errors)))
+                x_errors = self.start_snapshot(error_code = error_codes[0], error_message = errors[0])
+                snapshot_error_code = error_codes[0]
+                snapshot_error_msg = errors[0]
+            else:
+                print("[Snapshot_Request.take_snapshot] -> self.freeze_mounts() success")
+                frozen_at = datetime.utcnow()
+                x_errors = self.start_snapshot()
+            if len(x_errors) > 0:
+                print("[Snapshot_Request.take_snapshot] -> calling xdisksvc failed with: {}".format(x_errors[0]))
+                snapshot_error_code = x_errors[0]
+                snapshot_error_msg = snapshot_error_code
+            else:
+                print("[Snapshot_Request.take_snapshot] -> calling xdisksvc succeeded")
+                remote_call_success = True
+        except Exception as e:
+            print("[SnapshotRequest.take_snapshot] -> unexpected exception: {}\n{}".format(e, traceback.format_exc()))
+            snapshot_error_code = "UNEXPECTED_SNAPSHOT_EXC"
+            snapshot_error_msg = str(e)
+        finally:
+            call_remote_end = datetime.utcnow()
+            self.thaw_safe()
+            print("[SnapshotRequest.take_snapshot] -> thaw_safe executed successfully")
+        
+        print("[SnapshotRequest.take_snapshot] -> Outta try catch!")
+        body = {
+            "snapshotId": self.snapshotId,
+            "errMsg": "",
+            # "consistencyMode": "App",
+        }
+        if remote_call_success and (call_remote_end.timestamp() - frozen_at.timestamp()) < 9:
+            print("[SanpshotRequest.take_snapshot] -> app consistency verified")
+        else:
+            print("[SnapshotRequest.take_snapshot] -> app consistency validation failed")
+            body["error"] = {
+                "code": snapshot_error_code,
+                "message": snapshot_error_msg
+            }
+            body["errMsg"] = snapshot_error_msg
+        self.end_snapshot(body)
 
 def get_snapshot_requests(handler):
     global BASE_URI
@@ -553,20 +818,16 @@ def get_snapshot_requests(handler):
         "data": {},
     }
     try:
-        conn = request.urlopen(BASE_URI + "/machine/plugins?comp=XDiskSvcPlugin&type=checkforsnapshot", timeout = 10)
-        content = conn.read()
-        if conn.status == 404:
-            res.statusCode = 404
+        conn = request.urlopen(BASE_URI + "/machine/plugins?comp=xdisksvc&type=checkforsnapshot", timeout = 10)
+        res["statusCode"] = conn.status
+        if res["statusCode"] == 200:
+            res["data"] = json.loads(conn.read())
             return res
-        if conn.status == 200:
-            res.statusCode = 200
-            res.data = json.loads(content)
-            return res
+    except HTTPError as herr:
+        res["statusCode"] = herr.code
     except Exception as e:
         handler.log("Exception making a http request", e)
     return res
-
-
 
 def take_new_snapshot(handler, data):
     try:
@@ -585,15 +846,16 @@ def main():
     while True:
         try:
             res = get_snapshot_requests(handler)
-            if get_snapshot_requests(res.statusCode == 200):
-                take_new_snapshot(handler, res.data)
-            elif res.statusCode == 404:
+            print("[main] -> res: {}".format(res))
+            if res["statusCode"] == 200:
+                take_new_snapshot(handler, res["data"])
+            elif res["statusCode"] == 404:
                 handler.log("[main] -> no new snapshot requests at this time")
             else:
-                handler.log("[main] -> invalid response code: ", res.statusCode)
+                handler.log("[main] -> invalid response code: ", res["statusCode"])
         except Exception as e:
             handler.log("[main] -> Unexpected expcetion occured", e)
-        time.sleep(300.0 - ((time.monotonic() - starttime) % 300.0))
+        time.sleep(30.0 - ((time.monotonic() - starttime) % 30.0))
 
 if __name__ == '__main__' :
     main()
