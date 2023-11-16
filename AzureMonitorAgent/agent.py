@@ -442,12 +442,22 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
+    _, _, _, az_environment, _ = me_handler.get_imds_values(is_lad=False)
+    if az_environment.lower() == me_handler.ArcACloudName:
+        _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
+        default_configs["customRegionalEndpoint"] = mcs_endpoint
+        default_configs["customGlobalEndpoint"] = mcs_endpoint
+        default_configs["customResourceEndpoint"] = "https://monitoring.azs"
+
+
     """
     Decide the mode and configuration. There are two supported configuration schema, mix-and-match between schemas is disallowed:
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
         Next-Generation: allows MCS, GCS multi tenant, or both
     """
     is_gcs_single_tenant = False
+    GcsEnabled, McsEnabled = get_control_plane_mode()
+
     # Next-generation schema
     if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):
 
@@ -461,9 +471,7 @@ def enable():
         if geneva_configuration and geneva_configuration.get("enable") == True:
             hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
             ensure["azuremonitoragentmgr"] = True
-            # Note that internally AMCS with geneva config path can be used in which case syslog should be handled same way as default 1P
-            generate_localsyslog_configs()
-
+            
         if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
             hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
             ensure["azuremonitoragent"] = True
@@ -475,9 +483,7 @@ def enable():
     elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
         ensure["azuremonitoragentmgr"] = True
-        # generate local syslog configuration files as in auto config syslog is not driven from DCR
-        generate_localsyslog_configs()
-
+                
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
         ensure["azuremonitoragent"] = True
@@ -488,8 +494,12 @@ def enable():
         ensure["azuremonitoragent"] = True
         is_gcs_single_tenant = True
         handle_gcs_config(public_settings, protected_settings, default_configs)
-        # generate local syslog configuration files as in 1P syslog is not driven from DCR
-        generate_localsyslog_configs()
+        
+    # generate local syslog configuration files as in auto config syslog is not driven from DCR
+    # Note that internally AMCS with geneva config path can be used in which case syslog should be handled same way as default 1P
+    # generate local syslog configuration files as in 1P syslog is not driven from DCR
+    if GcsEnabled:
+        generate_localsyslog_configs(uses_gcs=True, uses_mcs=McsEnabled)
 
     config_file = "/etc/default/azuremonitoragent"
     temp_config_file = "/etc/default/azuremonitoragent_temp"
@@ -518,9 +528,6 @@ def enable():
         start_metrics_process()
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
-        # Delete the PA.json file to ensure that it isn't picked up by amacoreagent causing a TCP port 13000 listener which is not needed and may conflict with other software. It is only used for 3P custom logs.
-        if os.path.exists("/etc/opt/microsoft/azuremonitoragent/amacoreagent/PA.json"):
-            os.remove("/etc/opt/microsoft/azuremonitoragent/amacoreagent/PA.json")
         # In GCS scenarios, ensure that AMACoreAgent is running
         start_amacoreagent()
 
@@ -683,9 +690,9 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     default_configs["ENABLE_MCS"] = "true"
     default_configs["PA_GIG_BRIDGE_MODE"] = "true"
     # April 2022: PA_FLUENT_SOCKET_PORT setting is being deprecated in place of PA_DATA_PORT. Remove when AMA 1.17 and earlier no longer need servicing.
-    default_configs["PA_FLUENT_SOCKET_PORT"] = "13000"
+    default_configs["PA_FLUENT_SOCKET_PORT"] = "13005"
     # this port will be dynamic in future
-    default_configs["PA_DATA_PORT"] = "13000"
+    default_configs["PA_DATA_PORT"] = "13005"
 
     # fetch proxy settings
     if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
@@ -728,6 +735,33 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
 
     if identifier_name and identifier_value:
         default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
+
+def get_control_plane_mode():
+    """
+    Identify which control plane is in use
+    """
+    public_settings, protected_settings = get_settings()
+
+    GcsEnabled = False
+    McsEnabled = False
+
+    if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):        
+        geneva_configuration = public_settings.get(GenevaConfigKey)
+        azure_monitor_configuration = public_settings.get(AzureMonitorConfigKey)
+
+        if geneva_configuration and geneva_configuration.get("enable") == True:
+            GcsEnabled = True
+        if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
+            McsEnabled = True
+    # Legacy schema
+    elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
+        GcsEnabled = True
+    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+        McsEnabled = True
+    else:
+        GcsEnabled = True
+    
+    return GcsEnabled, McsEnabled
 
 def disable():
     """
@@ -1114,7 +1148,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                         if generate_token:
                             generate_token = False
-                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value)
+                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value, is_lad=False)
                             if msi_token_generated:
                                 hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
                             else:
@@ -1185,6 +1219,8 @@ def syslogconfig_watcher(hutil_error, hutil_log):
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
 
+    GcsEnabled, McsEnabled = get_control_plane_mode()
+        
     while True:
         try:       
             if os.path.isfile(AMASyslogConfigMarkerPath):
@@ -1195,11 +1231,14 @@ def syslogconfig_watcher(hutil_error, hutil_log):
                     if "true" in data:
                         syslog_enabled = True
                 f.close()
+            elif GcsEnabled:
+                # 1P Syslog is always enabled as each tenant could be having different mdsd.xml configuration
+                syslog_enabled = True
 
             if syslog_enabled:
                 # place syslog local configs
                 syslog_enabled  = False
-                generate_localsyslog_configs()
+                generate_localsyslog_configs(uses_gcs=GcsEnabled, uses_mcs=McsEnabled)
             else:
                 # remove syslog local configs
                 remove_localsyslog_configs()
@@ -1213,11 +1252,15 @@ def syslogconfig_watcher(hutil_error, hutil_log):
         finally:
             time.sleep(sleepTime)
 
-def generate_localsyslog_configs():
+def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     """
     Install local syslog configuration files if not present and restart syslog
     """
 
+    # don't deploy any configuration if no control plane is configured
+    if not uses_gcs and not uses_mcs:
+        return
+    
     public_settings, _ = get_settings()
     syslog_port = ''
     if os.path.isfile(AMASyslogPortFilePath):
@@ -1236,24 +1279,26 @@ def generate_localsyslog_configs():
     if not os.path.exists('/etc/selinux/config'):
         useSyslogTcp = True
     else:        
-        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"')
+        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
         if sedisabled == 0:
             useSyslogTcp = True
         else:            
-            check_semanage, _ = run_command_and_log("which semanage")
-            if check_semanage != 0:            
-                hutil_log_info("semanage not found, cannot let TCP Port through for syslog")
-            elif syslog_port != '':
-                # allow the syslog port in SELinux
-                run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port)
+            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
+            if check_semanage == 0 and syslog_port != '':
+                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"',log_cmd=False)
+                if syslogPortEnabled != 0:                    
+                    # allow the syslog port in SELinux
+                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
                 useSyslogTcp = True   
         
-    if useSyslogTcp == True and syslog_port != '':
+    # 1P tenants use omuxsock, so keep using that for customers using 1P
+    if useSyslogTcp == True and syslog_port != '' and not uses_gcs:
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
-                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+                if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
                     os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
                     os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
                 os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
@@ -1337,8 +1382,9 @@ def remove_localsyslog_configs():
     if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf') or os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
         if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
             os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
-        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+        if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
             os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):            
             os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
         run_command_and_log(get_service_command("rsyslog", "restart"))
         hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
@@ -1546,7 +1592,7 @@ def is_vm_supported_for_extension(operation):
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
-                       'ubuntu' : ['18.04', '20.04'], # Ubuntu
+                       'ubuntu' : ['18.04', '20.04', '22.04'], # Ubuntu
                        'alma' : ['8'], # Alma
                        'centos' : ['7'], # CentOS
                        'mariner' : ['2'], # Mariner 2.0
@@ -1813,7 +1859,6 @@ def final_check_if_dpkg_or_rpm_locked(exit_code, output):
     if dpkg_or_rpm_locked:
         exit_code = DPKGOrRPMLockedErrorCode
     return exit_code
-
 
 def get_settings():
     """

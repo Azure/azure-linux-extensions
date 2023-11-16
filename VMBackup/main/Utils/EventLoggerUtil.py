@@ -245,6 +245,16 @@ class EventLogger:
             FileHelpers.deleteFile(file_path)
             print("Information: Event reporting has paused due to reaching maximum capacity in the Event directory. Reporting will resume once space is available. Events for this iteration will not be reported.")
 
+    def clear_temp_directory(self, directory_path):
+        try:
+            if os.path.exists(directory_path):
+                if len(os.listdir(directory_path)) == 0:
+                    os.rmdir(directory_path)
+                else:
+                    shutil.rmtree(directory_path)
+        except Exception as ex:
+            logger.log("Warning: Error clearing the temp directory. Exception: {0}".format(str(ex)))
+    
     def dispose(self):
         print("Information: Dispose(), called on EventLogger. Event processing is terminating...")
         self._dispose(True)
@@ -268,6 +278,8 @@ class EventLogger:
                             logger.log("Warning: Unable to process events before termination of extension. Exception: {0}" .format(str(ex)))
                 self.disposed = True
                 print("Information: Event Logger has terminated")
+                print("Clearing the temp directory")
+                self.clear_temp_directory(self.temporary_directory)
                 self.event_logging_enabled = False
         except Exception as ex:
             logger.log("Warning: Processing Dispose() of EventLogger resulted in Exception: {0}" .format(str(ex)))
