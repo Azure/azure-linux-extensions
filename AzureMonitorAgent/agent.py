@@ -49,7 +49,6 @@ import re
 import hashlib
 import fileinput
 from collections import OrderedDict
-from distutils.version import LooseVersion
 from hashlib import sha256
 from shutil import copyfile
 
