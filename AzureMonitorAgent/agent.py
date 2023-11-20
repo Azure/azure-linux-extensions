@@ -136,15 +136,6 @@ HandlerEnvironment = None
 SettingsDict = None
 
 
-# Change permission of log path - if we fail, that is not an exit case
-try:
-    ext_log_path = '/var/log/azure/'
-    if os.path.exists(ext_log_path):
-        os.chmod(ext_log_path, 700)
-except:
-    pass
-
-
 def main():
     """
     Main method
