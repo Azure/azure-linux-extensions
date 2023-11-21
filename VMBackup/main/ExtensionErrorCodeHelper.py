@@ -14,6 +14,7 @@ class ExtensionErrorCodeEnum():
     FailedHandlerGuestAgentCertificateNotFound = 16
     #error_upload_status_blob = 16
     FailedInvalidDataDiskLunList = 17
+    FailedSafeFreezeBinaryNotFound = 18
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotRateExceeded = 173
@@ -68,7 +69,8 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotRateExceeded : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList : Status.ExtVmHealthStateEnum.green,
-                   
+            
+            ExtensionErrorCodeEnum.FailedSafeFreezeBinaryNotFound: Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeTimeout : Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount : Status.ExtVmHealthStateEnum.yellow,
@@ -130,7 +132,8 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableUnableToOpenMount : "FailedRetryableUnableToOpenMount",
             ExtensionErrorCodeEnum.error_parameter : "error_parameter",
             ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound : "FailedHandlerGuestAgentCertificateNotFound",
-
+            ExtensionErrorCodeEnum.FailedSafeFreezeBinaryNotFound : "FailedSafeFreezeBinaryNotFound",
+             
             ExtensionErrorCodeEnum.FailedPrepostPreScriptFailed : "FailedPrepostPreScriptFailed",
             ExtensionErrorCodeEnum.FailedPrepostPostScriptFailed : "FailedPrepostPostScriptFailed",
             ExtensionErrorCodeEnum.FailedPrepostPreScriptNotFound : "FailedPrepostPreScriptNotFound",

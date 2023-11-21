@@ -111,7 +111,8 @@ class FsFreezer:
         self.hutil = hutil
         self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
         self.isArm64Machine = False
-
+        self.file_exists = True
+        
         try:
             platformMachine = platform.machine()
             architectureFromUname = os.uname()[-1]
@@ -128,7 +129,12 @@ class FsFreezer:
         else:
             self.logger.log("isArm64Machine : " + str(self.isArm64Machine) + " Using x64 safefreeze binary")
             self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
-
+        
+        temp = os.path.join(os.path.dirname(os.path.realpath(__file__)), self.safeFreezeFolderPath)
+        self.logger.log("path "+ str(temp))
+        self.logger.log("exists path " + str(os.path.exists(temp)))
+        if((os.path.exists(temp)) == False):
+            self.file_exists = False
         try:
             self.mounts = Mounts(patching = self.patching, logger = self.logger)
         except Exception as e:

@@ -95,6 +95,7 @@ class CommonVariables:
     error_http_failure = 15
     FailedHandlerGuestAgentCertificateNotFound = 16
     #error_upload_status_blob = 16
+    FailedSafeFreezeBinaryNotFound = 18
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotRateExceeded = 173
