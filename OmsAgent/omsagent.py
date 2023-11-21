@@ -175,13 +175,6 @@ AutoManagedWorkspaceCreationSleepSeconds = 20
 AgentUser='omsagent'
 AgentGroup='omiusers'
 
-# Change permission of log path - if we fail, that is not an exit case
-try:
-    ext_log_path = '/var/log/azure/'
-    if os.path.exists(ext_log_path):
-        os.system('chmod {1} {0}'.format(ext_log_path, 700))
-except:
-    pass
 
 """
 What need to be packaged to make the signing work:
@@ -932,12 +925,13 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['7', '8'], 'red hat' : ['7', '8'], 'rhel' : ['7', '8'], # Red Hat
+    supported_dists = {'redhat' : ['7', '8', '9'], 'red hat' : ['7', '8', '9'], 'rhel' : ['7', '8', '9'], # Red Hat
                        'centos' : ['7', '8'], # CentOS
                        'oracle' : ['7', '8'], 'ol': ['7', '8'], # Oracle
-                       'debian' : ['8', '9', '10'], # Debian
+                       'debian' : ['8', '9', '10', '11'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
+                       'opensuse' : ['15'], # openSUSE
                        'rocky' : ['8', '9'], # Rocky
                        'alma' : ['8', '9'], # Alma
                        'amzn' : ['2'] # AWS
