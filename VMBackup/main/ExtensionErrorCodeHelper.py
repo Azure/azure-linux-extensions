@@ -14,7 +14,7 @@ class ExtensionErrorCodeEnum():
     FailedHandlerGuestAgentCertificateNotFound = 16
     #error_upload_status_blob = 16
     FailedInvalidDataDiskLunList = 17
-    FailedSafeFreezeBinaryNotFound = 18
+    FailedSafeFreezeBinaryNotFound = 19
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotRateExceeded = 173
