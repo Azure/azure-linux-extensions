@@ -346,10 +346,8 @@ def daemon():
                 exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
             
             if(freezer.file_exists == False):
-                backup_logger.log("inside if",True, "Info")
                 file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), freezer.safeFreezeFolderPath) 
                 error_msg = "safefreeze binary is missing in the following path " + str(file_path)
-                backup_logger.log("setting the error code", True, "Info")
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSafeFreezeBinaryNotFound)
                 temp_result=CommonVariables.FailedSafeFreezeBinaryNotFound
                 temp_status= 'error'
