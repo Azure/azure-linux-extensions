@@ -277,7 +277,7 @@ def daemon():
             backup_logger.log(errMsg, True, 'Error')
 
         freezer = FsFreezer(patching= MyPatching, logger = backup_logger, hutil = hutil)
-        backup_logger.log(freezer.file_exists, True, 'Info')
+        backup_logger.log("safeFreezeBinary exists " + str(freezer.file_exists), True, 'Info')
 
         global_error_result = None
         # precheck
