@@ -185,15 +185,16 @@ def disable_encryption():
 
 
 def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_marker=None):
-    if security_Type == CommonVariables.ConfidentialVM:
-        logger.log(msg="Do not send vm setting to host for stamping.",level=CommonVariables.InfoLevel)
-        return
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
     bek_util = BekUtil(disk_util, logger,encryption_environment)
     current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
     public_settings = get_public_settings()
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
+    if security_Type == CommonVariables.ConfidentialVM:
+        logger.log(msg="Do not send vm setting to host for stamping.",level=CommonVariables.InfoLevel)
+        extension_parameter.commit()
+        return
     has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
 
     # post new encryption settings via wire server protocol
