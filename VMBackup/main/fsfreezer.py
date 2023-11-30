@@ -111,7 +111,8 @@ class FsFreezer:
         self.hutil = hutil
         self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
         self.isArm64Machine = False
-
+        self.file_exists = True # Flag to indiacte safeFreeze Binary presence
+        
         try:
             platformMachine = platform.machine()
             architectureFromUname = os.uname()[-1]
@@ -128,7 +129,10 @@ class FsFreezer:
         else:
             self.logger.log("isArm64Machine : " + str(self.isArm64Machine) + " Using x64 safefreeze binary")
             self.safeFreezeFolderPath = "safefreeze/bin/safefreeze"
-
+        
+        self.logger.log("Checking for the safefreeze binary")
+        self.check_if_file_exists(self.safeFreezeFolderPath)
+        
         try:
             self.mounts = Mounts(patching = self.patching, logger = self.logger)
         except Exception as e:
@@ -147,7 +151,13 @@ class FsFreezer:
         self.getLockRetry = 0
         self.maxGetLockRetry = 5
         self.safeFreezelockFile = None
-
+    
+    def check_if_file_exists(self, relative_path):
+        full_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), relative_path)
+        self.logger.log("path of the file"+ str(full_path))
+        self.file_exists = os.path.exists(full_path)
+        self.logger.log("file path exists " + str(self.file_exists))
+    
     def should_skip(self, mount):
         if(self.resource_disk_mount_point is not None and mount.mount_point == self.resource_disk_mount_point):
             return True

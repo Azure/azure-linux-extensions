@@ -297,6 +297,8 @@ def daemon():
             backup_logger.log(errMsg, True, 'Error')
 
         freezer = FsFreezer(patching= MyPatching, logger = backup_logger, hutil = hutil)
+        backup_logger.log("safeFreezeBinary exists " + str(freezer.file_exists), True, 'Info')
+
         global_error_result = None
         # precheck
         freeze_called = False
@@ -377,6 +379,15 @@ def daemon():
                 hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHandlerGuestAgentCertificateNotFound)
                 temp_result=CommonVariables.FailedHandlerGuestAgentCertificateNotFound
                 temp_status= 'error'
+                exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
+            
+            if(freezer.file_exists == False):
+                file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), freezer.safeFreezeFolderPath) 
+                error_msg = "safefreeze binary is missing in the following path " + str(file_path)
+                hutil.SetExtErrorCode(ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedSafeFreezeBinaryNotFound)
+                temp_result=CommonVariables.FailedSafeFreezeBinaryNotFound
+                temp_status= 'error'
+                backup_logger.log("exiting with commit",True,"Info")
                 exit_with_commit_log(temp_status, temp_result,error_msg, para_parser)
 
             if(para_parser.commandStartTimeUTCTicks is not None and para_parser.commandStartTimeUTCTicks != ""):
