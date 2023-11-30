@@ -414,7 +414,7 @@ Please verify and re-run ADE install after fixing the issue.'
         result = executor.Execute(cmd)
         if result != CommonVariables.process_success:
             #SKR is failed trace the logs.
-            self.logger.log('enabling SKR tracing. set SKR_TRACE_ON = 1')
+            self.logger.log('SKR has failed. Turn on tracing and log the output.')
             os.environ["SKR_TRACE_ON"]="1"
             result = executor.Execute(cmd)
             #re-check, to ensure the SKR. 
