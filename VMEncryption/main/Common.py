@@ -62,7 +62,8 @@ class CommonVariables:
     """
     cvm_ade_vm_encryption_token_id = 5
     ADEEncryptionVersionInLuksToken_1_0='1.0'
-    PassphraseNameValue = 'LUKSPasswordProtector'
+    PassphraseNameValueProtected = 'LUKSPasswordProtector'
+    PassphraseNameValueNotProtected = 'LUKSPasswordNotProtector'
     """
     IMDS IP:
     """

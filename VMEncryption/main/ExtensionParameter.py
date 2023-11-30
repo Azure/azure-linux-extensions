@@ -174,6 +174,13 @@ class ExtensionParameter(object):
             if b[-1] == '/': b = b[:-1]
         return a==b
 
+    def cmk_changed(self):
+        if (self.KeyEncryptionKeyURL or self.get_kek_url()) and \
+           (not self._is_kv_equivalent(self.KeyEncryptionKeyURL, self.get_kek_url())):
+           self.logger.log('Current config KeyEncryptionKeyURL {0} differs from effective config KeyEncryptionKeyURL {1}'.format(self.KeyEncryptionKeyURL, self.get_kek_url()))
+           return True
+        return False
+     
     def config_changed(self):
         if (self.command or self.get_command()) and \
            (self.command != self.get_command() and \

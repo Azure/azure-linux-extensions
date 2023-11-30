@@ -193,21 +193,25 @@ class DiskUtil(object):
         self.logger.log("secure_key_release_operation {0} end.".format(operation))
         return process_comm.stdout.strip()
     
-    def import_token(self,device_path,passphrase_file,public_settings):
+    def import_token(self,device_path,passphrase_file,public_settings,PassphraseNameValue=CommonVariables.PassphraseNameValueProtected):
         '''this function reads passphrase from passphrase file, wrap it and update in token field of LUKS2 header.'''
         self.logger.log(msg="import_token for device: {0} started.".format(device_path))
-        protector = ""
+        Protector= ""
         with open(passphrase_file,"rb") as protector_file:
             #passphrase stored in keyfile is base64
-            protector = protector_file.read().decode('utf-8')
+            Protector = protector_file.read().decode('utf-8')
         KekVaultResourceId=public_settings.get(CommonVariables.KekVaultResourceIdKey)
         KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
         AttestationUrl = public_settings.get(CommonVariables.AttestationURLKey)
-        wrappedProtector = self.secure_key_release_operation(protectorbase64=protector,
+        if PassphraseNameValue == CommonVariables.PassphraseNameValueProtected:
+            Protector = self.secure_key_release_operation(protectorbase64=Protector,
                                                         kekUrl=KeyEncryptionKeyUrl,
                                                         operation=CommonVariables.secure_key_release_wrap,
                                                         attestationUrl=AttestationUrl)
-        if not wrappedProtector:
+        else:
+            self.logger.log(msg="import_token passphrase is not wrapped, value of passphrase name key: {0}".format(PassphraseNameValue))
+
+        if not Protector:
             self.logger.log("import_token protector wrapping is unsuccessful for device {0}".format(device_path))
             return False
         data={
@@ -219,10 +223,9 @@ class DiskUtil(object):
             CommonVariables.KeyVaultResourceIdKey:public_settings.get(CommonVariables.KeyVaultResourceIdKey),
             CommonVariables.KeyVaultURLKey:public_settings.get(CommonVariables.KeyVaultURLKey),
             CommonVariables.AttestationURLKey:AttestationUrl,
-            CommonVariables.PassphraseNameKey:CommonVariables.PassphraseNameValue,
-            CommonVariables.PassphraseKey:wrappedProtector
+            CommonVariables.PassphraseNameKey:PassphraseNameValue,
+            CommonVariables.PassphraseKey:Protector
         }
-        #TODO: needed to decide on temp path.
         custom_cmk = os.path.join("/var/lib/azure_disk_encryption_config/","custom_cmk.json")
         out_file = open(custom_cmk,"w")
         json.dump(data,out_file,indent=4)
@@ -254,6 +257,9 @@ class DiskUtil(object):
         keyEncryptionKeyUrl=disk_encryption_setting[CommonVariables.KeyEncryptionKeyURLKey]
         wrappedProtector = disk_encryption_setting[CommonVariables.PassphraseKey]
         attestationUrl = disk_encryption_setting[CommonVariables.AttestationURLKey]
+        if disk_encryption_setting[CommonVariables.PassphraseNameKey] != CommonVariables.PassphraseNameValueProtected:
+            self.logger.log("passphrase is not Protectected. No need to do SKR.")
+            return wrappedProtector if wrappedProtector else None
         if wrappedProtector:
             #unwrap the protector.
             protector=self.secure_key_release_operation(attestationUrl=attestationUrl,
