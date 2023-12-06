@@ -1,6 +1,0 @@
-version:
-  name: 'Azure Disk Encryption for Linux'
-  major: 1                                                              
-  minor: 1                                                              
-  tag: 'official'
-  system: 'buildrevision'

@@ -1,2 +1,0 @@
-def getpwnam(name):
-    pass
