@@ -175,13 +175,6 @@ AutoManagedWorkspaceCreationSleepSeconds = 20
 AgentUser='omsagent'
 AgentGroup='omiusers'
 
-# Change permission of log path - if we fail, that is not an exit case
-try:
-    ext_log_path = '/var/log/azure/'
-    if os.path.exists(ext_log_path):
-        os.system('chmod {1} {0}'.format(ext_log_path, 700))
-except:
-    pass
 
 """
 What need to be packaged to make the signing work:

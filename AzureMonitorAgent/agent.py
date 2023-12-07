@@ -136,15 +136,6 @@ HandlerEnvironment = None
 SettingsDict = None
 
 
-# Change permission of log path - if we fail, that is not an exit case
-try:
-    ext_log_path = '/var/log/azure/'
-    if os.path.exists(ext_log_path):
-        os.chmod(ext_log_path, 700)
-except:
-    pass
-
-
 def main():
     """
     Main method
@@ -1473,7 +1464,10 @@ def set_os_arch(operation):
         
         dynamicSSLPreviewFlagPath = PreviewFeaturesDirectory + 'useDynamicSSL'
         if os.path.exists(dynamicSSLPreviewFlagPath):
-            BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
+            if BundleFileName.endswith('.rpm'):
+                BundleFileName = BundleFileName.replace('.' + current_arch, '.dynamicssl.' + current_arch)        
+            elif BundleFileName.endswith('.deb'):
+                BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
         
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
