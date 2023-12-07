@@ -1458,9 +1458,8 @@ def set_os_arch(operation):
 
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
-        
-        dynamicSSLPreviewFlagPath = PreviewFeaturesDirectory + 'useDynamicSSL'
-        if os.path.exists(dynamicSSLPreviewFlagPath) or is_feature_enabled('useDynamicSSL'):
+                
+        if is_feature_enabled('useDynamicSSL'):
             # Check if they have libssl.so.1.1 since AMA is built against this version
             libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
             if libssl1_1 == 0:
@@ -1652,6 +1651,10 @@ def is_feature_enabled(feature):
     """
     feature_support_matrix = {'useDynamicSSL' : ['eastus'] }
     
+    featurePreviewFlagPath = PreviewFeaturesDirectory + feature
+    if os.path.exists(featurePreviewFlagPath):
+        return True
+        
     _, region = get_azure_environment_and_region()
 
     if feature in feature_support_matrix.keys():
