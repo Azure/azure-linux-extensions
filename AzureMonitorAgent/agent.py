@@ -1259,9 +1259,6 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
         f.close()
         
     useSyslogTcp = False
-    syslogTcpPreviewFlagPath = PreviewFeaturesDirectory + 'useSyslogTcp'
-    if os.path.exists(syslogTcpPreviewFlagPath):
-        useSyslogTcp = True
     
     # always use syslog tcp port, unless 
     # - the distro is Red Hat based and doesn't have semanage
@@ -1463,11 +1460,14 @@ def set_os_arch(operation):
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
         
         dynamicSSLPreviewFlagPath = PreviewFeaturesDirectory + 'useDynamicSSL'
-        if os.path.exists(dynamicSSLPreviewFlagPath):
-            if BundleFileName.endswith('.rpm'):
-                BundleFileName = BundleFileName.replace('.' + current_arch, '.dynamicssl.' + current_arch)        
-            elif BundleFileName.endswith('.deb'):
-                BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
+        if os.path.exists(dynamicSSLPreviewFlagPath) or is_feature_enabled('useDynamicSSL'):
+            # Check if they have libssl.so.1.1 since AMA is built against this version
+            libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
+            if libssl1_1 == 0:
+                if BundleFileName.endswith('.rpm'):
+                    BundleFileName = BundleFileName.replace('.' + current_arch, '.dynamicssl.' + current_arch)        
+                elif BundleFileName.endswith('.deb'):
+                    BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
         
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
@@ -1645,6 +1645,20 @@ def exit_if_vm_not_supported(operation):
         log_and_exit(operation, UnsupportedOperatingSystem, 'Unsupported operating system: ' \
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
+
+def is_feature_enabled(feature):
+    """
+    Checks if the feature is enabled in the current region
+    """
+    feature_support_matrix = {'useDynamicSSL' : ['eastus'] }
+    
+    _, region = get_azure_environment_and_region()
+
+    if feature in feature_support_matrix.keys():
+        if region in feature_support_matrix[feature]:
+            return True
+    
+    return False
 
 
 def get_ssl_cert_info(operation):
