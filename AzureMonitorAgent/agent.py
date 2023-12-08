@@ -1654,7 +1654,11 @@ def is_feature_enabled(feature):
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
     if os.path.exists(featurePreviewFlagPath):
         return True
-        
+    
+    featurePreviewDisabledFlagPath = PreviewFeaturesDirectory + feature + 'Disabled'
+    if os.path.exists(featurePreviewDisabledFlagPath):
+        return False
+    
     _, region = get_azure_environment_and_region()
 
     if feature in feature_support_matrix.keys():
