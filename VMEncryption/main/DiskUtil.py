@@ -194,7 +194,7 @@ class DiskUtil(object):
         self.logger.log("secure_key_release_operation {0} end.".format(operation))
         return process_comm.stdout.strip()
     
-    def import_token(self,device_path,token_data,token_id):
+    def import_token_data(self,device_path,token_data,token_id):
         self.logger.log(msg="import_token for device: {0} started.".format(device_path))
         temp_file = tempfile.NamedTemporaryFile(delete=False)
         temp_file.close()
@@ -278,7 +278,7 @@ class DiskUtil(object):
     def export_token(self,device_name):
         '''This function reads token id from luks2 header field and unwrap passphrase'''
         self.logger.log("export_token to device {0} started.".format(device_name))
-        device_path = os.path.join("/dev",device_name)
+        device_path = self.get_device_path(device_name)
         protector = None
         cmd = "cryptsetup token export --token-id {0} {1}".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_path)
         process_comm = ProcessCommunicator()
@@ -448,6 +448,29 @@ class DiskUtil(object):
             if token[1] is token_name:
                 return token[0]
         return None
+
+    def restore_luks2_token(self, device_name=None):
+        '''this function restoring token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption'''
+        if not device_name:
+            return
+        device_path = self.get_device_path(device_name)
+        ade_token_id = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
+        ade_token_id_backup = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionBackUpToken)
+        if not ade_token_id_backup:
+            #do nothing
+            return
+        if ade_token_id:
+            #remove backup token id
+            self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
+            return
+        self.logger.log("resotre luks2 token for device {0} is started.".format(device_name))
+        #read from backup and update AzureDiskEncryptionToken
+        data = self.read_token(device_name=device_name,token_id=ade_token_id_backup)
+        data['type']=CommonVariables.AzureDiskEncryptionBackUpToken
+        self.import_token_data(device_path=device_path,token_data=data,token_id=CommonVariables.AzureDiskEncryptionToken)
+        #remove backup
+        self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
+        self.logger.log("resotre luks2 token for device {0} is successful.".format(device_name))
 
     def _get_cryptsetup_version(self):
         # get version of currently installed cryptsetup
