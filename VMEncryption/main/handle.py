@@ -299,16 +299,29 @@ def update_encryption_settings_luks2_header():
                 logger.log("Not a LUKS device, device path: {0}".format(device_item_path))
                 continue
             logger.log("Reading passphrase from LUKS2 header, device name: {0}".format(device_item.name))
+            #keep token copy for manual recovery
+            data = disk_util.read_token(device_name=device_item.name,token_id=CommonVariables.cvm_ade_vm_encryption_token_id)
+            data['type']='Azure_Disk_Encryption_Backup'
+            disk_util.import_token(device_path=device_item.name,token_data=data,token_id=1)
             #get the unwrapped passphrase from LUKS2 header.
             passphrase=disk_util.export_token(device_name=device_item.name)
+            #remove token
+            disk_util.remove_token(device_name=device_item.name,token_id=CommonVariables.cvm_ade_vm_encryption_token_id) 
             if not passphrase:
                 logger.log("No passphrase in LUKS2 header, device name: {0}".format(device_item.name))
                 continue
             logger.log("Updating wrapped passphrase to LUKS2 header with current public setting. device name {0}".format(device_item.name))
             #protect passphrase before updating to LUKS2 is done in import_token
-            ret = disk_util.import_token(device_item_path,passphrase,public_setting,CommonVariables.PassphraseNameValueProtected)
+            temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
+            temp_keyfile.write(passphrase.encode("utf-8"))
+            temp_keyfile.close()
+            ret = disk_util.import_token(device_item_path,temp_keyfile.name,public_setting,CommonVariables.PassphraseNameValueProtected)
             if not ret:
-                logger.log("Udate passphrase with current public setting to LUKS2 header is not successful. device path {0}".format(device_item_path))
+                logger.log("Update passphrase with current public setting to LUKS2 header is not successful. device path {0}".format(device_item_path))
+                return None
+            os.unlink(temp_keyfile.name)
+            #removing backup token
+            disk_util.remove_token(device_name=device_item.name,token_id=1)
         extension_parameter.commit()
         bek_util.umount_azure_passhprase(encryption_config)
     except Exception as e:
@@ -839,6 +852,7 @@ def enable():
                                   encryption_config=encryption_config,
                                   passphrase_file=generated_passphrase_file)
         if security_Type == CommonVariables.ConfidentialVM:
+            #[TODO]token update/cleaning
             crypt_mount_config_util.device_unlock_using_luks2_header()
 
         encryption_status = json.loads(disk_util.get_encryption_status())

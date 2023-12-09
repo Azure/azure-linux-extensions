@@ -24,6 +24,7 @@ import re
 from subprocess import Popen
 import traceback
 import glob
+import tempfile
 
 from EncryptionConfig import EncryptionConfig
 from DecryptionMarkConfig import DecryptionMarkConfig
@@ -193,6 +194,18 @@ class DiskUtil(object):
         self.logger.log("secure_key_release_operation {0} end.".format(operation))
         return process_comm.stdout.strip()
     
+    def import_token(self,device_path,token_data,token_id):
+        self.logger.log(msg="import_token for device: {0} started.".format(device_path))
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
+        temp_file.close()
+        json.dump(token_data,temp_file.name,indent=4)
+        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(temp_file.name,token_id)
+        process_comm = ProcessCommunicator()
+        status = self.command_executor.Execute(cmd,communicator=process_comm)
+        self.logger.log(msg="import_token: device: {0} status: {1}".format(device_path,status))
+        os.unlink(temp_file.name)
+        return status==CommonVariables.process_success
+
     def import_token(self,device_path,passphrase_file,public_settings,PassphraseNameValue=CommonVariables.PassphraseNameValueProtected):
         '''this function reads passphrase from passphrase file, wrap it and update in token field of LUKS2 header.'''
         self.logger.log(msg="import_token for device: {0} started.".format(device_path))
@@ -226,6 +239,7 @@ class DiskUtil(object):
             CommonVariables.PassphraseNameKey:PassphraseNameValue,
             CommonVariables.PassphraseKey:Protector
         }
+        #TODO handle with temp file.
         custom_cmk = os.path.join("/var/lib/azure_disk_encryption_config/","custom_cmk.json")
         out_file = open(custom_cmk,"w")
         json.dump(data,out_file,indent=4)
@@ -238,6 +252,29 @@ class DiskUtil(object):
         self.logger.log(msg="import_token: device: {0} end.".format(device_path))
         return status==CommonVariables.process_success
     
+    def read_token(self,device_name,token_id):
+        '''this functions reads tokens from LUKS2 header.'''
+        device_path = os.path.join("/dev",device_name)
+        cmd = "cryptsetup token export --token-id {0} {1}".format(token_id,device_path)
+        process_comm = ProcessCommunicator()
+        status = self.command_executor.Execute(cmd, communicator=process_comm)
+        if status != 0:
+            self.logger.log("export_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
+            return None
+        token = process_comm.stdout
+        return token
+
+    def remove_token(self,device_name,token_id):
+        '''this function remove the token'''
+        device_path = os.path.join("/dev",device_name)
+        cmd = "cryptsetup token remove --token-id {0} {1}".format(token_id,device_path)
+        process_comm = ProcessCommunicator()
+        status = self.command_executor.Execute(cmd, communicator=process_comm)
+        if status != 0:
+            self.logger.log("remove token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
+            return False
+        return True
+
     def export_token(self,device_name):
         '''This function reads token id from luks2 header field and unwrap passphrase'''
         self.logger.log("export_token to device {0} started.".format(device_name))
@@ -403,6 +440,15 @@ class DiskUtil(object):
                 return splits[1]
         return None
 
+    def get_token_id(self,header_or_dev_path,token_name):
+        '''if LUKS2 header has token name return the id else return none.'''
+        luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
+        tokens = self._extract_luksv2_token(luks_dump_out)
+        for token in tokens:
+            if token[1] is token_name:
+                return token[0]
+        return None
+
     def _get_cryptsetup_version(self):
         # get version of currently installed cryptsetup
         cryptsetup_cmd = "{0} --version".format(self.distro_patcher.cryptsetup_path)
@@ -415,6 +461,31 @@ class DiskUtil(object):
         for line in lines:
             if "version:" in line.lower():
                 return line.split()[-1]
+
+    def _extract_luksv2_token(self, luks_dump_out):
+        """
+        ...
+        Tokens:
+            1: Azure_Disk_Encryption_BackUp
+            5: Azure_Disk_Encryption
+        ...
+        """
+        lines = luks_dump_out.split("\n")
+        token_segment = False
+        token_lines = []
+        for line in lines:
+            parts = line.split(":")
+            if len(parts)<2:
+                continue
+            if token_segment and parts[1].strip() is '':
+                break
+            if "tokens" in parts[0].strip().lower():
+                token_segment = True
+                continue
+            if token_segment and self._isnumeric(parts[0].strip()):
+                token_lines.append(parts)
+                continue
+        return token_lines
 
     def _extract_luksv2_keyslot_lines(self, luks_dump_out):
         """
