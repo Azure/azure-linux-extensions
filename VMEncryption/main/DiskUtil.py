@@ -196,10 +196,10 @@ class DiskUtil(object):
     
     def import_token_data(self,device_path,token_data,token_id):
         self.logger.log(msg="import_token for device: {0} started.".format(device_path))
-        temp_file = tempfile.NamedTemporaryFile(delete=False)
+        temp_file = tempfile.NamedTemporaryFile(delete=False,mode='w+')
+        json.dump(token_data,temp_file,indent=4)
         temp_file.close()
-        json.dump(token_data,temp_file.name,indent=4)
-        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(temp_file.name,token_id)
+        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(temp_file.name,token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd,communicator=process_comm)
         self.logger.log(msg="import_token: device: {0} status: {1}".format(device_path,status))
@@ -262,7 +262,7 @@ class DiskUtil(object):
             self.logger.log("export_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
             return None
         token = process_comm.stdout
-        return token
+        return json.loads(token)
 
     def remove_token(self,device_name,token_id):
         '''this function remove the token'''
@@ -271,7 +271,7 @@ class DiskUtil(object):
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd, communicator=process_comm)
         if status != 0:
-            self.logger.log("remove token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
+            self.logger.log("remove token id {0} not found in device {1} LUKS header".format(token_id,device_name))
             return False
         return True
 
@@ -506,7 +506,7 @@ class DiskUtil(object):
                 token_segment = True
                 continue
             if token_segment and self._isnumeric(parts[0].strip()):
-                token_lines.append(parts)
+                token_lines.append([int(parts[0].strip()),parts[1].strip()])
                 continue
         return token_lines
 
