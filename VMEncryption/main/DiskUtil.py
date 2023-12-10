@@ -240,15 +240,14 @@ class DiskUtil(object):
             CommonVariables.PassphraseKey:Protector
         }
         #TODO handle with temp file.
-        custom_cmk = os.path.join("/var/lib/azure_disk_encryption_config/","custom_cmk.json")
-        out_file = open(custom_cmk,"w")
-        json.dump(data,out_file,indent=4)
-        out_file.close()
-        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(custom_cmk,CommonVariables.cvm_ade_vm_encryption_token_id,device_path)
+        temp_file = tempfile.NamedTemporaryFile(delete=False,mode='w+')
+        json.dump(data,temp_file,indent=4)
+        temp_file.close()
+        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(temp_file.name,CommonVariables.cvm_ade_vm_encryption_token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd,communicator=process_comm)
         self.logger.log(msg="import_token: device: {0} status: {1}".format(device_path,status))
-        os.remove(custom_cmk)
+        os.remove(temp_file.name)
         self.logger.log(msg="import_token: device: {0} end.".format(device_path))
         return status==CommonVariables.process_success
     
@@ -445,7 +444,7 @@ class DiskUtil(object):
         luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
         tokens = self._extract_luksv2_token(luks_dump_out)
         for token in tokens:
-            if token[1] is token_name:
+            if token[1] == token_name:
                 return token[0]
         return None
 
@@ -500,7 +499,7 @@ class DiskUtil(object):
             parts = line.split(":")
             if len(parts)<2:
                 continue
-            if token_segment and parts[1].strip() is '':
+            if token_segment and parts[1].strip() == '':
                 break
             if "tokens" in parts[0].strip().lower():
                 token_segment = True
