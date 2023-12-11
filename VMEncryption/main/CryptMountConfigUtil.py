@@ -266,6 +266,8 @@ class CryptMountConfigUtil(object):
         lock = threading.Lock()
         for device_item in device_items:
             if device_item.file_system == "crypto_LUKS": 
+                 #resotre Luks2 token from BackUp (if needed)
+                 self.disk_util.restore_luks2_token(device_name=device_item.name)
                  device_item_path = self.disk_util.get_device_path(device_item.name)
                  azure_item_path = azure_name_table[device_item_path] if device_item_path in azure_name_table else device_item_path
                  thread = threading.Thread(target=self._device_unlock_using_luks2_header,args=(device_item.name,device_item_path,azure_item_path,lock))

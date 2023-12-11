@@ -61,8 +61,12 @@ class CommonVariables:
     CVM LUKS2 header token
     """
     cvm_ade_vm_encryption_token_id = 5
+    cvm_ade_vm_encryption_backup_token_id = 6
     ADEEncryptionVersionInLuksToken_1_0='1.0'
-    PassphraseNameValue = 'LUKSPasswordProtector'
+    PassphraseNameValueProtected = 'LUKSPasswordProtector'
+    PassphraseNameValueNotProtected = 'LUKSPasswordNotProtector'
+    AzureDiskEncryptionToken = 'Azure_Disk_Encryption'
+    AzureDiskEncryptionBackUpToken='Azure_Disk_Encryption_BackUp'
     """
     IMDS IP:
     """

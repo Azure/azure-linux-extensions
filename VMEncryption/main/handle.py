@@ -185,15 +185,16 @@ def disable_encryption():
 
 
 def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_marker=None):
-    if security_Type == CommonVariables.ConfidentialVM:
-        logger.log(msg="Do not send vm setting to host for stamping.",level=CommonVariables.InfoLevel)
-        return
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
     bek_util = BekUtil(disk_util, logger,encryption_environment)
     current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
     public_settings = get_public_settings()
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
+    if security_Type == CommonVariables.ConfidentialVM:
+        logger.log(msg="Do not send vm setting to host for stamping.",level=CommonVariables.InfoLevel)
+        extension_parameter.commit()
+        return
     has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
 
     # post new encryption settings via wire server protocol
@@ -270,6 +271,89 @@ def get_protected_settings():
     else:
         return protected_settings_str
 
+def update_encryption_settings_luks2_header(extra_items_to_encrypt=[]):
+    '''This function is used for CMK passphrse wrapping with new KEK URL and update metadata in LUKS2 header.'''
+    hutil.do_parse_context('UpdateEncryptionSettingsLuks2Header')
+    logger.log('Updating encryption settings LUKS-2 header')
+    # ensure cryptsetup package is still available in case it was for some reason removed after enable
+    try:
+        DistroPatcher.install_cryptsetup()
+    except Exception as e:
+        hutil.save_seq()
+        message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+        hutil.do_exit(exit_code=CommonVariables.missing_dependency,
+                      operation='UpdateEncryptionSettingsLuks2Header',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.missing_dependency),
+                      message=message)
+    try:
+        public_setting = get_public_settings()
+        encryption_config = EncryptionConfig(encryption_environment, logger)
+        extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_setting)
+        disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+        bek_util = BekUtil(disk_util, logger,encryption_environment)
+        device_items = disk_util.get_device_items(None)
+        for device_item in device_items:
+            device_item_path = disk_util.get_device_path(device_item.name)
+            if not disk_util.is_luks_device(device_item_path,None):
+                logger.log("Not a LUKS device, device path: {0}".format(device_item_path))
+                continue
+            #restoring the token data to type Azure_Disk_Encryption
+            disk_util.restore_luks2_token(device_name=device_item.name)
+            logger.log("Reading passphrase from LUKS2 header, device name: {0}".format(device_item.name))
+            #keep token copy for manual recovery
+            ade_token_id = disk_util.get_token_id(header_or_dev_path=device_item_path,token_name=CommonVariables.AzureDiskEncryptionToken)
+            if not ade_token_id:
+                logger.log("token type: Azure_Disk_Encryption not found for device {0}".format(device_item.name))
+                continue
+            data = disk_util.read_token(device_name=device_item.name,token_id=ade_token_id)
+            #writing to backup token
+            data['type']=CommonVariables.AzureDiskEncryptionBackUpToken
+            disk_util.import_token_data(device_path=device_item_path,token_data=data,token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
+            #get the unwrapped passphrase from LUKS2 header.
+            passphrase=disk_util.export_token(device_name=device_item.name)
+            #remove token
+            disk_util.remove_token(device_name=device_item.name,token_id=ade_token_id)
+            if not passphrase:
+                logger.log("No passphrase in LUKS2 header, device name: {0}".format(device_item.name))
+                continue
+            logger.log("Updating wrapped passphrase to LUKS2 header with current public setting. device name {0}".format(device_item.name))
+            #protect passphrase before updating to LUKS2 is done in import_token
+            temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
+            temp_keyfile.write(passphrase.encode("utf-8"))
+            temp_keyfile.close()
+            #save passphrase to LUKS2 header with PassphraseNameValueProtected
+            ret = disk_util.import_token(device_path=device_item_path,passphrase_file=temp_keyfile.name,public_settings=public_setting,PassphraseNameValue=CommonVariables.PassphraseNameValueProtected)
+            if not ret:
+                logger.log("Update passphrase with current public setting to LUKS2 header is not successful. device path {0}".format(device_item_path))
+                return None
+            os.unlink(temp_keyfile.name)
+            #removing backup token
+            disk_util.remove_token(device_name=device_item.name,token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
+        extension_parameter.commit()
+        bek_util.umount_azure_passhprase(encryption_config)
+
+        if len(extra_items_to_encrypt) > 0:
+            hutil.do_status_report(operation='UpdateEncryptionSettingsLuks2Header',
+                                   status=CommonVariables.extension_success_status,
+                                   status_code=str(CommonVariables.success),
+                                   message='Encryption settings updated in LUKS2 header')
+        else:
+            hutil.do_exit(exit_code=0,
+                          operation='UpdateEncryptionSettingsLuks2Header',
+                          status=CommonVariables.extension_success_status,
+                          code=str(CommonVariables.success),
+                          message='Encryption settings updated in LUKS2 header')
+    except Exception as e:
+        hutil.save_seq()
+        message = "Failed to update encryption settings Luks2 header with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+        logger.log(msg=message, level=CommonVariables.ErrorLevel)
+        bek_util.umount_azure_passhprase(encryption_config)
+        hutil.do_exit(exit_code=CommonVariables.unknown_error,
+                      operation='UpdateEncryptionSettingsLuks2Header',
+                      status=CommonVariables.extension_error_status,
+                      code=str(CommonVariables.unknown_error),
+                      message=message)
 
 def update_encryption_settings(extra_items_to_encrypt=[]):
     hutil.do_parse_context('UpdateEncryptionSettings')
@@ -945,14 +1029,21 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
             logger.log("An operation already running. Cannot accept an update settings request.")
             hutil.reject_settings()
         are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
-        if not are_devices_encrypted:
-            logger.log('Required devices not encrypted for volume type {0}. Calling update to stamp encryption settings.'.format(volume_type))
-            update_encryption_settings(items_to_encrypt)
-            logger.log('Encryption Settings stamped. Calling enable to encrypt new devices.')
-            enable_encryption()
+        if security_Type==CommonVariables.ConfidentialVM:
+            logger.log('Calling Update Encryption Setting in LUKS2 header.')
+            if extension_parameter.cmk_changed():
+                update_encryption_settings_luks2_header(items_to_encrypt)
+            if not are_devices_encrypted:
+                enable_encryption()
         else:
-            logger.log('Calling Update Encryption Setting.')
-            update_encryption_settings()
+            if not are_devices_encrypted:
+                logger.log('Required devices not encrypted for volume type {0}. Calling update to stamp encryption settings.'.format(volume_type))
+                update_encryption_settings(items_to_encrypt)
+                logger.log('Encryption Settings stamped. Calling enable to encrypt new devices.')
+                enable_encryption()
+            else:
+                logger.log('Calling Update Encryption Setting.')
+                update_encryption_settings()
     else:
         logger.log("Config did not change or first call, enabling encryption")
         encryption_marker = EncryptionMarkConfig(logger, encryption_environment)
