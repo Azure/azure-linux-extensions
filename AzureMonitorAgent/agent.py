@@ -1649,7 +1649,7 @@ def is_feature_enabled(feature):
     """
     Checks if the feature is enabled in the current region
     """
-    feature_support_matrix = {'useDynamicSSL' : ['centraluseuap', 'eastus2euap', 'westcentralus'] }
+    feature_support_matrix = {'useDynamicSSL' : ['eastus2euap', 'westcentralus'] }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
     if os.path.exists(featurePreviewFlagPath):
