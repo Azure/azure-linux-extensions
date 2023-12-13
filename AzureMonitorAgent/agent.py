@@ -277,12 +277,14 @@ def compare_and_copy_bin(src, dest):
 def copy_amacoreagent_binaries():
     amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
     amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
-
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
+
+    liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
+    liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
+    compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
-
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
     
 def install():
