@@ -197,6 +197,12 @@ class DiskUtil(object):
     def import_token_data(self,device_path,token_data,token_id):
         '''Updating token_data json object to LUKS2 header's Tokens field.'''
         self.logger.log(msg="import_token_data for device: {0} started.".format(device_path))
+        if not token_data or not type(token_data) is dict:
+            self.logger.log(level=CommonVariables.WarningLevel, msg="import_token_data: token_data: {0} for device: {1} is not valid.".format(token_data,device_path))
+            return False
+        if not token_id:
+            self.logger.log(level= CommonVariables.WarningLevel, msg = "import_token_data: token_id: {0} for device: {1} is not valid.".format(token_id,device_path) )
+            return False
         temp_file = tempfile.NamedTemporaryFile(delete=False,mode='w+')
         json.dump(token_data,temp_file,indent=4)
         temp_file.close()
@@ -211,6 +217,9 @@ class DiskUtil(object):
         '''this function reads passphrase from passphrase file, wrap it and update in token field of LUKS2 header.'''
         self.logger.log(msg="import_token for device: {0} started.".format(device_path))
         self.logger.log(msg="import_token for passphrase file path: {0}.".format(passphrase_file))
+        if not passphrase_file or not os.path.exists(passphrase_file):
+            self.logger.log(level=CommonVariables.WarningLevel,msg="import_token for passphrase file path: {0} not exists.".format(passphrase_file))
+            return False
         Protector= ""
         with open(passphrase_file,"rb") as protector_file:
             #passphrase stored in keyfile is base64
@@ -255,11 +264,14 @@ class DiskUtil(object):
     def read_token(self,device_name,token_id):
         '''this functions reads tokens from LUKS2 header.'''
         device_path = os.path.join("/dev",device_name)
+        if not os.path.exists(device_path) or not token_id:
+            self.logger.log(level=CommonVariables.WarningLevel,msg="read_token: Inputs not valid. device_name: {0}, token id: {1}".format(device_name,token_id))
+            return None
         cmd = "cryptsetup token export --token-id {0} {1}".format(token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd, communicator=process_comm)
         if status != 0:
-            self.logger.log("export_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
+            self.logger.log("read_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
             return None
         token = process_comm.stdout
         return json.loads(token)
@@ -278,14 +290,18 @@ class DiskUtil(object):
     def export_token(self,device_name):
         '''This function reads token id from luks2 header field and unwrap passphrase'''
         self.logger.log("export_token to device {0} started.".format(device_name))
+        if not device_name or not os.path.exists(self.get_device_path(device_name)):
+            self.logger.log(level= CommonVariables.WarningLevel, msg="export_token Input is not valid. device name: {0}".format(device_name))
+            return None
         device_path = self.get_device_path(device_name)
         protector = None
-        cmd = "cryptsetup token export --token-id {0} {1}".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_path)
-        process_comm = ProcessCommunicator()
-        status = self.command_executor.Execute(cmd, communicator=process_comm)
-        if status != 0:
-            self.logger.log("export_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
+        cvm_ade_vm_encryption_token_id = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
+        if not cvm_ade_vm_encryption_token_id:
+            self.logger.log("export_token token id {0} not found in device {1} LUKS header".format(cvm_ade_vm_encryption_token_id,device_name))
             return None
+        cmd = "cryptsetup token export --token-id {0} {1}".format(cvm_ade_vm_encryption_token_id,device_path)
+        process_comm = ProcessCommunicator()
+        self.command_executor.Execute(cmd, communicator=process_comm)
         token = process_comm.stdout
         disk_encryption_setting=json.loads(token)
         if disk_encryption_setting['version'] != CommonVariables.ADEEncryptionVersionInLuksToken_1_0:
@@ -442,6 +458,9 @@ class DiskUtil(object):
 
     def get_token_id(self,header_or_dev_path,token_name):
         '''if LUKS2 header has token name return the id else return none.'''
+        if not header_or_dev_path or not os.path.exists(header_or_dev_path) or not token_name:
+            self.logger.log("get_token_id: invalid input, header_or_dev_path:{0} token_name:{1}".format(header_or_dev_path,token_name))
+            return None
         luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
         tokens = self._extract_luksv2_token(luks_dump_out)
         for token in tokens:
@@ -456,7 +475,8 @@ class DiskUtil(object):
            [Y,N,do nothing]
            [N,N,do nothing]
            [N,Y,move token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption]'''
-        if not device_name:
+        if not device_name or not os.path.exists(self.get_device_path(device_name)):
+            self.logger.log(level=CommonVariables.WarningLevel,msg="restore_luks2_token invalid input. device_name = {0}".format(device_name))
             return
         device_path = self.get_device_path(device_name)
         ade_token_id = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
@@ -498,6 +518,8 @@ class DiskUtil(object):
             5: Azure_Disk_Encryption
         ...
         """
+        if not luks_dump_out:
+            return []
         lines = luks_dump_out.split("\n")
         token_segment = False
         token_lines = []
