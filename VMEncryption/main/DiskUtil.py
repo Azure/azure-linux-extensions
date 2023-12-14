@@ -195,20 +195,22 @@ class DiskUtil(object):
         return process_comm.stdout.strip()
     
     def import_token_data(self,device_path,token_data,token_id):
-        self.logger.log(msg="import_token for device: {0} started.".format(device_path))
+        '''Updating token_data json object to LUKS2 header's Tokens field.'''
+        self.logger.log(msg="import_token_data for device: {0} started.".format(device_path))
         temp_file = tempfile.NamedTemporaryFile(delete=False,mode='w+')
         json.dump(token_data,temp_file,indent=4)
         temp_file.close()
         cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(temp_file.name,token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd,communicator=process_comm)
-        self.logger.log(msg="import_token: device: {0} status: {1}".format(device_path,status))
+        self.logger.log(msg="import_token_data: device: {0} status: {1}".format(device_path,status))
         os.unlink(temp_file.name)
         return status==CommonVariables.process_success
 
     def import_token(self,device_path,passphrase_file,public_settings,PassphraseNameValue=CommonVariables.PassphraseNameValueProtected):
         '''this function reads passphrase from passphrase file, wrap it and update in token field of LUKS2 header.'''
         self.logger.log(msg="import_token for device: {0} started.".format(device_path))
+        self.logger.log(msg="import_token for passphrase file path: {0}.".format(passphrase_file))
         Protector= ""
         with open(passphrase_file,"rb") as protector_file:
             #passphrase stored in keyfile is base64
@@ -239,7 +241,6 @@ class DiskUtil(object):
             CommonVariables.PassphraseNameKey:PassphraseNameValue,
             CommonVariables.PassphraseKey:Protector
         }
-        #TODO handle with temp file.
         temp_file = tempfile.NamedTemporaryFile(delete=False,mode='w+')
         json.dump(data,temp_file,indent=4)
         temp_file.close()
@@ -247,7 +248,7 @@ class DiskUtil(object):
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd,communicator=process_comm)
         self.logger.log(msg="import_token: device: {0} status: {1}".format(device_path,status))
-        os.remove(temp_file.name)
+        os.unlink(temp_file.name)
         self.logger.log(msg="import_token: device: {0} end.".format(device_path))
         return status==CommonVariables.process_success
     
@@ -449,7 +450,12 @@ class DiskUtil(object):
         return None
 
     def restore_luks2_token(self, device_name=None):
-        '''this function restoring token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption'''
+        '''this function restoring token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption, 
+        this function acts on 4 secenarios. [token id Azure_Disk_Encryption, token id Azure_Disk_Encryption_BackUp, resote_action)'''
+        '''[Y,Y,remove token type Azure_Disk_Encryption_BackUp]
+           [Y,N,do nothing]
+           [N,N,do nothing]
+           [N,Y,move token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption]'''
         if not device_name:
             return
         device_path = self.get_device_path(device_name)

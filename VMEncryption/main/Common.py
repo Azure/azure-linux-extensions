@@ -60,7 +60,9 @@ class CommonVariables:
     """
     CVM LUKS2 header token
     """
+    #used to store ADE (encryption setting + wrapped passphrase) token. Type: Azure_Disk_Encryption 
     cvm_ade_vm_encryption_token_id = 5
+    #used to store backup of token type Azure_Disk_Encryption token during CMK rotation. Type: Azure_Disk_Encryption_BackUp
     cvm_ade_vm_encryption_backup_token_id = 6
     ADEEncryptionVersionInLuksToken_1_0='1.0'
     PassphraseNameValueProtected = 'LUKSPasswordProtector'
