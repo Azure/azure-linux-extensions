@@ -1,5 +1,13 @@
 1.4.0.6
-- Cleaned repository
+- Cleaned SP and DP branches of non ADE files (Build compliance)
+
+1.4.0.5
+- For CVM temp disk encryption, do not attempt secure key release if KEK is not provided.
+
+1.4.0.4
+- Add support for boost SKU's
+- Update resid for managedHSM
+- Disbale root login in strip down state
 
 1.4.0.3
 - temp disk encryption for CVM is by default.
