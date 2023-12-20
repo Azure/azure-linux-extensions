@@ -1,1 +1,0 @@
-[{  "name": "Microsoft.OSTCExtensions.OSPatchingForLinuxTest", "seqNo": "0", "version": 1.0,  "handlerEnvironment": {    "logFolder": ".",    "configFolder": "./config",    "statusFolder": "./status",    "heartbeatFile": "./heartbeat.log"}}]

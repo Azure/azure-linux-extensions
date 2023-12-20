@@ -1,2 +1,0 @@
-include HandlerManifest.json handler.py
-prune test
