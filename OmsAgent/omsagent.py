@@ -938,18 +938,29 @@ def is_vm_supported_for_extension():
     }
 
     vm_dist, vm_ver, vm_supported = '', '', False
+    parse_manually = False
 
-    try:
-        vm_dist, vm_ver, vm_id = platform.linux_distribution()
-    except AttributeError:
+    # platform commands used below aren't available after Python 3.6
+    if sys.version_info < (3,7):
         try:
-            vm_dist, vm_ver, vm_id = platform.dist()
+            vm_dist, vm_ver, vm_id = platform.linux_distribution()
         except AttributeError:
-            hutil_log_info("Falling back to /etc/os-release distribution parsing")
+            try:
+                vm_dist, vm_ver, vm_id = platform.dist()
+            except AttributeError:
+                hutil_log_info("Falling back to /etc/os-release distribution parsing")
 
-    # Fallback if either of the above fail; on some (especially newer)
-    # distros, linux_distribution() and dist() are unreliable or deprecated
-    if not vm_dist and not vm_ver:
+        # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
+        # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
+        try:
+            temp_vm_ver = int(vm_ver.split('.')[0])
+        except:
+            parse_manually = True
+    else:
+        parse_manually = True
+
+    # Fallback if either of the above platform commands fail, or we switch to manual parsing
+    if (not vm_dist and not vm_ver) or parse_manually:
         try:
             with open('/etc/os-release', 'r') as fp:
                 for line in fp:
