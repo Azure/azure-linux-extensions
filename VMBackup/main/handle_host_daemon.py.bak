@@ -189,34 +189,32 @@ class GetMountsError(Exception):
     def __init__(message = ""):
         super().__init__("[SnapshotRequest.get_mounts] -> failed: {}".format(message))
 
-def print_from_thread(msg):
-    os.write(sys.stdout.fileno(), msg.encode("utf-8"))
-
-def thread_for_binary(self,args):
-    print_from_thread("[FreezeHandler.thread_for_binary] -> Thread for binary is called: {}\n".format(args))
-    time.sleep(3)
-    print_from_thread("[FreezeHandler.thread_for_binary] -> Waited in thread for 3 seconds\n")
-    print_from_thread("[FreezeHandler.thread_for_binary] -> ****** 1. Starting Freeze Binary \n")
-    self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
-    print_from_thread("Binary subprocess Created\n")
 
 class FreezeHandler(object):
     def __init__(self,handler):
         # sig_handle valid values(0:nothing done,1: freezed successfully, 2:freeze failed)
         self.sig_handle = 0
         self.child = None
-        self.handler = handler 
+        self.handler = handler
 
-    def sigusr1_handler(self, signal, frame):
-        print_from_thread('[FreezeHandler.sigusr1_handler] -> freezed\n')
-        print_from_thread("[FreezeHandler.sigusr1_handler] -> ****** 4. Freeze Completed (Signal=1 received)\n")
+    def thread_for_binary(self,args):
+        print("[FreezeHandler.thread_for_binary] -> Thread for binary is called")
+        time.sleep(3)
+        print("[FreezeHandler.thread_for_binary] -> Waited in thread for 3 seconds",True)
+        print("[FreezeHandler.thread_for_binary] -> ****** 1. Starting Freeze Binary ",True)
+        self.child = subprocess.Popen(args,stdout=subprocess.PIPE)
+        print("Binary subprocess Created",True)
+
+    def sigusr1_handler(self):
+        print('[FreezeHandler.sigusr1_handler] -> freezed')
+        print("[FreezeHandler.sigusr1_handler] -> ****** 4. Freeze Completed (Signal=1 received)")
         self.sig_handle=1
 
-    def sigchld_handler(self, signal, frame):
-        print_from_thread('[FreezeHandler.sigchld_handler] -> some child process terminated\n')
+    def sigchld_handler(self):
+        print('[FreezeHandler.sigchld_handler] -> some child process terminated')
         if(self.child is not None and self.child.poll() is not None):
-            print_from_thread("[FreezeHandler.sigchld_handler] -> binary child terminated\n")
-            print_from_thread("[FreezeHandler.sigchld_handler] -> ****** 9. Binary Process completed (Signal=2 received)\n")
+            print("[FreezeHandler.sigchld_handler] -> binary child terminated")
+            print("[FreezeHandler.sigchld_handler] -> ****** 9. Binary Process completed (Signal=2 received)")
             self.sig_handle=2
 
     def reset_signals(self):
@@ -224,7 +222,7 @@ class FreezeHandler(object):
         self.child = None
 
     def startproc(self,args):
-        binary_thread = threading.Thread(target=thread_for_binary, args=[self, args])
+        binary_thread = threading.Thread(target=self.thread_for_binary, args=[self, args])
         binary_thread.start()
 
         SafeFreezeWaitInSecondsDefault = 66
@@ -340,7 +338,6 @@ class SnapshotRequest:
         p1.stdout.close()
         disks = []
         for x in p2.split("\n"):
-            # print("device: {}".format(x))
             if not x.strip():
                 continue
             if not self.is_usb("/dev/{}".format(x)):
@@ -450,18 +447,17 @@ class SnapshotRequest:
             
             # find name of mount using:
             # grep -E "^/dev/sdb1" /proc/mounts | awk '{print $2}'
-            # print("Found partition: {}".format(partition))
             if partition is not None:
-                p1 = subprocess.Popen(["grep", "-E", "^/dev/{}".format(partition), "/proc/mounts"], stdout=subprocess.PIPE)
+                p1 = subprocess.Popen(["grep", "-E", "^{}".format(partition), "/proc/mounts"], stdout=subprocess.PIPE)
                 p2 = subprocess.check_output(["awk", '{print $2}'], stdin=p1.stdout).decode("utf-8")
                 p1.stdout.close()
                 v = [x for x in p2.split("\n") if x.strip()]
                 if len(v) > 0:
-                    # print("Returning v[0]: {}".format(v[0]))
                     return v[0]
         except Exception as e:
             self.handler.log(
-                    "[SnapshotRequest.get_resource_disk_mountpoint] -> unexpected error occured: {}\n{}".format(e, traceback.format_exc())
+                "[SnapshotRequest.get_resource_disk_mountpoint] -> unexpected error occured",
+                traceback.format_exc(e)
             )
         return None
 
@@ -473,43 +469,27 @@ class SnapshotRequest:
             p3 = subprocess.check_output(["awk", '{print $1" "$3}'], stdin=p2.stdout).decode("utf-8")
             p1.stdout.close()
             p2.stdout.close()
-            # print("p3: {}".format(p3))
             disks = self.get_block_devices() 
-            # print("disks: {}".format(disks))
-            def is_valid_mount(partition,mount_point):
+            def is_valid_mount(m):
+                v = m.strip()
+                if not v:
+                    return False
+                v = v.split()
+                partition = v[0]
+                mount_point = v[1]
                 if resource_mount is not None and mount_point.strip() == resource_mount:
                     return False
                 # lsblk -ndo pkname /dev/sda1
                 disk = subprocess.check_output(["lsblk", "-ndo", "pkname", partition]).decode("utf-8")
-                disk = " ".join(disk.split()) # removing any trailing or preceding newlines
-                # print("[is_valid_disk] -> if disk: {} exists in list: {}".format(disk, disks))
                 if disk not in disks:
                     return False
                 return True
-            mounts = []
-            for m in p3.split("\n"):
-                if not m.strip():
-                    continue
-                m = " ".join(m.split()) # removing any preceding or trailing new lines
-                v = m.split()
-                # print("Post split: {}".format(v))
-                if len(v) != 2:
-                    continue 
-                partition = v[0]
-                mount_point = v[1]
-                # print("[get_mounts] -> Checking mount: {}".format(mount_point))
-                # print("[get_mounts] -> Checking partition: {}".format(partition))
-                if not is_valid_mount(partition, mount_point):
-                    continue
-                mounts.append(mount_point)
-            print("Mounts: {}".format(mounts))
-            return mounts
+            return [x for x in p3.split("\n") if is_valid_mount(x)] 
         except Exception as e:
-            self.handler.log("[SnapshotRequest.get_mounts] -> Unexpected error: {}".format(e))
-            raise GetMountsError(traceback.format_exc())
+            raise GetMountsError(traceback.format_exc(e))
 
     def safefreeze_path(self):
-        p = os.path.join(os.getcwd(),os.path.dirname(__file__),"safefreeze/bin/safefreeze")
+        p = "safefreeze/bin/safefreeze"
         machine = os.uname()[-1]
         if IS_PYTHON3:
             machine = os.uname().machine
@@ -551,7 +531,6 @@ class SnapshotRequest:
             print("[SnapshotRequest.freeze_safe] -> freeze_safe after returning from startproc : sig_handle={}".format(str(sig_handle)))
             if(sig_handle != 1):
                 if (self.freeze_handler.child is not None):
-                    print("[SnapshotRequest.freeze_safe] -> calling log_binary_output")
                     self.log_binary_output()
                 if (sig_handle == 0):
                     timedout = True
@@ -602,11 +581,10 @@ class SnapshotRequest:
                 # Will try for 30 seconds to see if freeze process has stopped
                 for i in range(0,30):
                     if(self.freeze_handler.child.poll() is None):
-                        print("child still running sigusr1 sent")
+                        print.log("child still running sigusr1 sent")
                         time.sleep(1)
                     else:
                         break
-                print("[SnapshotRequest.thaw_safe] -> calling log_binary_output: 1")
                 self.log_binary_output()
                 if(self.freeze_handler.child.returncode != 0):
                     error_msg = '[SnapshotRequest.thaw_safe] -> snapshot result inconsistent as child returns with failure'
@@ -621,7 +599,6 @@ class SnapshotRequest:
                 else:
                     error_msg = '[SnapshotRequest.thaw_safe] -> snapshot result inconsistent'
                     errors.append(error_msg)
-                print("[SnapshotRequest.thaw_safe] -> calling log_binary_output: 2")
                 self.log_binary_output()
                 print(error_msg, True, 'Error')
         finally:
@@ -634,8 +611,7 @@ class SnapshotRequest:
         errors = []
         error_codes = []
         try:
-            timeout = self.handler.get_intvalue_from_configfile('timeout','60')
-            args = [self.safefreeze_path(), str(timeout)]
+            args = [self.safefreeze_path(), self.handler.get_intvalue_from_configfile('timeout',60)]
             mounts = self.get_mounts()
             if len(mounts) == 0:
                 self.handler.log("[SnapshotRequest.freeze_mounts] -> nothing to freeze")
@@ -647,118 +623,67 @@ class SnapshotRequest:
                 self.freeze_start_time = datetime.utcnow()
                 self.freeze_safe_active = True
         except GetMountsError as gme:
-            self.handler.log("[SnapshotRequest.freeze_mounts] -> get_mounts failed: {}\n{}".format(gme, traceback.format_exc()))
+            self.handler.log("[SnapshotRequest.freeze_mounts] -> get_mounts failed: {}".format(traceback.format_exc(gme)))
         except Exception as e:
-            self.handler.log("[SnapshotRequest.freeze_mounts] -> unexpected error occured: {}\n{}".format(e, traceback.format_exc()))
+            self.handler.log("[SnapshotRequest.freeze_mounts] -> unexpected error occured: {}".format(traceback.format_exc(e)))
         return errors, error_codes
 
     def start_snapshot(self, error_code = None, error_message = None):
-        print("[SnapshotRequest.start_snapshot] -> Fired")
         errors = []
-        try:
-            payload = {
-                "snapshotId": self.snapshotId,
-                "errMsg": ""
+        payload = {
+            "snapshotId": self.snapshotId,
+        }
+        if error_code is not None:
+            payload["error"] = {
+                "code": error_code if isinstance(error_code, str) else "",
+                "message": error_message if isinstance(error_message, str) else "",
             }
-            if error_code is not None:
-                payload["error"] = {
-                    "code": error_code if isinstance(error_code, str) else "",
-                    "message": error_message if isinstance(error_message, str) else "",
-                }
-                payload["errMsg"] = error_message if isinstance(error_message, str) else ""
-            
-            # if IS_PYTHON3:
-            #     data = urllib.urlencode(payload).encode("utf-8")
-            # else:
-            #     data = urllib.urlencode(payload)
-            # print("[SnapshotRequest.start_snapshot] -> Data:{}".format(data))
-
-            if IS_PYTHON3:
-                data = json.dumps(payload).encode("utf-8")
-                print("[SnapshotRequest.start_snapshot] -> Data: {}".format(data))
-                r = request.Request(
-                    url = "{}/machine/plugins?comp=xdisksvc&type=startsnapshot".format(BASE_URI),
-                    headers = {
-                        "Content-Type": "application/json; charset=utf-8",
-                        "Content-Length": len(data),
-                    }
-                )
-            else:
-                data = json.dumps(payload)
-                print("[SnapshotRequest.start_snapshot] -> Data: {}".format(data))
-                r = request.Request(
-                    url = "{}/machine/plugins?comp=xdisksvc&type=startsnapshot".format(BASE_URI),
-                    headers = {
-                        "Content-Type": "application/json; charset=utf-8"
-                    }
-                )
-            conn = request.urlopen(r, timeout = 10, data = data)
-            print("[SnapshotRequest.start_snapshot] -> Request: {}".format(r))
-            # if IS_PYTHON3:
-            #     conn = request.urlopen(r, timeout = 10, data = data)
-            # else:
-            #     conn = request.urlopen(r, timeout = 10)
-            if conn.status != 200:
-                resp = conn.read()
-                print("[SnapshotRequest.start_snapshot] -> unexpected status code:{}, Body: {}".format(conn.status, resp))
+        r = request.Request(
+            url = "{}/machine/plugins?comp=xdisksvc&type=startsnaphsots".format(BASE_URI),
+            data = urllib.urlencode(json.dumps(payload)),
+            headers = {
+                "Content-Type": "application/json"
+            }
+        )
+        try:
+            conn = request.urlopen(r, timeout = 10)
+            if conn.status != 201:
+                print("[SnapshotRequest.start_snapshot] -> unexpected status code: ", conn.status)
                 errors.append("STARTSNAP_UNEXPECTED_STATUS_{}".format(conn.status))
         except HTTPError as herr:
-            print("[SnapshotRequest.start_snapshot] -> startsnapshot request failed with status: {}, reason: {}".format(herr.code, herr.reason))
+            print("[SnapshotRequest.start_sanpshot] -> startsnapshot request failed with {} error".format(herr.code))
             errors.append("STARTSNAP_HTTP_ERR")
         except Exception as e:
-            print("[SnapshotRequest.start_snapshot] -> unexpected error occured: {}\n{}".format(e, traceback.format_exc()))
+            print("[SnapshotRequest.start_snapshot] -> unexpected error occured")
+            print(traceback.format_exc(e))
             errors.append("STARTSNAP_UNEXPECTED_EXC")
         return errors
 
     def end_snapshot(self, payload):
         errors = []
         try:
-
-            # if IS_PYTHON3:
-            #     data = urllib.urlencode(payload).encode("utf-8")
-            # else:
-            #     data = urllib.urlencode(payload)
-            # print("[SanpshotRequest.end_snapshot] -> Data:{}".format(data))
-            if IS_PYTHON3:
-                data = json.dumps(payload).encode("utf-8")
-                print("[SnapshotRequest.end_snapshot] -> Data: {}".format(data))
-                r = request.Request(
-                    url = "{}/machine/plugins?comp=xdisksvc&type=publishsnapshot".format(BASE_URI),
-                    headers = {
-                        "Content-Type": "application/json",
-                        "Content-Length": len(data)
-                    }
-                )
-            else:
-                data = json.dumps(payload)
-                print("[SnapshotRequest.end_snapshot] -> Data: {}".format(data))
-                r = request.Request(
-                    url = "{}/machine/plugins?comp=xdisksvc&type=publishsnapshot".format(BASE_URI),
-                    headers = {
-                        "Content-Type": "application/json"
-                    }
-                )
-
-            conn = request.urlopen(r, timeout = 10, data = data)
-            # if IS_PYTHON3:
-            #     conn = request.urlopen(r, timeout = 10, data = data)
-            # else:
-            #     conn = request.urlopen(r, timeout = 10)
+            r = request.Request(
+                url = "{}/machine/plugins?comp=xdisksvc&type=endsnapshots".format(BASE_URI),
+                data = urllib.urlencode(json.dumps(payload)),
+                headers = {
+                    "Content-Type": "application/json"
+                }
+            )
+            conn = request.urlopen(r, timeout = 10)
             if conn.status != 200:
-                resp = conn.read()
-                print("[SnapshotRequest.end_snapshot] -> unexpected status code: {}, Body: {}".format(conn.status, resp))
+                print("[SnapshotRequest.end_snapshot] -> unexpected status code: ", conn.status)
                 errors.append("ENDSNAP_UNEXPECTED_STATUS_{}".format(conn.status))
         except HTTPError as herr:
-            print("[SnapshotRequest.end_snapshot] -> unexpected status code: {}, reason: {}".format(herr.code, herr.reason))
+            print("[SnapshotRequest.end_snapshot] -> unexpected status code: ", herr.code)
             errors.append("ENDSNAP_UNEXPECTED_STATUS_{}".format(herr.code))
         except Exception as e:
-            print("[SnapshotRequest.end_snapshot] -> unexpected error occured: {}\n{}".format(e, traceback.format_exc()))
+            print("[SnapshotRequest.end_snapshot] -> unexpected error occured")
+            print(traceback.format_exc(e))
             errors.append("ENDSNAP_UNEXPECTED_EXC")
         return errors
 
     def take_snapshot(self):
         # self.freeze_start = datetime.utcnow()
-        print("[SnapshotRequest.take_snapshot] -> Fired")
         frozen_at = 0
         call_remote_end = 0
         remote_call_success = False
@@ -769,13 +694,12 @@ class SnapshotRequest:
             errors, error_codes = self.freeze_mounts()
             x_errors = []
             if len(errors) > 0:
-                print("[Snapshot_Request.take_snapshot] -> self.freeze_mounts() failed")
+                print("Snapshot_Request.take_snapshot] -> self.freeze_mounts() failed")
                 print("{}".format("\n".join(errors)))
                 x_errors = self.start_snapshot(error_code = error_codes[0], error_message = errors[0])
                 snapshot_error_code = error_codes[0]
                 snapshot_error_msg = errors[0]
             else:
-                print("[Snapshot_Request.take_snapshot] -> self.freeze_mounts() success")
                 frozen_at = datetime.utcnow()
                 x_errors = self.start_snapshot()
             if len(x_errors) > 0:
@@ -783,22 +707,17 @@ class SnapshotRequest:
                 snapshot_error_code = x_errors[0]
                 snapshot_error_msg = snapshot_error_code
             else:
-                print("[Snapshot_Request.take_snapshot] -> calling xdisksvc succeeded")
                 remote_call_success = True
         except Exception as e:
-            print("[SnapshotRequest.take_snapshot] -> unexpected exception: {}\n{}".format(e, traceback.format_exc()))
+            print("[SnapshotRequest.take_snapshot] -> unexpected exception: {}".format(traceback.format_exc(e)))
             snapshot_error_code = "UNEXPECTED_SNAPSHOT_EXC"
-            snapshot_error_msg = str(e)
+            snapshot_error_msg = traceback.format_exc(e)
         finally:
             call_remote_end = datetime.utcnow()
             self.thaw_safe()
-            print("[SnapshotRequest.take_snapshot] -> thaw_safe executed successfully")
-        
-        print("[SnapshotRequest.take_snapshot] -> Outta try catch!")
         body = {
             "snapshotId": self.snapshotId,
-            "errMsg": "",
-            # "consistencyMode": "App",
+            "consistencyMode": "App",
         }
         if remote_call_success and (call_remote_end.timestamp() - frozen_at.timestamp()) < 9:
             print("[SanpshotRequest.take_snapshot] -> app consistency verified")
@@ -808,7 +727,6 @@ class SnapshotRequest:
                 "code": snapshot_error_code,
                 "message": snapshot_error_msg
             }
-            body["errMsg"] = snapshot_error_msg
         self.end_snapshot(body)
 
 def get_snapshot_requests(handler):
@@ -842,7 +760,7 @@ def main():
     global SCRIPT_DIR
     HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
     handler = Handler(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
-    starttime = time.time()
+    starttime = time.monotonic()
     while True:
         try:
             res = get_snapshot_requests(handler)
@@ -855,7 +773,7 @@ def main():
                 handler.log("[main] -> invalid response code: ", res["statusCode"])
         except Exception as e:
             handler.log("[main] -> Unexpected expcetion occured", e)
-        time.sleep(300.0 - ((time.time() - starttime) % 300.0))
+        time.sleep(300.0 - ((time.monotonic() - starttime) % 300.0))
 
 if __name__ == '__main__' :
     main()

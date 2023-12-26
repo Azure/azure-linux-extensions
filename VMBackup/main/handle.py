@@ -696,5 +696,81 @@ def start_daemon():
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
 
+def can_use_systemd():
+    try:
+        pso = subprocess.check_output(["systemctl", "is-system-running"])
+        return pso == "running"
+    except Exception as e:
+        backup_logger.log("error running `systemctl is-system-running`: {}".format(e), True, 'Warning')
+
+    try:
+        pso = subprocess.check_output(["ps", "--no-headers", "-o", "comm", "1"])
+        return pso == "systemd"
+    except Exception as e:
+        backup_logger.log("error running `ps --no-headers -o comm 1`: {}".format(e), True, "Warning")
+    return False
+
+def create_host_based_systemd_service():
+    ## Create the file `/etc/systemd/system/directsnapshot.service`
+    ## [Unit]
+    ##     Description=My test service
+    ##     After=multi-user.target
+    ## [Service]
+    ##     Type=simple
+    ##     Restart=always
+    ##     ExecStart=/usr/bin/python3 /home/<username>/test.py
+    ## [Install]
+    ##     WantedBy=multi-user.target
+    systemd_service_file = "/etc/systemd/system/directsnapshot.service"
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    work_dir = os.path.dirname(script_dir)
+    script_path = os.path.join(script_dir, "handle_host_daemon.py")
+    exec_path = ""
+    try:
+        exec_path = sys.executable
+    except Exception as e:
+        backup_logger.log("error fetching python executable path: {}".format(e), True, "Error")
+        return
+    if exec_path == "" or exec_path is None:
+        backup_logger.log("empty python executable path", True, "Error")
+        return
+    if os.path.isfile(systemd_service_file):
+        try:
+            subprocess.check_output(["systemctl", "stop", "directsnapshot.service"])
+            os.remove(systemd_service_file)
+        except Exception as e:
+            backup_logger.log("error removing existing systemd service: {}".format(e), True, "Error")
+            return
+    with open(systemd_service_file, "w", encoding="utf-8") as f:
+        f.write("[Unit]\n")
+        f.write("\tDescription=Snapshot service for Microsoft Azure Restore Points\n")
+        f.write("\tAfter=multi-user.target\n")
+        f.write("[Service]\n")
+        f.write("\tType=simple\n")
+        f.write("\tRestart=always\n")
+        f.write("\tWorkingDirectory={}\n".format(work_dir))
+        f.write("\tExecStart={} {}\n".format(exec_path, script_path))
+        f.write("[Install]\n")
+        f.write("\tWantedBy=multi-user.target\n")
+    
+    # Daemon reload, enable and run
+    try:
+        subprocess.check_output(["systemctl", "daemon-reload"])
+        subprocess.check_output(["systemctl", "enable", "--now", "directsnapshot.service"])
+    except Exception as e:
+        backup_logger.log("error running systemd service: {}".format(e), True, "Error")
+
+def create_host_based_process():
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+
+def create_host_based_service():
+    try:
+        if can_use_systemd():
+            create_host_based_systemd_service()
+        else:
+            create_host_based_process()
+    except Exception as e:
+        backup_logger.log("error creating service for host based snapshots: {}".format(e), True, "Error")
+
 if __name__ == '__main__' :
     main()
