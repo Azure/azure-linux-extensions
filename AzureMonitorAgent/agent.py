@@ -1272,7 +1272,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
         else:            
             check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
             if check_semanage == 0 and syslog_port != '':
-                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"',log_cmd=False)
+                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
                 if syslogPortEnabled != 0:                    
                     # allow the syslog port in SELinux
                     run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
