@@ -295,8 +295,16 @@ class HandlerUtility:
             self.logging_file=self._context._log_file
             self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
             self._change_log_file()
-            self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
-            self.event_dir = self._context._event_dir
+            try:
+                if(self.get_intvalue_from_configfile("disable_logging", 1) == 0):
+                    self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
+                    self.event_dir = self._context._event_dir
+            except Exception as e:
+                self._context._event_dir = None
+                self.event_dir = None
+                errorMsg = 'The eventsFolder field is missing in handlerEnvironment.json file. Hence skipping event logging!'
+                self.log(errorMsg, 'Error')
+                self.log(repr(e), 'Error')
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
             if seqNo != -1:

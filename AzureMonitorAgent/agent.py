@@ -277,12 +277,14 @@ def compare_and_copy_bin(src, dest):
 def copy_amacoreagent_binaries():
     amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
     amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
-
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
+
+    liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
+    liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
+    compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
-
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
     
 def install():
@@ -1259,9 +1261,6 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
         f.close()
         
     useSyslogTcp = False
-    syslogTcpPreviewFlagPath = PreviewFeaturesDirectory + 'useSyslogTcp'
-    if os.path.exists(syslogTcpPreviewFlagPath):
-        useSyslogTcp = True
     
     # always use syslog tcp port, unless 
     # - the distro is Red Hat based and doesn't have semanage
@@ -1275,7 +1274,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
         else:            
             check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
             if check_semanage == 0 and syslog_port != '':
-                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"',log_cmd=False)
+                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
                 if syslogPortEnabled != 0:                    
                     # allow the syslog port in SELinux
                     run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
@@ -1461,10 +1460,15 @@ def set_os_arch(operation):
 
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
-        
-        dynamicSSLPreviewFlagPath = PreviewFeaturesDirectory + 'useDynamicSSL'
-        if os.path.exists(dynamicSSLPreviewFlagPath):
-            BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
+                
+        if is_feature_enabled('useDynamicSSL'):
+            # Check if they have libssl.so.1.1 since AMA is built against this version
+            libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
+            if libssl1_1 == 0:
+                if BundleFileName.endswith('.rpm'):
+                    BundleFileName = BundleFileName.replace('.' + current_arch, '.dynamicssl.' + current_arch)        
+                elif BundleFileName.endswith('.deb'):
+                    BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
         
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
@@ -1642,6 +1646,28 @@ def exit_if_vm_not_supported(operation):
         log_and_exit(operation, UnsupportedOperatingSystem, 'Unsupported operating system: ' \
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
+
+def is_feature_enabled(feature):
+    """
+    Checks if the feature is enabled in the current region
+    """
+    feature_support_matrix = {'useDynamicSSL' : ['eastus2euap', 'westcentralus'] }
+    
+    featurePreviewFlagPath = PreviewFeaturesDirectory + feature
+    if os.path.exists(featurePreviewFlagPath):
+        return True
+    
+    featurePreviewDisabledFlagPath = PreviewFeaturesDirectory + feature + 'Disabled'
+    if os.path.exists(featurePreviewDisabledFlagPath):
+        return False
+    
+    _, region = get_azure_environment_and_region()
+
+    if feature in feature_support_matrix.keys():
+        if region in feature_support_matrix[feature]:
+            return True
+    
+    return False
 
 
 def get_ssl_cert_info(operation):
