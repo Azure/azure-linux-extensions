@@ -771,6 +771,7 @@ def create_host_based_systemd_service():
     script_dir = os.path.dirname(os.path.realpath(__file__))
     work_dir = os.path.dirname(script_dir)
     script_path = os.path.join(script_dir, "handle_host_daemon.py")
+    sys_script_path = os.path.join("main", "handle_host_daemon.py")
     exec_path = ""
     try:
         exec_path = sys.executable
@@ -795,7 +796,7 @@ def create_host_based_systemd_service():
         f.write("\tType=simple\n")
         f.write("\tRestart=always\n")
         f.write("\tWorkingDirectory={}\n".format(work_dir))
-        f.write("\tExecStart={} {}\n".format(exec_path, script_path))
+        f.write("\tExecStart={} {}\n".format(exec_path, sys_script_path))
         f.write("[Install]\n")
         f.write("\tWantedBy=multi-user.target\n")
 
