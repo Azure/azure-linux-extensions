@@ -27,12 +27,12 @@ then
 				cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
 				echo "`date -u`- The command is $1, exiting with conf file copy" >> $logfile	
 		fi
-    exit $arc
+        exit $arc
     else
         mkdir -p /etc/azure
         cp main/workloadPatch/WorkloadUtils/workload.conf /etc/azure/workload.conf
         echo "`date -u`- The command is $1, exiting with conf file copy" >> $logfile
-    exit $arc
+        exit $arc
     fi
 elif [ "$1" != "enable"  ] && [ "$1" != "daemon" ]
 then
