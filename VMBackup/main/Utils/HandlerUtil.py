@@ -151,6 +151,8 @@ class HandlerUtility:
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             self.update_settings_file()
+            if(self.eventlogger is not None):
+                self.eventlogger.dispose()
             sys.exit(0)
 
     def set_event_logger(self, eventlogger):
@@ -253,6 +255,8 @@ class HandlerUtility:
             self.log("waagent new path is used")
         if not _context:
             self.log("maybe no new settings file found")
+            if(self.eventlogger is not None):
+                self.eventlogger.dispose()
             sys.exit(0)
         return _context
 
@@ -291,8 +295,16 @@ class HandlerUtility:
             self.logging_file=self._context._log_file
             self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
             self._change_log_file()
-            self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
-            self.event_dir = self._context._event_dir
+            try:
+                if(self.get_intvalue_from_configfile("disable_logging", 1) == 0):
+                    self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
+                    self.event_dir = self._context._event_dir
+            except Exception as e:
+                self._context._event_dir = None
+                self.event_dir = None
+                errorMsg = 'The eventsFolder field is missing in handlerEnvironment.json file. Hence skipping event logging!'
+                self.log(errorMsg, 'Error')
+                self.log(repr(e), 'Error')
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
             if seqNo != -1:
@@ -701,6 +713,8 @@ class HandlerUtility:
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
+        if(self.eventlogger is not None):
+            self.eventlogger.dispose()
         sys.exit(exit_code)
 
     def get_handler_settings(self):

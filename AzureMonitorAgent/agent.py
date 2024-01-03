@@ -41,7 +41,6 @@ import re
 import hashlib
 import fileinput
 from collections import OrderedDict
-from distutils.version import LooseVersion
 from hashlib import sha256
 from shutil import copyfile
 
@@ -137,15 +136,6 @@ HUtilObject = None
 SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
-
-
-# Change permission of log path - if we fail, that is not an exit case
-try:
-    ext_log_path = '/var/log/azure/'
-    if os.path.exists(ext_log_path):
-        os.chmod(ext_log_path, 700)
-except:
-    pass
 
 
 def main():
@@ -289,12 +279,14 @@ def compare_and_copy_bin(src, dest):
 def copy_amacoreagent_binaries():
     amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
     amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
-
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
+
+    liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
+    liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
+    compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
-
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
     
 def install():
@@ -444,12 +436,22 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
+    _, _, _, az_environment, _ = me_handler.get_imds_values(is_lad=False)
+    if az_environment.lower() == me_handler.ArcACloudName:
+        _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
+        default_configs["customRegionalEndpoint"] = mcs_endpoint
+        default_configs["customGlobalEndpoint"] = mcs_endpoint
+        default_configs["customResourceEndpoint"] = "https://monitoring.azs"
+
+
     """
     Decide the mode and configuration. There are two supported configuration schema, mix-and-match between schemas is disallowed:
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
         Next-Generation: allows MCS, GCS multi tenant, or both
     """
     is_gcs_single_tenant = False
+    GcsEnabled, McsEnabled = get_control_plane_mode()
+
     # Next-generation schema
     if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):
 
@@ -463,9 +465,7 @@ def enable():
         if geneva_configuration and geneva_configuration.get("enable") == True:
             hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
             ensure["azuremonitoragentmgr"] = True
-            # Note that internally AMCS with geneva config path can be used in which case syslog should be handled same way as default 1P
-            generate_localsyslog_configs()
-
+            
         if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
             hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
             ensure["azuremonitoragent"] = True
@@ -477,9 +477,7 @@ def enable():
     elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
         ensure["azuremonitoragentmgr"] = True
-        # generate local syslog configuration files as in auto config syslog is not driven from DCR
-        generate_localsyslog_configs()
-
+                
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
         ensure["azuremonitoragent"] = True
@@ -490,8 +488,12 @@ def enable():
         ensure["azuremonitoragent"] = True
         is_gcs_single_tenant = True
         handle_gcs_config(public_settings, protected_settings, default_configs)
-        # generate local syslog configuration files as in 1P syslog is not driven from DCR
-        generate_localsyslog_configs()
+        
+    # generate local syslog configuration files as in auto config syslog is not driven from DCR
+    # Note that internally AMCS with geneva config path can be used in which case syslog should be handled same way as default 1P
+    # generate local syslog configuration files as in 1P syslog is not driven from DCR
+    if GcsEnabled:
+        generate_localsyslog_configs(uses_gcs=True, uses_mcs=McsEnabled)
 
     config_file = "/etc/default/azuremonitoragent"
     temp_config_file = "/etc/default/azuremonitoragent_temp"
@@ -682,9 +684,9 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     default_configs["ENABLE_MCS"] = "true"
     default_configs["PA_GIG_BRIDGE_MODE"] = "true"
     # April 2022: PA_FLUENT_SOCKET_PORT setting is being deprecated in place of PA_DATA_PORT. Remove when AMA 1.17 and earlier no longer need servicing.
-    default_configs["PA_FLUENT_SOCKET_PORT"] = "13000"
+    default_configs["PA_FLUENT_SOCKET_PORT"] = "13005"
     # this port will be dynamic in future
-    default_configs["PA_DATA_PORT"] = "13000"
+    default_configs["PA_DATA_PORT"] = "13005"
 
     # fetch proxy settings
     if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
@@ -727,6 +729,33 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
 
     if identifier_name and identifier_value:
         default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
+
+def get_control_plane_mode():
+    """
+    Identify which control plane is in use
+    """
+    public_settings, protected_settings = get_settings()
+
+    GcsEnabled = False
+    McsEnabled = False
+
+    if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):        
+        geneva_configuration = public_settings.get(GenevaConfigKey)
+        azure_monitor_configuration = public_settings.get(AzureMonitorConfigKey)
+
+        if geneva_configuration and geneva_configuration.get("enable") == True:
+            GcsEnabled = True
+        if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
+            McsEnabled = True
+    # Legacy schema
+    elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
+        GcsEnabled = True
+    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+        McsEnabled = True
+    else:
+        GcsEnabled = True
+    
+    return GcsEnabled, McsEnabled
 
 def disable():
     """
@@ -1113,7 +1142,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                         if generate_token:
                             generate_token = False
-                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value)
+                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value, is_lad=False)
                             if msi_token_generated:
                                 hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
                             else:
@@ -1184,6 +1213,8 @@ def syslogconfig_watcher(hutil_error, hutil_log):
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
 
+    GcsEnabled, McsEnabled = get_control_plane_mode()
+        
     while True:
         try:       
             if os.path.isfile(AMASyslogConfigMarkerPath):
@@ -1194,11 +1225,14 @@ def syslogconfig_watcher(hutil_error, hutil_log):
                     if "true" in data:
                         syslog_enabled = True
                 f.close()
+            elif GcsEnabled:
+                # 1P Syslog is always enabled as each tenant could be having different mdsd.xml configuration
+                syslog_enabled = True
 
             if syslog_enabled:
                 # place syslog local configs
                 syslog_enabled  = False
-                generate_localsyslog_configs()
+                generate_localsyslog_configs(uses_gcs=GcsEnabled, uses_mcs=McsEnabled)
             else:
                 # remove syslog local configs
                 remove_localsyslog_configs()
@@ -1212,11 +1246,15 @@ def syslogconfig_watcher(hutil_error, hutil_log):
         finally:
             time.sleep(sleepTime)
 
-def generate_localsyslog_configs():
+def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     """
     Install local syslog configuration files if not present and restart syslog
     """
 
+    # don't deploy any configuration if no control plane is configured
+    if not uses_gcs and not uses_mcs:
+        return
+    
     public_settings, _ = get_settings()
     syslog_port = ''
     if os.path.isfile(AMASyslogPortFilePath):
@@ -1225,9 +1263,6 @@ def generate_localsyslog_configs():
         f.close()
         
     useSyslogTcp = False
-    syslogTcpPreviewFlagPath = PreviewFeaturesDirectory + 'useSyslogTcp'
-    if os.path.exists(syslogTcpPreviewFlagPath):
-        useSyslogTcp = True
     
     # always use syslog tcp port, unless 
     # - the distro is Red Hat based and doesn't have semanage
@@ -1241,13 +1276,14 @@ def generate_localsyslog_configs():
         else:            
             check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
             if check_semanage == 0 and syslog_port != '':
-                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"',log_cmd=False)
+                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
                 if syslogPortEnabled != 0:                    
                     # allow the syslog port in SELinux
                     run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
                 useSyslogTcp = True   
         
-    if useSyslogTcp == True and syslog_port != '':
+    # 1P tenants use omuxsock, so keep using that for customers using 1P
+    if useSyslogTcp == True and syslog_port != '' and not uses_gcs:
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
@@ -1426,10 +1462,15 @@ def set_os_arch(operation):
 
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
-        
-        dynamicSSLPreviewFlagPath = PreviewFeaturesDirectory + 'useDynamicSSL'
-        if os.path.exists(dynamicSSLPreviewFlagPath):
-            BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
+                
+        if is_feature_enabled('useDynamicSSL'):
+            # Check if they have libssl.so.1.1 since AMA is built against this version
+            libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
+            if libssl1_1 == 0:
+                if BundleFileName.endswith('.rpm'):
+                    BundleFileName = BundleFileName.replace('.' + current_arch, '.dynamicssl.' + current_arch)        
+                elif BundleFileName.endswith('.deb'):
+                    BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
         
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
@@ -1539,7 +1580,7 @@ def is_vm_supported_for_extension(operation):
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
-                       'mariner' : ['2'], # Mariner 2.0
+                       'mariner' : ['1', '2'], # Mariner
                        'rocky' : ['8', '9'], # Rocky
                        'alma' : ['8', '9'], # Alma
                        'opensuse' : ['15'], # openSUSE
@@ -1607,6 +1648,28 @@ def exit_if_vm_not_supported(operation):
         log_and_exit(operation, UnsupportedOperatingSystem, 'Unsupported operating system: ' \
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
+
+def is_feature_enabled(feature):
+    """
+    Checks if the feature is enabled in the current region
+    """
+    feature_support_matrix = {'useDynamicSSL' : ['eastus2euap', 'westcentralus'] }
+    
+    featurePreviewFlagPath = PreviewFeaturesDirectory + feature
+    if os.path.exists(featurePreviewFlagPath):
+        return True
+    
+    featurePreviewDisabledFlagPath = PreviewFeaturesDirectory + feature + 'Disabled'
+    if os.path.exists(featurePreviewDisabledFlagPath):
+        return False
+    
+    _, region = get_azure_environment_and_region()
+
+    if feature in feature_support_matrix.keys():
+        if region in feature_support_matrix[feature]:
+            return True
+    
+    return False
 
 
 def get_ssl_cert_info(operation):
@@ -1814,7 +1877,6 @@ def final_check_if_dpkg_or_rpm_locked(exit_code, output):
     if dpkg_or_rpm_locked:
         exit_code = DPKGOrRPMLockedErrorCode
     return exit_code
-
 
 def get_settings():
     """

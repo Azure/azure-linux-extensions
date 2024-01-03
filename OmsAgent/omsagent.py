@@ -175,13 +175,6 @@ AutoManagedWorkspaceCreationSleepSeconds = 20
 AgentUser='omsagent'
 AgentGroup='omiusers'
 
-# Change permission of log path - if we fail, that is not an exit case
-try:
-    ext_log_path = '/var/log/azure/'
-    if os.path.exists(ext_log_path):
-        os.system('chmod {1} {0}'.format(ext_log_path, 700))
-except:
-    pass
 
 """
 What need to be packaged to make the signing work:
@@ -932,30 +925,42 @@ def is_vm_supported_for_extension():
     The supported distros of the OMSAgent-for-Linux are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists = {'redhat' : ['7', '8'], 'red hat' : ['7', '8'], 'rhel' : ['7', '8'], # Red Hat
+    supported_dists = {'redhat' : ['7', '8', '9'], 'red hat' : ['7', '8', '9'], 'rhel' : ['7', '8', '9'], # Red Hat
                        'centos' : ['7', '8'], # CentOS
                        'oracle' : ['7', '8'], 'ol': ['7', '8'], # Oracle
-                       'debian' : ['8', '9', '10'], # Debian
+                       'debian' : ['8', '9', '10', '11'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
+                       'opensuse' : ['15'], # openSUSE
                        'rocky' : ['8', '9'], # Rocky
                        'alma' : ['8', '9'], # Alma
                        'amzn' : ['2'] # AWS
     }
 
     vm_dist, vm_ver, vm_supported = '', '', False
+    parse_manually = False
 
-    try:
-        vm_dist, vm_ver, vm_id = platform.linux_distribution()
-    except AttributeError:
+    # platform commands used below aren't available after Python 3.6
+    if sys.version_info < (3,7):
         try:
-            vm_dist, vm_ver, vm_id = platform.dist()
+            vm_dist, vm_ver, vm_id = platform.linux_distribution()
         except AttributeError:
-            hutil_log_info("Falling back to /etc/os-release distribution parsing")
+            try:
+                vm_dist, vm_ver, vm_id = platform.dist()
+            except AttributeError:
+                hutil_log_info("Falling back to /etc/os-release distribution parsing")
 
-    # Fallback if either of the above fail; on some (especially newer)
-    # distros, linux_distribution() and dist() are unreliable or deprecated
-    if not vm_dist and not vm_ver:
+        # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
+        # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
+        try:
+            temp_vm_ver = int(vm_ver.split('.')[0])
+        except:
+            parse_manually = True
+    else:
+        parse_manually = True
+
+    # Fallback if either of the above platform commands fail, or we switch to manual parsing
+    if (not vm_dist and not vm_ver) or parse_manually:
         try:
             with open('/etc/os-release', 'r') as fp:
                 for line in fp:
