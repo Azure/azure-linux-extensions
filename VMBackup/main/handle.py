@@ -655,7 +655,7 @@ def daemon():
             eventlogger.dispose()
     except Exception as e:
         backup_logger.log(str(e), True, 'Error')
-        if(eventlogger is not None): 
+        if(eventlogger is not None):
             eventlogger.dispose()
     if monitor_process is not None:
         monitor_process.terminate()
@@ -751,7 +751,7 @@ def can_use_systemd():
 
     try:
         pso = subprocess.check_output(["ps", "--no-headers", "-o", "comm", "1"])
-        return pso == "systemd"
+        return pso[0:7].decode("utf-8") == "systemd"
     except Exception as e:
         backup_logger.log("error running `ps --no-headers -o comm 1`: {}".format(e), True, "Warning")
     return False
@@ -826,7 +826,6 @@ def create_host_based_process():
     subprocess.Popen(
         ["./main/handle_host_daemon.sh"],
         cwd = script_dir,
-        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         shell = True
     )
 
