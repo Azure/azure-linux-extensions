@@ -642,7 +642,7 @@ def daemon():
             eventlogger.dispose()
     except Exception as e:
         backup_logger.log(str(e), True, 'Error')
-        if(eventlogger is not None):
+        if(eventlogger is not None): 
             eventlogger.dispose()
     if monitor_process is not None:
         monitor_process.terminate()
