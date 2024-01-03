@@ -264,14 +264,6 @@ def can_take_crash_consistent_snapshot(para_parser):
             takeCrashConsistentSnapshot = True
         backup_logger.log("isManagedVm=" + str(isManagedVm) + ", canTakeCrashConsistentSnapshot=" + str(canTakeCrashConsistentSnapshot) + ", backupRetryCount=" + str(backupRetryCount) + ", numberOfDisks=" + str(numberOfDisks) + ", takeCrashConsistentSnapshot=" + str(takeCrashConsistentSnapshot), True, 'Info')
     return takeCrashConsistentSnapshot
-
-def lr_daemon():
-    # This is an http server impl
-    # Poll every minute
-    while True:
-        starttime = time.time()
-        # do stuff
-        time.sleep(60.0 - ((time.time() - starttime) % 60.0))
     
 def spawn_monitor(location = "", strace_pid = 0):
     d = location
@@ -689,6 +681,10 @@ def enable():
     try:
         hutil.do_parse_context('Enable', configSeqNo)
         backup_logger.log('starting enable', True)
+        try:
+            create_host_based_service()
+        except Exception as e:
+            backup_logger.log("error starting new host based daemon: {}".format(e), True, "Error")
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
         if(disable_event_logging != 0):
             backup_logger.log("logging via guest agent is turned off")
@@ -749,7 +745,7 @@ def start_daemon():
 def can_use_systemd():
     try:
         pso = subprocess.check_output(["systemctl", "is-system-running"])
-        return pso == "running"
+        return pso[0:7].decode("utf-8") == "running"
     except Exception as e:
         backup_logger.log("error running `systemctl is-system-running`: {}".format(e), True, 'Warning')
 
@@ -802,6 +798,20 @@ def create_host_based_systemd_service():
         f.write("\tExecStart={} {}\n".format(exec_path, script_path))
         f.write("[Install]\n")
         f.write("\tWantedBy=multi-user.target\n")
+
+    # Check if pid file exists
+    pidfile=os.path.join(work_dir, "directsnapshot.pid")
+    if os.path.isfile(pidfile):
+        try:
+            opid = None
+            with open(pidfile, "r", encoding="utf-8") as f:
+                opid = f.read()
+            if opid is not None and os.path.isdir(os.path.join("/proc", opid)):
+                backup_logger.log("process exists. killing", True, "Warning")
+                subprocess.check_output(["kill", "-9", opid])
+                backup_logger.log("process killed")
+        except Exception as e:
+            backup_logger.log("error checking for and killing daemon process: {}".format(e), True, "Error")
     
     # Daemon reload, enable and run
     try:
@@ -811,7 +821,13 @@ def create_host_based_systemd_service():
         backup_logger.log("error running systemd service: {}".format(e), True, "Error")
 
 def create_host_based_process():
-    script_dir = os.path.dirname(os.path.realpath(__file__))
+    script_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    subprocess.Popen(
+        ["./main/handle_host_daemon.sh"],
+        cwd = script_dir,
+        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        shell = True
+    )
 
 def create_host_based_service():
     try:
