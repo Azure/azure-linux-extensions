@@ -1,9 +1,0 @@
-[Unit]
-Description=Microsoft.Azure.Snapshot.Extension.Service
-After=multi-user.target
-[Service]
-Type=simple
-Restart=always
-ExecStart=/usr/bin/python /home/abhishek/code/work/azure-linux-extensions/VMBackup/main/handle.py lrdaemon
-[Install]
-WantedBy=multi-user.target
