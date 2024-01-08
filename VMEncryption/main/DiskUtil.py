@@ -195,7 +195,19 @@ class DiskUtil(object):
         return process_comm.stdout.strip()
     
     def import_token_data(self,device_path,token_data,token_id):
-        '''Updating token_data json object to LUKS2 header's Tokens field.'''
+        '''Updating token_data json object to LUKS2 header's Tokens field.
+        token data is as follow for version 1.0.
+        "version": "1.0",
+        "type": "Azure_Disk_Encryption",
+        "keyslots": [],
+        "KekVaultResourceId": "<kek_res_id>",
+        "KeyEncryptionKeyURL": "<kek_url>",
+        "KeyVaultResourceId": "<kv_res_id>",
+        "KeyVaultURL": "https://<vault_name>.vault.azure.net/",
+        "AttestationURL": null,
+        "PassphraseName": "LUKSPasswordProtector",
+        "Passphrase": "M53XE09n7O9r2AdKa7FYRYe..."
+        '''
         self.logger.log(msg="import_token_data for device: {0} started.".format(device_path))
         if not token_data or not type(token_data) is dict:
             self.logger.log(level=CommonVariables.WarningLevel, msg="import_token_data: token_data: {0} for device: {1} is not valid.".format(token_data,device_path))
@@ -299,11 +311,7 @@ class DiskUtil(object):
         if not cvm_ade_vm_encryption_token_id:
             self.logger.log("export_token token id {0} not found in device {1} LUKS header".format(cvm_ade_vm_encryption_token_id,device_name))
             return None
-        cmd = "cryptsetup token export --token-id {0} {1}".format(cvm_ade_vm_encryption_token_id,device_path)
-        process_comm = ProcessCommunicator()
-        self.command_executor.Execute(cmd, communicator=process_comm)
-        token = process_comm.stdout
-        disk_encryption_setting=json.loads(token)
+        disk_encryption_setting=self.read_token(device_name=device_name,token_id=cvm_ade_vm_encryption_token_id)
         if disk_encryption_setting['version'] != CommonVariables.ADEEncryptionVersionInLuksToken_1_0:
             self.logger.log("export_token token version {0} is not a vaild version.".format(disk_encryption_setting['version']))
             return None
@@ -464,17 +472,17 @@ class DiskUtil(object):
         luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
         tokens = self._extract_luksv2_token(luks_dump_out)
         for token in tokens:
-            if token[1] == token_name:
+            if len(token) == 2 and token[1] == token_name:
                 return token[0]
         return None
 
     def restore_luks2_token(self, device_name=None):
         '''this function restoring token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption, 
-        this function acts on 4 secenarios. [token id Azure_Disk_Encryption, token id Azure_Disk_Encryption_BackUp, resote_action)'''
-        '''[Y,Y,remove token type Azure_Disk_Encryption_BackUp]
-           [Y,N,do nothing]
-           [N,N,do nothing]
-           [N,Y,move token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption]'''
+        this function acts on 4 secenarios. [token id Azure_Disk_Encryption, token id Azure_Disk_Encryption_BackUp, resote_action, Scenario]'''
+        '''[Y,Y,remove token type Azure_Disk_Encryption_BackUp,VM restart/failure]
+           [Y,N,do nothing,Success scenario]
+           [N,N,do nothing,No token present]
+           [N,Y,move token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption,VM restart/failure]'''
         if not device_name or not os.path.exists(self.get_device_path(device_name)):
             self.logger.log(level=CommonVariables.WarningLevel,msg="restore_luks2_token invalid input. device_name = {0}".format(device_name))
             return
@@ -512,9 +520,23 @@ class DiskUtil(object):
 
     def _extract_luksv2_token(self, luks_dump_out):
         """
-        ...
+        A luks v2 luksheader looks kind of like this: (inessential stuff removed)
+
+        LUKS header information
+        Version:        2
+        Data segments:
+            0: crypt
+                offset: 0 [bytes]
+                length: 5539430400 [bytes]
+                cipher: aes-xts-plain64
+                sector: 512 [bytes]
+        Keyslots:
+            1: luks2
+                    Key:        512 bits
+            3: reencrypt (unbound)
+                    Key:        8 bits
         Tokens:
-            1: Azure_Disk_Encryption_BackUp
+            6: Azure_Disk_Encryption_BackUp
             5: Azure_Disk_Encryption
         ...
         """

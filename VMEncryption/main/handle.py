@@ -2189,7 +2189,7 @@ def disable_encryption_all_in_place(passphrase_file, decryption_marker, disk_uti
     return None
 
 
-def daemon_encrypt(): 
+def daemon_encrypt():
     logger.log("daemon_encrypt security type is {0}".format(security_Type))
     public_settings = get_public_settings()
     if security_Type == CommonVariables.ConfidentialVM:
