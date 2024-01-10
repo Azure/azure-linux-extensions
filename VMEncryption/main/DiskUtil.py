@@ -193,8 +193,8 @@ class DiskUtil(object):
             return None
         self.logger.log("secure_key_release_operation {0} end.".format(operation))
         return process_comm.stdout.strip()
-    
-    def import_token_data(self,device_path,token_data,token_id):
+
+    def import_token_data(self, device_path, token_data, token_id):
         '''Updating token_data json object to LUKS2 header's Tokens field.
         token data is as follow for version 1.0.
         "version": "1.0",
@@ -209,7 +209,7 @@ class DiskUtil(object):
         "Passphrase": "M53XE09n7O9r2AdKa7FYRYe..."
         '''
         self.logger.log(msg="import_token_data for device: {0} started.".format(device_path))
-        if not token_data or not type(token_data) is dict:
+        if not token_data or not isinstance(token_data, dict):
             self.logger.log(level=CommonVariables.WarningLevel, msg="import_token_data: token_data: {0} for device: {1} is not valid.".format(token_data,device_path))
             return False
         if not token_id:
@@ -225,42 +225,45 @@ class DiskUtil(object):
         os.unlink(temp_file.name)
         return status==CommonVariables.process_success
 
-    def import_token(self,device_path,passphrase_file,public_settings,PassphraseNameValue=CommonVariables.PassphraseNameValueProtected):
-        '''this function reads passphrase from passphrase file, wrap it and update in token field of LUKS2 header.'''
+    def import_token(self, device_path, passphrase_file, public_settings,
+                     passphrase_name_value=CommonVariables.PassphraseNameValueProtected):
+        '''This function reads passphrase from passphrase_file, do SKR and wrap passphrase with securely 
+        released key. Then it updates metadata (required encryption settings for SKR + wrapped passphrase) 
+        to primary token id: 5 type: Azure_Disk_Encryption in Tokens field of LUKS2 header.'''
         self.logger.log(msg="import_token for device: {0} started.".format(device_path))
         self.logger.log(msg="import_token for passphrase file path: {0}.".format(passphrase_file))
         if not passphrase_file or not os.path.exists(passphrase_file):
             self.logger.log(level=CommonVariables.WarningLevel,msg="import_token for passphrase file path: {0} not exists.".format(passphrase_file))
             return False
-        Protector= ""
+        protector= ""
         with open(passphrase_file,"rb") as protector_file:
             #passphrase stored in keyfile is base64
-            Protector = protector_file.read().decode('utf-8')
-        KekVaultResourceId=public_settings.get(CommonVariables.KekVaultResourceIdKey)
-        KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
-        AttestationUrl = public_settings.get(CommonVariables.AttestationURLKey)
-        if PassphraseNameValue == CommonVariables.PassphraseNameValueProtected:
-            Protector = self.secure_key_release_operation(protectorbase64=Protector,
-                                                        kekUrl=KeyEncryptionKeyUrl,
+            protector = protector_file.read().decode('utf-8')
+        kek_vault_resource_id=public_settings.get(CommonVariables.KekVaultResourceIdKey)
+        key_encryption_key_url=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
+        attestation_url = public_settings.get(CommonVariables.AttestationURLKey)
+        if passphrase_name_value == CommonVariables.PassphraseNameValueProtected:
+            protector = self.secure_key_release_operation(protectorbase64=protector,
+                                                        kekUrl=key_encryption_key_url,
                                                         operation=CommonVariables.secure_key_release_wrap,
-                                                        attestationUrl=AttestationUrl)
+                                                        attestationUrl=attestation_url)
         else:
-            self.logger.log(msg="import_token passphrase is not wrapped, value of passphrase name key: {0}".format(PassphraseNameValue))
+            self.logger.log(msg="import_token passphrase is not wrapped, value of passphrase name key: {0}".format(passphrase_name_value))
 
-        if not Protector:
+        if not protector:
             self.logger.log("import_token protector wrapping is unsuccessful for device {0}".format(device_path))
             return False
         data={
             "version":CommonVariables.ADEEncryptionVersionInLuksToken_1_0,
             "type":"Azure_Disk_Encryption",
             "keyslots":[],
-            CommonVariables.KekVaultResourceIdKey:KekVaultResourceId,
-            CommonVariables.KeyEncryptionKeyURLKey:KeyEncryptionKeyUrl,
+            CommonVariables.KekVaultResourceIdKey:kek_vault_resource_id,
+            CommonVariables.KeyEncryptionKeyURLKey:key_encryption_key_url,
             CommonVariables.KeyVaultResourceIdKey:public_settings.get(CommonVariables.KeyVaultResourceIdKey),
             CommonVariables.KeyVaultURLKey:public_settings.get(CommonVariables.KeyVaultURLKey),
-            CommonVariables.AttestationURLKey:AttestationUrl,
-            CommonVariables.PassphraseNameKey:PassphraseNameValue,
-            CommonVariables.PassphraseKey:Protector
+            CommonVariables.AttestationURLKey:attestation_url,
+            CommonVariables.PassphraseNameKey:passphrase_name_value,
+            CommonVariables.PassphraseKey:protector
         }
         status = self.import_token_data(device_path=device_path,
                                         token_data=data,
@@ -268,38 +271,44 @@ class DiskUtil(object):
         self.logger.log(msg="import_token: device: {0} end.".format(device_path))
         return status
 
-    def read_token(self,device_name,token_id):
+    def read_token(self, device_name, token_id):
         '''this functions reads tokens from LUKS2 header.'''
         device_path = self.get_device_path(dev_name=device_name)
         if not device_path or not token_id:
             self.logger.log(level=CommonVariables.WarningLevel,
-                            msg="read_token: Inputs not valid. device_name: {0}, token id: {1}".format(device_name,token_id))
+                            msg="read_token: Inputs are not valid. device_name: {0}, token id: {1}".format(device_name,token_id))
             return None
         cmd = "cryptsetup token export --token-id {0} {1}".format(token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd, communicator=process_comm)
         if status != 0:
             self.logger.log(level=CommonVariables.WarningLevel,
-                            msg="read_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
+                            msg="read_token: token id: {0} is not found for device_name: {1} in LUKS header".format(token_id,device_name))
             return None
         token = process_comm.stdout
         return json.loads(token)
 
-    def remove_token(self,device_name,token_id):
+    def remove_token(self, device_name, token_id):
         '''this function remove the token'''
-        device_path = os.path.join("/dev",device_name)
+        device_path = self.get_device_path(dev_name=device_name)
+        if not device_path or not token_id:
+            self.logger.log(level=CommonVariables.WarningLevel,
+                            msg="remove_token: Inputs are not valid. device name: {0}, token_id: {1}".format(device_name,token_id))
+            return False
         cmd = "cryptsetup token remove --token-id {0} {1}".format(token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd, communicator=process_comm)
         if status != 0:
             self.logger.log(level=CommonVariables.WarningLevel,
-                            msg="remove token id {0} not found in device {1} LUKS header".format(token_id,device_name))
+                            msg="remove_token: token id: {0} is not found for device_name: {1} in LUKS header".format(token_id,device_name))
             return False
         return True
 
     def export_token(self,device_name):
-        '''This function reads token id from luks2 header field and unwrap passphrase'''
-        self.logger.log("export_token to device {0} started.".format(device_name))
+        '''This function reads wrapped passphrase from LUKS2 Tokens for
+        token id:5, which belongs to primary token type: Azure_Disk_Encryption
+        and do SKR and returns unwrapped passphrase'''
+        self.logger.log("export_token: for device_name: {0} started.".format(device_name))
         device_path = self.get_device_path(device_name)
         if not device_path:
             self.logger.log(level= CommonVariables.WarningLevel, msg="export_token Input is not valid. device name: {0}".format(device_name))
@@ -313,17 +322,17 @@ class DiskUtil(object):
         if disk_encryption_setting['version'] != CommonVariables.ADEEncryptionVersionInLuksToken_1_0:
             self.logger.log("export_token token version {0} is not a vaild version.".format(disk_encryption_setting['version']))
             return None
-        keyEncryptionKeyUrl=disk_encryption_setting[CommonVariables.KeyEncryptionKeyURLKey]
-        wrappedProtector = disk_encryption_setting[CommonVariables.PassphraseKey]
-        attestationUrl = disk_encryption_setting[CommonVariables.AttestationURLKey]
+        key_encryption_key_url=disk_encryption_setting[CommonVariables.KeyEncryptionKeyURLKey]
+        wrapped_protector = disk_encryption_setting[CommonVariables.PassphraseKey]
+        attestation_url = disk_encryption_setting[CommonVariables.AttestationURLKey]
         if disk_encryption_setting[CommonVariables.PassphraseNameKey] != CommonVariables.PassphraseNameValueProtected:
             self.logger.log(level=CommonVariables.WarningLevel, msg="passphrase is not Protected. No need to do SKR.")
-            return wrappedProtector if wrappedProtector else None
-        if wrappedProtector:
+            return wrapped_protector if wrapped_protector else None
+        if wrapped_protector:
             #unwrap the protector.
-            protector=self.secure_key_release_operation(attestationUrl=attestationUrl,
-                                                        kekUrl=keyEncryptionKeyUrl,
-                                                        protectorbase64=wrappedProtector,
+            protector=self.secure_key_release_operation(attestationUrl=attestation_url,
+                                                        kekUrl=key_encryption_key_url,
+                                                        protectorbase64=wrapped_protector,
                                                         operation=CommonVariables.secure_key_release_unwrap)
         self.logger.log("export_token to device {0} end.".format(device_name))
         return protector

@@ -62,7 +62,7 @@ class CommonVariables:
     """
     #this token id is used to store Primary ADE (encryption setting + wrapped passphrase) token.
     cvm_ade_vm_encryption_token_id = 5
-    #this token id is used to store backup of token id 5, during CMK rotation.
+    #this token id is used to store backup of token id 5, during KEK rotation.
     cvm_ade_vm_encryption_backup_token_id = 6
     ADEEncryptionVersionInLuksToken_1_0='1.0'
     PassphraseNameValueProtected = 'LUKSPasswordProtector'

@@ -272,8 +272,11 @@ def get_protected_settings():
     else:
         return protected_settings_str
 
-def update_encryption_settings_luks2_header(extra_items_to_encrypt=[]):
-    '''This function is used for CMK passphrse wrapping with new KEK URL and update metadata in LUKS2 header.'''
+def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
+    '''This function is used for CMK passphrase wrapping with new KEK URL and update
+    metadata in LUKS2 header.'''
+    if extra_items_to_encrypt is None:
+        extra_items_to_encrypt=[]
     hutil.do_parse_context('UpdateEncryptionSettingsLuks2Header')
     logger.log('Updating encryption settings LUKS-2 header')
     # ensure cryptsetup package is still available in case it was for some reason removed after enable
@@ -304,21 +307,23 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=[]):
             disk_util.restore_luks2_token(device_name=device_item.name)
             logger.log("Reading passphrase from LUKS2 header, device name: {0}".format(device_item.name))
             #keep token copy for manual recovery
-            ade_token_id = disk_util.get_token_id(header_or_dev_path=device_item_path,token_name=CommonVariables.AzureDiskEncryptionToken)
-            if not ade_token_id:
-                logger.log("token type: Azure_Disk_Encryption not found for device {0}".format(device_item.name))
+            ade_primary_token_id = disk_util.get_token_id(header_or_dev_path=device_item_path,token_name=CommonVariables.AzureDiskEncryptionToken)
+            if not ade_primary_token_id:
+                logger.log("primary token type: Azure_Disk_Encryption not found for device {0}".format(device_item.name))
                 continue
-            data = disk_util.read_token(device_name=device_item.name,token_id=ade_token_id)
-            #writing to backup token
+            data = disk_util.read_token(device_name=device_item.name,token_id=ade_primary_token_id)
+            #writing primary token data to backup token, update token type to back up.
             data['type']=CommonVariables.AzureDiskEncryptionBackUpToken
+            #update backup token data to backup token id:6.
             disk_util.import_token_data(device_path=device_item_path,token_data=data,token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
             #get the unwrapped passphrase from LUKS2 header.
             passphrase=disk_util.export_token(device_name=device_item.name)
-            #remove token
-            disk_util.remove_token(device_name=device_item.name,token_id=ade_token_id)
             if not passphrase:
-                logger.log("No passphrase in LUKS2 header, device name: {0}".format(device_item.name))
+                logger.log(level=CommonVariables.WarningLevel,
+                           msg="No passphrase found in LUKS2 header, device name: {0}".format(device_item.name))
                 continue
+            #remove primary token from Tokens field of LUKS2 header.
+            disk_util.remove_token(device_name=device_item.name,token_id=ade_primary_token_id)
             logger.log("Updating wrapped passphrase to LUKS2 header with current public setting. device name {0}".format(device_item.name))
             #protect passphrase before updating to LUKS2 is done in import_token
             temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
@@ -334,7 +339,7 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=[]):
                            msg="Update passphrase with current public setting to LUKS2 header is not successful. device path {0}".format(device_item_path))
                 return None
             os.unlink(temp_keyfile.name)
-            #removing backup token
+            #removing backup token as KEK rotation is successful here.
             disk_util.remove_token(device_name=device_item.name,
                                    token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
         #committing the extension parameter if KEK rotation is successful.
@@ -1036,7 +1041,11 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
         if is_daemon_running():
             logger.log("An operation already running. Cannot accept an update settings request.")
             hutil.reject_settings()
-        are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
+        are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type=volume_type,
+                                                                                 encryption_status=encryption_status,
+                                                                                disk_util=disk_util,
+                                                                                bek_util=bek_util,
+                                                                                encryption_operation=encryption_operation)
         if security_Type==CommonVariables.ConfidentialVM:
             logger.log('Calling Update Encryption Setting in LUKS2 header.')
             if extension_parameter.cmk_changed():
