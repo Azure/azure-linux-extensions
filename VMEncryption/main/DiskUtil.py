@@ -506,14 +506,15 @@ class DiskUtil(object):
             #remove backup token id
             self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
             return
+        #ade_token_id_backup having value but ade_token_id_primary is none
         self.logger.log("restore luks2 token for device {0} is started.".format(device_name))
         #read from backup and update AzureDiskEncryptionToken
         data = self.read_token(device_name=device_name,token_id=ade_token_id_backup)
         data['type']=CommonVariables.AzureDiskEncryptionToken
-        self.import_token_data(device_path=device_path,token_data=data,token_id=ade_token_id_primary)
+        self.import_token_data(device_path=device_path,token_data=data,token_id=CommonVariables.cvm_ade_vm_encryption_token_id)
         #remove backup
         self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
-        self.logger.log("restore luks2 token id {0} to {1} for device {2} is successful.".format(ade_token_id_backup,ade_token_id_primary,device_name))
+        self.logger.log("restore luks2 token id {0} to {1} for device {2} is successful.".format(ade_token_id_backup,CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
 
     def _get_cryptsetup_version(self):
         # get version of currently installed cryptsetup

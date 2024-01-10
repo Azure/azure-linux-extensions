@@ -333,7 +333,7 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
             ret = disk_util.import_token(device_path=device_item_path,
                                          passphrase_file=temp_keyfile.name,
                                          public_settings=public_setting,
-                                         PassphraseNameValue=CommonVariables.PassphraseNameValueProtected)
+                                         passphrase_name_value=CommonVariables.PassphraseNameValueProtected)
             if not ret:
                 logger.log(level=CommonVariables.WarningLevel,
                            msg="Update passphrase with current public setting to LUKS2 header is not successful. device path {0}".format(device_item_path))
