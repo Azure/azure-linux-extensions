@@ -69,7 +69,7 @@ class CommonVariables:
     #this token type is used to store Primary ADE token. Type id: 5
     AzureDiskEncryptionToken = 'Azure_Disk_Encryption'
     #this token type is used to store backup ADE token. Type id: 6
-    #this token used for recovery to token 5 in case of reboot/interruption happened during reboot.
+    #this token used for recovery to token 5 in case of reboot/interruption happened during KEK rotation.
     AzureDiskEncryptionBackUpToken='Azure_Disk_Encryption_BackUp'
     """
     IMDS IP:

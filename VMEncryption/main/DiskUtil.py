@@ -270,15 +270,17 @@ class DiskUtil(object):
 
     def read_token(self,device_name,token_id):
         '''this functions reads tokens from LUKS2 header.'''
-        device_path = os.path.join("/dev",device_name)
-        if not os.path.exists(device_path) or not token_id:
-            self.logger.log(level=CommonVariables.WarningLevel,msg="read_token: Inputs not valid. device_name: {0}, token id: {1}".format(device_name,token_id))
+        device_path = self.get_device_path(dev_name=device_name)
+        if not device_path or not token_id:
+            self.logger.log(level=CommonVariables.WarningLevel,
+                            msg="read_token: Inputs not valid. device_name: {0}, token id: {1}".format(device_name,token_id))
             return None
         cmd = "cryptsetup token export --token-id {0} {1}".format(token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd, communicator=process_comm)
         if status != 0:
-            self.logger.log("read_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
+            self.logger.log(level=CommonVariables.WarningLevel,
+                            msg="read_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
             return None
         token = process_comm.stdout
         return json.loads(token)
@@ -290,17 +292,18 @@ class DiskUtil(object):
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd, communicator=process_comm)
         if status != 0:
-            self.logger.log("remove token id {0} not found in device {1} LUKS header".format(token_id,device_name))
+            self.logger.log(level=CommonVariables.WarningLevel,
+                            msg="remove token id {0} not found in device {1} LUKS header".format(token_id,device_name))
             return False
         return True
 
     def export_token(self,device_name):
         '''This function reads token id from luks2 header field and unwrap passphrase'''
         self.logger.log("export_token to device {0} started.".format(device_name))
-        if not device_name or not os.path.exists(self.get_device_path(device_name)):
+        device_path = self.get_device_path(device_name)
+        if not device_path:
             self.logger.log(level= CommonVariables.WarningLevel, msg="export_token Input is not valid. device name: {0}".format(device_name))
             return None
-        device_path = self.get_device_path(device_name)
         protector = None
         cvm_ade_vm_encryption_token_id = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
         if not cvm_ade_vm_encryption_token_id:
@@ -481,10 +484,10 @@ class DiskUtil(object):
         3. token id 5 not present but 6 present in LUKS2 Tokens field, restore token id 5 using
         token id 6, then remove token id 6.
         4. no token ids 5 or 6 present in LUKS2 Tokens field, do nothing.'''
-        if not device_name or not os.path.exists(self.get_device_path(device_name)):
+        device_path = self.get_device_path(device_name)
+        if not device_path:
             self.logger.log(level=CommonVariables.WarningLevel,msg="restore_luks2_token invalid input. device_name = {0}".format(device_name))
             return
-        device_path = self.get_device_path(device_name)
         ade_token_id_primary = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
         ade_token_id_backup = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionBackUpToken)
         if not ade_token_id_backup:
@@ -498,7 +501,7 @@ class DiskUtil(object):
         #read from backup and update AzureDiskEncryptionToken
         data = self.read_token(device_name=device_name,token_id=ade_token_id_backup)
         data['type']=CommonVariables.AzureDiskEncryptionToken
-        self.import_token_data(device_path=device_path,token_data=data,token_id=CommonVariables.AzureDiskEncryptionToken)
+        self.import_token_data(device_path=device_path,token_data=data,token_id=ade_token_id_primary)
         #remove backup
         self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
         self.logger.log("restore luks2 token id {0} to {1} for device {2} is successful.".format(ade_token_id_backup,ade_token_id_primary,device_name))
