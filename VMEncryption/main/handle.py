@@ -192,7 +192,8 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_ma
     public_settings = get_public_settings()
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
     if security_Type == CommonVariables.ConfidentialVM:
-        logger.log(msg="Do not send vm setting to host for stamping.",level=CommonVariables.InfoLevel)
+        logger.log(msg="Do not send CVM encryption setting to host for stamping.",
+                   level=CommonVariables.InfoLevel)
         extension_parameter.commit()
         return
     has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
@@ -299,6 +300,7 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=[]):
                 logger.log("Not a LUKS device, device path: {0}".format(device_item_path))
                 continue
             #restoring the token data to type Azure_Disk_Encryption
+            #It is necessary to restore if we are resuming from previous attempt, otherwise its no-op.
             disk_util.restore_luks2_token(device_name=device_item.name)
             logger.log("Reading passphrase from LUKS2 header, device name: {0}".format(device_item.name))
             #keep token copy for manual recovery
@@ -323,13 +325,19 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=[]):
             temp_keyfile.write(passphrase.encode("utf-8"))
             temp_keyfile.close()
             #save passphrase to LUKS2 header with PassphraseNameValueProtected
-            ret = disk_util.import_token(device_path=device_item_path,passphrase_file=temp_keyfile.name,public_settings=public_setting,PassphraseNameValue=CommonVariables.PassphraseNameValueProtected)
+            ret = disk_util.import_token(device_path=device_item_path,
+                                         passphrase_file=temp_keyfile.name,
+                                         public_settings=public_setting,
+                                         PassphraseNameValue=CommonVariables.PassphraseNameValueProtected)
             if not ret:
-                logger.log("Update passphrase with current public setting to LUKS2 header is not successful. device path {0}".format(device_item_path))
+                logger.log(level=CommonVariables.WarningLevel,
+                           msg="Update passphrase with current public setting to LUKS2 header is not successful. device path {0}".format(device_item_path))
                 return None
             os.unlink(temp_keyfile.name)
             #removing backup token
-            disk_util.remove_token(device_name=device_item.name,token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
+            disk_util.remove_token(device_name=device_item.name,
+                                   token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
+        #committing the extension parameter if KEK rotation is successful.
         extension_parameter.commit()
         bek_util.umount_azure_passhprase(encryption_config)
 

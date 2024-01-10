@@ -175,6 +175,7 @@ class ExtensionParameter(object):
         return a==b
 
     def cmk_changed(self):
+        '''current config CMK changed from effective config CMK.'''
         if (self.KeyEncryptionKeyURL or self.get_kek_url()) and \
            (not self._is_kv_equivalent(self.KeyEncryptionKeyURL, self.get_kek_url())):
            self.logger.log('Current config KeyEncryptionKeyURL {0} differs from effective config KeyEncryptionKeyURL {1}'.format(self.KeyEncryptionKeyURL, self.get_kek_url()))
