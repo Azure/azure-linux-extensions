@@ -193,11 +193,23 @@ class DiskUtil(object):
             return None
         self.logger.log("secure_key_release_operation {0} end.".format(operation))
         return process_comm.stdout.strip()
-    
-    def import_token_data(self,device_path,token_data,token_id):
-        '''Updating token_data json object to LUKS2 header's Tokens field.'''
+
+    def import_token_data(self, device_path, token_data, token_id):
+        '''Updating token_data json object to LUKS2 header's Tokens field.
+        token data is as follow for version 1.0.
+        "version": "1.0",
+        "type": "Azure_Disk_Encryption",
+        "keyslots": [],
+        "KekVaultResourceId": "<kek_res_id>",
+        "KeyEncryptionKeyURL": "<kek_url>",
+        "KeyVaultResourceId": "<kv_res_id>",
+        "KeyVaultURL": "https://<vault_name>.vault.azure.net/",
+        "AttestationURL": null,
+        "PassphraseName": "LUKSPasswordProtector",
+        "Passphrase": "M53XE09n7O9r2AdKa7FYRYe..."
+        '''
         self.logger.log(msg="import_token_data for device: {0} started.".format(device_path))
-        if not token_data or not type(token_data) is dict:
+        if not token_data or not isinstance(token_data, dict):
             self.logger.log(level=CommonVariables.WarningLevel, msg="import_token_data: token_data: {0} for device: {1} is not valid.".format(token_data,device_path))
             return False
         if not token_id:
@@ -213,111 +225,114 @@ class DiskUtil(object):
         os.unlink(temp_file.name)
         return status==CommonVariables.process_success
 
-    def import_token(self,device_path,passphrase_file,public_settings,PassphraseNameValue=CommonVariables.PassphraseNameValueProtected):
-        '''this function reads passphrase from passphrase file, wrap it and update in token field of LUKS2 header.'''
+    def import_token(self, device_path, passphrase_file, public_settings,
+                     passphrase_name_value=CommonVariables.PassphraseNameValueProtected):
+        '''This function reads passphrase from passphrase_file, do SKR and wrap passphrase with securely 
+        released key. Then it updates metadata (required encryption settings for SKR + wrapped passphrase) 
+        to primary token id: 5 type: Azure_Disk_Encryption in Tokens field of LUKS2 header.'''
         self.logger.log(msg="import_token for device: {0} started.".format(device_path))
         self.logger.log(msg="import_token for passphrase file path: {0}.".format(passphrase_file))
         if not passphrase_file or not os.path.exists(passphrase_file):
             self.logger.log(level=CommonVariables.WarningLevel,msg="import_token for passphrase file path: {0} not exists.".format(passphrase_file))
             return False
-        Protector= ""
+        protector= ""
         with open(passphrase_file,"rb") as protector_file:
             #passphrase stored in keyfile is base64
-            Protector = protector_file.read().decode('utf-8')
-        KekVaultResourceId=public_settings.get(CommonVariables.KekVaultResourceIdKey)
-        KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
-        AttestationUrl = public_settings.get(CommonVariables.AttestationURLKey)
-        if PassphraseNameValue == CommonVariables.PassphraseNameValueProtected:
-            Protector = self.secure_key_release_operation(protectorbase64=Protector,
-                                                        kekUrl=KeyEncryptionKeyUrl,
+            protector = protector_file.read().decode('utf-8')
+        kek_vault_resource_id=public_settings.get(CommonVariables.KekVaultResourceIdKey)
+        key_encryption_key_url=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
+        attestation_url = public_settings.get(CommonVariables.AttestationURLKey)
+        if passphrase_name_value == CommonVariables.PassphraseNameValueProtected:
+            protector = self.secure_key_release_operation(protectorbase64=protector,
+                                                        kekUrl=key_encryption_key_url,
                                                         operation=CommonVariables.secure_key_release_wrap,
-                                                        attestationUrl=AttestationUrl)
+                                                        attestationUrl=attestation_url)
         else:
-            self.logger.log(msg="import_token passphrase is not wrapped, value of passphrase name key: {0}".format(PassphraseNameValue))
+            self.logger.log(msg="import_token passphrase is not wrapped, value of passphrase name key: {0}".format(passphrase_name_value))
 
-        if not Protector:
+        if not protector:
             self.logger.log("import_token protector wrapping is unsuccessful for device {0}".format(device_path))
             return False
         data={
             "version":CommonVariables.ADEEncryptionVersionInLuksToken_1_0,
             "type":"Azure_Disk_Encryption",
             "keyslots":[],
-            CommonVariables.KekVaultResourceIdKey:KekVaultResourceId,
-            CommonVariables.KeyEncryptionKeyURLKey:KeyEncryptionKeyUrl,
+            CommonVariables.KekVaultResourceIdKey:kek_vault_resource_id,
+            CommonVariables.KeyEncryptionKeyURLKey:key_encryption_key_url,
             CommonVariables.KeyVaultResourceIdKey:public_settings.get(CommonVariables.KeyVaultResourceIdKey),
             CommonVariables.KeyVaultURLKey:public_settings.get(CommonVariables.KeyVaultURLKey),
-            CommonVariables.AttestationURLKey:AttestationUrl,
-            CommonVariables.PassphraseNameKey:PassphraseNameValue,
-            CommonVariables.PassphraseKey:Protector
+            CommonVariables.AttestationURLKey:attestation_url,
+            CommonVariables.PassphraseNameKey:passphrase_name_value,
+            CommonVariables.PassphraseKey:protector
         }
-        temp_file = tempfile.NamedTemporaryFile(delete=False,mode='w+')
-        json.dump(data,temp_file,indent=4)
-        temp_file.close()
-        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(temp_file.name,CommonVariables.cvm_ade_vm_encryption_token_id,device_path)
-        process_comm = ProcessCommunicator()
-        status = self.command_executor.Execute(cmd,communicator=process_comm)
-        self.logger.log(msg="import_token: device: {0} status: {1}".format(device_path,status))
-        os.unlink(temp_file.name)
+        status = self.import_token_data(device_path=device_path,
+                                        token_data=data,
+                                        token_id=CommonVariables.cvm_ade_vm_encryption_token_id)
         self.logger.log(msg="import_token: device: {0} end.".format(device_path))
-        return status==CommonVariables.process_success
-    
-    def read_token(self,device_name,token_id):
+        return status
+
+    def read_token(self, device_name, token_id):
         '''this functions reads tokens from LUKS2 header.'''
-        device_path = os.path.join("/dev",device_name)
-        if not os.path.exists(device_path) or not token_id:
-            self.logger.log(level=CommonVariables.WarningLevel,msg="read_token: Inputs not valid. device_name: {0}, token id: {1}".format(device_name,token_id))
+        device_path = self.get_device_path(dev_name=device_name)
+        if not device_path or not token_id:
+            self.logger.log(level=CommonVariables.WarningLevel,
+                            msg="read_token: Inputs are not valid. device_name: {0}, token id: {1}".format(device_name,token_id))
             return None
         cmd = "cryptsetup token export --token-id {0} {1}".format(token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd, communicator=process_comm)
         if status != 0:
-            self.logger.log("read_token token id {0} not found in device {1} LUKS header".format(CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
+            self.logger.log(level=CommonVariables.WarningLevel,
+                            msg="read_token: token id: {0} is not found for device_name: {1} in LUKS header".format(token_id,device_name))
             return None
         token = process_comm.stdout
         return json.loads(token)
 
-    def remove_token(self,device_name,token_id):
+    def remove_token(self, device_name, token_id):
         '''this function remove the token'''
-        device_path = os.path.join("/dev",device_name)
+        device_path = self.get_device_path(dev_name=device_name)
+        if not device_path or not token_id:
+            self.logger.log(level=CommonVariables.WarningLevel,
+                            msg="remove_token: Inputs are not valid. device name: {0}, token_id: {1}".format(device_name,token_id))
+            return False
         cmd = "cryptsetup token remove --token-id {0} {1}".format(token_id,device_path)
         process_comm = ProcessCommunicator()
         status = self.command_executor.Execute(cmd, communicator=process_comm)
         if status != 0:
-            self.logger.log("remove token id {0} not found in device {1} LUKS header".format(token_id,device_name))
+            self.logger.log(level=CommonVariables.WarningLevel,
+                            msg="remove_token: token id: {0} is not found for device_name: {1} in LUKS header".format(token_id,device_name))
             return False
         return True
 
     def export_token(self,device_name):
-        '''This function reads token id from luks2 header field and unwrap passphrase'''
-        self.logger.log("export_token to device {0} started.".format(device_name))
-        if not device_name or not os.path.exists(self.get_device_path(device_name)):
+        '''This function reads wrapped passphrase from LUKS2 Tokens for
+        token id:5, which belongs to primary token type: Azure_Disk_Encryption
+        and do SKR and returns unwrapped passphrase'''
+        self.logger.log("export_token: for device_name: {0} started.".format(device_name))
+        device_path = self.get_device_path(device_name)
+        if not device_path:
             self.logger.log(level= CommonVariables.WarningLevel, msg="export_token Input is not valid. device name: {0}".format(device_name))
             return None
-        device_path = self.get_device_path(device_name)
         protector = None
         cvm_ade_vm_encryption_token_id = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
         if not cvm_ade_vm_encryption_token_id:
             self.logger.log("export_token token id {0} not found in device {1} LUKS header".format(cvm_ade_vm_encryption_token_id,device_name))
             return None
-        cmd = "cryptsetup token export --token-id {0} {1}".format(cvm_ade_vm_encryption_token_id,device_path)
-        process_comm = ProcessCommunicator()
-        self.command_executor.Execute(cmd, communicator=process_comm)
-        token = process_comm.stdout
-        disk_encryption_setting=json.loads(token)
+        disk_encryption_setting=self.read_token(device_name=device_name,token_id=cvm_ade_vm_encryption_token_id)
         if disk_encryption_setting['version'] != CommonVariables.ADEEncryptionVersionInLuksToken_1_0:
             self.logger.log("export_token token version {0} is not a vaild version.".format(disk_encryption_setting['version']))
             return None
-        keyEncryptionKeyUrl=disk_encryption_setting[CommonVariables.KeyEncryptionKeyURLKey]
-        wrappedProtector = disk_encryption_setting[CommonVariables.PassphraseKey]
-        attestationUrl = disk_encryption_setting[CommonVariables.AttestationURLKey]
+        key_encryption_key_url=disk_encryption_setting[CommonVariables.KeyEncryptionKeyURLKey]
+        wrapped_protector = disk_encryption_setting[CommonVariables.PassphraseKey]
+        attestation_url = disk_encryption_setting[CommonVariables.AttestationURLKey]
         if disk_encryption_setting[CommonVariables.PassphraseNameKey] != CommonVariables.PassphraseNameValueProtected:
-            self.logger.log("passphrase is not Protectected. No need to do SKR.")
-            return wrappedProtector if wrappedProtector else None
-        if wrappedProtector:
+            self.logger.log(level=CommonVariables.WarningLevel, msg="passphrase is not Protected. No need to do SKR.")
+            return wrapped_protector if wrapped_protector else None
+        if wrapped_protector:
             #unwrap the protector.
-            protector=self.secure_key_release_operation(attestationUrl=attestationUrl,
-                                                        kekUrl=keyEncryptionKeyUrl,
-                                                        protectorbase64=wrappedProtector,
+            protector=self.secure_key_release_operation(attestationUrl=attestation_url,
+                                                        kekUrl=key_encryption_key_url,
+                                                        protectorbase64=wrapped_protector,
                                                         operation=CommonVariables.secure_key_release_unwrap)
         self.logger.log("export_token to device {0} end.".format(device_name))
         return protector
@@ -456,7 +471,7 @@ class DiskUtil(object):
                 return splits[1]
         return None
 
-    def get_token_id(self,header_or_dev_path,token_name):
+    def get_token_id(self, header_or_dev_path, token_name):
         '''if LUKS2 header has token name return the id else return none.'''
         if not header_or_dev_path or not os.path.exists(header_or_dev_path) or not token_name:
             self.logger.log("get_token_id: invalid input, header_or_dev_path:{0} token_name:{1}".format(header_or_dev_path,token_name))
@@ -464,38 +479,42 @@ class DiskUtil(object):
         luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
         tokens = self._extract_luksv2_token(luks_dump_out)
         for token in tokens:
-            if token[1] == token_name:
+            if len(token) == 2 and token[1] == token_name:
                 return token[0]
         return None
 
     def restore_luks2_token(self, device_name=None):
-        '''this function restoring token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption, 
-        this function acts on 4 secenarios. [token id Azure_Disk_Encryption, token id Azure_Disk_Encryption_BackUp, resote_action)'''
-        '''[Y,Y,remove token type Azure_Disk_Encryption_BackUp]
-           [Y,N,do nothing]
-           [N,N,do nothing]
-           [N,Y,move token type Azure_Disk_Encryption_BackUp to Azure_Disk_Encryption]'''
-        if not device_name or not os.path.exists(self.get_device_path(device_name)):
+        '''this function restores token
+        type:Azure_Disk_Encryption_BackUp, id:6 to type:Azure_Disk_Encryption id:5,
+        this function acts on 4 scenarios.
+        1. both token id: 5 and 6 present in LUKS2 Tokens filed, due to reboot/interrupt during
+        KEK rotation, such case remove token id 5 has latest data so remove token id 6.
+        2. token id 5 present but 6 is not present in LUKS2 Tokens field. do nothing.
+        3. token id 5 not present but 6 present in LUKS2 Tokens field, restore token id 5 using
+        token id 6, then remove token id 6.
+        4. no token ids 5 or 6 present in LUKS2 Tokens field, do nothing.'''
+        device_path = self.get_device_path(device_name)
+        if not device_path:
             self.logger.log(level=CommonVariables.WarningLevel,msg="restore_luks2_token invalid input. device_name = {0}".format(device_name))
             return
-        device_path = self.get_device_path(device_name)
-        ade_token_id = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
+        ade_token_id_primary = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
         ade_token_id_backup = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionBackUpToken)
         if not ade_token_id_backup:
             #do nothing
             return
-        if ade_token_id:
+        if ade_token_id_primary:
             #remove backup token id
             self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
             return
-        self.logger.log("resotre luks2 token for device {0} is started.".format(device_name))
+        #ade_token_id_backup having value but ade_token_id_primary is none
+        self.logger.log("restore luks2 token for device {0} is started.".format(device_name))
         #read from backup and update AzureDiskEncryptionToken
         data = self.read_token(device_name=device_name,token_id=ade_token_id_backup)
-        data['type']=CommonVariables.AzureDiskEncryptionBackUpToken
-        self.import_token_data(device_path=device_path,token_data=data,token_id=CommonVariables.AzureDiskEncryptionToken)
+        data['type']=CommonVariables.AzureDiskEncryptionToken
+        self.import_token_data(device_path=device_path,token_data=data,token_id=CommonVariables.cvm_ade_vm_encryption_token_id)
         #remove backup
         self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
-        self.logger.log("resotre luks2 token for device {0} is successful.".format(device_name))
+        self.logger.log("restore luks2 token id {0} to {1} for device {2} is successful.".format(ade_token_id_backup,CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
 
     def _get_cryptsetup_version(self):
         # get version of currently installed cryptsetup
@@ -512,9 +531,23 @@ class DiskUtil(object):
 
     def _extract_luksv2_token(self, luks_dump_out):
         """
-        ...
+        A luks v2 luksheader looks kind of like this: (inessential stuff removed)
+
+        LUKS header information
+        Version:        2
+        Data segments:
+            0: crypt
+                offset: 0 [bytes]
+                length: 5539430400 [bytes]
+                cipher: aes-xts-plain64
+                sector: 512 [bytes]
+        Keyslots:
+            1: luks2
+                    Key:        512 bits
+            3: reencrypt (unbound)
+                    Key:        8 bits
         Tokens:
-            1: Azure_Disk_Encryption_BackUp
+            6: Azure_Disk_Encryption_BackUp
             5: Azure_Disk_Encryption
         ...
         """
