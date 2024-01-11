@@ -487,7 +487,7 @@ class DiskUtil(object):
         '''this function restores token
         type:Azure_Disk_Encryption_BackUp, id:6 to type:Azure_Disk_Encryption id:5,
         this function acts on 4 scenarios.
-        1. both token id: 5 and 6 present in LUKS2 Tokens filed, due to reboot/interrupt during
+        1. both token id: 5 and 6 present in LUKS2 Tokens field, due to reboot/interrupt during
         KEK rotation, such case remove token id 5 has latest data so remove token id 6.
         2. token id 5 present but 6 is not present in LUKS2 Tokens field. do nothing.
         3. token id 5 not present but 6 present in LUKS2 Tokens field, restore token id 5 using

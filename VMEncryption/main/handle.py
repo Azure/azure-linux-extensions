@@ -295,7 +295,6 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
         encryption_config = EncryptionConfig(encryption_environment, logger)
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_setting)
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
-        bek_util = BekUtil(disk_util, logger,encryption_environment)
         device_items = disk_util.get_device_items(None)
         for device_item in device_items:
             device_item_path = disk_util.get_device_path(device_item.name)
@@ -306,7 +305,7 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
             #It is necessary to restore if we are resuming from previous attempt, otherwise its no-op.
             disk_util.restore_luks2_token(device_name=device_item.name)
             logger.log("Reading passphrase from LUKS2 header, device name: {0}".format(device_item.name))
-            #keep token copy for manual recovery
+            #copy primary token to backup token for recovery, if reboot or interrupt happened during KEK rotation.
             ade_primary_token_id = disk_util.get_token_id(header_or_dev_path=device_item_path,token_name=CommonVariables.AzureDiskEncryptionToken)
             if not ade_primary_token_id:
                 logger.log("primary token type: Azure_Disk_Encryption not found for device {0}".format(device_item.name))
@@ -344,7 +343,6 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
                                    token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
         #committing the extension parameter if KEK rotation is successful.
         extension_parameter.commit()
-        bek_util.umount_azure_passhprase(encryption_config)
 
         if len(extra_items_to_encrypt) > 0:
             hutil.do_status_report(operation='UpdateEncryptionSettingsLuks2Header',
@@ -361,7 +359,6 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
         hutil.save_seq()
         message = "Failed to update encryption settings Luks2 header with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         logger.log(msg=message, level=CommonVariables.ErrorLevel)
-        bek_util.umount_azure_passhprase(encryption_config)
         hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='UpdateEncryptionSettingsLuks2Header',
                       status=CommonVariables.extension_error_status,
