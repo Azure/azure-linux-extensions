@@ -16,16 +16,8 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
 import platform
 import sys
-if sys.version_info[0] < 3:
-    from future import standard_library
-    standard_library.install_aliases()
-    from builtins import str
-    
-import urllib.request, urllib.error, urllib.parse
 import json
 import os
 from shutil import copyfile, rmtree
@@ -37,6 +29,13 @@ import time
 import signal
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+    import urllib.error as urlerror
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    import urllib2 as urlerror
 
 # Cloud Environments
 PublicCloudName     = "azurepubliccloud"
@@ -172,8 +171,8 @@ def generate_Arc_MSI_token(resource = "https://ingestion.monitor.azure.com/"):
             arc_endpoint = metrics_utils.get_arc_endpoint()
             try:
                 msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=" + resource
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
-                res = urllib.request.urlopen(req)
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.urlopen(req)
             except:
                 # The above request is expected to fail and add a key to the path
                 authkey_dir = "/var/opt/azcmagent/tokens/"
@@ -189,8 +188,8 @@ def generate_Arc_MSI_token(resource = "https://ingestion.monitor.azure.com/"):
                 with open(authkey_path, "r") as f:
                     key = f.read()
                 auth += key
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
-                res = urllib.request.urlopen(req)
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
+                res = urllib.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
 
             if not data or "access_token" not in data:
@@ -254,8 +253,8 @@ def generate_MSI_token(identifier_name = '', identifier_value = '', is_lad = Tru
                 if identifier_name and identifier_value:
                     msiauthurl += '&{0}={1}'.format(identifier_name, identifier_value)
 
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
-                res = urllib.request.urlopen(req)
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+                res = urllib.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
 
                 if not data or "access_token" not in data:
@@ -597,8 +596,8 @@ def get_imds_values(is_lad):
     while retries <= max_retries:
 
         # Query imds to get the required information
-        req = urllib.request.Request(imds_url, headers={'Metadata':'true'})
-        res = urllib.request.urlopen(req)
+        req = urllib.Request(imds_url, headers={'Metadata':'true'})
+        res = urllib.urlopen(req)
         data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "compute" not in data:
@@ -793,17 +792,11 @@ def setup_me(is_lad, HUtilObj=None):
     aad_auth_url = ""
     arm_url = "https://{0}/subscriptions/{1}?api-version=2014-04-01".format(arm_domain, subscription_id)
     try:
-        req = urllib.request.Request(arm_url, headers={'Content-Type':'application/json'})
+        req = urllib.Request(arm_url, headers={'Content-Type':'application/json'})
 
-        # urlopen alias in future backport is broken on py2.6, fails on urls with HTTPS - https://github.com/PythonCharmers/python-future/issues/167
-        # Using this hack of switching between py2 and 3 to avoid this
-        if sys.version_info < (2,7):
-            from urllib2 import HTTPError, Request, urlopen
-            urlopen(req)
-        else:
-            res = urllib.request.urlopen(req)
+        res = urllib.urlopen(req)
 
-    except urllib.error.HTTPError as e:
+    except urlerror.HTTPError as e:
         err_res = e.headers["WWW-Authenticate"]
         for line in err_res.split(","):
                 if "Bearer authorization_uri" in line:
