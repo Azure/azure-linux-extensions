@@ -668,10 +668,6 @@ def enable():
     try:
         hutil.do_parse_context('Enable', configSeqNo)
         backup_logger.log('starting enable', True)
-        try:
-            create_host_based_service()
-        except Exception as e:
-            backup_logger.log("error starting new host based daemon: {}".format(e), True, "Error")
         backup_logger.log("patch_class_name: "+str(patch_class_name)+" and orig_distro: "+str(orig_distro),True)
         if(disable_event_logging != 0):
             backup_logger.log("logging via guest agent is turned off")
@@ -682,6 +678,12 @@ def enable():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
+
+        try:
+            if CommonVariables.enableSnapshotExtensionPolling in para_parser.wellKnownSettingFlags and para_parser.wellKnownSettingFlags[CommonVariables.enableSnapshotExtensionPolling]:
+                create_host_based_service()
+        except Exception as e:
+            backup_logger.log("error starting new host based daemon: {}".format(e), True, "Error")
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             if(eventlogger is not None):
