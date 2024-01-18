@@ -35,11 +35,12 @@ class ParameterParser(object):
         self.snapshotTaskToken = ''
         self.includedDisks = None
         self.dynamicConfigsFromCRP = None
-        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False}
+        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False, CommonVariables.enableSnapshotExtensionPolling: False}
         settingKeysMapping= {}
         settingKeysMapping[CommonVariables.isSnapshotTtlEnabled.lower()] = CommonVariables.isSnapshotTtlEnabled
         settingKeysMapping[CommonVariables.useMccfToFetchDsasForAllDisks.lower()] = CommonVariables.useMccfToFetchDsasForAllDisks
         settingKeysMapping[CommonVariables.useMccfForLad.lower()] = CommonVariables.useMccfForLad
+        settingKeysMapping[CommonVariables.enableSnapshotExtensionPolling.lower()] = CommonVariables.enableSnapshotExtensionPolling
         self.includeLunList = []    #To be shared with HP
 
         """
