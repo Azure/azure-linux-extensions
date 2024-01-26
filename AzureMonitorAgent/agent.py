@@ -284,7 +284,13 @@ def copy_amacoreagent_binaries():
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
 
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
-    
+
+def copy_mdsd_binaries():
+    current_arch = platform.machine()
+    mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
+    mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
+    compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
+
 def install():
     """
     Ensure that this VM distro and version are supported.
@@ -333,6 +339,13 @@ def install():
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
+    # Copy mdsd with OpenSSL dynamically linked
+    if is_feature_enabled('useDynamicSSL'):
+        # Check if they have libssl.so.1.1 since AMA is built against this version
+        libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
+        if libssl1_1 == 0:
+            copy_mdsd_binaries()
+            
     # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
     if is_systemd() and platform.machine() == 'aarch64':
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
@@ -1458,15 +1471,6 @@ def set_os_arch(operation):
 
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
-                
-        if is_feature_enabled('useDynamicSSL'):
-            # Check if they have libssl.so.1.1 since AMA is built against this version
-            libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
-            if libssl1_1 == 0:
-                if BundleFileName.endswith('.rpm'):
-                    BundleFileName = BundleFileName.replace('.' + current_arch, '.dynamicssl.' + current_arch)        
-                elif BundleFileName.endswith('.deb'):
-                    BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
         
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
