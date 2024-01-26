@@ -46,7 +46,7 @@ rm -f packages/*dynamicssl*
 mkdir -p tmp
 cp $input_path/azuremonitoragent_$AGENT_VERSION*dynamicssl_x86_64.deb tmp/
 AMA_DEB_PACKAGE_NAME=$(find tmp/ -type f -name "azuremonitoragent_*x86_64.deb" -printf "%f\\n" | head -n 1)
-ar vx $AMA_DEB_PACKAGE_NAME --output=tmp
+ar vx tmp/$AMA_DEB_PACKAGE_NAME --output=tmp
 tar xvf tmp/data.tar.gz -C tmp
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_x86_64
 rm -rf tmp/
@@ -54,7 +54,7 @@ rm -rf tmp/
 mkdir -p tmp
 cp $input_path/azuremonitoragent_$AGENT_VERSION*dynamicssl_aarch64.deb tmp/
 AMA_DEB_PACKAGE_NAME=$(find tmp/ -type f -name "azuremonitoragent_*aarch64.deb" -printf "%f\\n" | head -n 1)
-ar vx $AMA_DEB_PACKAGE_NAME --output=tmp
+ar vx tmp/$AMA_DEB_PACKAGE_NAME --output=tmp
 tar xvf tmp/data.tar.gz -C tmp
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_aarch64
 rm -rf tmp/
