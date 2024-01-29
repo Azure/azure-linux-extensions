@@ -17,21 +17,26 @@
       "services": [
         {
           "name": "azuremonitoragent"
+          "cpuQuotaPercentage": 250
         },
         {
           "name": "azuremonitoragentmgr"
         },
         {
           "name": "azuremonitor-agentlauncher"
+          "cpuQuotaPercentage": 2
         },
         {
           "name": "azuremonitor-coreagent"
+          "cpuQuotaPercentage": 200
         },
         {
           "name": "metrics-extension"
+          "cpuQuotaPercentage": 5
         },
         {
           "name": "metrics-sourcer"
+          "cpuQuotaPercentage": 10
         }
       ]
     }
