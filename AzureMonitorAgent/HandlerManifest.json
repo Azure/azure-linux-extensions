@@ -24,7 +24,7 @@
         },
         {
           "name": "azuremonitor-agentlauncher"
-          "cpuQuotaPercentage": 2
+          "cpuQuotaPercentage": 4
         },
         {
           "name": "azuremonitor-coreagent"
