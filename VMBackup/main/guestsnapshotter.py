@@ -19,8 +19,10 @@
 import os
 try:
     import urlparse as urlparser
+    from urlparse import urlunparse as unparser
 except ImportError:
     import urllib.parse as urlparser
+    from urllib.parse import urlunparse as unparser
 import traceback
 import datetime
 try:
@@ -74,7 +76,7 @@ class GuestSnapshotter(object):
         error_logger=''
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
-        if(sasuri is None):
+        if(sasuri is None
             error_logger = error_logger + str(datetime.datetime.utcnow()) + " Failed to do the snapshot because sasuri is none "
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
@@ -94,11 +96,17 @@ class GuestSnapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
-                if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
-                    self.logger.log("Not passing the TTL header via Guest path though it is enabled")
                 temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
+                if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
+                    self.logger.log("Not passing the TTL header via Guest path though it is enabled")
+                    if(self.port != ""):
+                        hostname = sasuri_obj.hostname
+                        modified_netloc = "{}:{}".format(hostname, self.port)
+                        modified_sasuri_obj = sasuri_obj._replace(netloc = modified_netloc)
+                        sasuri_obj = urlparser.urlunparse(modified_sasuri_obj)
+                        print(sasuri_obj)
                 temp_logger = temp_logger + str(datetime.datetime.utcnow()) + ' start calling the snapshot rest api. '
                 # initiate http call for blob-snapshot and get http response
                 result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers, responseBodyRequired = True)
@@ -150,11 +158,17 @@ class GuestSnapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
-                if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
-                    self.logger.log("Not passing the TTL header via Guest path though it is enabled")
                 self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
+                if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
+                    self.logger.log("Not passing the TTL header via Guest path though it is enabled")
+                    if(self.port != ""):
+                        hostname = sasuri_obj.hostname
+                        modified_netloc = "{}:{}".format(hostname, self.port)
+                        modified_sasuri_obj = sasuri_obj._replace(netloc = modified_netloc)
+                        sasuri_obj = urlparser.urlunparse(modified_sasuri_obj)
+                        print(sasuri_obj)
                 self.logger.log("start calling the snapshot rest api")
                 # initiate http call for blob-snapshot and get http response
                 result, httpResp, errMsg, responseBody  = http_util.HttpCallGetResponse('PUT', sasuri_obj, body_content, headers = headers, responseBodyRequired = True)
@@ -333,6 +347,7 @@ class GuestSnapshotter(object):
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on):
         thaw_done = False
+        self.port = self.get_port(paras)
         if (self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 1 or self.hutil.get_intvalue_from_configfile('seqsnapshot',0) == 2 or (len(paras.blobs) <= 4)):
             snapshot_result, blob_snapshot_info_array, all_failed, exceptOccurred, is_inconsistent, thaw_done, unable_to_sleep, all_snapshots_failed =  self.snapshotall_seq(paras, freezer, thaw_done, g_fsfreeze_on)
         else:
@@ -384,3 +399,10 @@ class GuestSnapshotter(object):
         else:
             snapshot_info.isSuccessful = False
             snapshot_info.snapshotUri = None
+
+def get_port(self, paras):    
+    print(paras.createdBy)
+    if paras is not None and paras.createdBy == "crp":
+        return "8443"
+    else:
+        return ""
