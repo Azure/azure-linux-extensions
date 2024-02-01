@@ -296,7 +296,7 @@ class HandlerUtility:
             self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
             self._change_log_file()
             try:
-                if(self.get_intvalue_from_configfile("disable_logging", 0) == 0):
+                if(self.get_intvalue_from_configfile("disable_logging", 1) == 0):
                     self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
                     self.event_dir = self._context._event_dir
             except Exception as e:

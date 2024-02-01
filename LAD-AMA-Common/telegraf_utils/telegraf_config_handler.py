@@ -16,26 +16,22 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
 import sys
-if sys.version_info[0] < 3:
-    from future import standard_library
-    standard_library.install_aliases()
-    from builtins import str
-
 import json
 import os
 from telegraf_utils.telegraf_name_map import name_map
 import subprocess
 import signal
-import urllib.request, urllib.error, urllib.parse
 from shutil import copyfile, rmtree
 import time
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
 
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
 
 """
 Sample input data received by this script
@@ -724,8 +720,8 @@ def handle_config(config_data, me_url, mdsd_url, is_lad):
     data = None
     while retries <= max_retries:
 
-        req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
-        res = urllib.request.urlopen(req)
+        req = urllib.Request(imdsurl, headers={'Metadata':'true'})
+        res = urllib.urlopen(req)
         data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "compute" not in data:

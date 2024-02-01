@@ -4,8 +4,8 @@ from error_codes import *
 from errors      import error_info
 from helpers     import general_info
 
-RSYSLOG_CONF = "/etc/rsyslog.d/10-azuremonitoragent.conf"
-SYSLOG_NG_CONF = "/etc/syslog-ng/conf.d/azuremonitoragent.conf"
+RSYSLOG_CONF = "/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf"
+SYSLOG_NG_CONF = "/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf"
 
 
 

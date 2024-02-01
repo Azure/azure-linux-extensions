@@ -18,13 +18,6 @@
 
 from __future__ import print_function
 import sys
-# future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
-if sys.version_info[0] < 3:
-    from future import standard_library
-    standard_library.install_aliases()
-    from builtins import str
-
 import os
 import os.path
 import datetime
@@ -41,7 +34,6 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib.request, urllib.parse, urllib.error
 import shutil
 import crypt
 import xml.dom.minidom
@@ -57,6 +49,16 @@ import telegraf_utils.telegraf_config_handler as telhandler
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
 import metrics_ext_utils.metrics_common_utils as metrics_utils
+
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+    from urllib.parse import urlparse
+    import urllib.error as urlerror
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    from urlparse import urlparse
+    import urllib2 as urlerror
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -277,14 +279,22 @@ def compare_and_copy_bin(src, dest):
 def copy_amacoreagent_binaries():
     amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
     amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
-
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
+
+    liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
+    liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
+    compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
-
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
-    
+
+def copy_mdsd_binaries():
+    current_arch = platform.machine()
+    mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
+    mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
+    compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
+
 def install():
     """
     Ensure that this VM distro and version are supported.
@@ -333,6 +343,13 @@ def install():
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
+    # Copy mdsd with OpenSSL dynamically linked
+    if is_feature_enabled('useDynamicSSL'):
+        # Check if they have libssl.so.1.1 since AMA is built against this version
+        libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
+        if libssl1_1 == 0:
+            copy_mdsd_binaries()
+            
     # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
     if is_systemd() and platform.machine() == 'aarch64':
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
@@ -1259,9 +1276,6 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
         f.close()
         
     useSyslogTcp = False
-    syslogTcpPreviewFlagPath = PreviewFeaturesDirectory + 'useSyslogTcp'
-    if os.path.exists(syslogTcpPreviewFlagPath):
-        useSyslogTcp = True
     
     # always use syslog tcp port, unless 
     # - the distro is Red Hat based and doesn't have semanage
@@ -1275,7 +1289,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
         else:            
             check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
             if check_semanage == 0 and syslog_port != '':
-                syslogPortEnabled, _ = run_command_and_log('semanage port -l | grep "syslogd_port_t\W*tcp\W*' + syslog_port+'"',log_cmd=False)
+                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
                 if syslogPortEnabled != 0:                    
                     # allow the syslog port in SELinux
                     run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
@@ -1462,13 +1476,6 @@ def set_os_arch(operation):
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
         
-        dynamicSSLPreviewFlagPath = PreviewFeaturesDirectory + 'useDynamicSSL'
-        if os.path.exists(dynamicSSLPreviewFlagPath):
-            if BundleFileName.endswith('.rpm'):
-                BundleFileName = BundleFileName.replace('.' + current_arch, '.dynamicssl.' + current_arch)        
-            elif BundleFileName.endswith('.deb'):
-                BundleFileName = BundleFileName.replace('_' + current_arch, '.dynamicssl_' + current_arch)        
-        
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
@@ -1577,7 +1584,7 @@ def is_vm_supported_for_extension(operation):
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
-                       'mariner' : ['2'], # Mariner 2.0
+                       'mariner' : ['1', '2'], # Mariner
                        'rocky' : ['8', '9'], # Rocky
                        'alma' : ['8', '9'], # Alma
                        'opensuse' : ['15'], # openSUSE
@@ -1645,6 +1652,28 @@ def exit_if_vm_not_supported(operation):
         log_and_exit(operation, UnsupportedOperatingSystem, 'Unsupported operating system: ' \
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
+
+def is_feature_enabled(feature):
+    """
+    Checks if the feature is enabled in the current region
+    """
+    feature_support_matrix = {'useDynamicSSL' : ['eastus2euap', 'westcentralus'] }
+    
+    featurePreviewFlagPath = PreviewFeaturesDirectory + feature
+    if os.path.exists(featurePreviewFlagPath):
+        return True
+    
+    featurePreviewDisabledFlagPath = PreviewFeaturesDirectory + feature + 'Disabled'
+    if os.path.exists(featurePreviewDisabledFlagPath):
+        return False
+    
+    _, region = get_azure_environment_and_region()
+
+    if feature in feature_support_matrix.keys():
+        if region in feature_support_matrix[feature]:
+            return True
+    
+    return False
 
 
 def get_ssl_cert_info(operation):
@@ -1724,20 +1753,20 @@ def get_azure_environment_and_region():
     Retreive the Azure environment and region from Azure or Arc IMDS
     """
     imds_endpoint = get_imds_endpoint()
-    req = urllib.request.Request(imds_endpoint)
+    req = urllib.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     environment = region = None
 
     try:
-        response = json.loads(urllib.request.urlopen(req).read())
+        response = json.loads(urllib.urlopen(req).read())
 
         if ('compute' in response):
             if ('azEnvironment' in response['compute']):
                 environment = response['compute']['azEnvironment']
             if ('location' in response['compute']):
                 region = response['compute']['location'].lower()
-    except urllib.error.HTTPError as e:
+    except urlerror.HTTPError as e:
         hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
         hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
     except:

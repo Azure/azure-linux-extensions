@@ -57,6 +57,7 @@ from PluginHost import PluginHost
 from PluginHost import PluginHostResult
 import platform
 from workloadPatch import WorkloadPatch
+from signal import SIGTERM;
 
 #Main function is the only entrence to this extension handler
 
@@ -78,7 +79,7 @@ def main():
         hutil.patching = MyPatching
         configSeqNo = -1
         hutil.try_parse_context(configSeqNo)
-        disable_event_logging = hutil.get_intvalue_from_configfile("disable_logging", 0)
+        disable_event_logging = hutil.get_intvalue_from_configfile("disable_logging", 1)
         if disable_event_logging == 0 or hutil.event_dir is not None :
             eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
         else:
@@ -251,6 +252,25 @@ def can_take_crash_consistent_snapshot(para_parser):
         backup_logger.log("isManagedVm=" + str(isManagedVm) + ", canTakeCrashConsistentSnapshot=" + str(canTakeCrashConsistentSnapshot) + ", backupRetryCount=" + str(backupRetryCount) + ", numberOfDisks=" + str(numberOfDisks) + ", takeCrashConsistentSnapshot=" + str(takeCrashConsistentSnapshot), True, 'Info')
     return takeCrashConsistentSnapshot
 
+def spawn_monitor(location = "", strace_pid = 0):
+    d = location
+    if d == "":
+        d = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        d = os.path.join(d, "debughelper")
+    bd = os.path.join(d, "msft_snap_monit")
+    try:
+        args = [bd, "--wd", d]
+        if (strace_pid > 0):
+            args = [bd, "--wd", d, "--strace", "--tracepid", str(strace_pid)]
+
+        backup_logger.log("[spawn_monitor] -> command: %s" % (" ".join(args)))
+        p = subprocess.Popen(args)
+        backup_logger.log("[spawn_monitor] -> monitoring started")
+        return p
+    except Exception as e:
+        backup_logger.log("[spawn_monitor] -> subprocess Popen failed: %s" % (e));
+    return None
+
 def daemon():
     global MyPatching, backup_logger, hutil, run_result, run_status, error_msg, freezer, para_parser, snapshot_done, snapshot_info_array, g_fsfreeze_on, total_used_size, patch_class_name, orig_distro, workload_patch, configSeqNo, eventlogger
     try:
@@ -286,6 +306,9 @@ def daemon():
         thread_timeout=str(60)
         OnAppFailureDoFsFreeze = True
         OnAppSuccessDoFsFreeze = True
+        MonitorRun = False
+        MonitorEnableStrace = False
+        MonitorLocation = ""
         #Adding python version to the telemetry
         try:
             python_version_info = sys.version_info
@@ -315,13 +338,26 @@ def daemon():
                 OnAppFailureDoFsFreeze= config.get('SnapshotThread','OnAppFailureDoFsFreeze')
             if config.has_option('SnapshotThread','OnAppSuccessDoFsFreeze'):
                 OnAppSuccessDoFsFreeze= config.get('SnapshotThread','OnAppSuccessDoFsFreeze')
+            if config.has_option("Monitor", "Run"):
+                MonitorRun = config.getboolean("Monitor", "Run")
+            if config.has_option("Monitor", "Strace"):
+                MonitorEnableStrace = config.getboolean("Monitor", "Strace")
+            if config.has_option("Monitor", "Location"):
+                MonitorLocation = config.get("Monitor", "Location")
         except Exception as e:
             errMsg='cannot read config file or file not present'
             backup_logger.log(errMsg, True, 'Warning')
         backup_logger.log("final thread timeout" + thread_timeout, True)
     
-        snapshot_info_array = None
+        # Start the monitor process if enabled
+        monitor_process = None
+        if MonitorRun:
+            if MonitorEnableStrace:
+                monitor_process = spawn_monitor(location = MonitorLocation, strace_pid=os.getpid())
+            else:
+                monitor_process = spawn_monitor(location = MonitorLocation)
 
+        snapshot_info_array = None
         try:
             # we need to freeze the file system first
             backup_logger.log('starting daemon for freezing the file system', True)
@@ -566,6 +602,9 @@ def daemon():
             backup_logger.log(errMsg, True, 'Error')
             global_error_result = e
 
+        if monitor_process is not None:
+            monitor_process.terminate()
+
         """
         we do the final report here to get rid of the complex logic to handle the logging when file system be freezed issue.
         """
@@ -605,7 +644,8 @@ def daemon():
         backup_logger.log(str(e), True, 'Error')
         if(eventlogger is not None): 
             eventlogger.dispose()
-
+    if monitor_process is not None:
+        monitor_process.terminate()
     sys.exit(0)
 
 def uninstall():
@@ -638,6 +678,12 @@ def enable():
         protected_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('protectedSettings', {})
         public_settings = hutil._context._config['runtimeSettings'][0]['handlerSettings'].get('publicSettings')
         para_parser = ParameterParser(protected_settings, public_settings, backup_logger)
+
+        try:
+            if CommonVariables.enableSnapshotExtensionPolling in para_parser.wellKnownSettingFlags and para_parser.wellKnownSettingFlags[CommonVariables.enableSnapshotExtensionPolling]:
+                create_host_based_service()
+        except Exception as e:
+            backup_logger.log("error starting new host based daemon: {}".format(e), True, "Error")
 
         if(para_parser.taskId is not None and para_parser.taskId != ""):
             if(eventlogger is not None):
@@ -684,6 +730,102 @@ def start_daemon():
     #throw Broke pipe exeception when parent process exit.
     devnull = open(os.devnull, 'w')
     child = subprocess.Popen(args, stdout=devnull, stderr=devnull)
+
+def can_use_systemd():
+    try:
+        pso = subprocess.check_output(["systemctl", "is-system-running"])
+        return pso[0:7].decode("utf-8") == "running"
+    except Exception as e:
+        backup_logger.log("error running `systemctl is-system-running`: {}".format(e), True, 'Warning')
+
+    try:
+        pso = subprocess.check_output(["ps", "--no-headers", "-o", "comm", "1"])
+        return pso[0:7].decode("utf-8") == "systemd"
+    except Exception as e:
+        backup_logger.log("error running `ps --no-headers -o comm 1`: {}".format(e), True, "Warning")
+    return False
+
+def create_host_based_systemd_service():
+    ## Create the file `/etc/systemd/system/directsnapshot.service`
+    ## [Unit]
+    ##     Description=My test service
+    ##     After=multi-user.target
+    ## [Service]
+    ##     Type=simple
+    ##     Restart=always
+    ##     ExecStart=/usr/bin/python3 /home/<username>/test.py
+    ## [Install]
+    ##     WantedBy=multi-user.target
+    systemd_service_file = "/etc/systemd/system/directsnapshot.service"
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    work_dir = os.path.dirname(script_dir)
+    script_path = os.path.join(script_dir, "handle_host_daemon.py")
+    sys_script_path = os.path.join("main", "handle_host_daemon.py")
+    exec_path = ""
+    try:
+        exec_path = sys.executable
+    except Exception as e:
+        backup_logger.log("error fetching python executable path: {}".format(e), True, "Error")
+        return
+    if exec_path == "" or exec_path is None:
+        backup_logger.log("empty python executable path", True, "Error")
+        return
+    if os.path.isfile(systemd_service_file):
+        try:
+            subprocess.check_output(["systemctl", "stop", "directsnapshot.service"])
+            os.remove(systemd_service_file)
+        except Exception as e:
+            backup_logger.log("error removing existing systemd service: {}".format(e), True, "Error")
+            return
+    with open(systemd_service_file, "w", encoding="utf-8") as f:
+        f.write("[Unit]\n")
+        f.write("\tDescription=Snapshot service for Microsoft Azure Restore Points\n")
+        f.write("\tAfter=multi-user.target\n")
+        f.write("[Service]\n")
+        f.write("\tType=simple\n")
+        f.write("\tRestart=always\n")
+        f.write("\tWorkingDirectory={}\n".format(work_dir))
+        f.write("\tExecStart={} {}\n".format(exec_path, sys_script_path))
+        f.write("[Install]\n")
+        f.write("\tWantedBy=multi-user.target\n")
+
+    # Check if pid file exists
+    pidfile=os.path.join(work_dir, "directsnapshot.pid")
+    if os.path.isfile(pidfile):
+        try:
+            opid = None
+            with open(pidfile, "r", encoding="utf-8") as f:
+                opid = f.read()
+            if opid is not None and os.path.isdir(os.path.join("/proc", opid)):
+                backup_logger.log("process exists. killing", True, "Warning")
+                subprocess.check_output(["kill", "-9", opid])
+                backup_logger.log("process killed")
+        except Exception as e:
+            backup_logger.log("error checking for and killing daemon process: {}".format(e), True, "Error")
+    
+    # Daemon reload, enable and run
+    try:
+        subprocess.check_output(["systemctl", "daemon-reload"])
+        subprocess.check_output(["systemctl", "enable", "--now", "directsnapshot.service"])
+    except Exception as e:
+        backup_logger.log("error running systemd service: {}".format(e), True, "Error")
+
+def create_host_based_process():
+    script_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    subprocess.Popen(
+        ["./main/handle_host_daemon.sh"],
+        cwd = script_dir,
+        shell = True
+    )
+
+def create_host_based_service():
+    try:
+        if can_use_systemd():
+            create_host_based_systemd_service()
+        else:
+            create_host_based_process()
+    except Exception as e:
+        backup_logger.log("error creating service for host based snapshots: {}".format(e), True, "Error")
 
 if __name__ == '__main__' :
     main()
