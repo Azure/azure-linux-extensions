@@ -293,7 +293,10 @@ def copy_mdsd_binaries():
     current_arch = platform.machine()
     mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
     mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
-    compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
+
+    canUseShared, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
+    if canUseShared != 0:
+        compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
 
 def install():
     """
