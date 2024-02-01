@@ -76,7 +76,7 @@ class GuestSnapshotter(object):
         error_logger=''
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
-        if(sasuri is None
+        if(sasuri is None):
             error_logger = error_logger + str(datetime.datetime.utcnow()) + " Failed to do the snapshot because sasuri is none "
             snapshot_error.errorcode = CommonVariables.error
             snapshot_error.sasuri = sasuri
