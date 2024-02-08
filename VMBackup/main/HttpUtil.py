@@ -27,6 +27,7 @@ import shlex
 import subprocess
 import sys
 from common import CommonVariables
+from parameterparser import ParameterParser
 from subprocess import *
 from Utils.WAAgentUtil import waagent
 import Utils.HandlerUtil
@@ -127,7 +128,15 @@ class HttpUtil(object):
                 if(isHostCall):
                     connection = httplibs.HTTPConnection(sasuri_obj.hostname, timeout = 40) # making call with port 80 to make it http call
                 else:
-                    connection = httplibs.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
+                    port = None
+                    isTTlEnabled = False
+                    if CommonVariables.isSnapshotTtlEnabled in ParameterParser.wellKnownSettingFlags and ParameterParser.wellKnownSettingFlags[CommonVariables.isSnapshotTtlEnabled]:
+                       # TTL is enabled, routing to a 8443 port
+                       port = 8443
+                       connection = httplibs.HTTPSConnection(sasuri_obj.hostname, port = port, timeout = 10)
+                    else:
+                        self.logger.log("Routing to a default port")
+                        connection = httplibs.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
                 self.logger.log("Details of sas uri object  hostname: " + str(sasuri_obj.hostname) + " path: " + str(sasuri_obj.path))
                 connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)
                 resp = connection.getresponse()

@@ -126,3 +126,23 @@ class ParameterParser(object):
                 errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
                 backup_logger.log(errorMsg, True)
         backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
+    def get_port(self):  
+        metadata = self.backup_metadata
+        createdByKey = "createdby"
+        createdByValue = "CRP"
+        if(metadata != None):
+            try:
+                self.logger.log("metadata received " + str(metadata), True)
+                for data in self.backup_metadata:
+                    if CommonVariables.key in data and CommonVariables.value in data:
+                        data_key = data[CommonVariables.key].lower()
+                        if(data_key == createdByKey):
+                            data_value = data[CommonVariables.value].upper()
+                            if(data_value == createdByValue):
+                                self.logger.log("it is a managed vm and request is being routed to Xstore's native path")
+                                return "8443"
+            except Exception as e:
+                errorMsg = "Exception occurred while populating metadata, Exception: %s" % (str(e))
+                self.logger.log(errorMsg, True)
+        else:
+            return ""
