@@ -32,5 +32,6 @@ else
     ${PYTHON} --version 2>&1
 fi
 
+export NO_PROXY="169.254.169.254"
 PYTHONPATH=${PYTHONPATH} ${PYTHON} ${COMMAND} ${ARG}
 exit $?
