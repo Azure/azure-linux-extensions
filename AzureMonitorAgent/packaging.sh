@@ -43,6 +43,9 @@ cp $input_path/azuremonitoragent-$AGENT_VERSION* packages/
 # remove dynamic ssl packages
 rm -f packages/*dynamicssl*
 
+# validate HandlerManifest.json syntax
+cat HandlerManifest.json | json_pp -f json -t null
+
 mkdir -p tmp
 cp $input_path/azuremonitoragent_$AGENT_VERSION*dynamicssl_x86_64.deb tmp/
 AMA_DEB_PACKAGE_NAME=$(find tmp/ -type f -name "azuremonitoragent_*x86_64.deb" -printf "%f\\n" | head -n 1)
