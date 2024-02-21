@@ -27,9 +27,9 @@ import shlex
 import subprocess
 import sys
 from common import CommonVariables
-from parameterparser import ParameterParser
 from subprocess import *
 from Utils.WAAgentUtil import waagent
+from parameterparser import ParameterParser
 import Utils.HandlerUtil
 import sys
 
@@ -114,7 +114,7 @@ class HttpUtil(object):
             else:
                 return CommonVariables.error_http_failure
 
-    def HttpCallGetResponse(self, method, sasuri_obj, data, headers , responseBodyRequired = False, isHostCall = False):
+    def HttpCallGetResponse(self, method, sasuri_obj, data, headers, responseBodyRequired = False, isHostCall = False):
         result = CommonVariables.error_http_failure
         resp = None
         responeBody = ""
@@ -128,12 +128,10 @@ class HttpUtil(object):
                 if(isHostCall):
                     connection = httplibs.HTTPConnection(sasuri_obj.hostname, timeout = 40) # making call with port 80 to make it http call
                 else:
-                    port = None
-                    isTTlEnabled = False
-                    if CommonVariables.isSnapshotTtlEnabled in ParameterParser.wellKnownSettingFlags and ParameterParser.wellKnownSettingFlags[CommonVariables.isSnapshotTtlEnabled]:
+                    port_info = ParameterParser.port()
+                    if(port_info != None):
                        # TTL is enabled, routing to a 8443 port
-                       port = 8443
-                       connection = httplibs.HTTPSConnection(sasuri_obj.hostname, port = port, timeout = 10)
+                       connection = httplibs.HTTPSConnection(sasuri_obj.hostname, port = port_info, timeout = 10)
                     else:
                         self.logger.log("Routing to a default port")
                         connection = httplibs.HTTPSConnection(sasuri_obj.hostname, timeout = 10)

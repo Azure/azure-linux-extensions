@@ -16,12 +16,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pickle import NONE
 from common import CommonVariables
 import base64
 import json
 import sys
 
 class ParameterParser(object):
+    port = None
     def __init__(self, protected_settings, public_settings, backup_logger):
         """
         TODO: we should validate the parameter first
@@ -126,23 +128,22 @@ class ParameterParser(object):
                 errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
                 backup_logger.log(errorMsg, True)
         backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
-    def get_port(self):  
-        metadata = self.backup_metadata
+
+        
         createdByKey = "createdby"
         createdByValue = "CRP"
-        if(metadata != None):
+        if(self.backup_metadata != None):
             try:
-                self.logger.log("metadata received " + str(metadata), True)
+                backup_logger.log("metadata received " + str(self.backup_metadata), True)
                 for data in self.backup_metadata:
                     if CommonVariables.key in data and CommonVariables.value in data:
                         data_key = data[CommonVariables.key].lower()
                         if(data_key == createdByKey):
                             data_value = data[CommonVariables.value].upper()
                             if(data_value == createdByValue):
-                                self.logger.log("it is a managed vm and request is being routed to Xstore's native path")
-                                return "8443"
+                                backup_logger.log("it is a managed vm and request is being routed to Xstore's native path")
+                                ParameterParser.port = 8443
+                                break
             except Exception as e:
                 errorMsg = "Exception occurred while populating metadata, Exception: %s" % (str(e))
-                self.logger.log(errorMsg, True)
-        else:
-            return ""
+                backup_logger.log(errorMsg, True)
