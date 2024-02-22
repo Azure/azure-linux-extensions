@@ -20,7 +20,7 @@ class EventLogger:
     _lock = threading.Lock()
     
     
-    def __init__(self, event_directory, severity_level):
+    def __init__(self, event_directory, severity_level, use_async_event_logging = 0):
         global logger
         self.temporary_directory = os.path.join(event_directory, 'Temp')
         self.space_available_in_event_directory = 0
@@ -32,6 +32,7 @@ class EventLogger:
         self.event_logging_error_count = 0
         self.events_folder = event_directory
         self.event_logging_enabled = bool(self.events_folder)
+        self.use_threads = use_async_event_logging
         self.filehelper = FileHelpers()
 
         if self.event_logging_enabled:
@@ -46,7 +47,6 @@ class EventLogger:
 
             FileHelpers.clearOldJsonFilesInDirectory(self.events_folder)
             
-            #self.event_processing_signal = threading.Event() # an event object that runs continuously until signal is set
             self.current_message = ''
             self.event_queue = queue.Queue()
             			
@@ -54,23 +54,25 @@ class EventLogger:
             self.space_available_in_event_directory = max(0, space_available)
             print("Information: Space available in event directory : %sB" %(self.space_available_in_event_directory))
             
-            #self.event_processing_interval = LoggingConstants.MinEventProcesingInterval
-            #print("Information: Setting event reporting interval to %ss" %(self.event_processing_interval))
+            if( self.use_threads == 1):
+                self.event_processing_signal = threading.Event() # an event object that runs continuously until signal is set
+                self.event_processing_interval = LoggingConstants.MinEventProcesingInterval
+                print("Information: Setting event reporting interval to %ss" %(self.event_processing_interval))
             
-            #self.begin_event_queue_polling()
+                self.begin_event_queue_polling()
             self._event_processing_loop
         else:
             print("Warning: EventsFolder parameter is empty. Guest Agent does not support event logging.")
             
     @staticmethod
-    def GetInstance(backup_logger, event_directory, severity_level):
+    def GetInstance(backup_logger, event_directory, severity_level, use_async_event_logging = 0):
         global logger
         try:
             logger = backup_logger
             if EventLogger._instance is None:
                 with EventLogger._lock:
                     if EventLogger._instance is None:
-                        EventLogger._instance = EventLogger(event_directory, severity_level)
+                        EventLogger._instance = EventLogger(event_directory, severity_level, use_async_event_logging)
         except Exception as e:
             print("Exception has occurred {0}".format(str(e)))
         return EventLogger._instance
@@ -136,7 +138,7 @@ class EventLogger:
 
     def begin_event_queue_polling(self):
         global logger
-        print("Event polling is starting...")
+        print("Event logging via polling is starting...") #using threads
         try:
             self.event_processing_task = threading.Thread(target=self._event_processing_loop)
             self.event_processing_task.start()
@@ -145,11 +147,17 @@ class EventLogger:
 
     def _event_processing_loop(self):
         global logger
-        #while not self.event_processing_signal.wait(self.event_processing_interval):
-        try:
-            self._process_events()
-        except Exception as ex:
-            print("Warning: Event processing has failed. Exception: {0}" .format(str(ex)))
+        if(self.use_threads == 1):
+            while not self.event_processing_signal.wait(self.event_processing_interval):
+                try:
+                    self._process_events()
+                except Exception as ex:
+                    print("Warning: Event processing has failed. Exception: {0}" .format(str(ex)))
+        else:
+            try:
+                self._process_events()
+            except Exception as ex:
+                print("Warning: Event processing has failed. Exception: {0}" .format(str(ex)))
         print("Information: Exiting function polling...")
 
     def _process_events(self):
@@ -265,9 +273,10 @@ class EventLogger:
         try:
             if not self.disposed:
                 if disposing and self.event_logging_enabled:
-                    # self.event_processing_signal.set()
-                    # self.event_processing_task.join()
-                    # self.event_processing_signal.clear()
+                    if self.use_threads == 1:
+                        self.event_processing_signal.set()
+                        self.event_processing_task.join()
+                        self.event_processing_signal.clear()
                     if (self.current_message != ''):
                         self.event_queue.put(Event("Info", self.current_message, LoggingConstants.DefaultEventTaskName, self.operation_id, self.extension_version).convertToDictionary())
                     if not self.event_queue.empty():
