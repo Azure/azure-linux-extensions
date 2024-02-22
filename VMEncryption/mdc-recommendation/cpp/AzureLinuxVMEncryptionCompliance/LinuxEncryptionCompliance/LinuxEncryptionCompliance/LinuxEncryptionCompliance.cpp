@@ -8,13 +8,11 @@
 #include <fstream>
 #include <iostream>
 
-// boost
-#include <boost/filesystem.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+#include <libgen.h>         // dirname
+#include <unistd.h>         // readlink
+#include <linux/limits.h>   // PATH_MAX
 
-namespace pt = boost::property_tree;
+#include "nlohmann/json.hpp"
 
 #define DSC_PATH_SEPARATOR "/"
 #define SHIM_CALLER_NAME "extension_shim.sh"
@@ -124,6 +122,28 @@ void MI_CALL LinuxEncryptionCompliance_DeleteInstance(
     MI_Context_PostResult(context, MI_RESULT_NOT_SUPPORTED);
 }
 
+std::string join_path(const std::string& p1, const std::string& p2)
+{
+    char sep = '/';
+    std::string tmp = p1;
+
+#ifdef _WIN32
+    sep = '\\';
+#endif
+
+    if (p1[p1.length() - 1] != sep) {
+        tmp += sep;
+        return tmp + p2;
+    } else {
+        return p1 + p2;
+    }
+}
+
+std::string parent_path(std::string path)
+{
+    return path.substr(0, path.find_last_of("/\\"));
+}
+
 void *safe_malloc(size_t size)
 {
     void *return_pointer = malloc(size);
@@ -144,16 +164,23 @@ std::string get_dsc_folder_path(MI_Context *context)
         MI_Value value;
         result = MI_Context_GetCustomOption(context, MI_T("GuestConfigurationPath"), &type, &value);
         if(result == MI_RESULT_OK) {
-            std::string dsc_folder_path = value.string;            
+            std::string dsc_folder_path = value.string;
             return dsc_folder_path;
         }
     }
 
     // Compute dsc folder path from current process path.
-    boost::filesystem::path p = boost::filesystem::read_symlink("/proc/self/exe");
-    std::string exe_path(p.string());
-    std::string::size_type last_path_separator = exe_path.find_last_of(DSC_PATH_SEPARATOR); // if nothing found, returns the last character
-    std::string current_exe_path(exe_path.substr(0, last_path_separator));    
+    char result[PATH_MAX];
+    std::string current_exe_path;
+    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+    if (count != -1) {
+        current_exe_path = dirname(result);
+    }
+    else
+    {
+        throw std::runtime_error("Failed to find GuestConfigurationPath.");
+    }
+    
     return current_exe_path;
 }
 
@@ -167,17 +194,18 @@ std::string config_folder_path(MI_Context *context)
         MI_Value value;
         result = MI_Context_GetCustomOption(context, MI_T("AssignmentPath"), &type, &value);
         if(result == MI_RESULT_OK) {
-            boost::filesystem::path dsc_folder_path = value.string;
-            std::string dsc_folder_path_str = dsc_folder_path.string();            
-            return dsc_folder_path.parent_path().parent_path().string();
+            std::string dsc_folder_path = value.string;
+            dsc_folder_path = parent_path(dsc_folder_path);
+            dsc_folder_path = parent_path(dsc_folder_path);
+            return dsc_folder_path;
         }
     }
 
     // Compute dsc folder path from current process path.
-    boost::filesystem::path dsc_folder_path = get_dsc_folder_path(context);
-    boost::filesystem::path config_folder_path = dsc_folder_path.parent_path()/"Configuration";
-    std::string config_folder_path_str = config_folder_path.string();
-    return config_folder_path.string();
+    std::string dsc_folder_path = get_dsc_folder_path(context);
+    dsc_folder_path = parent_path(dsc_folder_path);
+    std::string config_folder_path = join_path(dsc_folder_path, "Configuration");
+    return config_folder_path;
 }
 
 // Retrieves the path to the python helper scripts folder for encryption detection.
@@ -190,20 +218,19 @@ std::string get_helper_scripts_folder_path(MI_Context *context, std::string poli
         MI_Value value;
         result = MI_Context_GetCustomOption(context, MI_T("AssignmentPath"), &type, &value);
         if(result == MI_RESULT_OK) {
-            boost::filesystem::path policy_config_folder_path = value.string;
-            boost::filesystem::path policy_modules_folder_path = policy_config_folder_path / "Modules";
-            boost::filesystem::path helper_scripts_folder_path = policy_modules_folder_path / "helper";
-            std::string policy_config_folder_path_str = policy_config_folder_path.string();
-            MI_Context_WriteVerbose(context, ("policy_config_folder_path: " + policy_config_folder_path_str).c_str());
-            return helper_scripts_folder_path.string();
+            std::string policy_config_folder_path = value.string;
+            std::string policy_modules_folder_path = join_path(policy_config_folder_path, "Modules");
+            std::string helper_scripts_folder_path = join_path(policy_modules_folder_path, "helper");
+            MI_Context_WriteVerbose(context, ("policy_config_folder_path: " + policy_config_folder_path).c_str());
+            return helper_scripts_folder_path;
         }
     }
 
     std::string gcagent_config_folder_path = config_folder_path(context);
     MI_Context_WriteVerbose(context, ("gcagent-config-folder-path: " + gcagent_config_folder_path).c_str());
-    std::string policy_config_folder_path = gcagent_config_folder_path + DSC_PATH_SEPARATOR + std::string(policy_name);
-    std::string policy_modules_folder_path = policy_config_folder_path + DSC_PATH_SEPARATOR + "Modules";
-    std::string helper_scripts_folder_path = policy_modules_folder_path + DSC_PATH_SEPARATOR + "helper";
+    std::string policy_config_folder_path = join_path(gcagent_config_folder_path, policy_name);
+    std::string policy_modules_folder_path = join_path(policy_config_folder_path, "Modules");
+    std::string helper_scripts_folder_path = join_path(policy_modules_folder_path, "helper");
     return helper_scripts_folder_path;
 }
 
@@ -318,20 +345,20 @@ void process_json_output(MI_Context *context, std::string policy_name, bool &com
     try
     {
         std::string helper_scripts_folder_path = get_helper_scripts_folder_path(context, policy_name);
-        std::string json_output_file_path = helper_scripts_folder_path + DSC_PATH_SEPARATOR + JSON_OUTPUT_FILE_NAME;
+        std::string json_output_file_path = join_path(helper_scripts_folder_path, JSON_OUTPUT_FILE_NAME);
 
         std::cout << "Opening json file with parse " << std::cout<<json_output_file_path<< std::endl;
 
-        pt::ptree root;
-        pt::read_json(json_output_file_path, root);;
+        std::ifstream ifs(json_output_file_path);
+        nlohmann::json root = nlohmann::json::parse(ifs);
         MI_Context_WriteVerbose(context, "Parsing JSON output file for compliance result..");
-        compliance_status = root.get<bool>("result.isCompliant");
+        compliance_status = root["result"]["isCompliant"];
         MI_Context_WriteVerbose(context, "Fetched result from JSON file.");
 
         MI_Context_WriteVerbose(context, "Parsing JSON output file for reasons..");
-        for (pt::ptree::value_type &reason_val : root.get_child("reasons"))
+        for (auto &reason : root["reasons"])
         {
-            reason_phrases.push_back(reason_val.second.data());
+            reason_phrases.push_back(reason);
         }
         MI_Context_WriteVerbose(context, "Fetched reasons from JSON file.");
     }
