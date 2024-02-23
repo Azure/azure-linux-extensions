@@ -58,7 +58,6 @@ class EventLogger:
                 self.event_processing_signal = threading.Event() # an event object that runs continuously until signal is set
                 self.event_processing_interval = LoggingConstants.MinEventProcesingInterval
                 print("Information: Setting event reporting interval to %ss" %(self.event_processing_interval))
-            
                 self.begin_event_queue_polling()
             self._event_processing_loop
         else:
