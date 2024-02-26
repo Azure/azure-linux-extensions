@@ -400,12 +400,23 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         agentconf += "  \"VMInstanceId\"= \"" + virtual_machine_name + "\"\n"    
     if has_me_output or is_lad:
         agentconf += "\n# Configuration for sending metrics to MetricsExtension\n"
-        agentconf += "[[outputs.socket_writer]]\n"
+
+        # for AMA we use Sockets to write to ME but for LAD we continue using UDP
+        # because we support a lot more counters in AMA path and ME is not able to handle it with UDP
+        if is_lad:
+            agentconf += "[[outputs.influxdb]]\n"
+        else:
+            agentconf += "[[outputs.socket_writer]]\n"
         agentconf += "  namedrop = [" + storage_namepass_str[:-2] + "]\n"
         if is_lad:
             agentconf += "  fielddrop = [" + excess_diskio_field_drop_list_str[:-2] + "]\n"
-        agentconf += "  data_format = \"influx\"\n"
-        agentconf += "  address = \"" + str(me_url) + "\"\n\n"
+        
+        if is_lad:
+            agentconf += "  urls = [\"" + str(me_url) + "\"]\n\n"
+            agentconf += "  udp_payload = \"2048B\"\n\n"
+        else:
+            agentconf += "  data_format = \"influx\"\n"
+            agentconf += "  address = \"" + str(me_url) + "\"\n\n"
     if has_mdsd_output:
         agentconf += "\n# Configuration for sending metrics to MDSD\n"
         agentconf += "[[outputs.socket_writer]]\n"
