@@ -532,8 +532,11 @@ def enable():
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-        start_amacoreagent()
-        restart_launcher()
+        if platform.machine() != 'aarch64':
+            # enable processes for Custom Logs
+            ensure["azuremonitor-agentlauncher"] = True
+            ensure["azuremonitor-coreagent"] = True
+            
         # start the metrics and syslog watcher only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
@@ -815,23 +818,12 @@ def update():
 
     return 0, ""
 
-def start_amacoreagent():
-    if platform.machine() == 'aarch64':
-        return
-    # start Core Agent
-    hutil_log_info('Handler initiating Core Agent')
-    if is_systemd():
-        exit_code, output = run_command_and_log('systemctl start azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
-
 def restart_launcher():
     if platform.machine() == 'aarch64':
         return
     # start agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
-        # in case AL is not cleaning up properly
-        check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
 def set_proxy(address, username, password):
