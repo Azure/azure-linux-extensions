@@ -32,7 +32,7 @@ class EventLogger:
         self.event_logging_error_count = 0
         self.events_folder = event_directory
         self.event_logging_enabled = bool(self.events_folder)
-        self.use_threads = use_async_event_logging
+        self.async_event_logging = use_async_event_logging
         self.filehelper = FileHelpers()
 
         if self.event_logging_enabled:
@@ -54,7 +54,7 @@ class EventLogger:
             self.space_available_in_event_directory = max(0, space_available)
             print("Information: Space available in event directory : %sB" %(self.space_available_in_event_directory))
             
-            if( self.use_threads == 1):
+            if( self.async_event_logging == 1):
                 self.event_processing_signal = threading.Event() # an event object that runs continuously until signal is set
                 self.event_processing_interval = LoggingConstants.MinEventProcesingInterval
                 print("Information: Setting event reporting interval to %ss" %(self.event_processing_interval))
@@ -146,7 +146,7 @@ class EventLogger:
 
     def _event_processing_loop(self):
         global logger
-        if(self.use_threads == 1):
+        if(self.async_event_logging == 1):
             while not self.event_processing_signal.wait(self.event_processing_interval):
                 try:
                     self._process_events()
@@ -272,7 +272,7 @@ class EventLogger:
         try:
             if not self.disposed:
                 if disposing and self.event_logging_enabled:
-                    if self.use_threads == 1:
+                    if self.async_event_logging == 1:
                         self.event_processing_signal.set()
                         self.event_processing_task.join()
                         self.event_processing_signal.clear()
