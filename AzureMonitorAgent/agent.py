@@ -396,7 +396,7 @@ def uninstall():
     if PackageManager == "dpkg":
         AMAUninstallCommand = "dpkg -P azuremonitoragent"
     elif PackageManager == "rpm":
-        AMAUninstallCommand = "rpm -e azuremonitoragent"
+        AMAUninstallCommand = "rpm -e azuremonitoragent --allmatches"
     else:
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
