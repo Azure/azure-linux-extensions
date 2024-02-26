@@ -1107,7 +1107,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data,
-                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port,
+                                "unix:///run/azuremonitoragent/mdm_influxdb.socket",
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
