@@ -30,8 +30,7 @@ cp ../Common/WALinuxAgent-2.0.16/waagent .
 
 cp -r  ../LAD-AMA-Common/metrics_ext_utils .
 cp -r  ../LAD-AMA-Common/telegraf_utils .
-cp -r  ../Diagnostic/services .
-cp -f ../AzureMonitorAgent/services/metrics-extension.service services/metrics-extension.service
+cp -f  ../Diagnostic/services/metrics-sourcer.service services/metrics-sourcer.service
 
 # cleanup packages, ext
 rm -rf packages MetricsExtensionBin amaCoreAgentBin agentLauncherBin mdsdBin tmp
