@@ -542,7 +542,8 @@ def enable():
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
         # In GCS scenarios, ensure that AMACoreAgent is running
-        ensure["azuremonitor-coreagent"] = True
+        if platform.machine() != 'aarch64':
+            ensure["azuremonitor-coreagent"] = True
 
     hutil_log_info('Handler initiating onboarding.')
 
