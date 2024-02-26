@@ -79,9 +79,10 @@ def main():
         hutil.patching = MyPatching
         configSeqNo = -1
         hutil.try_parse_context(configSeqNo)
-        disable_event_logging = hutil.get_intvalue_from_configfile("disable_logging", 1)
+        disable_event_logging = hutil.get_intvalue_from_configfile("disable_logging", 0)
+        use_async_event_logging = hutil.get_intvalue_from_configfile("async_event_logging ", 0)
         if disable_event_logging == 0 or hutil.event_dir is not None :
-            eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level)
+            eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level, use_async_event_logging)
         else:
             eventlogger = None
         hutil.set_event_logger(eventlogger)
