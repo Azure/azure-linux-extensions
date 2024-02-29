@@ -272,6 +272,75 @@ def get_protected_settings():
     else:
         return protected_settings_str
 
+def create_temp_file(file_content):
+    '''This function is creating a temp file of file_content. returning a file name.'''
+    temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
+    if isinstance(file_content, bytes):
+        temp_keyfile.write(file_content)
+    else:
+        temp_keyfile.write(file_content.encode("utf-8"))
+    temp_keyfile.close()
+    return temp_keyfile.name
+
+def add_new_passphrase_luks2_key_slot(disk_util,\
+                        existing_passphrase,\
+                        new_passphrase,\
+                        device_path,\
+                        luks_header_path):
+    '''This function is used to add a new passphrase in luks key slot.'''
+    logger.log("add_new_passphrase_luks2_key_slot: start!")
+    ret = False
+    try:
+        before_key_slots = disk_util.luks_dump_keyslots(device_path, luks_header_path)
+        logger.log("Before key addition, key slots for {0}: {1}".format(device_path, before_key_slots))
+        logger.log("Adding new key for {0}".format(device_path))
+        existing_passphrase_file_name = create_temp_file(existing_passphrase)
+        new_passphrase_file_name = create_temp_file(new_passphrase)
+        luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file_name,
+                                            dev_path=device_path,
+                                            mapper_name=None,
+                                            header_file=luks_header_path,
+                                            new_key_path=new_passphrase_file_name)
+        logger.log("luks add result is {0}".format(luks_add_result))
+        after_key_slots = disk_util.luks_dump_keyslots(device_path, luks_header_path)
+        logger.log("After key addition, key slots for {0}: {1}".format(device_path, after_key_slots))
+        new_key_slot = list([x[0] != x[1] for x in zip(before_key_slots, after_key_slots)]).index(True)
+        logger.log("New key was added in key slot {0}".format(new_key_slot))
+        os.unlink(existing_passphrase_file_name)
+        os.unlink(new_passphrase_file_name)
+        ret = True
+    except Exception as e:
+        msg="add_new_passphrase_luks2_key_slot failed with error {0}, stack trace: {1}".format(e, traceback.format_exc())
+        logger.log(msg=msg,level=CommonVariables.WarningLevel)
+    logger.log("add_new_passphrase_luks2_key_slot: end!")
+    return ret
+
+def remove_passphrase_luks2_key_slot(disk_util,\
+                        passphrase,\
+                        device_path,\
+                        luks_header_path):
+    '''This function is used for removing a passphrase from luks key slot.'''
+    logger.log("remove_passphrase_luks2_key_slot: start!")
+    ret = False
+    try:
+        before_key_slots = disk_util.luks_dump_keyslots(device_path, luks_header_path)
+        logger.log("Before key removal, key slots for {0}: {1}".format(device_path, before_key_slots))
+        logger.log("Removing new key for {0}".format(device_path))
+        passphrase_file_name = create_temp_file(passphrase)
+        luks_remove_result = disk_util.luks_remove_key(passphrase_file=passphrase_file_name,
+                                                    dev_path=device_path,
+                                                    header_file=luks_header_path)
+        logger.log("luks remove result is {0}".format(luks_remove_result))
+        after_key_slots = disk_util.luks_dump_keyslots(device_path, luks_header_path)
+        logger.log("After key removal, key slots for {0}: {1}".format(device_path, after_key_slots))
+        os.unlink(passphrase_file_name)
+        ret = True
+    except Exception as e:
+        msg="remove_passphrase_luks2_key_slot failed with error {0}, stack trace: {1}".format(e, traceback.format_exc())
+        logger.log(msg=msg,level=CommonVariables.WarningLevel)
+    logger.log("remove_passphrase_luks2_key_slot: end!")
+    return ret
+
 def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
     '''This function is used for CMK passphrase wrapping with new KEK URL and update
     metadata in LUKS2 header.'''
@@ -295,7 +364,11 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
         encryption_config = EncryptionConfig(encryption_environment, logger)
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_setting)
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
+        bek_util = BekUtil(disk_util, logger,encryption_environment)
         device_items = disk_util.get_device_items(None)
+        if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
+            extension_parameter.passphrase = bek_util.generate_passphrase()
+
         for device_item in device_items:
             device_item_path = disk_util.get_device_path(device_item.name)
             if not disk_util.is_luks_device(device_item_path,None):
@@ -324,20 +397,36 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
             #remove primary token from Tokens field of LUKS2 header.
             disk_util.remove_token(device_name=device_item.name,token_id=ade_primary_token_id)
             logger.log("Updating wrapped passphrase to LUKS2 header with current public setting. device name {0}".format(device_item.name))
+            #add new slot with new passphrase.
+            is_added = add_new_passphrase_luks2_key_slot(disk_util=disk_util,
+                                existing_passphrase=passphrase,
+                                new_passphrase=extension_parameter.passphrase,
+                                device_path= device_item_path,
+                                luks_header_path=None)
+            if not is_added:
+                logger.log(level=CommonVariables.WarningLevel,
+                           msg="new passphrase is not added to LUKS2 slot. Skip operation for device: {0}".format(device_item.name))
+                continue
             #protect passphrase before updating to LUKS2 is done in import_token
-            temp_keyfile = tempfile.NamedTemporaryFile(delete=False)
-            temp_keyfile.write(passphrase.encode("utf-8"))
-            temp_keyfile.close()
+            new_passphrase_file = create_temp_file(extension_parameter.passphrase)
             #save passphrase to LUKS2 header with PassphraseNameValueProtected
             ret = disk_util.import_token(device_path=device_item_path,
-                                         passphrase_file=temp_keyfile.name,
+                                         passphrase_file=new_passphrase_file,
                                          public_settings=public_setting,
                                          passphrase_name_value=CommonVariables.PassphraseNameValueProtected)
             if not ret:
                 logger.log(level=CommonVariables.WarningLevel,
                            msg="Update passphrase with current public setting to LUKS2 header is not successful. device path {0}".format(device_item_path))
                 return None
-            os.unlink(temp_keyfile.name)
+            os.unlink(new_passphrase_file)
+            #removing old password form key slot.
+            is_removed = remove_passphrase_luks2_key_slot(disk_util=disk_util,
+                                                          passphrase=passphrase,
+                                                          device_path=device_item_path,
+                                                          luks_header_path=None)
+            if not is_removed:
+                logger.log(level=CommonVariables.WarningLevel,
+                           msg="old passphrase is not removed from LUKS2 slot. Skip operation for device: {0}".format(device_item.name))
             #removing backup token as KEK rotation is successful here.
             disk_util.remove_token(device_name=device_item.name,
                                    token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
