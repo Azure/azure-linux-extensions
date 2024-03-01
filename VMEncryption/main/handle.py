@@ -430,6 +430,15 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
             #removing backup token as KEK rotation is successful here.
             disk_util.remove_token(device_name=device_item.name,
                                    token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
+            #update passphrase file for auto unlock
+            key_file_name = CommonVariables.encryption_key_file_name
+            scsi_lun_numbers = disk_util.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(device_item_path)])
+            if len(scsi_lun_numbers) != 0:
+                scsi_controller, lun_number = scsi_lun_numbers[0]
+                key_file_name = "{0}_{1}_{2}".format(key_file_name,str(scsi_controller),str(lun_number))
+            bek_util.store_bek_passphrase_file_name(encryption_config=encryption_config,
+                                                    passphrase=extension_parameter.passphrase,
+                                                    key_file_name=key_file_name)
         #committing the extension parameter if KEK rotation is successful.
         extension_parameter.commit()
 
