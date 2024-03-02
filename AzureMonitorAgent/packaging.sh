@@ -33,8 +33,8 @@ cp -r  ../LAD-AMA-Common/telegraf_utils .
 cp -f  ../Diagnostic/services/metrics-sourcer.service services/metrics-sourcer.service
 
 # cleanup packages, ext
-rm -rf packages MetricsExtensionBin amaCoreAgentBin agentLauncherBin mdsdBin tmp
-mkdir -p packages MetricsExtensionBin amaCoreAgentBin agentLauncherBin mdsdBin
+rm -rf packages MetricsExtensionBin mdsdBin tmp
+mkdir -p packages MetricsExtensionBin mdsdBin
 
 # copy shell bundle to packages/
 cp $input_path/azuremonitoragent_$AGENT_VERSION* packages/
@@ -63,9 +63,6 @@ cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_aarch64
 rm -rf tmp/
 
 cp $input_path/MetricsExtension* MetricsExtensionBin/
-cp $input_path/amacoreagent amaCoreAgentBin/
-cp $input_path/liblz4x64.so amaCoreAgentBin/
-cp $input_path/agentlauncher agentLauncherBin/
 
 # make the shim.sh file executable
 chmod +x shim.sh
