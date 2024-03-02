@@ -65,6 +65,7 @@ rm -rf tmp/
 cp $input_path/MetricsExtension* MetricsExtensionBin/
 cp $input_path/amacoreagent amaCoreAgentBin/
 cp $input_path/liblz4x64.so amaCoreAgentBin/
+cp $input_path/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
 cp $input_path/agentlauncher agentLauncherBin/
 
 # make the shim.sh file executable
