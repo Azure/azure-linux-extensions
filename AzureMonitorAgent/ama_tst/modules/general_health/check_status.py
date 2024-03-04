@@ -1,5 +1,6 @@
 import subprocess
 import re
+import platform
 
 from error_codes import *
 from errors      import error_info
@@ -9,9 +10,11 @@ def check_restart_status(interactive):
     """
     check if the subcomponents restart in a given time interval
     """
-    subcomponents = {'azuremonitoragent': 'azuremonitoragent', 
-                     'azuremonitor-agentlauncher': 'agentlauncher',
-                     'azuremonitor-coreagent': 'amacoreagent'}
+    subcomponents = {'azuremonitoragent': 'azuremonitoragent'}
+
+    if platform.machine() != 'aarch64':
+        subcomponents['azuremonitor-agentlauncher'] = 'agentlauncher'
+        subcomponents['azuremonitor-coreagent'] = 'amacoreagent'
     if is_metrics_configured():
         subcomponents['metrics-extension'] = 'MetricsExtension'
         subcomponents['metrics-sourcer'] = 'Telegraf'

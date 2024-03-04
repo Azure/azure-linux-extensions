@@ -357,10 +357,12 @@ def install():
         if libssl1_1 == 0:
             copy_mdsd_binaries()
             
-    # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
-    if is_systemd() and platform.machine() == 'aarch64':
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+    # Comment out the following check in AMA 1.31 as the coreagent & agentlauncher services are not installed with the aarch64 deb/rpm packages.
+    #
+    # # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
+    # if is_systemd() and platform.machine() == 'aarch64':
+    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
+    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
     
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
