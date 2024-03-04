@@ -1,6 +1,7 @@
 import os
 import json
 import subprocess
+import platform
 
 from error_codes       import *
 from errors            import error_info, is_error, print_errors
@@ -35,7 +36,12 @@ def check_workspace():
     return NO_ERROR
 
 def check_subcomponents(): 
-    services = ['azuremonitoragent', 'azuremonitor-agentlauncher', 'azuremonitor-coreagent']
+
+    services = ['azuremonitoragent']
+    if platform.machine() != 'aarch64':
+        services.append('azuremonitor-coreagent')
+        services.append('azuremonitor-agentlauncher')
+
     if is_metrics_configured():
         services.append('metrics-sourcer')
         services.append('metrics-extension')
