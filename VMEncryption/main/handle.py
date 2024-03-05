@@ -290,29 +290,42 @@ def update_encryption_settings():
                     continue
 
                 before_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
-
                 logger.log("Before key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, before_keyslots))
 
                 logger.log("Adding new key for {0}".format(crypt_item.dev_path))
-
                 luks_add_result = disk_util.luks_add_key(passphrase_file=existing_passphrase_file,
                                                          dev_path=crypt_item.dev_path,
                                                          mapper_name=crypt_item.mapper_name,
                                                          header_file=crypt_item.luks_header_path,
                                                          new_key_path=temp_keyfile.name)
 
-                logger.log("luks add result is {0}".format(luks_add_result))
+                # if unable to add key, stop updating encryption settings and return QOS error code
+                if luks_add_result is None or luks_add_result!=0: 
+                    message = "cryptsetup luksAddKeyresult is {0}".format(luks_add_result)
+                    logger.log(msg=message, level=CommonVariables.ErrorLevel)
+                    hutil.do_exit(exit_code=CommonVariables.luks_add_key_error,
+                            operation='UpdateEncryptionSettings',
+                            status=CommonVariables.extension_error_status,
+                            code=str(CommonVariables.luks_add_key_error),
+                            message=message)
 
                 after_keyslots = disk_util.luks_dump_keyslots(crypt_item.dev_path, crypt_item.luks_header_path)
-
                 logger.log("After key addition, keyslots for {0}: {1}".format(crypt_item.dev_path, after_keyslots))
 
-                new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
-
-                logger.log("New key was added in keyslot {0}".format(new_keyslot))
+                # if unable to find new keyslot, stop updating encryption settings and return QOS error code
+                try:
+                    new_keyslot = list(map(lambda x: x[0] != x[1], zip(before_keyslots, after_keyslots))).index(True)
+                    logger.log("New key was added in keyslot {0}".format(new_keyslot))
+                except Exception as e:
+                    message = "Unable to find new keyslot:  {0}, stack trace: {1}".format(e, traceback.format_exc())
+                    logger.log(msg=message, level=CommonVariables.ErrorLevel)
+                    hutil.do_exit(exit_code=CommonVariables.luks_add_key_error,
+                                operation='UpdateEncryptionSettings',
+                                status=CommonVariables.extension_error_status,
+                                code=str(CommonVariables.luks_add_key_error),
+                                message=message)                
 
                 # crypt_item.current_luks_slot = new_keyslot
-
                 # disk_util.update_crypt_item(crypt_item)
 
             logger.log("New key successfully added to all encrypted devices")
