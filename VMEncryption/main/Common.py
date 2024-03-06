@@ -121,6 +121,7 @@ class CommonVariables:
     cloud_symlinks_dir = '/dev/disk/cloud'
     disk_by_id_root = '/dev/disk/by-id'
     disk_by_uuid_root = '/dev/disk/by-uuid'
+    disk_by_partuuid_root = '/dev/disk/by-partuuid'
     nvme_device_identifier = '/dev/nvme'
     nvme_device_name_identifier = 'nvme'
 

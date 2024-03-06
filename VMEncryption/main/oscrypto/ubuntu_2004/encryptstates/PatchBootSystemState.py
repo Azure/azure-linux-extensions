@@ -149,11 +149,16 @@ class PatchBootSystemState(OSEncryptionState):
         self.command_executor.Execute('grub-install --recheck --force {0}'.format(self.rootfs_disk), True)
 
     def _get_root_partuuid(self):
-        proc_comm = ProcessCommunicator()
-        self.command_executor.Execute(command_to_execute="blkid -t LABEL=cloudimg-rootfs -o value -s PARTUUID",
-                                      raise_exception_on_failure=True,
-                                      communicator=proc_comm)
-        return proc_comm.stdout.strip()
+        if not os.path.exists(CommonVariables.disk_by_partuuid_root):
+            self.context.logger.log(CommonVariables.disk_by_partuuid_root + " does not exist.")
+            return None
+        partuuids = os.listdir(CommonVariables.disk_by_partuuid_root)
+        for partuuid in partuuids:
+            if os.path.realpath(os.path.join(CommonVariables.disk_by_partuuid_root, partuuid)) == os.path.realpath(self.rootfs_block_device):
+                self.context.logger.log("Root PARTUUID found " + partuuid)
+                return partuuid
+        self.context.logger.log("Cannot determine root PARTUUID.")
+        return None
 
     def _copy_ade_scripts(self):
         # Copy Ubuntu 20.04 specific hook and boot scripts for ADE into position
