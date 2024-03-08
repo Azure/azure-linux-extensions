@@ -251,6 +251,8 @@ def _set_user_account_pub_key(protect_settings, hutil):
     cert_txt = protect_settings.get('ssh_key')
     expiration = protect_settings.get('expiration')
     remove_prior_keys = protect_settings.get('remove_prior_keys')
+    enable_passwordless_access = protect_settings.get('enable_passwordless_access', False)
+
     no_convert = False
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
         raise Exception("No password or ssh_key is specified.")
@@ -262,7 +264,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     # Reset user account and password, password could be empty
     sudoers = _get_other_sudoers(user_name)
     error_string = MyDistro.create_account(
-        user_name, user_pass, expiration, None)
+        user_name, user_pass, expiration, None, enable_passwordless_access)
     _save_other_sudoers(sudoers)
 
     if error_string is not None:
