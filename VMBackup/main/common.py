@@ -45,6 +45,7 @@ class CommonVariables:
     isSnapshotTtlEnabled = 'isSnapshotTtlEnabled'
     useMccfForLad = 'useMccfForLad'
     useMccfToFetchDsasForAllDisks = 'useMccfToFetchDsasForAllDisks'
+    enableSnapshotExtensionPolling = "EnableSnapshotExtensionPolling"
     key = 'Key'
     value = 'Value'
     snapshotTtlHeader = 'x-ms-snapshot-ttl-expiry-hours'
@@ -95,12 +96,14 @@ class CommonVariables:
     error_http_failure = 15
     FailedHandlerGuestAgentCertificateNotFound = 16
     #error_upload_status_blob = 16
+
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotRateExceeded = 173
     FailedFsFreezeFailed = 121
     FailedFsFreezeTimeout = 122
     FailedUnableToOpenMount = 123
+    FailedSafeFreezeBinaryNotFound = 124
 
     """
     Pre-Post Plugin error code definitions
