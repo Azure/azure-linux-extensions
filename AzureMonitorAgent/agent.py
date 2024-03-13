@@ -324,6 +324,15 @@ def install():
             if insserv_exit_code != 0:
                 return insserv_exit_code, insserv_output
 
+    # Check if Debian 12 VMs have rsyslog package (required for AMA 1.31+)
+    if (vm_dist.startswith('debian')) and vm_ver.startswith('12'):
+        check_rsyslog, _ = run_command_and_log("dpkg -l | grep rsyslog")
+        if check_rsyslog != 0:
+            hutil_log_info("'rsyslog' package missing from Debian 12 machine, installing to allow AMA to run.")
+            rsyslog_exit_code, rsyslog_output = run_command_and_log("apt update && apt install -y rsyslog")
+            if rsyslog_exit_code != 0:
+                return rsyslog_exit_code, rsyslog_output
+
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
@@ -1582,7 +1591,7 @@ def is_vm_supported_for_extension(operation):
                        'red hat' : ['7', '8', '9'], # Oracle, RHEL
                        'oracle' : ['7', '8', '9'], # Oracle
                        'ol' : ['7', '8', '9'], # Oracle Linux
-                       'debian' : ['9', '10', '11'], # Debian
+                       'debian' : ['9', '10', '11', '12'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
