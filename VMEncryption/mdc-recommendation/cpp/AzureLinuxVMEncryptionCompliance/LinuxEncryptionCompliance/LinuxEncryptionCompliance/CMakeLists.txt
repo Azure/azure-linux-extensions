@@ -6,7 +6,6 @@ find_package(Dsc CONFIG QUIET)
 
 if (MSVC) # Windows only
     find_package(cpprestsdk REQUIRED)
-    find_package(Boost COMPONENTS program_options)
     # The BUILD_WINDOWS macro breaks the ccpprestsdk headers. The macro is set globally in
     # desiredstateconfiguration\tools\DscConfig.cmake; we undefine it for this project.
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /UBUILD_WINDOWS")
@@ -19,7 +18,6 @@ if (MSVC) # Windows only
         MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE
         MAP_IMPORTED_CONFIG_RELEASE RELEASE
     )
-    include_directories(${Boost_INCLUDE_DIRS})
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
     SET (NO_IMPORT_LIB 1 )
@@ -50,7 +48,6 @@ add_internal_library(${TARGETNAME} SHARED ${SOURCES})
 
 if (MSVC) # Windows only
     target_link_libraries(${TARGETNAME}
-        ${Boost_LIBRARIES}
         pal.lib
         mi.lib
         ntdll.lib
@@ -58,8 +55,6 @@ if (MSVC) # Windows only
         )
 else () # Linux only
     target_link_libraries(${TARGETNAME}
-        boost_system
-        boost_filesystem
         mi
     )
 endif ()
