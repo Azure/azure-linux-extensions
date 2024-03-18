@@ -17,7 +17,8 @@ supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
                     'rocky' : ['8'], # Rocky
                     'alma' : ['8'], # Alma
                     'opensuse' : ['15'], # openSUSE
-                    'amzn' : ['2'] # Amazon Linux 2
+                    'amzn' : ['2'], # Amazon Linux 2
+                    'miracle' : ['8', '9'] # MIRACLE LINUX
 }
 
 supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
