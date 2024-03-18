@@ -369,7 +369,7 @@ def stop_telemetry_process():
             for pid in f.readlines():
                 # Verify the pid actually belongs to omsagent.
                 cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
-                if os.path.exists(cmd_file):
+                if os.path.exists(cmd_file) and (os.path.getsize(cmd_file) > 0):
                     with open(cmd_file, "r") as pidf:
                         cmdline = pidf.readlines()
                         if cmdline[0].find("omsagent.py") >= 0 and cmdline[0].find("-telemetry") >= 0:
