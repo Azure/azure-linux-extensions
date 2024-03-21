@@ -21,8 +21,8 @@ import os
 import os.path
 import sys
 
-# imp was deprecated in python 3.6
-if sys.version_info >= (3, 6):
+# imp was deprecated in python 3.4
+if sys.version_info >= (3, 4):
     import importlib as imp
 else:
     import imp
