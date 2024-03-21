@@ -17,9 +17,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import imp
 import os
 import os.path
+import sys
+
+# imp was deprecated in python 3.6
+if sys.version_info >= (3, 6):
+    import importlib as imp
+else:
+    import imp
 
 #
 # The following code will search and load waagent code and expose
