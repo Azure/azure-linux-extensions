@@ -302,6 +302,22 @@ def copy_mdsd_binaries():
     if canUseShared != 0:
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
 
+# TODO: This method needs to be revisited after ME package is available
+# def install_me_package():
+#     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
+#     bundle_path = os.path.join(package_directory, BundleFileName)
+#     os.chmod(bundle_path, 100)
+#     print(PackageManager, " and ", BundleFileName)
+#     MEInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
+#     hutil_log_info('Running command "{0}"'.format(MEInstallCommand))
+
+#     # Retry, since install can fail due to concurrent package operations
+#     exit_code, output = run_command_with_retries_output(MEInstallCommand, retries = 15,
+#                                          retry_check = retry_if_dpkg_or_rpm_locked,
+#                                          final_check = final_check_if_dpkg_or_rpm_locked)
+
+#     return exit_code, output    
+
 def install():
     """
     Ensure that this VM distro and version are supported.
@@ -346,6 +362,11 @@ def install():
     if exit_code != 0:
         return exit_code, output
 
+    # TODO: intall ME .deb/.rpm package
+    # exit_code, output = install_me_package()
+    # if exit_code != 0:
+    #     return exit_code, output
+    
     # Copy the AMACoreAgent and agentlauncher binaries
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
@@ -494,6 +515,8 @@ def enable():
             azure_monitor_public_settings = azure_monitor_configuration.get("configuration")
             azure_monitor_protected_settings = protected_settings.get(AzureMonitorConfigKey) if protected_settings is not None else None
             handle_mcs_config(azure_monitor_public_settings, azure_monitor_protected_settings, default_configs)
+            # TODO: handle ME config (Managed identity, proxy)
+            # handle_me_config()
 
     # Legacy schema
     elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
@@ -504,6 +527,8 @@ def enable():
         hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
         ensure["azuremonitoragent"] = True
         handle_mcs_config(public_settings, protected_settings, default_configs)
+        # TODO: handle ME config (Managed identity, proxy)
+        # handle_me_config()
 
     else:
         hutil_log_info("Detected Geneva mode; azuremonitoragent service will be started to handle Geneva configuration")
@@ -542,6 +567,7 @@ def enable():
             # enable processes for Custom Logs
             ensure["azuremonitor-agentlauncher"] = True
             ensure["azuremonitor-coreagent"] = True
+        # ensure['metrics-extension'] = True
             
         # start the metrics and syslog watcher only in 3P mode
         start_metrics_process()
@@ -756,6 +782,23 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     if identifier_name and identifier_value:
         default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
 
+# TODO: This method needs to be revisited after ME managed Idenetity & proxy is available
+# def handle_me_config(default_configs):
+#     # setting managed identity
+#     identifier_name, identifier_value, error_msg = get_managed_identity()
+
+#     if error_msg:
+#         log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Failed to determine managed identity settings. {0}.'.format(error_msg))
+
+#     if identifier_name and identifier_value:
+#         me_managed_identity = "{0}#{1}".format(identifier_name, identifier_value)
+#         #TODO: write to ME setting file
+        
+#     # setting proxy
+#     me_proxy ="{0}{1}{2}".format(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], 
+#                             default_configs["MDSD_PROXY_PASSWORD"])
+#     #TODO: write to ME setting file
+    
 def get_control_plane_mode():
     """
     Identify which control plane is in use
@@ -920,18 +963,18 @@ def stop_metrics_process():
         else:
             hutil_log_error(tel_rm_msg)
 
-    if me_handler.is_running(is_lad=False):
-        me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
-        if me_out:
-            hutil_log_info(me_msg)
-        else:
-            hutil_log_error(me_msg)
+    # if me_handler.is_running(is_lad=False):
+    #     me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+    #     if me_out:
+    #         hutil_log_info(me_msg)
+    #     else:
+    #         hutil_log_error(me_msg)
 
-        me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
-        if me_rm_out:
-            hutil_log_info(me_rm_msg)
-        else:
-            hutil_log_error(me_rm_msg)
+    #     me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
+    #     if me_rm_out:
+    #         hutil_log_info(me_rm_msg)
+    #     else:
+    #         hutil_log_error(me_rm_msg)
 
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
@@ -1034,6 +1077,7 @@ def start_syslogconfig_process():
         hutil_log_info('start syslog watcher process '+str(args))
         subprocess.Popen(args, stdout=log, stderr=log)
 
+# TODO: remove all metrics-extension service related code
 def metrics_watcher(hutil_error, hutil_log):
     """
     Watcher thread to monitor metric configuration changes and to take action on them
@@ -1076,32 +1120,32 @@ def metrics_watcher(hutil_error, hutil_log):
                     if len(json_data) == 0:
                         last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
                         if telhandler.is_running(is_lad=False):
-                            # Stop the telegraf and ME services
+                            # Stop the telegraf service
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
                                 hutil_log(tel_msg)
                             else:
                                 hutil_error(tel_msg)
 
-                            # Delete the telegraf and ME services
+                            # Delete the telegraf service
                             tel_rm_out, tel_rm_msg = telhandler.remove_telegraf_service(is_lad=False)
                             if tel_rm_out:
                                 hutil_log(tel_rm_msg)
                             else:
                                 hutil_error(tel_rm_msg)
 
-                        if me_handler.is_running(is_lad=False):
-                            me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
-                            if me_out:
-                                hutil_log(me_msg)
-                            else:
-                                hutil_error(me_msg)
+                        # if me_handler.is_running(is_lad=False):
+                        #     me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+                        #     if me_out:
+                        #         hutil_log(me_msg)
+                        #     else:
+                        #         hutil_error(me_msg)
 
-                            me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
-                            if me_rm_out:
-                                hutil_log(me_rm_msg)
-                            else:
-                                hutil_error(me_rm_msg)
+                        #     me_rm_out, me_rm_msg = me_handler.remove_metrics_service(is_lad=False)
+                        #     if me_rm_out:
+                        #         hutil_log(me_rm_msg)
+                        #     else:
+                        #         hutil_error(me_rm_msg)
                     else:
                         crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
@@ -1117,7 +1161,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
-                            me_handler.setup_me(is_lad=False, HUtilObj=HUtilObject)
+                            # me_handler.setup_me(is_lad=False, HUtilObj=HUtilObject)
 
                             start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
                             if start_telegraf_res:
@@ -1126,11 +1170,11 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_error(log_messages)
 
 
-                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
-                            if start_metrics_out:
-                                hutil_log("Successfully started metrics-extension.")
-                            else:
-                                hutil_error(log_messages)
+                            # start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                            # if start_metrics_out:
+                            #     hutil_log("Successfully started metrics-extension.")
+                            # else:
+                            #     hutil_error(log_messages)
 
                             last_crc = crc
 
@@ -1164,7 +1208,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_error(log_messages)
 
                         telegraf_restart_retries = 0
-                        me_restart_retries = 0
+                        # me_restart_retries = 0
                         max_restart_retries = 10
 
                         # Check if telegraf is running, if not, then restart
@@ -1188,25 +1232,25 @@ def metrics_watcher(hutil_error, hutil_log):
                             telegraf_restart_retries = 0
 
                         # Check if ME is running, if not, then restart
-                        if not me_handler.is_running(is_lad=False):
-                            if me_restart_retries < max_restart_retries:
-                                me_restart_retries += 1
-                                hutil_log("MetricsExtension binary process is not running. Restarting MetricsExtension now. Retry count - {0}".format(me_restart_retries))
-                                me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
-                                if me_out:
-                                    hutil_log(me_msg)
-                                else:
-                                    hutil_error(me_msg)
-                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                        # if not me_handler.is_running(is_lad=False):
+                        #     if me_restart_retries < max_restart_retries:
+                        #         me_restart_retries += 1
+                        #         hutil_log("MetricsExtension binary process is not running. Restarting MetricsExtension now. Retry count - {0}".format(me_restart_retries))
+                        #         me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+                        #         if me_out:
+                        #             hutil_log(me_msg)
+                        #         else:
+                        #             hutil_error(me_msg)
+                        #         start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
 
-                                if start_metrics_out:
-                                    hutil_log("Successfully started metrics-extension.")
-                                else:
-                                    hutil_error(log_messages)
-                            else:
-                                hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
-                        else:
-                            me_restart_retries = 0
+                        #         if start_metrics_out:
+                        #             hutil_log("Successfully started metrics-extension.")
+                        #         else:
+                        #             hutil_error(log_messages)
+                        #     else:
+                        #         hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
+                        # else:
+                        #     me_restart_retries = 0
 
         except IOError as e:
             hutil_error('I/O error in setting up or monitoring metrics. Exception={0}'.format(e))
