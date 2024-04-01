@@ -24,7 +24,7 @@ import re
 from subprocess import Popen
 import traceback
 import glob
-import tempfile
+import io
 
 from EncryptionConfig import EncryptionConfig
 from DecryptionMarkConfig import DecryptionMarkConfig
@@ -54,13 +54,7 @@ class DiskUtil(object):
         self.command_executor = CommandExecutor(self.logger)
         self._LUN_PREFIX = "lun"
         self._SCSI_PREFIX = "scsi"
-    
-    def _get_SKR_exe_path(self):
-        '''getting cvm_secure_key_release_app path AzureSttestSRK'''
-        absFilePath=os.path.abspath(__file__)
-        currentDir = os.path.dirname(absFilePath)
-        return os.path.normpath(os.path.join(currentDir,".."))
-    
+
     def get_osmapper_path(self):
         return os.path.join(CommonVariables.dev_mapper_root, CommonVariables.osmapper_name)
 
@@ -109,7 +103,7 @@ class DiskUtil(object):
         path_var = device_header_path if device_header_path else device_path
         cmd = 'cryptsetup isLuks ' + path_var
         return (int)(self.command_executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
-      
+
     def is_device_locked(self, device_path, device_header_path):
         '''Checks if device is locked or unlocked'''
         if not self.is_luks_device(device_path=device_path, device_header_path=device_header_path):
@@ -119,15 +113,14 @@ class DiskUtil(object):
         if self.command_executor.ExecuteInBash(cmd,suppress_logging=True) == CommonVariables.process_success:
             self.logger.log("is_device_locked device path {0} is opened.".format(device_path))
             return False
-        #test command is failed for multiple mappers for same crypted device. 
+        #test command is failed for multiple mappers for same crypted device.
         #if any of mapper status is valid.
-        #luksClose to non valid mapper status 
+        #luksClose to non valid mapper status
         cmd="ls -C /dev/disk/by-id/dm-uuid-*$(cryptsetup luksUUID {0} | tr -d -)*".format(path_var)
         comm = ProcessCommunicator()
         locked = True
         if self.command_executor.ExecuteInBash(cmd,communicator=comm,suppress_logging=True) == CommonVariables.process_success:
-            import io
-            buf = io.StringIO(comm.stdout) 
+            buf = io.StringIO(comm.stdout)
             for line in buf:
                 file = os.path.basename(line.strip())
                 sp = "-".join(file.split('-')[:-5])
@@ -146,7 +139,7 @@ class DiskUtil(object):
                 self.command_executor.Execute(cmd)
             self.logger.log("is_device_locked device path {0} is locked.".format(device_path))
         return locked
-           
+
     def create_luks_header(self, mapper_name):
         luks_header_file_path = self.encryption_environment.luks_header_base_path + mapper_name
         if not os.path.exists(luks_header_file_path):
@@ -161,182 +154,6 @@ class DiskUtil(object):
             self.command_executor.ExecuteInBash(dd_command, raise_exception_on_failure=True)
         return cleartext_key_file_path
        
-    def secure_key_release_operation(self,protectorbase64,kekUrl,operation,attestationUrl=None):
-        '''This function release key and does wrap/unwrap operation on protector'''
-        self.logger.log("secure_key_release_operation {0} started.".format(operation))
-        skr_app_dir = self._get_SKR_exe_path()
-        skr_app = os.path.join(skr_app_dir,CommonVariables.secure_key_release_app)
-        if not os.path.isdir(skr_app_dir):
-            self.logger.log("secure_key_release_operation app directory {0} is not valid.".format(skr_app_dir))
-            return None
-        if not os.path.isfile(skr_app):
-            self.logger.log("secure_key_release_operation app {0} is not present.".format(skr_app))
-            return None
-        if attestationUrl:
-            cmd = "{0} -a {1} -k {2} -s {3}".format(skr_app,attestationUrl,kekUrl,protectorbase64)
-        else:
-            cmd = "{0} -k {1} -s {2}".format(skr_app,kekUrl,protectorbase64)
-        cmd = "{0} {1}".format(cmd,operation)
-        process_comm = ProcessCommunicator()
-        #needed to subpress logic for this execute command. run this command silently due to password. 
-        ret = self.command_executor.Execute(cmd,communicator=process_comm,suppress_logging=True)
-        if ret!=CommonVariables.process_success:
-            msg = ""
-            if process_comm.stderr:
-                msg = process_comm.stderr.strip()
-            elif process_comm.stdout:
-                msg = process_comm.stdout.strip()
-            else:
-                pass
-            self.logger.log("secure_key_release_operation {0} unsuccessful.".format(operation))
-            self.logger.log(msg=msg)
-            return None
-        self.logger.log("secure_key_release_operation {0} end.".format(operation))
-        return process_comm.stdout.strip()
-
-    def import_token_data(self, device_path, token_data, token_id):
-        '''Updating token_data json object to LUKS2 header's Tokens field.
-        token data is as follow for version 1.0.
-        "version": "1.0",
-        "type": "Azure_Disk_Encryption",
-        "keyslots": [],
-        "KekVaultResourceId": "<kek_res_id>",
-        "KeyEncryptionKeyURL": "<kek_url>",
-        "KeyVaultResourceId": "<kv_res_id>",
-        "KeyVaultURL": "https://<vault_name>.vault.azure.net/",
-        "AttestationURL": null,
-        "PassphraseName": "LUKSPasswordProtector",
-        "Passphrase": "M53XE09n7O9r2AdKa7FYRYe..."
-        '''
-        self.logger.log(msg="import_token_data for device: {0} started.".format(device_path))
-        if not token_data or not isinstance(token_data, dict):
-            self.logger.log(level=CommonVariables.WarningLevel, msg="import_token_data: token_data: {0} for device: {1} is not valid.".format(token_data,device_path))
-            return False
-        if not token_id:
-            self.logger.log(level= CommonVariables.WarningLevel, msg = "import_token_data: token_id: {0} for device: {1} is not valid.".format(token_id,device_path) )
-            return False
-        temp_file = tempfile.NamedTemporaryFile(delete=False,mode='w+')
-        json.dump(token_data,temp_file,indent=4)
-        temp_file.close()
-        cmd = "cryptsetup token import --json-file {0} --token-id {1} {2}".format(temp_file.name,token_id,device_path)
-        process_comm = ProcessCommunicator()
-        status = self.command_executor.Execute(cmd,communicator=process_comm)
-        self.logger.log(msg="import_token_data: device: {0} status: {1}".format(device_path,status))
-        os.unlink(temp_file.name)
-        return status==CommonVariables.process_success
-
-    def import_token(self, device_path, passphrase_file, public_settings,
-                     passphrase_name_value=CommonVariables.PassphraseNameValueProtected):
-        '''This function reads passphrase from passphrase_file, do SKR and wrap passphrase with securely 
-        released key. Then it updates metadata (required encryption settings for SKR + wrapped passphrase) 
-        to primary token id: 5 type: Azure_Disk_Encryption in Tokens field of LUKS2 header.'''
-        self.logger.log(msg="import_token for device: {0} started.".format(device_path))
-        self.logger.log(msg="import_token for passphrase file path: {0}.".format(passphrase_file))
-        if not passphrase_file or not os.path.exists(passphrase_file):
-            self.logger.log(level=CommonVariables.WarningLevel,msg="import_token for passphrase file path: {0} not exists.".format(passphrase_file))
-            return False
-        protector= ""
-        with open(passphrase_file,"rb") as protector_file:
-            #passphrase stored in keyfile is base64
-            protector = protector_file.read().decode('utf-8')
-        kek_vault_resource_id=public_settings.get(CommonVariables.KekVaultResourceIdKey)
-        key_encryption_key_url=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
-        attestation_url = public_settings.get(CommonVariables.AttestationURLKey)
-        if passphrase_name_value == CommonVariables.PassphraseNameValueProtected:
-            protector = self.secure_key_release_operation(protectorbase64=protector,
-                                                        kekUrl=key_encryption_key_url,
-                                                        operation=CommonVariables.secure_key_release_wrap,
-                                                        attestationUrl=attestation_url)
-        else:
-            self.logger.log(msg="import_token passphrase is not wrapped, value of passphrase name key: {0}".format(passphrase_name_value))
-
-        if not protector:
-            self.logger.log("import_token protector wrapping is unsuccessful for device {0}".format(device_path))
-            return False
-        data={
-            "version":CommonVariables.ADEEncryptionVersionInLuksToken_1_0,
-            "type":"Azure_Disk_Encryption",
-            "keyslots":[],
-            CommonVariables.KekVaultResourceIdKey:kek_vault_resource_id,
-            CommonVariables.KeyEncryptionKeyURLKey:key_encryption_key_url,
-            CommonVariables.KeyVaultResourceIdKey:public_settings.get(CommonVariables.KeyVaultResourceIdKey),
-            CommonVariables.KeyVaultURLKey:public_settings.get(CommonVariables.KeyVaultURLKey),
-            CommonVariables.AttestationURLKey:attestation_url,
-            CommonVariables.PassphraseNameKey:passphrase_name_value,
-            CommonVariables.PassphraseKey:protector
-        }
-        status = self.import_token_data(device_path=device_path,
-                                        token_data=data,
-                                        token_id=CommonVariables.cvm_ade_vm_encryption_token_id)
-        self.logger.log(msg="import_token: device: {0} end.".format(device_path))
-        return status
-
-    def read_token(self, device_name, token_id):
-        '''this functions reads tokens from LUKS2 header.'''
-        device_path = self.get_device_path(dev_name=device_name)
-        if not device_path or not token_id:
-            self.logger.log(level=CommonVariables.WarningLevel,
-                            msg="read_token: Inputs are not valid. device_name: {0}, token id: {1}".format(device_name,token_id))
-            return None
-        cmd = "cryptsetup token export --token-id {0} {1}".format(token_id,device_path)
-        process_comm = ProcessCommunicator()
-        status = self.command_executor.Execute(cmd, communicator=process_comm)
-        if status != 0:
-            self.logger.log(level=CommonVariables.WarningLevel,
-                            msg="read_token: token id: {0} is not found for device_name: {1} in LUKS header".format(token_id,device_name))
-            return None
-        token = process_comm.stdout
-        return json.loads(token)
-
-    def remove_token(self, device_name, token_id):
-        '''this function remove the token'''
-        device_path = self.get_device_path(dev_name=device_name)
-        if not device_path or not token_id:
-            self.logger.log(level=CommonVariables.WarningLevel,
-                            msg="remove_token: Inputs are not valid. device name: {0}, token_id: {1}".format(device_name,token_id))
-            return False
-        cmd = "cryptsetup token remove --token-id {0} {1}".format(token_id,device_path)
-        process_comm = ProcessCommunicator()
-        status = self.command_executor.Execute(cmd, communicator=process_comm)
-        if status != 0:
-            self.logger.log(level=CommonVariables.WarningLevel,
-                            msg="remove_token: token id: {0} is not found for device_name: {1} in LUKS header".format(token_id,device_name))
-            return False
-        return True
-
-    def export_token(self,device_name):
-        '''This function reads wrapped passphrase from LUKS2 Tokens for
-        token id:5, which belongs to primary token type: Azure_Disk_Encryption
-        and do SKR and returns unwrapped passphrase'''
-        self.logger.log("export_token: for device_name: {0} started.".format(device_name))
-        device_path = self.get_device_path(device_name)
-        if not device_path:
-            self.logger.log(level= CommonVariables.WarningLevel, msg="export_token Input is not valid. device name: {0}".format(device_name))
-            return None
-        protector = None
-        cvm_ade_vm_encryption_token_id = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
-        if not cvm_ade_vm_encryption_token_id:
-            self.logger.log("export_token token id {0} not found in device {1} LUKS header".format(cvm_ade_vm_encryption_token_id,device_name))
-            return None
-        disk_encryption_setting=self.read_token(device_name=device_name,token_id=cvm_ade_vm_encryption_token_id)
-        if disk_encryption_setting['version'] != CommonVariables.ADEEncryptionVersionInLuksToken_1_0:
-            self.logger.log("export_token token version {0} is not a vaild version.".format(disk_encryption_setting['version']))
-            return None
-        key_encryption_key_url=disk_encryption_setting[CommonVariables.KeyEncryptionKeyURLKey]
-        wrapped_protector = disk_encryption_setting[CommonVariables.PassphraseKey]
-        attestation_url = disk_encryption_setting[CommonVariables.AttestationURLKey]
-        if disk_encryption_setting[CommonVariables.PassphraseNameKey] != CommonVariables.PassphraseNameValueProtected:
-            self.logger.log(level=CommonVariables.WarningLevel, msg="passphrase is not Protected. No need to do SKR.")
-            return wrapped_protector if wrapped_protector else None
-        if wrapped_protector:
-            #unwrap the protector.
-            protector=self.secure_key_release_operation(attestationUrl=attestation_url,
-                                                        kekUrl=key_encryption_key_url,
-                                                        protectorbase64=wrapped_protector,
-                                                        operation=CommonVariables.secure_key_release_unwrap)
-        self.logger.log("export_token to device {0} end.".format(device_name))
-        return protector
-
     def encrypt_disk(self, dev_path, passphrase_file, mapper_name, header_file):
         return_code = self.luks_format(passphrase_file=passphrase_file, dev_path=dev_path, header_file=header_file)
         if return_code != CommonVariables.process_success:
@@ -452,7 +269,7 @@ class DiskUtil(object):
 
         return self.luks_add_key(passphrase_file, dev_path, mapper_name, header_file, cleartext_key_file_path)
 
-    def _luks_get_header_dump(self, header_or_dev_path):
+    def luks_get_header_dump(self, header_or_dev_path):
         cryptsetup_cmd = "{0} luksDump {1}".format(self.distro_patcher.cryptsetup_path, header_or_dev_path)
 
         proc_comm = ProcessCommunicator()
@@ -461,7 +278,7 @@ class DiskUtil(object):
         return proc_comm.stdout
 
     def luks_get_uuid(self, header_or_dev_path):
-        luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
+        luks_dump_out = self.luks_get_header_dump(header_or_dev_path)
 
         lines = filter(lambda l: "uuid" in l.lower(), luks_dump_out.split("\n"))
 
@@ -470,51 +287,6 @@ class DiskUtil(object):
             if len(splits) == 2 and len(splits[1]) == 36:
                 return splits[1]
         return None
-
-    def get_token_id(self, header_or_dev_path, token_name):
-        '''if LUKS2 header has token name return the id else return none.'''
-        if not header_or_dev_path or not os.path.exists(header_or_dev_path) or not token_name:
-            self.logger.log("get_token_id: invalid input, header_or_dev_path:{0} token_name:{1}".format(header_or_dev_path,token_name))
-            return None
-        luks_dump_out = self._luks_get_header_dump(header_or_dev_path)
-        tokens = self._extract_luksv2_token(luks_dump_out)
-        for token in tokens:
-            if len(token) == 2 and token[1] == token_name:
-                return token[0]
-        return None
-
-    def restore_luks2_token(self, device_name=None):
-        '''this function restores token
-        type:Azure_Disk_Encryption_BackUp, id:6 to type:Azure_Disk_Encryption id:5,
-        this function acts on 4 scenarios.
-        1. both token id: 5 and 6 present in LUKS2 Tokens field, due to reboot/interrupt during
-        KEK rotation, such case remove token id 5 has latest data so remove token id 6.
-        2. token id 5 present but 6 is not present in LUKS2 Tokens field. do nothing.
-        3. token id 5 not present but 6 present in LUKS2 Tokens field, restore token id 5 using
-        token id 6, then remove token id 6.
-        4. no token ids 5 or 6 present in LUKS2 Tokens field, do nothing.'''
-        device_path = self.get_device_path(device_name)
-        if not device_path:
-            self.logger.log(level=CommonVariables.WarningLevel,msg="restore_luks2_token invalid input. device_name = {0}".format(device_name))
-            return
-        ade_token_id_primary = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionToken)
-        ade_token_id_backup = self.get_token_id(header_or_dev_path=device_path,token_name=CommonVariables.AzureDiskEncryptionBackUpToken)
-        if not ade_token_id_backup:
-            #do nothing
-            return
-        if ade_token_id_primary:
-            #remove backup token id
-            self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
-            return
-        #ade_token_id_backup having value but ade_token_id_primary is none
-        self.logger.log("restore luks2 token for device {0} is started.".format(device_name))
-        #read from backup and update AzureDiskEncryptionToken
-        data = self.read_token(device_name=device_name,token_id=ade_token_id_backup)
-        data['type']=CommonVariables.AzureDiskEncryptionToken
-        self.import_token_data(device_path=device_path,token_data=data,token_id=CommonVariables.cvm_ade_vm_encryption_token_id)
-        #remove backup
-        self.remove_token(device_name=device_name,token_id=ade_token_id_backup)
-        self.logger.log("restore luks2 token id {0} to {1} for device {2} is successful.".format(ade_token_id_backup,CommonVariables.cvm_ade_vm_encryption_token_id,device_name))
 
     def _get_cryptsetup_version(self):
         # get version of currently installed cryptsetup
@@ -528,47 +300,6 @@ class DiskUtil(object):
         for line in lines:
             if "version:" in line.lower():
                 return line.split()[-1]
-
-    def _extract_luksv2_token(self, luks_dump_out):
-        """
-        A luks v2 luksheader looks kind of like this: (inessential stuff removed)
-
-        LUKS header information
-        Version:        2
-        Data segments:
-            0: crypt
-                offset: 0 [bytes]
-                length: 5539430400 [bytes]
-                cipher: aes-xts-plain64
-                sector: 512 [bytes]
-        Keyslots:
-            1: luks2
-                    Key:        512 bits
-            3: reencrypt (unbound)
-                    Key:        8 bits
-        Tokens:
-            6: Azure_Disk_Encryption_BackUp
-            5: Azure_Disk_Encryption
-        ...
-        """
-        if not luks_dump_out:
-            return []
-        lines = luks_dump_out.split("\n")
-        token_segment = False
-        token_lines = []
-        for line in lines:
-            parts = line.split(":")
-            if len(parts)<2:
-                continue
-            if token_segment and parts[1].strip() == '':
-                break
-            if "tokens" in parts[0].strip().lower():
-                token_segment = True
-                continue
-            if token_segment and self._isnumeric(parts[0].strip()):
-                token_lines.append([int(parts[0].strip()),parts[1].strip()])
-                continue
-        return token_lines
 
     def _extract_luksv2_keyslot_lines(self, luks_dump_out):
         """
@@ -627,7 +358,7 @@ class DiskUtil(object):
             return False
 
     def luks_dump_keyslots(self, dev_path, header_file):
-        luks_dump_out = self._luks_get_header_dump(header_file or dev_path)
+        luks_dump_out = self.luks_get_header_dump(header_file or dev_path)
 
         luks_version = self._extract_luks_version_from_dump(luks_dump_out)
 
@@ -652,7 +383,7 @@ class DiskUtil(object):
         else:
             device_header = header_file
 
-        luks_dump_out = self._luks_get_header_dump(device_header)
+        luks_dump_out = self.luks_get_header_dump(device_header)
 
         luks_version = self._extract_luks_version_from_dump(luks_dump_out)
 
@@ -1551,7 +1282,7 @@ class DiskUtil(object):
             # https://gitlab.com/cryptsetup/cryptsetup/-/wikis/FrequentlyAskedQuestions#2-setup
 
             # Dump the in place LUKS header and version
-            luksDump = self._luks_get_header_dump(device_path)
+            luksDump = self.luks_get_header_dump(device_path)
             luksVer = self._extract_luks_version_from_dump(luksDump)
 
             if luksVer and int(luksVer) == 1:

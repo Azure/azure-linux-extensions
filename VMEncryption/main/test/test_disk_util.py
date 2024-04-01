@@ -3,6 +3,7 @@ import os.path
 import json
 
 from DiskUtil import DiskUtil
+from CVMDiskUtil import CVMDiskUtil
 from EncryptionEnvironment import EncryptionEnvironment
 from Common import DeviceItem
 from Common import CommonVariables
@@ -20,6 +21,7 @@ class Test_Disk_Util(unittest.TestCase):
     def setUp(self):
         self.logger = ConsoleLogger()
         self.disk_util = DiskUtil(None, MockDistroPatcher('Ubuntu', '14.04', '4.15'), self.logger, EncryptionEnvironment(None, self.logger))
+        self.cvm_disk_util = CVMDiskUtil(disk_util=self.disk_util,logger=self.logger)
         try:
             self.assertCountEqual([1],[1])
         except AttributeError:
@@ -443,12 +445,12 @@ Digests:
         '''read passphrase from Passphrase_file, and update to LUKS2 header'''
         cmd_exc_mock.return_value = 0
         path_exit.return_value=False
-        result = self.disk_util.import_token(device_path="/dev/sdc",
+        result = self.cvm_disk_util.import_token(device_path="/dev/sdc",
                                              passphrase_file=None,
                                              public_settings=None)
         self.assertEqual(result,False)
         path_exit.return_value=False
-        result = self.disk_util.import_token(device_path="/dev/sdc",
+        result = self.cvm_disk_util.import_token(device_path="/dev/sdc",
                                              passphrase_file="/var/lib/file_path",
                                              public_settings=None)
         self.assertEqual(result,False)
@@ -459,15 +461,15 @@ Digests:
         '''read token from LUKS2 header token'''
         cmd_exc_mock.return_value = 1
         path_exists.return_value = False
-        result = self.disk_util.read_token(device_name="",token_id=None)
+        result = self.cvm_disk_util.read_token(device_name="",token_id=None)
         self.assertEqual(result,None)
         cmd_exc_mock.return_value = 1
         path_exists.return_value = True
-        result = self.disk_util.read_token(device_name="sda",token_id=None)
+        result = self.cvm_disk_util.read_token(device_name="sda",token_id=None)
         self.assertEqual(result,None)
         cmd_exc_mock.return_value = 1
         path_exists.return_value = True
-        result = self.disk_util.read_token(device_name="sda",token_id=1)
+        result = self.cvm_disk_util.read_token(device_name="sda",token_id=1)
         self.assertEqual(result,None)
 
     @mock.patch("DiskUtil.DiskUtil.get_token_id")
@@ -511,20 +513,20 @@ Digests:
         luks_dump.return_value="Tokens:\n\
             1: Azure_Disk_Encryption_BackUp\n\
             5: Azure_Disk_Encryption"
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption_BackUp")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption_BackUp")
         self.assertEqual(token_id,1)
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
         self.assertEqual(token_id,5)
         luks_dump.return_value="Tokens:\n\
             1: Azure_Disk_Encryption_BackUp"
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption_BackUp")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption_BackUp")
         self.assertEqual(token_id,1)
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
         self.assertEqual(token_id,None)
-        token_id = self.disk_util.get_token_id("","Azure_Disk_Encryption_BackUp")
+        token_id = self.cvm_disk_util.get_token_id("","Azure_Disk_Encryption_BackUp")
         self.assertEqual(token_id,None)
-        token_id = self.disk_util.get_token_id("/dev/sda","")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","")
         self.assertEqual(token_id,None)
         header_or_dev_path_exist.return_value = False
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
         self.assertEqual(token_id,None)

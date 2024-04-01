@@ -36,6 +36,7 @@ from Utils import HandlerUtil
 from Common import CommonVariables, CryptItem
 from ExtensionParameter import ExtensionParameter
 from DiskUtil import DiskUtil
+from CVMDiskUtil import CVMDiskUtil
 from CryptMountConfigUtil import CryptMountConfigUtil
 from ResourceDiskUtil import ResourceDiskUtil
 from BackupLogger import BackupLogger
@@ -342,8 +343,7 @@ def remove_passphrase_luks2_key_slot(disk_util,\
     return ret
 
 def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
-    '''This function is used for CMK passphrase wrapping with new KEK URL and update
-    metadata in LUKS2 header.'''
+    '''This function is used for updating metadata information in LUKS2 header.'''
     if extra_items_to_encrypt is None:
         extra_items_to_encrypt=[]
     hutil.do_parse_context('UpdateEncryptionSettingsLuks2Header')
@@ -364,7 +364,8 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
         encryption_config = EncryptionConfig(encryption_environment, logger)
         extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_setting)
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
-        bek_util = BekUtil(disk_util, logger,encryption_environment)
+        bek_util = BekUtil(disk_util, logger, encryption_environment)
+        cvm_disk_util = CVMDiskUtil(disk_util=disk_util, logger=logger)
         device_items = disk_util.get_device_items(None)
         if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
             extension_parameter.passphrase = bek_util.generate_passphrase()
@@ -376,26 +377,26 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
                 continue
             #restoring the token data to type Azure_Disk_Encryption
             #It is necessary to restore if we are resuming from previous attempt, otherwise its no-op.
-            disk_util.restore_luks2_token(device_name=device_item.name)
+            cvm_disk_util.restore_luks2_token(device_name=device_item.name)
             logger.log("Reading passphrase from LUKS2 header, device name: {0}".format(device_item.name))
             #copy primary token to backup token for recovery, if reboot or interrupt happened during KEK rotation.
-            ade_primary_token_id = disk_util.get_token_id(header_or_dev_path=device_item_path,token_name=CommonVariables.AzureDiskEncryptionToken)
+            ade_primary_token_id = cvm_disk_util.get_token_id(header_or_dev_path=device_item_path,token_name=CommonVariables.AzureDiskEncryptionToken)
             if not ade_primary_token_id:
                 logger.log("primary token type: Azure_Disk_Encryption not found for device {0}".format(device_item.name))
                 continue
-            data = disk_util.read_token(device_name=device_item.name,token_id=ade_primary_token_id)
+            data = cvm_disk_util.read_token(device_name=device_item.name,token_id=ade_primary_token_id)
             #writing primary token data to backup token, update token type to back up.
             data['type']=CommonVariables.AzureDiskEncryptionBackUpToken
             #update backup token data to backup token id:6.
-            disk_util.import_token_data(device_path=device_item_path,token_data=data,token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
+            cvm_disk_util.import_token_data(device_path=device_item_path,token_data=data,token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
             #get the unwrapped passphrase from LUKS2 header.
-            passphrase=disk_util.export_token(device_name=device_item.name)
+            passphrase=cvm_disk_util.export_token(device_name=device_item.name)
             if not passphrase:
                 logger.log(level=CommonVariables.WarningLevel,
                            msg="No passphrase found in LUKS2 header, device name: {0}".format(device_item.name))
                 continue
             #remove primary token from Tokens field of LUKS2 header.
-            disk_util.remove_token(device_name=device_item.name,token_id=ade_primary_token_id)
+            cvm_disk_util.remove_token(device_name=device_item.name,token_id=ade_primary_token_id)
             logger.log("Updating wrapped passphrase to LUKS2 header with current public setting. device name {0}".format(device_item.name))
             #add new slot with new passphrase.
             is_added = add_new_passphrase_luks2_key_slot(disk_util=disk_util,
@@ -410,7 +411,7 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
             #protect passphrase before updating to LUKS2 is done in import_token
             new_passphrase_file = create_temp_file(extension_parameter.passphrase)
             #save passphrase to LUKS2 header with PassphraseNameValueProtected
-            ret = disk_util.import_token(device_path=device_item_path,
+            ret = cvm_disk_util.import_token(device_path=device_item_path,
                                          passphrase_file=new_passphrase_file,
                                          public_settings=public_setting,
                                          passphrase_name_value=CommonVariables.PassphraseNameValueProtected)
@@ -428,7 +429,7 @@ def update_encryption_settings_luks2_header(extra_items_to_encrypt=None):
                 logger.log(level=CommonVariables.WarningLevel,
                            msg="old passphrase is not removed from LUKS2 slot. Skip operation for device: {0}".format(device_item.name))
             #removing backup token as KEK rotation is successful here.
-            disk_util.remove_token(device_name=device_item.name,
+            cvm_disk_util.remove_token(device_name=device_item.name,
                                    token_id=CommonVariables.cvm_ade_vm_encryption_backup_token_id)
             #update passphrase file for auto unlock
             key_file_name = CommonVariables.encryption_key_file_name
@@ -1495,7 +1496,8 @@ def enable_encryption_format(passphrase, encryption_format_items, disk_util, cry
                 logger.log(msg="update crypt item failed", level=CommonVariables.ErrorLevel)
             #update luks2 header token field 
             if security_Type == CommonVariables.ConfidentialVM:
-                disk_util.import_token(device_path=crypt_item_to_update.dev_path,
+                cvm_disk_util = CVMDiskUtil(disk_util=disk_util, logger=logger)
+                cvm_disk_util.import_token(device_path=crypt_item_to_update.dev_path,
                                        passphrase_file=passphrase,
                                        public_settings=get_public_settings())
         else:
@@ -1657,7 +1659,8 @@ def encrypt_inplace_without_separate_header_file(passphrase_file,
             else:
                 #update luks2 header token field
                 if security_Type == CommonVariables.ConfidentialVM:
-                    disk_util.import_token(device_path=ongoing_item_config.original_dev_path,
+                    cvm_disk_util = CVMDiskUtil(disk_util=disk_util, logger=logger)
+                    cvm_disk_util.import_token(device_path=ongoing_item_config.original_dev_path,
                                            passphrase_file=passphrase_file,
                                            public_settings=get_public_settings())
                 ongoing_item_config.current_slice_index = 0
