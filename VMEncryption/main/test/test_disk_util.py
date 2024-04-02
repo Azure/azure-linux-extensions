@@ -3,10 +3,12 @@ import os.path
 import json
 
 from DiskUtil import DiskUtil
+from CVMDiskUtil import CVMDiskUtil
 from EncryptionEnvironment import EncryptionEnvironment
 from Common import DeviceItem
 from Common import CommonVariables
 from CommandExecutor import CommandExecutor
+from CVMDiskUtil import CVMDiskUtil
 
 from .console_logger import ConsoleLogger
 from .test_utils import mock_dir_structure, MockDistroPatcher
@@ -20,6 +22,7 @@ class Test_Disk_Util(unittest.TestCase):
     def setUp(self):
         self.logger = ConsoleLogger()
         self.disk_util = DiskUtil(None, MockDistroPatcher('Ubuntu', '14.04', '4.15'), self.logger, EncryptionEnvironment(None, self.logger))
+        self.cvm_disk_util = CVMDiskUtil(disk_util=self.disk_util, logger=self.logger)
         try:
             self.assertCountEqual([1],[1])
         except AttributeError:
@@ -229,7 +232,7 @@ class Test_Disk_Util(unittest.TestCase):
         self.assertEqual(path_exists, 0)
         self.assertEqual(cmd_exc_mock.call_count, 1)
 
-    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil.luks_get_header_dump")
     def test_luks_dump_keyslots(self, get_luks_header_mock):
         get_luks_header_mock.return_value = """
 LUKS header information
@@ -308,7 +311,7 @@ Tokens:
         header_size = self.disk_util.get_luks_header_size()
         self.assertEqual(header_size, CommonVariables.luks_header_size_v2)
 
-    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil.luks_get_header_dump")
     def test_get_luks_header_size_luks1(self, lghd_mock):
         lghd_mock.return_value = """
 LUKS header information for /dev/sdd
@@ -341,7 +344,7 @@ Key Slot 7: DISABLED"""
         header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
         self.assertEqual(header_size, CommonVariables.luks_header_size)
 
-    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil.luks_get_header_dump")
     def test_get_luks_header_size_luks2(self, lghd_mock):
         lghd_mock.return_value = """
 LUKS header information
@@ -390,7 +393,7 @@ Digests:
         header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
         self.assertEqual(header_size, CommonVariables.luks_header_size_v2)
 
-    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil.luks_get_header_dump")
     @mock.patch("DiskUtil.DiskUtil._extract_luks_version_from_dump")
     def test_get_luks_header_size_bad_version(self, ver_mock, dump_mock):
         # log error, return None if LUKS version is outside of supported {1,2}
@@ -399,7 +402,7 @@ Digests:
         header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
         self.assertEqual(header_size, None)
 
-    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil.luks_get_header_dump")
     @mock.patch("DiskUtil.DiskUtil._extract_luks_version_from_dump")
     def test_get_luks_header_size_luks1_badoffset(self, ver_mock, dump_mock):
         # log error, return None if LUKS1 offset is not found in header dump
@@ -408,7 +411,7 @@ Digests:
         header_size = self.disk_util.get_luks_header_size("/mocked/device/path")
         self.assertEqual(header_size, None)
 
-    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil.luks_get_header_dump")
     @mock.patch("DiskUtil.DiskUtil._extract_luks_version_from_dump")
     def test_get_luks_header_size_luks2_badoffset(self, ver_mock, dump_mock):
         # log error, return None if LUKS2 offset is not found in header dump
@@ -422,19 +425,19 @@ Digests:
         '''update dict type data to luks2 header'''
         cmd_exc_mock.return_value = 0
         data = {}
-        result = self.disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
+        result = self.cvm_disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
         self.assertEqual(result,False)
         data = None
-        result = self.disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
+        result = self.cvm_disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
         self.assertEqual(result,False)
         data = [1,3]
-        result = self.disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
+        result = self.cvm_disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
         self.assertEqual(result,False)
         data = "test data"
-        result = self.disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
+        result = self.cvm_disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
         self.assertEqual(result,False)
         data = {'version':'1.0','type':'ADE'}
-        result = self.disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
+        result = self.cvm_disk_util.import_token_data(device_path="/dev/sda",token_data=data,token_id=1)
         self.assertEqual(result,True)
 
     @mock.patch("os.path.exists", return_value=True)
@@ -443,12 +446,12 @@ Digests:
         '''read passphrase from Passphrase_file, and update to LUKS2 header'''
         cmd_exc_mock.return_value = 0
         path_exit.return_value=False
-        result = self.disk_util.import_token(device_path="/dev/sdc",
+        result = self.cvm_disk_util.import_token(device_path="/dev/sdc",
                                              passphrase_file=None,
                                              public_settings=None)
         self.assertEqual(result,False)
         path_exit.return_value=False
-        result = self.disk_util.import_token(device_path="/dev/sdc",
+        result = self.cvm_disk_util.import_token(device_path="/dev/sdc",
                                              passphrase_file="/var/lib/file_path",
                                              public_settings=None)
         self.assertEqual(result,False)
@@ -459,18 +462,18 @@ Digests:
         '''read token from LUKS2 header token'''
         cmd_exc_mock.return_value = 1
         path_exists.return_value = False
-        result = self.disk_util.read_token(device_name="",token_id=None)
+        result = self.cvm_disk_util.read_token(device_name="",token_id=None)
         self.assertEqual(result,None)
         cmd_exc_mock.return_value = 1
         path_exists.return_value = True
-        result = self.disk_util.read_token(device_name="sda",token_id=None)
+        result = self.cvm_disk_util.read_token(device_name="sda",token_id=None)
         self.assertEqual(result,None)
         cmd_exc_mock.return_value = 1
         path_exists.return_value = True
-        result = self.disk_util.read_token(device_name="sda",token_id=1)
+        result = self.cvm_disk_util.read_token(device_name="sda",token_id=1)
         self.assertEqual(result,None)
 
-    @mock.patch("DiskUtil.DiskUtil.get_token_id")
+    @mock.patch("CVMDiskUtil.CVMDiskUtil.get_token_id")
     @mock.patch("os.path.exists")
     @mock.patch("CommandExecutor.CommandExecutor.Execute", return_value=0)
     def test_export_token(self,cmd_exc_mock,path_exists,ade_encryption_token):
@@ -478,25 +481,25 @@ Digests:
         ade_encryption_token.return_value = 5
         cmd_exc_mock.return_value = 1
         path_exists.return_value = False
-        protector = self.disk_util.export_token("sda")
+        protector = self.cvm_disk_util.export_token("sda")
         self.assertEqual(protector, None)
         path_exists.return_value = True
         ade_encryption_token.return_value = None
-        protector = self.disk_util.export_token("sda")
+        protector = self.cvm_disk_util.export_token("sda")
         self.assertEqual(protector, None)
 
     def test_extract_luksv2_token(self):
         '''extracting Tokens field to get token from LUKS2 header. returns list'''
         luks_dump_out = None
-        tokens = self.disk_util._extract_luksv2_token(luks_dump_out)
+        tokens = self.cvm_disk_util.extract_luks2_token(luks_dump_out)
         self.assertEqual(len(tokens), 0)
         luks_dump_out = ""
-        tokens = self.disk_util._extract_luksv2_token(luks_dump_out)
+        tokens = self.cvm_disk_util.extract_luks2_token(luks_dump_out)
         self.assertEqual(len(tokens), 0)
         luks_dump_out = "Tokens:\n\
             1: Azure_Disk_Encryption_BackUp\n\
             5: Azure_Disk_Encryption"
-        tokens = self.disk_util._extract_luksv2_token(luks_dump_out)
+        tokens = self.cvm_disk_util.extract_luks2_token(luks_dump_out)
         self.assertEqual(len(tokens), 2)
         self.assertEqual(tokens[0][0], 1)
         self.assertEqual(tokens[0][1], "Azure_Disk_Encryption_BackUp")
@@ -504,27 +507,27 @@ Digests:
         self.assertEqual(tokens[1][1], "Azure_Disk_Encryption")
 
     @mock.patch("os.path.exists")
-    @mock.patch("DiskUtil.DiskUtil._luks_get_header_dump")
+    @mock.patch("DiskUtil.DiskUtil.luks_get_header_dump")
     def test_get_token_id(self,luks_dump,header_or_dev_path_exist):
         '''getting the token id from LUKS2 header, if not present return None'''
         header_or_dev_path_exist.return_value = True
         luks_dump.return_value="Tokens:\n\
             1: Azure_Disk_Encryption_BackUp\n\
             5: Azure_Disk_Encryption"
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption_BackUp")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption_BackUp")
         self.assertEqual(token_id,1)
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
         self.assertEqual(token_id,5)
         luks_dump.return_value="Tokens:\n\
             1: Azure_Disk_Encryption_BackUp"
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption_BackUp")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption_BackUp")
         self.assertEqual(token_id,1)
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
         self.assertEqual(token_id,None)
-        token_id = self.disk_util.get_token_id("","Azure_Disk_Encryption_BackUp")
+        token_id = self.cvm_disk_util.get_token_id("","Azure_Disk_Encryption_BackUp")
         self.assertEqual(token_id,None)
-        token_id = self.disk_util.get_token_id("/dev/sda","")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","")
         self.assertEqual(token_id,None)
         header_or_dev_path_exist.return_value = False
-        token_id = self.disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
+        token_id = self.cvm_disk_util.get_token_id("/dev/sda","Azure_Disk_Encryption")
         self.assertEqual(token_id,None)

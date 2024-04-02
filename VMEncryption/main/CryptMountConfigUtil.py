@@ -25,10 +25,11 @@ import uuid
 import io
 from datetime import datetime
 import sys
+import threading
 
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from Common import CryptItem, CommonVariables
-
+from CVMDiskUtil import CVMDiskUtil
 
 class CryptMountConfigUtil(object):
     """
@@ -221,16 +222,17 @@ class CryptMountConfigUtil(object):
 
     def _device_unlock_using_luks2_header(self,device_name,device_item_path,azure_device_path,lock):
         device_item_real_path = os.path.realpath(device_item_path)
+        cmv_disk_util = CVMDiskUtil(disk_util=self.disk_util, logger=self.logger)
         if self.disk_util.is_device_locked(device_item_real_path,None):
             self.logger.log("Found an encrypted device {0} in locked state.".format(device_name))
             #read protector from device luks header.
-            protector = self.disk_util.export_token(device_name=device_name)
+            protector = cmv_disk_util.export_token(device_name=device_name)
             if not protector:
                 self.logger.log("device_unlock_using_luks2_header {0} device does not have token field containing wrapped protector.".format(device_name))
                 return
             crypt_item = CryptItem()
             crypt_item.dev_path = azure_device_path
-            #using UUID of crypted device as mappers name. 
+            #using UUID of encrypted device as mappers name.
             crypt_item.mapper_name = self.disk_util.get_device_items_property(dev_name=device_name,
                                                                             property_name='UUID')
             crypt_item.uses_cleartext_key = False
@@ -257,17 +259,17 @@ class CryptMountConfigUtil(object):
                 lock.release()
 
     def device_unlock_using_luks2_header(self):
-        """Reads vm setting properties of blcock devices that have wrapped passphrase in tokens in LUKS header."""
+        """Reads vm setting properties of block devices that have wrapped passphrase in tokens in LUKS header."""
         self.logger.log("device_unlock_using_luks2_header Start")
         device_items = self.disk_util.get_device_items(None)
         azure_name_table = self.disk_util.get_block_device_to_azure_udev_table()
-        import threading
+        cmv_disk_util = CVMDiskUtil(disk_util=self.disk_util, logger=self.logger)
         threads = []
         lock = threading.Lock()
         for device_item in device_items:
             if device_item.file_system == "crypto_LUKS":
                  #restore LUKS2 token using BackUp.
-                 self.disk_util.restore_luks2_token(device_name=device_item.name)
+                 cmv_disk_util.restore_luks2_token(device_name=device_item.name)
                  device_item_path = self.disk_util.get_device_path(device_item.name)
                  azure_item_path = azure_name_table[device_item_path] if device_item_path in azure_name_table else device_item_path
                  thread = threading.Thread(target=self._device_unlock_using_luks2_header,args=(device_item.name,device_item_path,azure_item_path,lock))
