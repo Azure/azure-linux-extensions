@@ -1,0 +1,33 @@
+#!/bin/sh
+# -*- mode: shell-script; indent-tabs-mode: nil; sh-basic-offset: 4; -*-
+# ex: ts=8 sw=4 sts=4 et filetype=sh
+#set -x
+
+PREREQS=""
+
+prereqs() { echo "$PREREQS"; }
+
+case "$1" in
+    prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+# this hook script prepares the various boot script prerequisites
+# /usr/share/initramfs-tools/scripts/init-premount/crypt-ade-boot
+
+# add /etc/fstab entries and mount point directories
+mkdir -p $DESTDIR/boot
+mkdir -p $DESTDIR/mnt/azure_bek_disk
+BOOTUUID=$(findmnt -fn -o UUID /boot)
+echo "/dev/disk/by-uuid/$BOOTUUID /boot auto defaults 0 0" >> "$DESTDIR/etc/fstab"
+echo "/dev/disk/by-label/BEK\\x20VOLUME /mnt/azure_bek_disk auto defaults 0 0" >> "$DESTDIR/etc/fstab"
+
+# inject luks header
+mkdir -p ${DESTDIR}/boot/luks
+copy_exec /boot/luks/osluksheader /boot/luks
+
+exit 0

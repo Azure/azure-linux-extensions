@@ -99,7 +99,7 @@ class OSEncryptionState(object):
             self.bootfs_block_device = '/dev/sda1'
         elif self.rootfs_sdx_path == '/dev/mapper/osencrypt' or self.rootfs_sdx_path.startswith('/dev/dm-'):
             self.rootfs_block_device = '/dev/mapper/osencrypt'
-            bootfs_uuid = self._parse_uuid_from_fstab('/boot')
+            bootfs_uuid = self._get_boot_uuid()
             self.context.logger.log("bootfs_uuid: {0}".format(bootfs_uuid))
             self.bootfs_block_device = self.disk_util.query_dev_sdx_path_by_uuid(bootfs_uuid)
         elif self.rootfs_sdx_path.startswith(CommonVariables.nvme_device_identifier):

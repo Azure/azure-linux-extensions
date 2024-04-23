@@ -19,6 +19,7 @@
 
 import os
 import sys
+import inspect
 
 from .AbstractPatching import AbstractPatching
 from Common import CommonVariables
@@ -46,9 +47,8 @@ class UbuntuPatching(AbstractPatching):
         self.resize2fs_path = '/sbin/resize2fs'
         self.umount_path = '/bin/umount'
         self.touch_path = '/usr/bin/touch'
-        self.min_version_online_encryption='22.04'
-        #support_online_encryption is false in base class. 
-        #self.support_online_encryption=self.validate_online_encryption_support()
+        self.min_version_online_encryption='23.10' 
+        self.support_online_encryption=self.validate_online_encryption_support()
 
     def packages_installed(self, packages):
         ''' return true if all packages in list are already installed '''
@@ -181,3 +181,60 @@ class UbuntuPatching(AbstractPatching):
             return gen2_disk
         else:
             return None
+        
+    def install_and_enable_ade_online_enc(self, root_partuuid, boot_uuid, rootfs_disk, is_os_disk_lvm=False):
+        script_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        encrypt_scripts_dir = os.path.join(script_dir,'../oscrypto/91adeOnlineUbu')
+
+        # hook script
+        hook_script_name = 'crypt-ade-hook'
+        hook_script_source = os.path.join(script_dir, encrypt_scripts_dir, hook_script_name)
+        hook_script_dest = os.path.join('/usr/share/initramfs-tools/hooks/', hook_script_name)
+        if not os.path.exists(hook_script_source):
+            message = "Hook script not found at path: {0}".format(hook_script_source)
+            self.logger.log(message)
+            raise Exception(message)
+        else:
+            self.logger.log("Hook script found at path: {0}".format(hook_script_source))
+        self.command_executor.Execute('cp {0} {1}'.format(hook_script_source,hook_script_dest), True)
+        self.command_executor.Execute('chmod +x {0}'.format(hook_script_dest), True)
+
+        # copy boot script and update with root partition uuid
+        boot_script_name = 'crypt-ade-boot'
+        boot_script_source = os.path.join(script_dir, encrypt_scripts_dir, boot_script_name)
+        boot_script_dest = os.path.join('/usr/share/initramfs-tools/scripts/init-premount/', boot_script_name)
+        if not os.path.exists(boot_script_source):
+            message = "Boot script not found at path: {0}".format(boot_script_source)
+            self.logger.log(message)
+            raise Exception(message)
+        else:
+            self.logger.log("Boot script found at path: {0}".format(boot_script_source))
+        self.command_executor.Execute('cp {0} {1}'.format(boot_script_source,boot_script_dest), True)
+        self.command_executor.Execute('chmod +x {0}'.format(boot_script_dest), True)
+
+        if root_partuuid:
+            # add root partition UUID to boot script cryptsetup command
+            self.command_executor.Execute("sed -i 's/ROOTPARTUUID/{0}/g' /usr/share/initramfs-tools/scripts/init-premount/crypt-ade-boot".format(root_partuuid), True)
+            # add root partition UUID to /etc/crypttab
+            entry = 'osencrypt /dev/disk/by-partuuid/{0} /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partuuid)
+            self.append_contents_to_file(entry, '/etc/crypttab')
+        else:
+            message = "Failed to get root partition UUID"
+            self.logger.log(message)
+            raise Exception(message)
+
+        # once hook and boot scripts are ready, update initramfs
+        #self.command_executor.Execute('update-initramfs -u -k all', True)
+
+        # prior to updating grub, do the following: 
+        # - remove the 40-force-partuuid.cfg file added by cloudinit, since it references the old boot partition
+        # - set grub cmdline to use root=/dev/mapper/osencrypt
+        self.command_executor.Execute("rm -f /etc/default/grub.d/40-force-partuuid.cfg", True)
+        self.command_executor.Execute("sed -i 's/GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"root=\/dev\/mapper\/osencrypt /g' /etc/default/grub", True)
+
+        # now update grub and re-install
+        self.command_executor.Execute('update-grub', True)
+        self.command_executor.Execute('grub-install --recheck --force {0}'.format(rootfs_disk), True)
+
+    def pack_initial_root_fs(self):
+        self.command_executor.Execute('update-initramfs -u -k all', True)
