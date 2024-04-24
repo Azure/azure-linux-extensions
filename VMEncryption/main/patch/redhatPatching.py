@@ -15,25 +15,27 @@
 # limitations under the License.
 #
 
-import os
-import os.path
-import sys
 import base64
-import re
-import json
-import platform
-import shutil
-import time
-import traceback
 import datetime
-import subprocess
+import filecmp
 import inspect
 import io
-import filecmp
+import json
+import os
+import os.path
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import time
+import traceback
+
+from CommandExecutor import *
+from Common import *
 
 from .AbstractPatching import AbstractPatching
-from Common import *
-from CommandExecutor import *
+
 
 class redhatPatching(AbstractPatching):
     def __init__(self, logger, distro_info):
@@ -272,8 +274,17 @@ class redhatPatching(AbstractPatching):
     def add_kernelopts(self, args_to_add):
         grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), self.grub_cfg_paths)
 
+        distro, version, _ = platform.linux_distribution()
+        # log version
+        logger.log("Distro: {0}, Version: {1}".format(distro, version))
+
+        if distro.lower() == 'redhat' and float(version) >= 9.3:
+            grub2_mkconfig_cmd = 'grub2-mkconfig --update-bls-cmdline -o {0}'
+        else:
+            grub2_mkconfig_cmd = 'grub2-mkconfig -o {0}'
+
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            self.command_executor.ExecuteInBash('grub2-mkconfig -o {0}'.format(grub_cfg_path), True)
+            self.command_executor.ExecuteInBash(grub2_mkconfig_cmd.format(grub_cfg_path), True)
 
     def pack_initial_root_fs(self):
         self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)
