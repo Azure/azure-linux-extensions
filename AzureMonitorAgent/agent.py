@@ -1669,7 +1669,7 @@ def is_feature_enabled(feature):
     """
     Checks if the feature is enabled in the current region
     """
-    feature_support_matrix = {'useDynamicSSL' : ['eastus2euap', 'westcentralus'] }
+    feature_support_matrix = {'useDynamicSSL' : ['all'] }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
     if os.path.exists(featurePreviewFlagPath):
@@ -1682,7 +1682,7 @@ def is_feature_enabled(feature):
     _, region = get_azure_environment_and_region()
 
     if feature in feature_support_matrix.keys():
-        if region in feature_support_matrix[feature]:
+        if region in feature_support_matrix[feature] or "all" in feature_support_matrix[feature]:
             return True
     
     return False
