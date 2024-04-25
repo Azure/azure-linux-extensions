@@ -296,11 +296,15 @@ def copy_amacoreagent_binaries():
 def copy_mdsd_binaries():
     current_arch = platform.machine()
     mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
+    mdsdmgr_bin_local_path = os.getcwd() + "/mdsdBin/mdsdmgr_" + current_arch
     mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
+    mdsdmgr_bin = "/opt/microsoft/azuremonitoragent/bin/mdsdmgr"
 
-    canUseShared, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
-    if canUseShared != 0:
+    canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
+    canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
+    if canUseSharedmdsd != 0 and canUseSharedmdsdmgr != 0:        
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
+        compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
 
 def install():
     """
