@@ -78,6 +78,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         raise Exception("No url provided for Influxdb output plugin to ME, AMA.")
 
     telegraf_json = {}
+    pluginConfigIdMap = {}
 
     for item in data:
         sink = item["sink"]
@@ -88,6 +89,20 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         counter = item["displayName"]
         if counter in name_map:
             plugin = name_map[counter]["plugin"]
+
+            splitResult = plugin.split('_')
+            telegraf_plugin = splitResult[0]
+            if telegraf_plugin not in pluginConfigIdMap:
+                pluginConfigIdMap[telegraf_plugin] = []
+
+            configIds = pluginConfigIdMap[telegraf_plugin]
+
+            configurationIds = item["configurationId"]
+
+            for configId in configurationIds:
+                if configId not in configIds:
+                    configIds.append(configId)
+            
             omiclass = ""
             if is_lad:
                 omiclass = counter.split("->")[0]
@@ -331,8 +346,18 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             # We are sourcing the VMI metrics that need to be aggregated at half the selected frequency 
             rated_min_interval = str(int(min_interval[:-1]) // 2) + "s" 
             input_str += " "*2 + "interval = " + "\"" + rated_min_interval + "\"\n\n"
+            
+            splitResult = plugin.split('_')
+            telegraf_plugin = splitResult[0]
+            configIds = pluginConfigIdMap[telegraf_plugin]
 
-            config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
+            input_str_with_tags = ""
+            for configId in configIds:
+                input_str_with_tags += input_str + "\n"
+                input_str_with_tags += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
+                input_str_with_tags += " "*4 + "configurationId=\"" + configId + "\"\n\n"
+
+            config_file["data"] = input_str_with_tags + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
 
             output.append(config_file)
             config_file = {}
