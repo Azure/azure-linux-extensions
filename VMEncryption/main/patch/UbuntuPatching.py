@@ -223,9 +223,6 @@ class UbuntuPatching(AbstractPatching):
             self.logger.log(message)
             raise Exception(message)
 
-        # once hook and boot scripts are ready, update initramfs
-        #self.command_executor.Execute('update-initramfs -u -k all', True)
-
         # prior to updating grub, do the following: 
         # - remove the 40-force-partuuid.cfg file added by cloudinit, since it references the old boot partition
         # - set grub cmdline to use root=/dev/mapper/osencrypt

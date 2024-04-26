@@ -34,6 +34,7 @@ import filecmp
 from .AbstractPatching import AbstractPatching
 from Common import *
 from CommandExecutor import *
+from distutils.version import LooseVersion
 
 class redhatPatching(AbstractPatching):
     def __init__(self, logger, distro_info):
@@ -270,13 +271,17 @@ class redhatPatching(AbstractPatching):
         command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
 
     def add_kernelopts(self, args_to_add):
-        self.append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" {0} "\n'.format(" ".join(args_to_add)),
-                                      '/etc/default/grub')
+        self.add_args_to_default_grub(args_to_add)
         
         grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), self.grub_cfg_paths)
 
+        extra_parameters = ""
+        if type(self).__name__.startswith('redhat'):
+            # Should not be called when actual instance is of subclass like oracle
+            if LooseVersion(self.distro_info[1]) >= LooseVersion('9.3'):
+                extra_parameters = extra_parameters + "--update-bls-cmdline"
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            self.command_executor.ExecuteInBash('grub2-mkconfig -o {0}'.format(grub_cfg_path), True)
+            self.command_executor.ExecuteInBash('grub2-mkconfig -o {0} {1}'.format(grub_cfg_path, extra_parameters), True)
 
     def pack_initial_root_fs(self):
         self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)
