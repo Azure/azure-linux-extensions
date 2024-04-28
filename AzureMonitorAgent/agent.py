@@ -296,11 +296,15 @@ def copy_amacoreagent_binaries():
 def copy_mdsd_binaries():
     current_arch = platform.machine()
     mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
+    mdsdmgr_bin_local_path = os.getcwd() + "/mdsdBin/mdsdmgr_" + current_arch
     mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
+    mdsdmgr_bin = "/opt/microsoft/azuremonitoragent/bin/mdsdmgr"
 
-    canUseShared, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
-    if canUseShared != 0:
+    canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
+    canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
+    if canUseSharedmdsd != 0 and canUseSharedmdsdmgr != 0:        
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
+        compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
 
 def install():
     """
@@ -1669,7 +1673,7 @@ def is_feature_enabled(feature):
     """
     Checks if the feature is enabled in the current region
     """
-    feature_support_matrix = {'useDynamicSSL' : ['eastus2euap', 'westcentralus'] }
+    feature_support_matrix = {'useDynamicSSL' : ['all'] }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
     if os.path.exists(featurePreviewFlagPath):
@@ -1682,7 +1686,7 @@ def is_feature_enabled(feature):
     _, region = get_azure_environment_and_region()
 
     if feature in feature_support_matrix.keys():
-        if region in feature_support_matrix[feature]:
+        if region in feature_support_matrix[feature] or "all" in feature_support_matrix[feature]:
             return True
     
     return False

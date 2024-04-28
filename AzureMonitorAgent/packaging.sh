@@ -52,6 +52,7 @@ AMA_DEB_PACKAGE_NAME=$(find tmp/ -type f -name "azuremonitoragent_*x86_64.deb" -
 ar vx tmp/$AMA_DEB_PACKAGE_NAME --output=tmp
 tar xvf tmp/data.tar.gz -C tmp
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_x86_64
+cp tmp/opt/microsoft/azuremonitoragent/bin/mdsdmgr mdsdBin/mdsdmgr_x86_64
 rm -rf tmp/
 
 mkdir -p tmp
@@ -60,6 +61,7 @@ AMA_DEB_PACKAGE_NAME=$(find tmp/ -type f -name "azuremonitoragent_*aarch64.deb" 
 ar vx tmp/$AMA_DEB_PACKAGE_NAME --output=tmp
 tar xvf tmp/data.tar.gz -C tmp
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_aarch64
+cp tmp/opt/microsoft/azuremonitoragent/bin/mdsdmgr mdsdBin/mdsdmgr_aarch64
 rm -rf tmp/
 
 cp $input_path/MetricsExtension* MetricsExtensionBin/
