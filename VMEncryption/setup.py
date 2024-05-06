@@ -217,6 +217,7 @@ final_folder_path = target_zip_file_location + target_folder_name
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
 copytree(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/', final_folder_path+'/'+main_folder+'/oscrypto/ubuntu_2004/encryptscripts/')
+copytree(main_folder+'/oscrypto/91adeOnlineUbu/', final_folder_path+'/'+main_folder+'/oscrypto/91adeOnlineUbu/')
 #copy SKR app TODO: folder structure. 
 copy2('./AzureAttestSKR', final_folder_path+'/' )
 #temp VNS changes: folder structure. 

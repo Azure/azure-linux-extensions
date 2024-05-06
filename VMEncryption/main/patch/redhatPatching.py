@@ -34,6 +34,7 @@ import filecmp
 from .AbstractPatching import AbstractPatching
 from Common import *
 from CommandExecutor import *
+from distutils.version import LooseVersion
 
 class redhatPatching(AbstractPatching):
     def __init__(self, logger, distro_info):
@@ -270,10 +271,48 @@ class redhatPatching(AbstractPatching):
         command_executor.Execute('grub2-mkconfig -o /boot/grub2/grub.cfg', True)
 
     def add_kernelopts(self, args_to_add):
+        self.add_args_to_default_grub(args_to_add)
+        
         grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), self.grub_cfg_paths)
 
+        extra_parameters = ""
+        if type(self).__name__.startswith('redhat'):
+            # Should not be called when actual instance is of subclass like oracle
+            if LooseVersion(self.distro_info[1]) >= LooseVersion('9.3'):
+                extra_parameters = extra_parameters + "--update-bls-cmdline"
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
-            self.command_executor.ExecuteInBash('grub2-mkconfig -o {0}'.format(grub_cfg_path), True)
+            self.command_executor.ExecuteInBash('grub2-mkconfig -o {0} {1}'.format(grub_cfg_path, extra_parameters), True)
 
     def pack_initial_root_fs(self):
         self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)
+
+    def install_and_enable_ade_online_enc(self, root_partuuid, boot_uuid, rootfs_disk, is_os_disk_lvm=False):
+        # Copy the 91adeOnline directory to dracut/modules.d
+        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+        ademoduledir = os.path.join(scriptdir, '../oscrypto/91adeOnline')
+        self.command_executor.Execute('cp -r {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
+
+        # Change config so that dracut will force add the dm_crypt kernel module
+        self.append_contents_to_file('\nadd_drivers+=" dm_crypt "\n',
+                                      '/etc/dracut.conf.d/ade.conf')
+
+        # Add the new kernel param
+        additional_params = ["rd.luks.ade.partuuid={0}".format(root_partuuid),
+                             "rd.luks.ade.bootuuid={0}".format(boot_uuid),
+                             "rd.debug"]
+        self.add_kernelopts(additional_params)
+
+        # For clarity after reboot, we should also add the correct info to crypttab
+        entry = 'osencrypt /dev/disk/by-partuuid/{0} /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partuuid)
+        self.append_contents_to_file(entry, '/etc/crypttab')
+
+        if is_os_disk_lvm:
+            #Add the plain os disk base to the "LVM Reject list" and add osencrypt device to the "Accept list"
+            self.append_contents_to_file('\ndevices { filter = ["a|osencrypt|", "r|' + root_partuuid + '|"] }\n', '/etc/lvm/lvm.conf')
+            # Force dracut to include LVM and Crypt modules
+            self.append_contents_to_file('\nadd_dracutmodules+=" crypt lvm"\n',
+                                          '/etc/dracut.conf.d/ade.conf')
+        else:
+            self.append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
+                                          '/etc/dracut.conf.d/ade.conf')
+            self.add_kernelopts(["root=/dev/mapper/osencrypt"])

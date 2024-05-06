@@ -18,6 +18,7 @@
 #
 
 import os
+import io
 import sys
 import base64
 import re
@@ -78,3 +79,19 @@ class AbstractPatching(object):
 
     def add_kernelopts(self, args_to_add):
         pass
+
+    def add_args_to_default_grub(self, args_to_add):
+        self.append_contents_to_file('\nGRUB_CMDLINE_LINUX+=" {0} "\n'.format(" ".join(args_to_add)),
+                                      '/etc/default/grub')
+
+    def install_and_enable_ade_online_enc(self, root_partuuid, boot_uuid, rootfs_disk, is_os_disk_lvm):
+        pass
+
+    def append_contents_to_file(self, contents, path):
+        # Python 3.x strings are Unicode by default and do not use decode
+        if sys.version_info[0] < 3:
+            if isinstance(contents, str):
+                contents = contents.decode('utf-8')
+
+        with io.open(path, 'a') as f:
+            f.write(contents)

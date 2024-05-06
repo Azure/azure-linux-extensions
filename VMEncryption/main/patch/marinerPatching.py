@@ -26,6 +26,7 @@ class marinerPatching(redhatPatching):
         self.command_executor.ExecuteInBash('mkinitrd -f -v', True)
 
     def add_kernelopts(self, args_to_add):
+        self.add_args_to_default_grub(args_to_add)
         grub_cfg_paths = filter(lambda path_pair: os.path.exists(path_pair[0]) and os.path.exists(path_pair[1]), self.grub_cfg_paths)
 
         for grub_cfg_path, grub_env_path in grub_cfg_paths:

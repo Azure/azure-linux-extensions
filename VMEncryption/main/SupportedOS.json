@@ -44,6 +44,14 @@
     ],
     "Ubuntu" : [
         {
+          "Version" : "24.04",
+          "MinSupportedVersion" : "24.04"
+        },   
+        {
+          "Version" : "23.10",
+          "MinSupportedVersion" : "23.10"
+        },
+        {
           "Version" : "16.04"
         },
         {

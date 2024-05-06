@@ -74,18 +74,7 @@ class PatchBootSystemState(OSEncryptionState):
             self._install_and_enable_detached_header_kernel_params(root_partuuid, luks_uuid, boot_uuid)
         else:
             # if detached header fix is absent we will use the 91ade workaround
-            self._install_and_enable_91ade(root_partuuid, boot_uuid)
-
-        if self.disk_util.is_os_disk_lvm():
-            # Add the plain os disk base to the "LVM Reject list" and add osencrypt device to the "Accept list"
-            self._append_contents_to_file('\ndevices { filter = ["a|osencrypt|", "r|' + root_partuuid + '|"] }\n', '/etc/lvm/lvm.conf')
-            # Force dracut to include LVM and Crypt modules
-            self._append_contents_to_file('\nadd_dracutmodules+=" crypt lvm"\n',
-                                          '/etc/dracut.conf.d/ade.conf')
-        else:
-            self._append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
-                                          '/etc/dracut.conf.d/ade.conf')
-            self._add_kernelopts(["root=/dev/mapper/osencrypt"])
+            self.context.distro_patcher.install_and_enable_ade_online_enc(root_partuuid, boot_uuid, self.rootfs_disk, self.disk_util.is_os_disk_lvm())
 
         # Everything is ready, repack using dracut/mkinitrd. None of the changes above will take affect until this line is executed.
         self.context.distro_patcher.pack_initial_root_fs()
@@ -125,29 +114,6 @@ class PatchBootSystemState(OSEncryptionState):
                              "rd.luks.hdr={0}=UUID={1}".format(luks_uuid, boot_uuid),
                              "rd.debug"]
         self._add_kernelopts(additional_params)
-
-    def _install_and_enable_91ade(self, root_partuuid, boot_uuid):
-        # Copy the 91adeOnline directory to dracut/modules.d
-        scriptdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-        ademoduledir = os.path.join(scriptdir, '../../91adeOnline')
-        self.command_executor.Execute('cp -r {0} /lib/dracut/modules.d/'.format(ademoduledir), True)
-
-        # Change config so that dracut will force add the dm_crypt kernel module
-        self._append_contents_to_file('\nadd_drivers+=" dm_crypt "\n',
-                                      '/etc/dracut.conf.d/ade.conf')
-
-        # Add the new kernel param
-        additional_params = ["rd.luks.ade.partuuid={0}".format(root_partuuid),
-                             "rd.luks.ade.bootuuid={0}".format(boot_uuid),
-                             "rd.debug"]
-        self._add_kernelopts(additional_params)
-
-        # For clarity after reboot, we should also add the correct info to crypttab
-        crypt_item = CryptItem()
-        crypt_item.dev_path = os.path.join("/dev/disk/by-partuuid/", root_partuuid)
-        crypt_item.mapper_name = CommonVariables.osmapper_name
-        crypt_item.luks_header_path = "/boot/luks/osluksheader"
-        self.crypt_mount_config_util.add_crypt_item(crypt_item)
 
     def _get_root_partuuid(self):
         root_partuuid = None
