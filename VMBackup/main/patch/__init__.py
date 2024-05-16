@@ -36,11 +36,11 @@ from patch.NSBSDPatching import NSBSDPatching
 def DistInfo():
     try:
         if 'FreeBSD' in platform.system():
-            release = re.sub('\\-.*\Z', '', str(platform.release()))
+            release = re.sub('\\-.*$', '', str(platform.release()))
             distinfo = ['FreeBSD', release]
             return distinfo
         if 'NS-BSD' in platform.system():
-            release = re.sub('\\-.*\Z', '', str(platform.release()))
+            release = re.sub('\\-.*$', '', str(platform.release()))
             distinfo = ['NS-BSD', release]
             return distinfo
         if 'linux_distribution' in dir(platform):
