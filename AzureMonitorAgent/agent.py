@@ -284,6 +284,10 @@ def copy_amacoreagent_binaries():
     liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
     liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
     compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
+
+    libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
+    libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
+    compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
@@ -292,11 +296,15 @@ def copy_amacoreagent_binaries():
 def copy_mdsd_binaries():
     current_arch = platform.machine()
     mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
+    mdsdmgr_bin_local_path = os.getcwd() + "/mdsdBin/mdsdmgr_" + current_arch
     mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
+    mdsdmgr_bin = "/opt/microsoft/azuremonitoragent/bin/mdsdmgr"
 
-    canUseShared, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
-    if canUseShared != 0:
+    canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
+    canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
+    if canUseSharedmdsd != 0 and canUseSharedmdsdmgr != 0:        
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
+        compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
 
 def install():
     """
@@ -319,6 +327,16 @@ def install():
             insserv_exit_code, insserv_output = run_command_and_log("zypper --non-interactive install insserv-compat")
             if insserv_exit_code != 0:
                 return insserv_exit_code, insserv_output
+
+    # Check if Debian 12 VMs have rsyslog package (required for AMA 1.31+)
+    if (vm_dist.startswith('debian')) and vm_ver.startswith('12'):
+        check_rsyslog, _ = run_command_and_log("dpkg -s rsyslog")
+        if check_rsyslog != 0:
+            hutil_log_info("'rsyslog' package missing from Debian 12 machine, installing to allow AMA to run.")
+            rsyslog_exit_code, rsyslog_output = run_command_and_log("DEBIAN_FRONTEND=noninteractive apt-get update && \
+                                                                    DEBIAN_FRONTEND=noninteractive apt-get install -y rsyslog")
+            if rsyslog_exit_code != 0:
+                return rsyslog_exit_code, rsyslog_output
 
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
@@ -353,10 +371,12 @@ def install():
         if libssl1_1 == 0:
             copy_mdsd_binaries()
             
-    # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
-    if is_systemd() and platform.machine() == 'aarch64':
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+    # Comment out the following check in AMA 1.31 as the coreagent & agentlauncher services are not installed with the aarch64 deb/rpm packages.
+    #
+    # # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
+    # if is_systemd() and platform.machine() == 'aarch64':
+    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
+    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
     
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
@@ -532,14 +552,18 @@ def enable():
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-        start_amacoreagent()
-        restart_launcher()
+        if platform.machine() != 'aarch64':
+            # enable processes for Custom Logs
+            ensure["azuremonitor-agentlauncher"] = True
+            ensure["azuremonitor-coreagent"] = True
+            
         # start the metrics and syslog watcher only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
         # In GCS scenarios, ensure that AMACoreAgent is running
-        start_amacoreagent()
+        if platform.machine() != 'aarch64':
+            ensure["azuremonitor-coreagent"] = True
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -815,23 +839,12 @@ def update():
 
     return 0, ""
 
-def start_amacoreagent():
-    if platform.machine() == 'aarch64':
-        return
-    # start Core Agent
-    hutil_log_info('Handler initiating Core Agent')
-    if is_systemd():
-        exit_code, output = run_command_and_log('systemctl start azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
-
 def restart_launcher():
     if platform.machine() == 'aarch64':
         return
     # start agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
-        # in case AL is not cleaning up properly
-        check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
 def set_proxy(address, username, password):
@@ -1114,7 +1127,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data,
-                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port,
+                                "unix:///run/azuremonitoragent/mdm_influxdb.socket",
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
@@ -1583,7 +1596,7 @@ def is_vm_supported_for_extension(operation):
                        'red hat' : ['7', '8', '9'], # Oracle, RHEL
                        'oracle' : ['7', '8', '9'], # Oracle
                        'ol' : ['7', '8', '9'], # Oracle Linux
-                       'debian' : ['9', '10', '11'], # Debian
+                       'debian' : ['9', '10', '11', '12'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
@@ -1660,7 +1673,7 @@ def is_feature_enabled(feature):
     """
     Checks if the feature is enabled in the current region
     """
-    feature_support_matrix = {'useDynamicSSL' : ['eastus2euap', 'westcentralus'] }
+    feature_support_matrix = {'useDynamicSSL' : ['all'] }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
     if os.path.exists(featurePreviewFlagPath):
@@ -1673,7 +1686,7 @@ def is_feature_enabled(feature):
     _, region = get_azure_environment_and_region()
 
     if feature in feature_support_matrix.keys():
-        if region in feature_support_matrix[feature]:
+        if region in feature_support_matrix[feature] or "all" in feature_support_matrix[feature]:
             return True
     
     return False

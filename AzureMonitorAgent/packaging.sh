@@ -30,7 +30,7 @@ cp ../Common/WALinuxAgent-2.0.16/waagent .
 
 cp -r  ../LAD-AMA-Common/metrics_ext_utils .
 cp -r  ../LAD-AMA-Common/telegraf_utils .
-cp -r  ../Diagnostic/services .
+cp -f  ../Diagnostic/services/metrics-sourcer.service services/metrics-sourcer.service
 
 # cleanup packages, ext
 rm -rf packages MetricsExtensionBin amaCoreAgentBin agentLauncherBin mdsdBin tmp
@@ -43,12 +43,16 @@ cp $input_path/azuremonitoragent-$AGENT_VERSION* packages/
 # remove dynamic ssl packages
 rm -f packages/*dynamicssl*
 
+# validate HandlerManifest.json syntax
+cat HandlerManifest.json | json_pp -f json -t null
+
 mkdir -p tmp
 cp $input_path/azuremonitoragent_$AGENT_VERSION*dynamicssl_x86_64.deb tmp/
 AMA_DEB_PACKAGE_NAME=$(find tmp/ -type f -name "azuremonitoragent_*x86_64.deb" -printf "%f\\n" | head -n 1)
 ar vx tmp/$AMA_DEB_PACKAGE_NAME --output=tmp
 tar xvf tmp/data.tar.gz -C tmp
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_x86_64
+cp tmp/opt/microsoft/azuremonitoragent/bin/mdsdmgr mdsdBin/mdsdmgr_x86_64
 rm -rf tmp/
 
 mkdir -p tmp
@@ -57,11 +61,13 @@ AMA_DEB_PACKAGE_NAME=$(find tmp/ -type f -name "azuremonitoragent_*aarch64.deb" 
 ar vx tmp/$AMA_DEB_PACKAGE_NAME --output=tmp
 tar xvf tmp/data.tar.gz -C tmp
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_aarch64
+cp tmp/opt/microsoft/azuremonitoragent/bin/mdsdmgr mdsdBin/mdsdmgr_aarch64
 rm -rf tmp/
 
 cp $input_path/MetricsExtension* MetricsExtensionBin/
 cp $input_path/amacoreagent amaCoreAgentBin/
 cp $input_path/liblz4x64.so amaCoreAgentBin/
+cp $input_path/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
 cp $input_path/agentlauncher agentLauncherBin/
 
 # make the shim.sh file executable

@@ -32,10 +32,12 @@ import metrics_ext_utils.metrics_common_utils as metrics_utils
 if sys.version_info[0] == 3:
     import urllib.request as urllib
     import urllib.error as urlerror
+    from urllib.parse import urlparse
 
 elif sys.version_info[0] == 2:
     import urllib2 as urllib
     import urllib2 as urlerror
+    from urlparse import urlparse
 
 # Cloud Environments
 PublicCloudName     = "azurepubliccloud"
@@ -302,8 +304,8 @@ def get_ArcA_MSI_token(resource = "https://monitoring.azs"):
             arc_endpoint = metrics_utils.get_arc_endpoint()
             try:
                 msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=" + resource
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
-                res = urllib.request.urlopen(req)
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.urlopen(req)
             except:
                 # The above request is expected to fail and add a key to the path
                 authkey_dir = "/var/opt/azcmagent/tokens/"
@@ -319,8 +321,8 @@ def get_ArcA_MSI_token(resource = "https://monitoring.azs"):
                 with open(authkey_path, "r") as f:
                     key = f.read()
                 auth += key
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
-                res = urllib.request.urlopen(req)
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
+                res = urllib.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
 
             if not data or "access_token" not in data:
@@ -535,7 +537,7 @@ def create_custom_metrics_conf(mds_gig_endpoint_region, gig_endpoint = ""):
         gig_hostname = mds_gig_endpoint_region + ".monitoring.azure.com"
         gig_ingestion_endpoint = "https://" + gig_hostname + "/api/v1/ingestion/ingest"
     else:
-        gig_hostname = urllib.parse.urlparse(gig_endpoint).netloc
+        gig_hostname = urlparse(gig_endpoint).netloc
         gig_ingestion_endpoint = gig_endpoint + "/api/v1/ingestion/ingest"
 
     conf_json = '''{
@@ -649,8 +651,8 @@ def get_arca_endpoints_from_himds():
     while retries <= max_retries:
 
         # Query imds to get the required information
-        req = urllib.request.Request(imds_url, headers={'Metadata':'true'})
-        res = urllib.request.urlopen(req)
+        req = urllib.Request(imds_url, headers={'Metadata':'true'})
+        res = urllib.urlopen(req)
         data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "dataplaneEndpoints" not in data or "resourceManager" not in data:
@@ -695,8 +697,8 @@ def get_arca_ingestion_endpoint_from_mcs():
     while retries <= max_retries:
 
         # Query imds to get the required information
-        req = urllib.request.Request(mcs_config_query_url, headers={'Metadata':'true', 'Authorization':mcs_token})
-        res = urllib.request.urlopen(req)
+        req = urllib.Request(mcs_config_query_url, headers={'Metadata':'true', 'Authorization':mcs_token})
+        res = urllib.urlopen(req)
         data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "configurations" not in data:
@@ -736,7 +738,7 @@ def get_arm_domain(az_environment):
     try:
         if az_environment.lower() == ArcACloudName:
             arm_endpoint, _ = get_arca_endpoints_from_himds()
-            arm_endpoint_parsed = urllib.parse.urlparse(arm_endpoint)
+            arm_endpoint_parsed = urlparse(arm_endpoint)
             domain = arm_endpoint_parsed.netloc
         else:
             domain = ARMDomainMap[az_environment.lower()]
