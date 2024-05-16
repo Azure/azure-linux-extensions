@@ -545,10 +545,10 @@ class HandlerUtility:
     def get_dist_info(self):
         try:
             if 'FreeBSD' in platform.system():
-                release = re.sub('\-.*\Z', '', str(platform.release()))
+                release = re.sub(r'\-.*\Z', '', str(platform.release()))
                 return "FreeBSD",release
             if 'NS-BSD' in platform.system():
-                release = re.sub('\-.*\Z', '', str(platform.release()))
+                release = re.sub(r'\-.*\Z', '', str(platform.release()))
                 return "NS-BSD", release
             if 'linux_distribution' in dir(platform):
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
@@ -650,7 +650,7 @@ class HandlerUtility:
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
         stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
-        stat_rept = stat_rept.replace('\\\/', '\/')  # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
+        stat_rept = stat_rept.replace(r'\\\/', r'\/')  # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
         stat_rept = stat_rept.replace(date_place_holder,date_string)
 
         # Add Status as sub-status for Status to be written on Status-File

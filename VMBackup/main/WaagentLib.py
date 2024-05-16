@@ -4531,11 +4531,11 @@ def GetMyDistro(dist_class_name=''):
 def DistInfo(fullname=0):
     try:
         if 'FreeBSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
+            release = re.sub('-.*\Z', '', str(platform.release()))
             distinfo = ['FreeBSD', release]
             return distinfo
         if 'NS-BSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
+            release = re.sub('-.*\Z', '', str(platform.release()))
             distinfo = ['NS-BSD', release]
             return distinfo
         if 'linux_distribution' in dir(platform):
@@ -4710,7 +4710,7 @@ def main():
     global force
     force = False
     for a in sys.argv[1:]:
-        if re.match("^([-/]*)(help|usage|\?)", a):
+        if re.match("^([-/]*)(help|usage|\\?)", a):
             sys.exit(Usage())
         elif re.match("^([-/]*)version", a):
             print(GuestAgentVersion + " running on " + LinuxDistro)
@@ -4742,7 +4742,7 @@ def main():
     global daemon
     daemon = False
     for a in args:
-        if re.match("^([-/]*)deprovision\+user", a):
+        if re.match("^([-/]*)deprovision\\+user", a):
             sys.exit(Deprovision(force, True))
         elif re.match("^([-/]*)deprovision", a):
             sys.exit(Deprovision(force, False))

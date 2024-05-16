@@ -53,17 +53,27 @@ def searchWAAgentOld():
 pathUsed = 1 
 try:
     agentPath = searchWAAgent()
-    if(agentPath):
-        waagent = imp.load_source('waagent', agentPath)
+    if agentPath is None:
+       pathUsed = 0
+       # Search for the old agent path if the new one is not found
+       agentPath = searchWAAgentOld()
+    if agentPath:
+        try:
+            # For Python 3.5 and later, use importlib
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('waagent', agentPath)
+            waagent = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(waagent)       
+        except ImportError:
+            # For Python 3.4 and earlier, use imp module
+            import imp
+            waagent = imp.load_source('waagent', agentPath)
+        except Exception:
+            raise Exception("Can't load waagent.")
     else:
-        raise Exception("Can't load new waagent.")
+         raise Exception("Can't load new or old waagent. Agent path not found.")
 except Exception as e:
-    pathUsed = 0 
-    agentPath = searchWAAgentOld()
-    if(agentPath):
-        waagent = imp.load_source('waagent', agentPath)
-    else:
-        raise Exception("Can't load old waagent.")
+    raise Exception(e)
 
 if not hasattr(waagent, "AddExtensionEvent"):
     """
