@@ -222,7 +222,7 @@ class FreezeSnapshotter(object):
                     if(blob_snapshot_info.ddSnapshotIdentifier != None):
                         # snapshotUri is None for DD Disks. It is populated only for XStore disks
                         blob_snapshot_info.snapshotUri = None
-                        creationTimeStr = '\/Date(' + blob_snapshot_info.ddSnapshotIdentifier.creationTime + ')\/'
+                        creationTimeStr = '\\/Date(' + blob_snapshot_info.ddSnapshotIdentifier.creationTime + ')\\/'
                         creationTimeObj = Status.CreationTime(creationTimeStr, 0)
                         ddSnapshotIdentifierInfo = Status.DirectDriveSnapshotIdentifier(creationTimeObj, blob_snapshot_info.ddSnapshotIdentifier.id, blob_snapshot_info.ddSnapshotIdentifier.token)
                         self.logger.log("DDSnapshotIdentifier Information to CRP- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime.DateTime, ddSnapshotIdentifierInfo.id))
