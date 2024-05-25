@@ -35,6 +35,9 @@ class Backuplogger(object):
         self.logging_off = False
 
     def enforce_local_flag(self, enforced_local):
+        #Pause file logging during I/O freeze period by setting Enforced_local_flag_value to False
+        #Enforced_local_flag_value is turned to False from True when Freeze Starts
+        #Enforced_local_flag_value is turned to True from False when Freeze Ends
         if (self.hutil.get_intvalue_from_configfile('LoggingOff', 0) == 1):
             self.logging_off = True
         if (self.enforced_local_flag_value != False and enforced_local == False and self.logging_off == True):

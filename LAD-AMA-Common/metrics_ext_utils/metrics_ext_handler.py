@@ -16,16 +16,8 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
 import platform
 import sys
-if sys.version_info[0] < 3:
-    from future import standard_library
-    standard_library.install_aliases()
-    from builtins import str
-    
-import urllib.request, urllib.error, urllib.parse
 import json
 import os
 from shutil import copyfile, rmtree
@@ -37,6 +29,15 @@ import time
 import signal
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+    import urllib.error as urlerror
+    from urllib.parse import urlparse
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    import urllib2 as urlerror
+    from urlparse import urlparse
 
 # Cloud Environments
 PublicCloudName     = "azurepubliccloud"
@@ -44,6 +45,7 @@ FairfaxCloudName    = "azureusgovernmentcloud"
 MooncakeCloudName   = "azurechinacloud"
 USNatCloudName      = "usnat" # EX
 USSecCloudName      = "ussec" # RX
+ArcACloudName       = "azurestackcloud"
 DefaultCloudName    = PublicCloudName # Fallback
 
 ARMDomainMap = {
@@ -51,7 +53,8 @@ ARMDomainMap = {
     FairfaxCloudName:   "management.usgovcloudapi.net",
     MooncakeCloudName:  "management.chinacloudapi.cn",
     USNatCloudName:     "management.azure.eaglex.ic.gov",
-    USSecCloudName:     "management.azure.microsoft.scloud"
+    USSecCloudName:     "management.azure.microsoft.scloud",
+    ArcACloudName:      "armmanagement.autonomous.cloud.private"
 }
 
 
@@ -93,7 +96,7 @@ def stop_metrics_service(is_lad):
         metrics_service_name = get_metrics_extension_service_name(is_lad)
 
         if os.path.isfile(metrics_service_path):
-            code = os.system("sudo systemctl stop {0}".format(metrics_service_name))
+            code = os.system("systemctl stop {0}".format(metrics_service_name))            
         else:
             return False, "Metrics Extension service file does not exist. Failed to stop ME service: {0}.service.".format(metrics_service_name)
 
@@ -147,7 +150,7 @@ def remove_metrics_service(is_lad):
 
     return True, "Successfully removed metrics-extensions service and MetricsExtension binary."
 
-def generate_Arc_MSI_token():
+def generate_Arc_MSI_token(resource = "https://ingestion.monitor.azure.com/"):
     """
     This method is used to query the Hyrbid metdadata service of Arc to get the MSI Auth token for the VM and write it to the ME config location
     This is called from the main extension code after config setup is complete
@@ -169,9 +172,9 @@ def generate_Arc_MSI_token():
         while retries <= max_retries:
             arc_endpoint = metrics_utils.get_arc_endpoint()
             try:
-                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://ingestion.monitor.azure.com/"
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
-                res = urllib.request.urlopen(req)
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=" + resource
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.urlopen(req)
             except:
                 # The above request is expected to fail and add a key to the path
                 authkey_dir = "/var/opt/azcmagent/tokens/"
@@ -187,8 +190,8 @@ def generate_Arc_MSI_token():
                 with open(authkey_path, "r") as f:
                     key = f.read()
                 auth += key
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
-                res = urllib.request.urlopen(req)
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
+                res = urllib.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
 
             if not data or "access_token" not in data:
@@ -220,13 +223,16 @@ def generate_Arc_MSI_token():
     return True, expiry_epoch_time, log_messages
 
 
-def generate_MSI_token(identifier_name = '', identifier_value = ''):
+def generate_MSI_token(identifier_name = '', identifier_value = '', is_lad = True):
     """
     This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
     This is called from the main extension code after config setup is complete
     """
 
     if metrics_utils.is_arc_installed():
+        _, _, _, az_environment, _ = get_imds_values(is_lad)
+        if az_environment.lower() == ArcACloudName:
+            return generate_Arc_MSI_token("https://monitoring.azs")
         return generate_Arc_MSI_token()
     else:
         _, configFolder = get_handler_vars()
@@ -249,8 +255,8 @@ def generate_MSI_token(identifier_name = '', identifier_value = ''):
                 if identifier_name and identifier_value:
                     msiauthurl += '&{0}={1}'.format(identifier_name, identifier_value)
 
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
-                res = urllib.request.urlopen(req)
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+                res = urllib.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
 
                 if not data or "access_token" not in data:
@@ -282,6 +288,64 @@ def generate_MSI_token(identifier_name = '', identifier_value = ''):
 
         return True, expiry_epoch_time, log_messages
 
+def get_ArcA_MSI_token(resource = "https://monitoring.azs"):
+    """
+    This method is used to query the Hyrbid metdadata service of ArcA to get the MSI Auth token for the VM
+    """
+    token_string = ""
+    log_messages = ""
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
+
+    try:
+        data = None
+        while retries <= max_retries:
+            arc_endpoint = metrics_utils.get_arc_endpoint()
+            try:
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=" + resource
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.urlopen(req)
+            except:
+                # The above request is expected to fail and add a key to the path
+                authkey_dir = "/var/opt/azcmagent/tokens/"
+                if not os.path.exists(authkey_dir):
+                    log_messages += "Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir)
+                    return False, token_string, log_messages
+                keys_dir = []
+                for filename in os.listdir(authkey_dir):
+                    keys_dir.append(filename)
+
+                authkey_path = authkey_dir + keys_dir[-1]
+                auth = "basic "
+                with open(authkey_path, "r") as f:
+                    key = f.read()
+                auth += key
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
+                res = urllib.urlopen(req)
+                data = json.loads(res.read().decode('utf-8', 'ignore'))
+
+            if not data or "access_token" not in data:
+                retries += 1
+            else:
+                break
+
+            log_messages += "Failed to fetch MSI Auth url. Retrying in {2} seconds. Retry Count - {0} out of Mmax Retries - {1}\n".format(retries, max_retries, sleep_time)
+            time.sleep(sleep_time)
+
+
+        if retries > max_retries:
+            log_messages += "Unable to fetch a valid MSI auth token for {0}.\n".format(resource)
+            return False, token_string, log_messages
+
+        token_string = data["access_token"]
+
+    except Exception as e:
+        log_messages += "Failed to get msi auth token. Please check if VM's system assigned Identity is enabled Failed with error {0}\n".format(e)
+        return False, token_string, log_messages
+
+    return True, token_string, log_messages
+
 
 def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port, HUtilObj=None):
     """
@@ -307,9 +371,9 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
             os.system(r"sed -i 's+%ME_INFLUX_PORT%+{1}+' {0}".format(me_service_path, me_influx_port))
             os.system(r"sed -i 's+%ME_DATA_DIRECTORY%+{1}+' {0}".format(me_service_path, configFolder))
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
-            daemon_reload_status = os.system("sudo systemctl daemon-reload")
+            daemon_reload_status = os.system("systemctl daemon-reload")
             if daemon_reload_status != 0:
-                message = "Unable to reload systemd after ME service file change. Failed to set up ME service. Exit code:" + str(daemon_reload_status)
+                message = "Unable to reload systemd after ME service file change. Failed to set up ME service. Check system for hardening. Exit code:" + str(daemon_reload_status)
                 if HUtilObj is not None:
                     HUtilObj.log(message)
                 else:
@@ -350,9 +414,9 @@ def start_metrics(is_lad):
     # If the VM has systemd, then we use that to start/stop
     metrics_service_name = get_metrics_extension_service_name(is_lad)
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart {0}".format(metrics_service_name))
+        service_restart_status = os.system("systemctl restart {0}".format(metrics_service_name))
         if service_restart_status != 0:
-            log_messages += "Unable to start {0}. Failed to start ME service.".format(metrics_service_name)
+            log_messages += "Unable to start {0} using systemctl. Failed to start ME service. Check system for hardening.".format(metrics_service_name)
             return False, log_messages
 
     #Else start ME as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
@@ -462,20 +526,27 @@ def create_metrics_extension_conf(az_resource_id, aad_url):
 } '''
     return conf_json
 
-def create_custom_metrics_conf(mds_gig_endpoint_region):
+def create_custom_metrics_conf(mds_gig_endpoint_region, gig_endpoint = ""):
     """
     Create the metrics extension config
     :param mds_gig_endpoint_region: mds gig endpoint region for the VM
     """
     # Note : mds gig endpoint url is only for 3rd party customers. 1st party endpoint is different
 
+    if not gig_endpoint:
+        gig_hostname = mds_gig_endpoint_region + ".monitoring.azure.com"
+        gig_ingestion_endpoint = "https://" + gig_hostname + "/api/v1/ingestion/ingest"
+    else:
+        gig_hostname = urlparse(gig_endpoint).netloc
+        gig_ingestion_endpoint = gig_endpoint + "/api/v1/ingestion/ingest"
+
     conf_json = '''{
         "version": 17,
         "maxMetricAgeInSeconds": 0,
         "endpointsForClientForking": [],
-        "homeStampGslbHostname": "''' + mds_gig_endpoint_region + '''.monitoring.azure.com",
+        "homeStampGslbHostname": "''' + gig_hostname + '''",
         "endpointsForClientPublication": [
-            "https://''' + mds_gig_endpoint_region + '''.monitoring.azure.com/api/v1/ingestion/ingest"
+            "''' + gig_ingestion_endpoint + '''"
         ]
     } '''
     return conf_json
@@ -527,8 +598,8 @@ def get_imds_values(is_lad):
     while retries <= max_retries:
 
         # Query imds to get the required information
-        req = urllib.request.Request(imds_url, headers={'Metadata':'true'})
-        res = urllib.request.urlopen(req)
+        req = urllib.Request(imds_url, headers={'Metadata':'true'})
+        res = urllib.urlopen(req)
         data = json.loads(res.read().decode('utf-8', 'ignore'))
 
         if "compute" not in data:
@@ -563,6 +634,101 @@ def get_imds_values(is_lad):
 
     return az_resource_id, subscription_id, location, az_environment, data
 
+def get_arca_endpoints_from_himds():
+    """
+    Query himds to get required arca endpoints for MetricsExtension config for this connected machine
+    """
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
+    imds_url = "http://localhost:40342/metadata/endpoints?api-version=2019-11-01"
+
+    if metrics_utils.is_arc_installed():
+        imds_url = metrics_utils.get_arc_endpoint()
+        imds_url += "/metadata/endpoints?api-version=2019-11-01"
+
+    data = None
+    while retries <= max_retries:
+
+        # Query imds to get the required information
+        req = urllib.Request(imds_url, headers={'Metadata':'true'})
+        res = urllib.urlopen(req)
+        data = json.loads(res.read().decode('utf-8', 'ignore'))
+
+        if "dataplaneEndpoints" not in data or "resourceManager" not in data:
+            retries += 1
+        else:
+            break
+
+        time.sleep(sleep_time)
+
+    if retries > max_retries:
+        raise Exception("Unable to find 'dataplaneEndpoints' key in imds query response. Reached max retry limit of - {0} times. Failed to set up ME.".format(max_retries))
+
+    if "arcMonitorControlServiceEndpoint" not in data["dataplaneEndpoints"]:
+        raise Exception("Unable to find 'arcMonitorControlServiceEndpoint' key in imds query response. Failed to set up ME.")
+
+    mcs_endpoint = data["dataplaneEndpoints"]["arcMonitorControlServiceEndpoint"]
+    arm_endpoint = data["resourceManager"]
+
+    return arm_endpoint, mcs_endpoint
+
+def get_arca_ingestion_endpoint_from_mcs():
+    """
+    Query himds to get required arca endpoints for MetricsExtension config for this connected machine
+    """
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
+
+    _, mcs_endpoint = get_arca_endpoints_from_himds()
+    az_resource_id, _, _, _, _ = get_imds_values(False)
+    msi_token_fetched, mcs_token, log_messages = get_ArcA_MSI_token()
+    if not msi_token_fetched:
+        raise Exception("Unable to fetch MCS token, error message: " + log_messages)
+    
+
+    mcs_config_query_url = mcs_endpoint + az_resource_id + "/agentConfigurations?platform=linux&includeMeConfig=true&api-version=2022-06-02"
+
+    if not mcs_token.lower().startswith("bearer "):
+        mcs_token = "Bearer " + mcs_token
+
+    data = None
+    while retries <= max_retries:
+
+        # Query imds to get the required information
+        req = urllib.Request(mcs_config_query_url, headers={'Metadata':'true', 'Authorization':mcs_token})
+        res = urllib.urlopen(req)
+        data = json.loads(res.read().decode('utf-8', 'ignore'))
+
+        if "configurations" not in data:
+            retries += 1
+        else:
+            break
+
+        time.sleep(sleep_time)
+
+    if retries > max_retries:
+        raise Exception("Unable to find 'configurations' key in amcs query response. Reached max retry limit of - {0} times. Failed to set up ME.".format(max_retries))
+
+    if "content" not in data["configurations"][0]:
+        raise Exception("Unable to find 'content' key in amcs query response. Failed to set up ME.")
+    
+    if "channels" not in data["configurations"][0]["content"]:
+        raise Exception("Unable to find 'channels' key in amcs query response. Failed to set up ME.")
+    
+    if "endpoint" not in data["configurations"][0]["content"]["channels"][0]:
+        raise Exception("Unable to find 'endpoint' key in amcs query response. Failed to set up ME.")
+
+    ingestion_endpoint = data["configurations"][0]["content"]["channels"][0]["endpoint"]
+
+    # try:
+    #     gig_hostname = urllib.parse.urlparse(ingestion_endpoint).netloc
+
+    # except Exception as e:
+    #     raise Exception("Failed to retrieve ingestion host name with Exception='{0}'. ".format(e))
+
+    return ingestion_endpoint
 
 def get_arm_domain(az_environment):
     """
@@ -570,7 +736,13 @@ def get_arm_domain(az_environment):
     """
 
     try:
-        domain = ARMDomainMap[az_environment.lower()]
+        if az_environment.lower() == ArcACloudName:
+            arm_endpoint, _ = get_arca_endpoints_from_himds()
+            arm_endpoint_parsed = urlparse(arm_endpoint)
+            domain = arm_endpoint_parsed.netloc
+        else:
+            domain = ARMDomainMap[az_environment.lower()]
+
     except KeyError:
         raise Exception("Unknown cloud environment \"{0}\". Failed to set up ME.".format(az_environment))
 
@@ -622,17 +794,11 @@ def setup_me(is_lad, HUtilObj=None):
     aad_auth_url = ""
     arm_url = "https://{0}/subscriptions/{1}?api-version=2014-04-01".format(arm_domain, subscription_id)
     try:
-        req = urllib.request.Request(arm_url, headers={'Content-Type':'application/json'})
+        req = urllib.Request(arm_url, headers={'Content-Type':'application/json'})
 
-        # urlopen alias in future backport is broken on py2.6, fails on urls with HTTPS - https://github.com/PythonCharmers/python-future/issues/167
-        # Using this hack of switching between py2 and 3 to avoid this
-        if sys.version_info < (2,7):
-            from urllib2 import HTTPError, Request, urlopen
-            urlopen(req)
-        else:
-            res = urllib.request.urlopen(req)
+        res = urllib.urlopen(req)
 
-    except urllib.error.HTTPError as e:
+    except urlerror.HTTPError as e:
         err_res = e.headers["WWW-Authenticate"]
         for line in err_res.split(","):
                 if "Bearer authorization_uri" in line:
@@ -652,7 +818,11 @@ def setup_me(is_lad, HUtilObj=None):
     me_conf = create_metrics_extension_conf(az_resource_id, aad_auth_url)
 
     #create custom metrics conf
-    custom_conf = create_custom_metrics_conf(location)
+    if az_environment.lower() == ArcACloudName:
+        ingestion_endpoint = get_arca_ingestion_endpoint_from_mcs()
+        custom_conf = create_custom_metrics_conf(location, ingestion_endpoint)
+    else:
+        custom_conf = create_custom_metrics_conf(location)
 
     #write configs to disk
     logFolder, configFolder = get_handler_vars()

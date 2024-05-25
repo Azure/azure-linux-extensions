@@ -34,6 +34,13 @@ class ParameterParser(object):
         self.customSettings = None
         self.snapshotTaskToken = ''
         self.includedDisks = None
+        self.dynamicConfigsFromCRP = None
+        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False, CommonVariables.enableSnapshotExtensionPolling: False}
+        settingKeysMapping= {}
+        settingKeysMapping[CommonVariables.isSnapshotTtlEnabled.lower()] = CommonVariables.isSnapshotTtlEnabled
+        settingKeysMapping[CommonVariables.useMccfToFetchDsasForAllDisks.lower()] = CommonVariables.useMccfToFetchDsasForAllDisks
+        settingKeysMapping[CommonVariables.useMccfForLad.lower()] = CommonVariables.useMccfForLad
+        settingKeysMapping[CommonVariables.enableSnapshotExtensionPolling.lower()] = CommonVariables.enableSnapshotExtensionPolling
         self.includeLunList = []    #To be shared with HP
 
         """
@@ -52,7 +59,6 @@ class ParameterParser(object):
         elif(CommonVariables.customSettings in protected_settings.keys()):
             backup_logger.log("Reading customSettings from protected_settings", True)
             self.customSettings = protected_settings.get(CommonVariables.customSettings)
-
 
         self.publicObjectStr = public_settings.get(CommonVariables.object_str)
         if(self.publicObjectStr is not None and self.publicObjectStr != ""):
@@ -75,6 +81,8 @@ class ParameterParser(object):
             self.snapshotTaskToken = protected_settings.get(CommonVariables.snapshotTaskToken)
         if(CommonVariables.includedDisks in self.public_config_obj.keys()):
             self.includedDisks = self.public_config_obj[CommonVariables.includedDisks]
+        if("dynamicConfigsFromCRP" in self.public_config_obj):
+            self.dynamicConfigsFromCRP = self.public_config_obj['dynamicConfigsFromCRP']
 
         """
         first get the protected configuration
@@ -102,3 +110,20 @@ class ParameterParser(object):
         except Exception as e:
             errorMsg = "Exception occurred while populating includeLunList, Exception: %s" % (str(e))
             backup_logger.log(errorMsg, True)
+        
+        if(self.dynamicConfigsFromCRP != None):
+            try:
+                backup_logger.log("settings received " + str(self.dynamicConfigsFromCRP), True)
+                for config in self.dynamicConfigsFromCRP:
+                    if CommonVariables.key in config and CommonVariables.value in config:
+                        config_key = config[CommonVariables.key].lower()
+                        if(config_key in settingKeysMapping):
+                            self.wellKnownSettingFlags[settingKeysMapping[config_key]] = config[CommonVariables.value]
+                        else:
+                            backup_logger.log("The received " + str(config[CommonVariables.key]) + " is not an expected setting name.", True)
+                    else:
+                        backup_logger.log("The received dynamicConfigsFromCRP is not in expected format.", True)
+            except Exception as e:
+                errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
+                backup_logger.log(errorMsg, True)
+        backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)

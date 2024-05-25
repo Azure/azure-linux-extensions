@@ -145,7 +145,7 @@ void CfgCtxIdentityComponent::Enter(const xmlattr_t& properties)
 	_ctxidentity = dynamic_cast<CfgCtxIdentity*>(ParentContext);
 	if (!_ctxidentity) {
 		FATAL("Found <IdentityComponent> in <" + ParentContext->Name() + ">; that can't happen");
-		IsValid = false;	// Bummer; invalid
+		IsValid = false;
 		return;
 	}
 
@@ -164,7 +164,7 @@ void CfgCtxIdentityComponent::Enter(const xmlattr_t& properties)
 
 	if (ComponentName.empty()) {
 		ERROR("<IdentityComponent> requires attribute \"name\"");
-		IsValid = false;	// Bummer; invalid
+		IsValid = false;
 	} else if (!Envariable.empty() && useHostname) {
 		ERROR("Cannot specify both useComputerName and envariable for the same <IdentityComponent>");
 		IsValid = false;

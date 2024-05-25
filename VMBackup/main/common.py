@@ -42,6 +42,13 @@ class CommonVariables:
     statusBlobUploadError = 'statusBlobUploadError'
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
+    isSnapshotTtlEnabled = 'isSnapshotTtlEnabled'
+    useMccfForLad = 'useMccfForLad'
+    useMccfToFetchDsasForAllDisks = 'useMccfToFetchDsasForAllDisks'
+    enableSnapshotExtensionPolling = "EnableSnapshotExtensionPolling"
+    key = 'Key'
+    value = 'Value'
+    snapshotTtlHeader = 'x-ms-snapshot-ttl-expiry-hours'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
@@ -89,12 +96,14 @@ class CommonVariables:
     error_http_failure = 15
     FailedHandlerGuestAgentCertificateNotFound = 16
     #error_upload_status_blob = 16
+
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotRateExceeded = 173
     FailedFsFreezeFailed = 121
     FailedFsFreezeTimeout = 122
     FailedUnableToOpenMount = 123
+    FailedSafeFreezeBinaryNotFound = 124
 
     """
     Pre-Post Plugin error code definitions
@@ -104,6 +113,7 @@ class CommonVariables:
     PrePost_ScriptStatus_Success = 0
     PrePost_ScriptStatus_Error = 1
     PrePost_ScriptStatus_Warning = 2
+    FailedInvalidDataDiskLunList = 17
 
     FailedPrepostPreScriptFailed = 300
     FailedPrepostPostScriptFailed = 301

@@ -10,16 +10,16 @@ import Utils.extensionutils as ext_utils
 import Utils.constants as constants
 
 
-def get_my_distro(config):
+def get_my_distro(config, os_name=None):
     if 'FreeBSD' in platform.system():
         return FreeBSDDistro(config)
+    
+    if os_name is None:
+        if os.path.isfile(constants.os_release):
+            os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
+        elif os.path.isfile(constants.system_release):
+            os_name = ext_utils.get_file_contents(constants.system_release)
 
-    if os.path.isfile(constants.os_release):
-        os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
-    elif os.path.isfile(constants.system_release):
-        os_name = ext_utils.get_file_contents(constants.system_release)
-    else:
-        return GenericDistro(config)
     if os_name is not None:
         if re.search("fedora", os_name, re.IGNORECASE):
             # Fedora
@@ -41,6 +41,8 @@ def get_my_distro(config):
             return SuSEDistro(config)
         if re.search("ubuntu", os_name, re.IGNORECASE):
             return UbuntuDistro(config)
+        if re.search("mariner", os_name, re.IGNORECASE):
+            return MarinerDistro(config)
     return GenericDistro(config)
 
 
@@ -152,7 +154,7 @@ class GenericDistro(object):
         salt = "${0}${1}".format(crypt_id, salt)
         return crypt.crypt(password, salt)
 
-    def create_account(self, user, password, expiration, thumbprint):
+    def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
         Create a user account, with 'user', 'password', 'expiration', ssh keys
         and sudo permissions.
@@ -193,7 +195,7 @@ class GenericDistro(object):
                 # add the include of sudoers.d to the /etc/sudoers
                 ext_utils.set_file_contents(
                     '/etc/sudoers', ext_utils.get_file_contents('/etc/sudoers') + '\n#includedir /etc/sudoers.d\n')
-            if password is None:
+            if password is None or enable_nopasswd:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
@@ -281,7 +283,7 @@ class FreeBSDDistro(GenericDistro):
     def chpasswd(self, user, password):
         return ext_utils.run_send_stdin(['pw', 'usermod', 'user', '-h', '0'], password, log_cmd=False)
 
-    def create_account(self, user, password, expiration, thumbprint):
+    def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
         Create a user account, with 'user', 'password', 'expiration', ssh keys
         and sudo permissions.
@@ -328,7 +330,7 @@ class FreeBSDDistro(GenericDistro):
                     self.sudoers_dir_base + '/sudoers',
                     ext_utils.get_file_contents(
                         self.sudoers_dir_base + '/sudoers') + '\n#includedir ' + self.sudoers_dir_base + '/sudoers.d\n')
-            if password is None:
+            if password is None or enable_nopasswd:
                 ext_utils.set_file_contents(
                     self.sudoers_dir_base + "/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
@@ -424,7 +426,7 @@ class CoreOSDistro(GenericDistro):
         """
         return 0
 
-    def create_account(self, user, password, expiration, thumbprint):
+    def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
         Create a user account, with 'user', 'password', 'expiration', ssh keys
         and sudo permissions.
@@ -458,7 +460,7 @@ class CoreOSDistro(GenericDistro):
         if password is not None:
             self.change_password(user, password)
         try:
-            if password is None:
+            if password is None or enable_nopasswd:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
@@ -523,7 +525,7 @@ class FedoraDistro(RedhatDistro):
             logger.error("Failed to restart SSH service with return code:" + str(retcode))
         return retcode
 
-    def create_account(self, user, password, expiration, thumbprint):
+    def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         ext_utils.run(['/sbin/usermod', user, '-G', 'wheel'])
 
     def delete_account(self, user):
@@ -535,3 +537,21 @@ class SuSEDistro(GenericDistro):
         super(SuSEDistro, self).__init__(config)
         self.ssh_service_name = 'sshd'
         self.distro_name = "SuSE"
+
+
+class MarinerDistro(GenericDistro):
+    def __init__(self, config):
+        super(MarinerDistro, self).__init__(config)
+        self.ssh_service_name = 'sshd'
+        self.service_cmd = '/usr/bin/systemctl'
+        self.distro_name = 'Mariner'
+    
+    def restart_ssh_service(self):
+        """
+        Service call to re(start) the SSH service
+        """
+        ssh_restart_cmd = [self.service_cmd, self.ssh_service_restart_option, self.ssh_service_name]
+        retcode = ext_utils.run(ssh_restart_cmd)
+        if retcode > 0:
+            logger.error("Failed to restart SSH service with return code:" + str(retcode))
+        return retcode

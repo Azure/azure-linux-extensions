@@ -1,7 +1,9 @@
 CC := aarch64-linux-gnu-gcc
 SRCDIR := src
 LIBDIR := lib
-BINDIR := bin
+BINDIRNEW := binNew
+BINDIROLD := bin
+BINDIR := $(BINDIRNEW)
 INCDIR := include
 BUILDDIR := build
 TARGET := $(BINDIR)/safefreeze

@@ -18,13 +18,6 @@
 
 from __future__ import print_function
 import sys
-# future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
-if sys.version_info[0] < 3:
-    from future import standard_library
-    standard_library.install_aliases()
-    from builtins import str
-
 import os
 import os.path
 import datetime
@@ -41,14 +34,13 @@ import subprocess
 import json
 import base64
 import inspect
-import urllib.request, urllib.parse, urllib.error
 import shutil
 import crypt
 import xml.dom.minidom
 import re
 import hashlib
+import fileinput
 from collections import OrderedDict
-from distutils.version import LooseVersion
 from hashlib import sha256
 from shutil import copyfile
 
@@ -57,6 +49,16 @@ import telegraf_utils.telegraf_config_handler as telhandler
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
 import metrics_ext_utils.metrics_common_utils as metrics_utils
+
+if sys.version_info[0] == 3:
+    import urllib.request as urllib
+    from urllib.parse import urlparse
+    import urllib.error as urlerror
+
+elif sys.version_info[0] == 2:
+    import urllib2 as urllib
+    from urlparse import urlparse
+    import urllib2 as urlerror
 
 try:
     from Utils.WAAgentUtil import waagent
@@ -110,6 +112,10 @@ PackageManager = ''
 PackageManagerOptions = ''
 MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricCounters.json'
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
+AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
+AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
+PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/previewFeatures/'
+ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -130,15 +136,6 @@ HUtilObject = None
 SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
-
-
-# Change permission of log path - if we fail, that is not an exit case
-try:
-    ext_log_path = '/var/log/azure/'
-    if os.path.exists(ext_log_path):
-        os.chmod(ext_log_path, 700)
-except:
-    pass
 
 
 def main():
@@ -165,6 +162,8 @@ def main():
             operation = 'Update'
         elif re.match('^([-/]*)(metrics)', option):
             operation = 'Metrics'
+        elif re.match('^([-/]*)(syslogconfig)', option):
+            operation = 'Syslogconfig'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -280,14 +279,33 @@ def compare_and_copy_bin(src, dest):
 def copy_amacoreagent_binaries():
     amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
     amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
-
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
+
+    liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
+    liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
+    compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
+
+    libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
+    libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
+    compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
-
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
-    
+
+def copy_mdsd_binaries():
+    current_arch = platform.machine()
+    mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
+    mdsdmgr_bin_local_path = os.getcwd() + "/mdsdBin/mdsdmgr_" + current_arch
+    mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
+    mdsdmgr_bin = "/opt/microsoft/azuremonitoragent/bin/mdsdmgr"
+
+    canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
+    canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
+    if canUseSharedmdsd != 0 and canUseSharedmdsdmgr != 0:        
+        compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
+        compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
+
 def install():
     """
     Ensure that this VM distro and version are supported.
@@ -309,6 +327,16 @@ def install():
             insserv_exit_code, insserv_output = run_command_and_log("zypper --non-interactive install insserv-compat")
             if insserv_exit_code != 0:
                 return insserv_exit_code, insserv_output
+
+    # Check if Debian 12 VMs have rsyslog package (required for AMA 1.31+)
+    if (vm_dist.startswith('debian')) and vm_ver.startswith('12'):
+        check_rsyslog, _ = run_command_and_log("dpkg -s rsyslog")
+        if check_rsyslog != 0:
+            hutil_log_info("'rsyslog' package missing from Debian 12 machine, installing to allow AMA to run.")
+            rsyslog_exit_code, rsyslog_output = run_command_and_log("DEBIAN_FRONTEND=noninteractive apt-get update && \
+                                                                    DEBIAN_FRONTEND=noninteractive apt-get install -y rsyslog")
+            if rsyslog_exit_code != 0:
+                return rsyslog_exit_code, rsyslog_output
 
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
@@ -336,16 +364,25 @@ def install():
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
-    # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
-    if is_systemd() and platform.machine() == 'aarch64':
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+    # Copy mdsd with OpenSSL dynamically linked
+    if is_feature_enabled('useDynamicSSL'):
+        # Check if they have libssl.so.1.1 since AMA is built against this version
+        libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
+        if libssl1_1 == 0:
+            copy_mdsd_binaries()
+            
+    # Comment out the following check in AMA 1.31 as the coreagent & agentlauncher services are not installed with the aarch64 deb/rpm packages.
+    #
+    # # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
+    # if is_systemd() and platform.machine() == 'aarch64':
+    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
+    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
     
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
     if exit_code == 0:
         vm_dist, _ = find_vm_distro('Install')
-        if vm_dist.startswith('suse'):
+        if (vm_dist.startswith('suse') or vm_dist.startswith('sles')):
             try:
                 suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
                 if suse_exit_code != 0:
@@ -384,6 +421,8 @@ def uninstall():
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
 
+    remove_localsyslog_configs()
+
     # Retry, since uninstall can fail due to concurrent package operations
     try:
         exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
@@ -404,12 +443,6 @@ def enable():
     """
 
     public_settings, protected_settings = get_settings()
-
-    # start the metrics watcher if its not already running
-    if ((protected_settings is None or len(protected_settings) == 0) or
-        (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application") or
-        (public_settings is not None and public_settings.get(AzureMonitorConfigKey) is not None and public_settings.get(AzureMonitorConfigKey).get("ensure") == True)):
-        start_metrics_process()
 
     exit_if_vm_not_supported('Enable')
 
@@ -439,11 +472,21 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
+    _, _, _, az_environment, _ = me_handler.get_imds_values(is_lad=False)
+    if az_environment.lower() == me_handler.ArcACloudName:
+        _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
+        default_configs["customRegionalEndpoint"] = mcs_endpoint
+        default_configs["customGlobalEndpoint"] = mcs_endpoint
+        default_configs["customResourceEndpoint"] = "https://monitoring.azs"
+
+
     """
     Decide the mode and configuration. There are two supported configuration schema, mix-and-match between schemas is disallowed:
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
         Next-Generation: allows MCS, GCS multi tenant, or both
     """
+    is_gcs_single_tenant = False
+    GcsEnabled, McsEnabled = get_control_plane_mode()
 
     # Next-generation schema
     if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):
@@ -458,7 +501,7 @@ def enable():
         if geneva_configuration and geneva_configuration.get("enable") == True:
             hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
             ensure["azuremonitoragentmgr"] = True
-
+            
         if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
             hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
             ensure["azuremonitoragent"] = True
@@ -470,7 +513,7 @@ def enable():
     elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
         ensure["azuremonitoragentmgr"] = True
-
+                
     elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
         hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
         ensure["azuremonitoragent"] = True
@@ -479,7 +522,14 @@ def enable():
     else:
         hutil_log_info("Detected Geneva mode; azuremonitoragent service will be started to handle Geneva configuration")
         ensure["azuremonitoragent"] = True
+        is_gcs_single_tenant = True
         handle_gcs_config(public_settings, protected_settings, default_configs)
+        
+    # generate local syslog configuration files as in auto config syslog is not driven from DCR
+    # Note that internally AMCS with geneva config path can be used in which case syslog should be handled same way as default 1P
+    # generate local syslog configuration files as in 1P syslog is not driven from DCR
+    if GcsEnabled:
+        generate_localsyslog_configs(uses_gcs=True, uses_mcs=McsEnabled)
 
     config_file = "/etc/default/azuremonitoragent"
     temp_config_file = "/etc/default/azuremonitoragent_temp"
@@ -502,8 +552,18 @@ def enable():
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-        start_amacoreagent()
-        restart_launcher()
+        if platform.machine() != 'aarch64':
+            # enable processes for Custom Logs
+            ensure["azuremonitor-agentlauncher"] = True
+            ensure["azuremonitor-coreagent"] = True
+            
+        # start the metrics and syslog watcher only in 3P mode
+        start_metrics_process()
+        start_syslogconfig_process()
+    elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
+        # In GCS scenarios, ensure that AMACoreAgent is running
+        if platform.machine() != 'aarch64':
+            ensure["azuremonitor-coreagent"] = True
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -664,9 +724,9 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     default_configs["ENABLE_MCS"] = "true"
     default_configs["PA_GIG_BRIDGE_MODE"] = "true"
     # April 2022: PA_FLUENT_SOCKET_PORT setting is being deprecated in place of PA_DATA_PORT. Remove when AMA 1.17 and earlier no longer need servicing.
-    default_configs["PA_FLUENT_SOCKET_PORT"] = "13000"
+    default_configs["PA_FLUENT_SOCKET_PORT"] = "13005"
     # this port will be dynamic in future
-    default_configs["PA_DATA_PORT"] = "13000"
+    default_configs["PA_DATA_PORT"] = "13005"
 
     # fetch proxy settings
     if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
@@ -677,7 +737,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
         else:
             log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
 
-        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == "true":
+        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == True:
             if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
                 default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                 default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
@@ -686,7 +746,21 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
         else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+    
+    # is this Arc? If so, check for proxy     
+    if os.path.isfile(ArcSettingsFile):
+        f = open(ArcSettingsFile, "r")
+        data = f.read()
 
+        if (data != ''):
+            json_data = json.loads(data)
+            if json_data is not None and "proxy.url" in json_data:
+                url = json_data["proxy.url"]
+                # only non-authenticated proxy config is supported
+                if url != '':
+                    default_configs["MDSD_PROXY_ADDRESS"] = url
+                    set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+                    
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
 
@@ -696,6 +770,33 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     if identifier_name and identifier_value:
         default_configs["MANAGED_IDENTITY"] = "{0}#{1}".format(identifier_name, identifier_value)
 
+def get_control_plane_mode():
+    """
+    Identify which control plane is in use
+    """
+    public_settings, protected_settings = get_settings()
+
+    GcsEnabled = False
+    McsEnabled = False
+
+    if public_settings is not None and (public_settings.get(GenevaConfigKey) or public_settings.get(AzureMonitorConfigKey)):        
+        geneva_configuration = public_settings.get(GenevaConfigKey)
+        azure_monitor_configuration = public_settings.get(AzureMonitorConfigKey)
+
+        if geneva_configuration and geneva_configuration.get("enable") == True:
+            GcsEnabled = True
+        if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
+            McsEnabled = True
+    # Legacy schema
+    elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
+        GcsEnabled = True
+    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+        McsEnabled = True
+    else:
+        GcsEnabled = True
+    
+    return GcsEnabled, McsEnabled
+
 def disable():
     """
     Disable Azure Monitor Linux Agent process on the VM.
@@ -704,6 +805,9 @@ def disable():
 
     #stop the metrics process
     stop_metrics_process()
+
+    #stop syslog config watcher process
+    stop_syslogconfig_process()
 
     # stop amacoreagent and agent launcher
     hutil_log_info('Handler initiating Core Agent and agent launcher')
@@ -735,23 +839,12 @@ def update():
 
     return 0, ""
 
-def start_amacoreagent():
-    if platform.machine() == 'aarch64':
-        return
-    # start Core Agent
-    hutil_log_info('Handler initiating Core Agent')
-    if is_systemd():
-        exit_code, output = run_command_and_log('systemctl start azuremonitor-coreagent && systemctl enable azuremonitor-coreagent')
-
 def restart_launcher():
     if platform.machine() == 'aarch64':
         return
     # start agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
-        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
-        # in case AL is not cleaning up properly
-        check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
 def set_proxy(address, username, password):
@@ -871,6 +964,25 @@ def stop_metrics_process():
 
         run_command_and_log("rm "+pids_filepath)
 
+def stop_syslogconfig_process():
+    
+    pids_filepath = os.path.join(os.getcwd(),'amasyslogconfig.pid')
+
+    # kill existing syslog config watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA syslog watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-syslogconfig") >= 0:
+                            kill_cmd = "kill " + pid
+                            run_command_and_log(kill_cmd)
+
+        run_command_and_log("rm "+ pids_filepath)
+
 def is_metrics_process_running():
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
     if os.path.exists(pids_filepath):
@@ -882,6 +994,21 @@ def is_metrics_process_running():
                     with open(cmd_file, "r") as pidf:
                         cmdline = pidf.readlines()
                         if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-metrics") >= 0:
+                            return True
+
+    return False
+
+def is_syslogconfig_process_running():
+    pids_filepath = os.path.join(os.getcwd(),'amasyslogconfig.pid')
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA syslog watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-syslogconfig") >= 0:
                             return True
 
     return False
@@ -902,6 +1029,23 @@ def start_metrics_process():
         args = [sys.executable, ama_path, '-metrics']
         log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
         hutil_log_info('start watcher process '+str(args))
+        subprocess.Popen(args, stdout=log, stderr=log)
+
+def start_syslogconfig_process():
+    """
+    Start syslog check process that performs periodic DCR monitoring activities and looks for syslog config changes
+    :return: None
+    """
+
+    # test
+    if not is_syslogconfig_process_running():
+        stop_syslogconfig_process()
+
+        # Start syslog config watcher
+        ama_path = os.path.join(os.getcwd(), 'agent.py')
+        args = [sys.executable, ama_path, '-syslogconfig']
+        log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+        hutil_log_info('start syslog watcher process '+str(args))
         subprocess.Popen(args, stdout=log, stderr=log)
 
 def metrics_watcher(hutil_error, hutil_log):
@@ -983,7 +1127,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data,
-                                "udp://127.0.0.1:" + metrics_constants.ama_metrics_extension_udp_port,
+                                "unix:///run/azuremonitoragent/mdm_influxdb.socket",
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
@@ -1027,7 +1171,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                         if generate_token:
                             generate_token = False
-                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value)
+                            msi_token_generated, me_msi_token_expiry_epoch, log_messages = me_handler.generate_MSI_token(identifier_name, identifier_value, is_lad=False)
                             if msi_token_generated:
                                 hutil_log("Successfully refreshed metrics-extension MSI Auth token.")
                             else:
@@ -1087,6 +1231,192 @@ def metrics_watcher(hutil_error, hutil_log):
         finally:
             time.sleep(sleepTime)
 
+def syslogconfig_watcher(hutil_error, hutil_log):
+    """
+    Watcher thread to monitor syslog configuration changes and to take action on them
+    """
+    syslog_enabled  = False
+    # Check for config changes every 30 seconds
+    sleepTime =  30
+
+    # Sleep before starting the monitoring
+    time.sleep(sleepTime)
+
+    GcsEnabled, McsEnabled = get_control_plane_mode()
+        
+    while True:
+        try:       
+            if os.path.isfile(AMASyslogConfigMarkerPath):
+                f = open(AMASyslogConfigMarkerPath, "r")
+                data = f.read()
+
+                if (data != ''):
+                    if "true" in data:
+                        syslog_enabled = True
+                f.close()
+            elif GcsEnabled:
+                # 1P Syslog is always enabled as each tenant could be having different mdsd.xml configuration
+                syslog_enabled = True
+
+            if syslog_enabled:
+                # place syslog local configs
+                syslog_enabled  = False
+                generate_localsyslog_configs(uses_gcs=GcsEnabled, uses_mcs=McsEnabled)
+            else:
+                # remove syslog local configs
+                remove_localsyslog_configs()
+
+        except IOError as e:
+            hutil_error('I/O error in setting up syslog config watcher. Exception={0}'.format(e))
+
+        except Exception as e:
+            hutil_error('Error in setting up syslog config watcher. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
+
+def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
+    """
+    Install local syslog configuration files if not present and restart syslog
+    """
+
+    # don't deploy any configuration if no control plane is configured
+    if not uses_gcs and not uses_mcs:
+        return
+    
+    public_settings, _ = get_settings()
+    syslog_port = ''
+    if os.path.isfile(AMASyslogPortFilePath):
+        f = open(AMASyslogPortFilePath, "r")
+        syslog_port = f.read()
+        f.close()
+        
+    useSyslogTcp = False
+    
+    # always use syslog tcp port, unless 
+    # - the distro is Red Hat based and doesn't have semanage
+    #   these distros seem to have SELinux on by default and we shouldn't be installing semanage ourselves
+    if not os.path.exists('/etc/selinux/config'):
+        useSyslogTcp = True
+    else:        
+        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
+        if sedisabled == 0:
+            useSyslogTcp = True
+        else:            
+            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
+            if check_semanage == 0 and syslog_port != '':
+                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
+                if syslogPortEnabled != 0:                    
+                    # allow the syslog port in SELinux
+                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
+                useSyslogTcp = True   
+        
+    # 1P tenants use omuxsock, so keep using that for customers using 1P
+    if useSyslogTcp == True and syslog_port != '' and not uses_gcs:
+        if os.path.exists('/etc/rsyslog.d/'):            
+            restartRequired = False
+            if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+                if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
+                    os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+                    os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+                os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True                
+            
+            portSetting = 'Port="' + syslog_port + '"'
+            defaultPortSetting = 'Port="28330"'
+            portUpdated = False
+            with open('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf') as f:
+                if portSetting not in f.read():
+                    portUpdated = True
+
+            if portUpdated == True:
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+                with fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak') as file:
+                    for line in file:
+                        print(line.replace(defaultPortSetting, portSetting), end='')
+                os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+            
+            if restartRequired == True:
+                run_command_and_log(get_service_command("rsyslog", "restart"))
+                hutil_log_info("Installed local syslog configuration files and restarted syslog")
+
+        if os.path.exists('/etc/syslog-ng/syslog-ng.conf'):
+            restartRequired = False
+            if not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+                if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+                    os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+                syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
+                if not os.path.exists(syslog_ng_confpath):
+                    os.makedirs(syslog_ng_confpath)
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+                os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+
+            portSetting = "port(" + syslog_port + ")"
+            defaultPortSetting = "port(28330)"
+            portUpdated = False
+            with open('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf') as f:
+                if portSetting not in f.read():
+                    portUpdated = True
+
+            if portUpdated == True:
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+                with fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak') as file:
+                    for line in file:
+                        print(line.replace(defaultPortSetting, portSetting), end='')
+                os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                restartRequired = True
+            
+            if restartRequired == True:
+                run_command_and_log(get_service_command("syslog-ng", "restart"))
+                hutil_log_info("Installed local syslog configuration files and restarted syslog")    
+    else:
+        if os.path.exists('/etc/rsyslog.d/') and not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):
+            if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+                os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent.conf","/etc/rsyslog.d/10-azuremonitoragent.conf")
+            os.chmod('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            os.chmod('/etc/rsyslog.d/10-azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            run_command_and_log(get_service_command("rsyslog", "restart"))
+            hutil_log_info("Installed local syslog configuration files and restarted syslog")
+
+        if os.path.exists('/etc/syslog-ng/syslog-ng.conf') and not os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+            if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+                os.remove("/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+            syslog_ng_confpath = os.path.join('/etc/syslog-ng/', 'conf.d')
+            if not os.path.exists(syslog_ng_confpath):
+                os.makedirs(syslog_ng_confpath)
+            copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent.conf","/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+            os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+            run_command_and_log(get_service_command("syslog-ng", "restart"))
+            hutil_log_info("Installed local syslog configuration files and restarted syslog")
+
+def remove_localsyslog_configs():
+    """
+    Remove local syslog configuration files if present and restart syslog
+    """    
+    if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf') or os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
+            os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
+        if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
+            os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+        if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf'):            
+            os.remove("/etc/rsyslog.d/10-azuremonitoragent.conf")
+        run_command_and_log(get_service_command("rsyslog", "restart"))
+        hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
+
+    if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf') or os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+        if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf'):
+            os.remove("/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
+        if os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf'):
+            os.remove("/etc/syslog-ng/conf.d/azuremonitoragent.conf")
+        run_command_and_log(get_service_command("syslog-ng", "restart"))
+        hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
+
 def metrics():
     """
     Take care of setting up telegraf and ME for metrics if configuration is present
@@ -1102,6 +1432,20 @@ def metrics():
 
     return 0, ""
 
+def syslogconfig():
+    """
+    Take care of setting up syslog configuration change watcher
+    """
+    pids_filepath = os.path.join(os.getcwd(), 'amasyslogconfig.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = syslogconfig_watcher, args = [hutil_log_error, hutil_log_info])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
 
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
@@ -1109,7 +1453,8 @@ operations = {'Disable' : disable,
               'Install' : install,
               'Enable' : enable,
               'Update' : update,
-              'Metrics' : metrics
+              'Metrics' : metrics,
+              'Syslogconfig' : syslogconfig
 }
 
 
@@ -1146,7 +1491,7 @@ def set_os_arch(operation):
 
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
-
+        
         # Rename the Arch appropriate metrics extension binary to MetricsExtension
         MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
         SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
@@ -1172,7 +1517,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
+    rpm_set = set(["oracle", "ol", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1200,19 +1545,25 @@ def find_vm_distro(operation):
     """
     vm_dist = vm_id = vm_ver =  None
     parse_manually = False
-    try:
-        vm_dist, vm_ver, vm_id = platform.linux_distribution()
-    except AttributeError:
+
+    # platform commands used below aren't available after Python 3.6
+    if sys.version_info < (3,7):
         try:
-            vm_dist, vm_ver, vm_id = platform.dist()
+            vm_dist, vm_ver, vm_id = platform.linux_distribution()
         except AttributeError:
-            hutil_log_info("Falling back to /etc/os-release distribution parsing")
-    # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
-    # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
-    try:
-        temp_vm_ver = int(vm_ver.split('.')[0])
-    except:
-        parse_manually = True
+            try:
+                vm_dist, vm_ver, vm_id = platform.dist()
+            except AttributeError:
+                hutil_log_info("Falling back to /etc/os-release distribution parsing")
+
+        # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
+        # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
+        try:
+            temp_vm_ver = int(vm_ver.split('.')[0])
+        except:
+            parse_manually = True
+    else:
+        parse_manually = True    
 
     if (not vm_dist and not vm_ver) or parse_manually: # SLES 15 and others
         try:
@@ -1243,20 +1594,21 @@ def is_vm_supported_for_extension(operation):
                        'rhel' : ['7', '8', '9'], # Rhel
                        'centos' : ['7', '8'], # CentOS
                        'red hat' : ['7', '8', '9'], # Oracle, RHEL
-                       'oracle' : ['7', '8'], # Oracle
-                       'debian' : ['9', '10', '11'], # Debian
+                       'oracle' : ['7', '8', '9'], # Oracle
+                       'ol' : ['7', '8', '9'], # Oracle Linux
+                       'debian' : ['9', '10', '11', '12'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
-                       'suse' : ['12'], 'sles' : ['15'], # SLES
+                       'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
-                       'mariner' : ['2'], # Mariner 2.0
-                       'rocky' : ['8'], # Rocky
-                       'alma' : ['8'], # Alma
+                       'mariner' : ['1', '2'], # Mariner
+                       'rocky' : ['8', '9'], # Rocky
+                       'alma' : ['8', '9'], # Alma
                        'opensuse' : ['15'], # openSUSE
                        'amzn' : ['2'] # Amazon Linux 2
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
-                       'ubuntu' : ['18.04', '20.04'], # Ubuntu
+                       'ubuntu' : ['18.04', '20.04', '22.04'], # Ubuntu
                        'alma' : ['8'], # Alma
                        'centos' : ['7'], # CentOS
                        'mariner' : ['2'], # Mariner 2.0
@@ -1317,6 +1669,28 @@ def exit_if_vm_not_supported(operation):
                                     '{0} {1}'.format(vm_dist, vm_ver))
     return 0
 
+def is_feature_enabled(feature):
+    """
+    Checks if the feature is enabled in the current region
+    """
+    feature_support_matrix = {'useDynamicSSL' : ['all'] }
+    
+    featurePreviewFlagPath = PreviewFeaturesDirectory + feature
+    if os.path.exists(featurePreviewFlagPath):
+        return True
+    
+    featurePreviewDisabledFlagPath = PreviewFeaturesDirectory + feature + 'Disabled'
+    if os.path.exists(featurePreviewDisabledFlagPath):
+        return False
+    
+    _, region = get_azure_environment_and_region()
+
+    if feature in feature_support_matrix.keys():
+        if region in feature_support_matrix[feature] or "all" in feature_support_matrix[feature]:
+            return True
+    
+    return False
+
 
 def get_ssl_cert_info(operation):
     """
@@ -1330,7 +1704,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    for name in ['centos', 'redhat', 'red hat', 'oracle', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma', 'amzn']:
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'ol', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma', 'amzn']:
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 
@@ -1395,20 +1769,20 @@ def get_azure_environment_and_region():
     Retreive the Azure environment and region from Azure or Arc IMDS
     """
     imds_endpoint = get_imds_endpoint()
-    req = urllib.request.Request(imds_endpoint)
+    req = urllib.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
     environment = region = None
 
     try:
-        response = json.loads(urllib.request.urlopen(req).read())
+        response = json.loads(urllib.urlopen(req).read())
 
         if ('compute' in response):
             if ('azEnvironment' in response['compute']):
                 environment = response['compute']['azEnvironment']
             if ('location' in response['compute']):
                 region = response['compute']['location'].lower()
-    except urllib.error.HTTPError as e:
+    except urlerror.HTTPError as e:
         hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
         hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
     except:
@@ -1523,7 +1897,6 @@ def final_check_if_dpkg_or_rpm_locked(exit_code, output):
     if dpkg_or_rpm_locked:
         exit_code = DPKGOrRPMLockedErrorCode
     return exit_code
-
 
 def get_settings():
     """

@@ -2255,13 +2255,23 @@ def RunGetOutput(cmd, chk_err=True, log_cmd=True):
         LogIfVerbose(cmd)
     try:
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
+        if isinstance(output, bytes):
+            output = output.decode('latin-1')
     except subprocess.CalledProcessError as e:
         if chk_err and log_cmd:
             Error('CalledProcessError.  Error Code is ' + str(e.returncode))
             Error('CalledProcessError.  Command string was ' + e.cmd)
-            Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
-        return e.returncode, e.output.decode('latin-1')
-    return 0, output.decode('latin-1')
+            if isinstance(e.output[:-1], bytes):
+                Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
+            else:
+                Error('CalledProcessError.  Command result was ' + (e.output[:-1]))
+        if isinstance(e.output, bytes):
+            return_value = e.output.decode('latin-1')
+        else:
+            return_value = e.output
+        return e.returncode, return_value
+    
+    return 0, output
 
 
 def RunSendStdin(cmd, input, chk_err=True, log_cmd=True):
@@ -2283,7 +2293,7 @@ def RunSendStdin(cmd, input, chk_err=True, log_cmd=True):
             Error('CalledProcessError.  Command string was ' + cmd)
             Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
             return 1, output[0].decode('latin-1')
-    if me.returncode is not 0 and chk_err is True and log_cmd:
+    if me.returncode !=  0 and chk_err is True and log_cmd:
         Error('CalledProcessError.  Error Code is ' + str(me.returncode))
         Error('CalledProcessError.  Command string was ' + cmd)
         Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
@@ -4521,11 +4531,11 @@ def GetMyDistro(dist_class_name=''):
 def DistInfo(fullname=0):
     try:
         if 'FreeBSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
+            release = re.sub('\\-.*$', '', str(platform.release()))
             distinfo = ['FreeBSD', release]
             return distinfo
         if 'NS-BSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
+            release = re.sub('\\-.*$', '', str(platform.release()))
             distinfo = ['NS-BSD', release]
             return distinfo
         if 'linux_distribution' in dir(platform):
@@ -4700,7 +4710,7 @@ def main():
     global force
     force = False
     for a in sys.argv[1:]:
-        if re.match("^([-/]*)(help|usage|\?)", a):
+        if re.match("^([-/]*)(help|usage|\\?)", a):
             sys.exit(Usage())
         elif re.match("^([-/]*)version", a):
             print(GuestAgentVersion + " running on " + LinuxDistro)
@@ -4732,7 +4742,7 @@ def main():
     global daemon
     daemon = False
     for a in args:
-        if re.match("^([-/]*)deprovision\+user", a):
+        if re.match("^([-/]*)deprovision\\+user", a):
             sys.exit(Deprovision(force, True))
         elif re.match("^([-/]*)deprovision", a):
             sys.exit(Deprovision(force, False))
