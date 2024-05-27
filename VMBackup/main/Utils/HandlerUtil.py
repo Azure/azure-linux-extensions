@@ -650,7 +650,7 @@ class HandlerUtility:
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
         stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
-        stat_rept = stat_rept.replace(r'\\\/', r'\/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
+        stat_rept = stat_rept.replace('\\\/', '\/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
         stat_rept = stat_rept.replace(date_place_holder,date_string)
 
         # Add Status as sub-status for Status to be written on Status-File
