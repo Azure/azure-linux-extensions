@@ -364,6 +364,9 @@ def install():
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
+    # Copy Kqle xtension binaries
+    copy_kqlextension_binaries()
+
     # Copy mdsd with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
         # Check if they have libssl.so.1.1 since AMA is built against this version
@@ -1717,6 +1720,12 @@ def get_ssl_cert_info(operation):
 
     log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
 
+def copy_kqlextension_binaries():
+    kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
+    kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
+
+    for f in os.listdir(kqlextension_bin_local_path):
+        compare_and_copy_bin(kqlextension_bin_local_path + "/" + f, kqlextension_bin + "/" + f)
 
 def is_arc_installed():
     """
