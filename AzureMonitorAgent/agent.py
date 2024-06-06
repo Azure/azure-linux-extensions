@@ -598,6 +598,26 @@ def enable():
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
                 return exit_code, output
 
+    # check if .NET is installed
+    check_dotnet, dotnetcmd_output = run_command_and_log("dotnet --list-runtimes",log_cmd=False)
+    if check_dotnet != 0:
+        print(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+        #ensure kql extension service is not running. do not block if it fails
+        kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+        if kql_exit_code != 0:
+            status_command = get_service_command("azuremonitor-kqlextension", "status")
+            kql_exit_code, status_output = run_command_and_log(status_command)
+    else:
+        if "7.0" in dotnetcmd_output:
+            print("Found .NET 7.0 installed.")
+        else:
+            print(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+            #ensure kql extension service is not running
+            kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+            if kql_exit_code != 0:
+                status_command = get_service_command("azuremonitor-kqlextension", "status")
+                kql_exit_code, status_output = run_command_and_log(status_command)
+
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
 
@@ -1723,7 +1743,7 @@ def get_ssl_cert_info(operation):
 def copy_kqlextension_binaries():
     kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
     kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
-
+    
     for f in os.listdir(kqlextension_bin_local_path):
         compare_and_copy_bin(kqlextension_bin_local_path + "/" + f, kqlextension_bin + "/" + f)
 
