@@ -1094,16 +1094,16 @@ def metrics_watcher(hutil_error, hutil_log):
                                 print(line, end='')
                     os.chmod(FluentCfgPath, stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
 
-            # add SELinux rules if needed
-            if os.path.exists('/etc/selinux/config') and influx_port != '':
-                sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
-                if sedisabled != 0:                        
-                    check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
-                    if check_semanage == 0:
-                        influxPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + influx_port,log_cmd=False)
-                        if influxPortEnabled != 0:                    
-                            # allow the influx port in SELinux
-                            run_command_and_log('semanage port -a -t http_port_t -p tcp ' + influx_port,log_cmd=False)
+                    # add SELinux rules if needed
+                    if os.path.exists('/etc/selinux/config') and influx_port != '':
+                        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
+                        if sedisabled != 0:                        
+                            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
+                            if check_semanage == 0:
+                                influxPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + influx_port,log_cmd=False)
+                                if influxPortEnabled != 0:                    
+                                    # allow the influx port in SELinux
+                                    run_command_and_log('semanage port -a -t http_port_t -p tcp ' + influx_port,log_cmd=False)
 
             if os.path.isfile(FluentCfgPath):
                 f = open(FluentCfgPath, "r")
