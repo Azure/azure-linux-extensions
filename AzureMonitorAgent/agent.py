@@ -43,6 +43,8 @@ import fileinput
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile
+from shutil import copytree
+from shutil import rmtree
 
 from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
@@ -301,11 +303,15 @@ def copy_mdsd_binaries():
     mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
     mdsdmgr_bin = "/opt/microsoft/azuremonitoragent/bin/mdsdmgr"
 
+    # copy the required libs to our test directory first
+    copytree("/opt/microsoft/azuremonitoragent/lib", os.getcwd() + "/lib")
+    
     canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
     canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
     if canUseSharedmdsd != 0 and canUseSharedmdsdmgr != 0:        
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
         compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
+    rmtree(os.getcwd() + "/lib")    
 
 def install():
     """
