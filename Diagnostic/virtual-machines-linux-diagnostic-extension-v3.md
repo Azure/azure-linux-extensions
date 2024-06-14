@@ -570,6 +570,7 @@ If you'd like to proceed, please execute the following commands on your Azure CL
 my_resource_group=<your_azure_resource_group_name_containing_your_azure_linux_vm>
 my_linux_vm=<your_azure_linux_vm_name>
 my_diagnostic_storage_account=<your_azure_storage_account_for_storing_vm_diagnostic_data>
+my_diagnostic_storage_account_sastoken=<sas_token_generated_in_portal>
 
 # Should login to Azure first before anything else
 az login
@@ -581,8 +582,7 @@ sed -i "s#__DIAGNOSTIC_STORAGE_ACCOUNT__#$my_diagnostic_storage_account#g" porta
 sed -i "s#__VM_RESOURCE_ID__#$my_vm_resource_id#g" portal_public_settings.json
 
 # Set protected settings (storage account SAS token)
-my_diagnostic_storage_account_sastoken=$(az storage account generate-sas --account-name $my_diagnostic_storage_account --expiry 9999-12-31T23:59Z --permissions wlacu --resource-types co --services bt -o tsv)
-my_lad_protected_settings="{'storageAccountName': '$my_diagnostic_storage_account', 'storageAccountSasToken': '$my_diagnostic_storage_account_sastoken'}"
+my_lad_protected_settings="{\"storageAccountName\" : \"$my_diagnostic_storage_account\", \"storageAccountSasToken\": \"$my_diagnostic_storage_account_sastoken\"}"
 
 # Finallly enable (set) the extension for the Portal metrics charts experience
 az vm extension set --publisher Microsoft.Azure.Diagnostics --name LinuxDiagnostic --version 3.0 --resource-group $my_resource_group --vm-name $my_linux_vm --protected-settings "${my_lad_protected_settings}" --settings portal_public_settings.json
