@@ -29,6 +29,7 @@ import sys
 from common import CommonVariables
 from subprocess import *
 from Utils.WAAgentUtil import waagent
+from parameterparser import ParameterParser
 import Utils.HandlerUtil
 import sys
 
@@ -113,7 +114,7 @@ class HttpUtil(object):
             else:
                 return CommonVariables.error_http_failure
 
-    def HttpCallGetResponse(self, method, sasuri_obj, data, headers , responseBodyRequired = False, isHostCall = False):
+    def HttpCallGetResponse(self, method, sasuri_obj, data, headers, responseBodyRequired = False, isHostCall = False):
         result = CommonVariables.error_http_failure
         resp = None
         responeBody = ""
@@ -127,7 +128,13 @@ class HttpUtil(object):
                 if(isHostCall):
                     connection = httplibs.HTTPConnection(sasuri_obj.hostname, timeout = 40) # making call with port 80 to make it http call
                 else:
-                    connection = httplibs.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
+                    port_info = ParameterParser.port()
+                    if(port_info != None):
+                       # TTL is enabled, routing to a 8443 port
+                       connection = httplibs.HTTPSConnection(sasuri_obj.hostname, port = port_info, timeout = 10)
+                    else:
+                        self.logger.log("Routing to a default port")
+                        connection = httplibs.HTTPSConnection(sasuri_obj.hostname, timeout = 10)
                 self.logger.log("Details of sas uri object  hostname: " + str(sasuri_obj.hostname) + " path: " + str(sasuri_obj.path))
                 connection.request(method=method, url=(sasuri_obj.path + '?' + sasuri_obj.query), body=data, headers = headers)
                 resp = connection.getresponse()
