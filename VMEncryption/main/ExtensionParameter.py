@@ -64,6 +64,8 @@ class ExtensionParameter(object):
         """
         private settings
         """
+        if protected_settings is None:
+            protected_settings = {}
         self.AADClientSecret = protected_settings.get(CommonVariables.AADClientSecretKey)
 
         if self.AADClientSecret is None:
