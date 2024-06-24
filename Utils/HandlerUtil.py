@@ -54,11 +54,15 @@ Example Status Report:
 import os
 import os.path
 import sys
-import imp
 import base64
 import json
 import time
 import re
+# imp was deprecated in python 3.12
+if sys.version_info >= (3, 12):
+    import importlib
+else:
+    import imp
 
 from xml.etree import ElementTree
 from os.path import join
