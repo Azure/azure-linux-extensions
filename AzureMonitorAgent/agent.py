@@ -371,6 +371,10 @@ def install():
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
+    # Copy Kqle xtension binaries
+    # Needs to be revisited for aarch64
+    copy_kqlextension_binaries()
+
     # Copy mdsd with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
         # Check if they have libssl.so.1.1 since AMA is built against this version
@@ -601,6 +605,33 @@ def enable():
             if status_exit_code != 0:
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
                 return exit_code, output
+
+    # check if .NET is installed to start Kql extension process
+    if platform.machine() != 'aarch64':
+        check_dotnet, dotnetcmd_output = run_command_and_log("dotnet --list-runtimes",log_cmd=False)
+        if check_dotnet != 0:
+            hutil_log_info(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+            #ensure kql extension service is not running. do not block if it fails
+            kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+            if kql_exit_code != 0:
+                status_command = get_service_command("azuremonitor-kqlextension", "status")
+                kql_exit_code, status_output = run_command_and_log(status_command)
+                hutil_log_info(status_output)
+        else:
+            if "7.0" in dotnetcmd_output:
+                hutil_log_info("Found .NET 7.0 installed")
+                if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
+                    # start/enable kql extension only in 3P mode and non aarch64
+                    kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
+                    output += kql_output # do not block if kql start fails
+            else:
+                hutil_log_info(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+                #ensure kql extension service is not running
+                kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+                if kql_exit_code != 0:
+                    status_command = get_service_command("azuremonitor-kqlextension", "status")
+                    kql_exit_code, status_output = run_command_and_log(status_command)
+                    hutil_log_info(status_output)
 
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
@@ -834,6 +865,14 @@ def disable():
 
             if status_exit_code != 0:
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
+
+    if platform.machine() != 'aarch64':
+        # stop kql extensionso that is not started after system reboot. Do not block if it fails.
+        kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+            if kql_exit_code != 0:
+                status_command = get_service_command("azuremonitor-kqlextension", "status")
+                kql_exit_code, kql_status_output = run_command_and_log(status_command)
+                hutil_log_info(kql_status_output)
 
     return exit_code, output
 
@@ -1759,6 +1798,12 @@ def get_ssl_cert_info(operation):
 
     log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
 
+def copy_kqlextension_binaries():
+    kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
+    kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
+    
+    for f in os.listdir(kqlextension_bin_local_path):
+        compare_and_copy_bin(kqlextension_bin_local_path + "/" + f, kqlextension_bin + "/" + f)
 
 def is_arc_installed():
     """
