@@ -365,6 +365,7 @@ def install():
     copy_amacoreagent_binaries()
 
     # Copy Kqle xtension binaries
+    # Needs to be revisited for aarch64
     copy_kqlextension_binaries()
 
     # Copy mdsd with OpenSSL dynamically linked
@@ -598,27 +599,30 @@ def enable():
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
                 return exit_code, output
 
-    # check if .NET is installed
-    check_dotnet, dotnetcmd_output = run_command_and_log("dotnet --list-runtimes",log_cmd=False)
-    if check_dotnet != 0:
-        print(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
-        #ensure kql extension service is not running. do not block if it fails
-        kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-        if kql_exit_code != 0:
-            status_command = get_service_command("azuremonitor-kqlextension", "status")
-            kql_exit_code, status_output = run_command_and_log(status_command)
-    else:
-        if "7.0" in dotnetcmd_output:
-            print("Found .NET 7.0 installed.")
-            kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
-            output += kql_output # do not block if kql start fails
-        else:
+    # check if .NET is installed to start Kql extension process
+    if platform.machine() != 'aarch64':
+        check_dotnet, dotnetcmd_output = run_command_and_log("dotnet --list-runtimes",log_cmd=False)
+        if check_dotnet != 0:
             print(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
-            #ensure kql extension service is not running
+            #ensure kql extension service is not running. do not block if it fails
             kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
             if kql_exit_code != 0:
                 status_command = get_service_command("azuremonitor-kqlextension", "status")
                 kql_exit_code, status_output = run_command_and_log(status_command)
+        else:
+            if "7.0" in dotnetcmd_output:
+                print("Found .NET 7.0 installed")
+                if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
+                    # start/enable kql extension only in 3P mode and non aarch64
+                    kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
+                    output += kql_output # do not block if kql start fails
+            else:
+                print(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+                #ensure kql extension service is not running
+                kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+                if kql_exit_code != 0:
+                    status_command = get_service_command("azuremonitor-kqlextension", "status")
+                    kql_exit_code, status_output = run_command_and_log(status_command)
 
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
@@ -852,6 +856,13 @@ def disable():
 
             if status_exit_code != 0:
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
+
+    if platform.machine() != 'aarch64':
+        # stop kql extensionso that is not started after system reboot. Do not block if it fails.
+        kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+            if kql_exit_code != 0:
+                status_command = get_service_command("azuremonitor-kqlextension", "status")
+                kql_exit_code, kql_status_output = run_command_and_log(status_command)
 
     return exit_code, output
 
