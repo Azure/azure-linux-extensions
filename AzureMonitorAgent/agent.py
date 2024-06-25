@@ -610,6 +610,8 @@ def enable():
     else:
         if "7.0" in dotnetcmd_output:
             print("Found .NET 7.0 installed.")
+            kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
+            output += kql_output # do not block if kql start fails
         else:
             print(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
             #ensure kql extension service is not running
