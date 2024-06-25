@@ -47,7 +47,12 @@ import zipfile
 import json
 import datetime
 import xml.sax.saxutils
-from distutils.version import LooseVersion
+# distutils was deprecated in python 3.12
+if sys.version_info >= (3, 12):
+    from importlib.metadata import version as LooseVersion
+else:
+    from distutils.version import LooseVersion
+
 
 if sys.version_info[0] == 3:
     import http.client as httpclient

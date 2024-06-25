@@ -17,9 +17,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import imp
 import os
 import os.path
+import sys
+# imp was deprecated in python 3.12
+if sys.version_info >= (3, 12):
+    import importlib
+    import types
+else:
+    import imp
 
 #
 # The following code will search and load waagent code and expose
@@ -45,7 +51,15 @@ def searchWAAgent():
 waagent = None
 agentPath = searchWAAgent()
 if agentPath:
-    waagent = imp.load_source('waagent', agentPath)
+    # imp was deprecated in python 3.12
+    if sys.version_info >= (3, 12):
+        # Create a module spec from the waagent python file, then create module from spec and load it
+        loader = importlib.machinery.SourceFileLoader('waagent', agentPath)
+        code = loader.get_code(loader.name)
+        waagent = types.ModuleType(loader.name)
+        exec(code, waagent.__dict__)
+    else:
+        waagent = imp.load_source('waagent', agentPath)
 else:
     raise Exception("Can't load waagent.")
 
