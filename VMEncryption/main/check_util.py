@@ -401,9 +401,6 @@ Please verify and re-run ADE install after fixing the issue.'
             return
         manage_id = public_settings.get(CommonVariables.EncryptionManagedIdentity)
         KeyEncryptionKeyUrl=public_settings.get(CommonVariables.KeyEncryptionKeyURLKey)
-        #checking if managed_id and KeyEncryptionKeyUrl is present. mandatory for DDE. 
-        if not manage_id:
-            raise Exception('managed identity is not provided. Managed Identity is a mandatory field.')
         if not KeyEncryptionKeyUrl:
             raise Exception('KEK URL is not provided. Key encryption key URL is a mandatory field.')
         ret = self._update_imds_managed_id_env_variable(manage_id)
@@ -413,11 +410,11 @@ Please verify and re-run ADE install after fixing the issue.'
         executor = CommandExecutor(self.logger)
         result = executor.Execute(cmd)
         if result != CommonVariables.process_success:
-            #SKR is failed trace the logs.
+            #SKR has failed then turn on tracing and log the output.
             self.logger.log('SKR has failed. Turn on tracing and log the output.')
             os.environ["SKR_TRACE_ON"]="1"
             result = executor.Execute(cmd)
-            #re-check, to ensure the SKR. 
+            #re-check, to ensure the SKR.
             if result != CommonVariables.process_success:
                 raise Exception(msg)
         return
