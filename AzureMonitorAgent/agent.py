@@ -869,10 +869,10 @@ def disable():
     if platform.machine() != 'aarch64':
         # stop kql extensionso that is not started after system reboot. Do not block if it fails.
         kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-            if kql_exit_code != 0:
-                status_command = get_service_command("azuremonitor-kqlextension", "status")
-                kql_exit_code, kql_status_output = run_command_and_log(status_command)
-                hutil_log_info(kql_status_output)
+        if kql_exit_code != 0:
+            status_command = get_service_command("azuremonitor-kqlextension", "status")
+            kql_exit_code, kql_status_output = run_command_and_log(status_command)
+            hutil_log_info(kql_status_output)
 
     return exit_code, output
 
