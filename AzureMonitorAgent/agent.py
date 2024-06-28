@@ -344,7 +344,16 @@ def install():
                                                                     DEBIAN_FRONTEND=noninteractive apt-get install -y rsyslog")
             if rsyslog_exit_code != 0:
                 return rsyslog_exit_code, rsyslog_output
-
+    
+    # Check if Amazon 2023 VMs have rsyslog package (required for AMA 1.31+)
+    if (vm_dist.startswith('amzn')) and vm_ver.startswith('2023'):
+        check_rsyslog, _ = run_command_and_log("dnf list installed | grep rsyslog.x86_64")
+        if check_rsyslog != 0:
+            hutil_log_info("'rsyslog' package missing from Amazon Linux 2023 machine, installing to allow AMA to run.")
+            rsyslog_exit_code, rsyslog_output = run_command_and_log("dnf install -y rsyslog")
+            if rsyslog_exit_code != 0:
+                return rsyslog_exit_code, rsyslog_output
+            
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
@@ -1685,7 +1694,7 @@ def is_vm_supported_for_extension(operation):
                        'rocky' : ['8', '9'], # Rocky
                        'alma' : ['8', '9'], # Alma
                        'opensuse' : ['15'], # openSUSE
-                       'amzn' : ['2'] # Amazon Linux 2
+                       'amzn' : ['2', '2023'] # Amazon Linux 2
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
