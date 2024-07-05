@@ -58,6 +58,8 @@ if agentPath:
         code = loader.get_code(loader.name)
         waagent = types.ModuleType(loader.name)
         exec(code, waagent.__dict__)
+        # Add the module to sys.modules
+        sys.modules['waagent'] = waagent
     else:
         waagent = imp.load_source('waagent', agentPath)
 else:
