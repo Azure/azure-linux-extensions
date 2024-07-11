@@ -1812,7 +1812,7 @@ def copy_kqlextension_binaries():
     kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
     
     for f in os.listdir(kqlextension_bin_local_path):
-        compare_and_copy_bin(kqlextension_bin_local_path + "/" + f, kqlextension_bin + "/" + f)
+        compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
 
 def is_arc_installed():
     """
