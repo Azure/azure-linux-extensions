@@ -801,7 +801,13 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
 
         if (data != ''):
             json_data = json.loads(data)
-            if json_data is not None and "proxy.url" in json_data:
+            BypassProxy = False
+            if json_data is not None and "proxy.bypass" in json_data:
+                bypass = json_data["proxy.bypass"]
+                if bypass == "AMA":
+                    BypassProxy = True
+                    
+            if not BypassProxy and json_data is not None and "proxy.url" in json_data:
                 url = json_data["proxy.url"]
                 # only non-authenticated proxy config is supported
                 if url != '':
