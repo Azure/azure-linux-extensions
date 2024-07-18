@@ -116,7 +116,7 @@ MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricC
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
 AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
-AMAInfluxPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/influx.port'
+AMAFluentPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluent.port'
 PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/previewFeatures/'
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
@@ -1124,15 +1124,15 @@ def metrics_watcher(hutil_error, hutil_log):
 
     while True:
         try:
-            # update fluent config for influx port if needed
-            influx_port = ''
-            if os.path.isfile(AMAInfluxPortFilePath):
-                f = open(AMAInfluxPortFilePath, "r")
-                influx_port = f.read()
+            # update fluent config for fluent port if needed
+            fluent_port = ''
+            if os.path.isfile(AMAFluentPortFilePath):
+                f = open(AMAFluentPortFilePath, "r")
+                fluent_port = f.read()
                 f.close()
             
-            if influx_port != '':
-                portSetting = "Port    "  + influx_port
+            if fluent_port != '':
+                portSetting = "    Port    "  + fluent_port
                 defaultPortSetting = 'Port    '
                 portUpdated = False
                 with open(FluentCfgPath) as f:
@@ -1149,15 +1149,15 @@ def metrics_watcher(hutil_error, hutil_log):
                     os.chmod(FluentCfgPath, stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
 
                     # add SELinux rules if needed
-                    if os.path.exists('/etc/selinux/config') and influx_port != '':
+                    if os.path.exists('/etc/selinux/config') and fluent_port != '':
                         sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
                         if sedisabled != 0:                        
                             check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
                             if check_semanage == 0:
-                                influxPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + influx_port,log_cmd=False)
-                                if influxPortEnabled != 0:                    
-                                    # allow the influx port in SELinux
-                                    run_command_and_log('semanage port -a -t http_port_t -p tcp ' + influx_port,log_cmd=False)
+                                fluentPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False)
+                                if fluentPortEnabled != 0:                    
+                                    # allow the fluent port in SELinux
+                                    run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False)
 
             if os.path.isfile(FluentCfgPath):
                 f = open(FluentCfgPath, "r")
