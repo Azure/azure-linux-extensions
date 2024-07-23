@@ -1137,7 +1137,7 @@ def metrics_watcher(hutil_error, hutil_log):
                 fluent_port = f.read()
                 f.close()
             
-            if fluent_port != '':
+            if fluent_port != '' and os.path.isfile(FluentCfgPath):
                 portSetting = "    Port    "  + fluent_port
                 defaultPortSetting = 'Port    '
                 portUpdated = False
