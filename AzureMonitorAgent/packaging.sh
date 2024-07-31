@@ -86,5 +86,25 @@ echo "Packaging extension $PACKAGE_NAME to $output_path"
 excluded_files="agent.version packaging.sh apply_version.sh update_version.sh"
 zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./tmp"
 
+# validate package size is within limits; these limits come from arc, ideally they are removed in the future
+max_uncompressed_size=$((400 * 1024 * 1024))
+max_compressed_size=$((275 * 1024 * 1024))
+
+# easiest to validate by immediately unzipping versus trying to `du` with various exclusions 
+unzip -d $output_path/unzipped $output_path/$PACKAGE_NAME
+uncompressed_size=$(du -sb $output_path/unzipped | cut -f1)
+compressed_size=$(du -sb $output_path/$PACKAGE_NAME | cut -f1)
+rm -rf $output_path/unzipped
+
+if [[ $uncompressed_size -gt $max_uncompressed_size ]]; then
+    echo "Uncompressed size of $PACKAGE_NAME is $uncompressed_size bytes, which exceeds the limit of $max_uncompressed_size bytes"
+    exit 1
+fi
+
+if [[ $compressed_size -gt $max_compressed_size ]]; then
+    echo "Compressed size of $PACKAGE_NAME is $compressed_size bytes, which exceeds the limit of $max_compressed_size bytes"
+    exit 1
+fi
+
 # cleanup newly added dir or files
 rm -rf Utils/ waagent
