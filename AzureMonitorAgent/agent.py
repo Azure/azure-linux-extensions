@@ -296,12 +296,14 @@ def copy_amacoreagent_binaries():
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
 
-def copy_mdsd_binaries():
+def copy_mdsd_fluentbit_binaries():
     current_arch = platform.machine()
     mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
     mdsdmgr_bin_local_path = os.getcwd() + "/mdsdBin/mdsdmgr_" + current_arch
+    fluentbit_bin_local_path = os.getcwd() + "/fluentBitBin/fluent-bit_" + current_arch
     mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
     mdsdmgr_bin = "/opt/microsoft/azuremonitoragent/bin/mdsdmgr"
+    fluentbit_bin = "/opt/microsoft/azuremonitoragent/bin/fluent-bit"
 
     # copy the required libs to our test directory first
     copytree("/opt/microsoft/azuremonitoragent/lib", os.getcwd() + "/lib")
@@ -311,6 +313,9 @@ def copy_mdsd_binaries():
     if canUseSharedmdsd != 0 and canUseSharedmdsdmgr != 0:        
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
         compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
+
+    compare_and_copy_bin(fluentbit_bin_local_path, fluentbit_bin)
+
     rmtree(os.getcwd() + "/lib")    
 
 def install():
@@ -384,12 +389,12 @@ def install():
     # Needs to be revisited for aarch64
     copy_kqlextension_binaries()
 
-    # Copy mdsd with OpenSSL dynamically linked
+    # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
         # Check if they have libssl.so.1.1 since AMA is built against this version
         libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
         if libssl1_1 == 0:
-            copy_mdsd_binaries()
+            copy_mdsd_fluentbit_binaries()
             
     # Comment out the following check in AMA 1.31 as the coreagent & agentlauncher services are not installed with the aarch64 deb/rpm packages.
     #
