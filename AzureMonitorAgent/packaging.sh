@@ -33,8 +33,8 @@ cp -r  ../LAD-AMA-Common/telegraf_utils .
 cp -f  ../Diagnostic/services/metrics-sourcer.service services/metrics-sourcer.service
 
 # cleanup packages, ext
-rm -rf packages MetricsExtensionBin amaCoreAgentBin KqlExtensionBin agentLauncherBin mdsdBin tmp
-mkdir -p packages MetricsExtensionBin amaCoreAgentBin KqlExtensionBin agentLauncherBin mdsdBin
+rm -rf packages MetricsExtensionBin amaCoreAgentBin KqlExtensionBin agentLauncherBin mdsdBin fluentBitBin tmp
+mkdir -p packages MetricsExtensionBin amaCoreAgentBin KqlExtensionBin agentLauncherBin mdsdBin fluentBitBin
 
 # copy shell bundle to packages/
 cp $input_path/azuremonitoragent_$AGENT_VERSION* packages/
@@ -53,6 +53,7 @@ ar vx tmp/$AMA_DEB_PACKAGE_NAME --output=tmp
 tar xvf tmp/data.tar.gz -C tmp
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_x86_64
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsdmgr mdsdBin/mdsdmgr_x86_64
+cp tmp/opt/microsoft/azuremonitoragent/bin/fluent-bit fluentBitBin/fluent-bit_x86_64
 rm -rf tmp/
 
 mkdir -p tmp
@@ -62,6 +63,7 @@ ar vx tmp/$AMA_DEB_PACKAGE_NAME --output=tmp
 tar xvf tmp/data.tar.gz -C tmp
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsd mdsdBin/mdsd_aarch64
 cp tmp/opt/microsoft/azuremonitoragent/bin/mdsdmgr mdsdBin/mdsdmgr_aarch64
+cp tmp/opt/microsoft/azuremonitoragent/bin/fluent-bit fluentBitBin/fluent-bit_aarch64
 rm -rf tmp/
 
 cp $input_path/MetricsExtension* MetricsExtensionBin/
