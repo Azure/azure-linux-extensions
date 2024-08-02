@@ -35,8 +35,6 @@ import json
 import base64
 import inspect
 import shutil
-import crypt
-import xml.dom.minidom
 import re
 import hashlib
 import fileinput
@@ -1679,6 +1677,15 @@ def find_vm_distro(operation):
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
+    
+    # initialize them to empty string so that .lower() is valid in case we weren't able to retrieve it
+    # downstream callers expect a string and not NoneType
+    if not vm_dist:
+        vm_dist = ""
+
+    if not vm_ver:
+        vm_ver = ""
+
     return vm_dist.lower(), vm_ver.lower()
 
 
@@ -2210,10 +2217,11 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    output = output.encode('utf-8')
+    if type(output) == str:
+        output = output.encode('utf-8')
 
     # On python 3, encode returns a byte object, so we must decode back to a string
-    if sys.version_info >= (3,):
+    if sys.version_info >= (3,) and type(output) == bytes:
         output = output.decode('utf-8', 'ignore')
 
     return exit_code, output.strip()
