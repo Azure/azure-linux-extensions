@@ -177,7 +177,7 @@ class LooseVersionComparator:
         # Regular expression to parse versions with pre-release tags
         match = re.match(r'^(\d+(?:\.\d+)*)(?:-([\da-zA-Z-]+))?$', version)
         if not match:
-            raise ValueError(f"Invalid version format: {version}")
+            raise ValueError("Invalid version format: {0}".format(version))
         
         main_version = tuple(map(int, match.group(1).split('.')))
         prerelease = match.group(2)
@@ -197,7 +197,7 @@ class LooseVersionComparator:
         return self.version == other.version and self.prerelease == other.prerelease
 
     def __str__(self):
-        return ".".join(map(str, self.version)) + (f"-{self.prerelease}" if self.prerelease else "")
+        return ".".join(map(str, self.version)) + ("-{0}".format(self.prerelease) if self.prerelease else "")
 
     @staticmethod
     def _compare_prerelease(pr1, pr2):
