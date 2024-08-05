@@ -1698,7 +1698,7 @@ def is_vm_supported_for_extension(operation):
                        'oracle' : ['7', '8', '9'], # Oracle
                        'ol' : ['7', '8', '9'], # Oracle Linux
                        'debian' : ['9', '10', '11', '12'], # Debian
-                       'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
+                       'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
                        'mariner' : ['1', '2'], # Mariner
