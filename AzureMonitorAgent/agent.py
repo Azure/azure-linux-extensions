@@ -1833,6 +1833,11 @@ def copy_kqlextension_binaries():
     for f in os.listdir(kqlextension_bin_local_path):
         compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
 
+    kqlextension_local_runtimes = os.getcwd() + "/KqlExtensionBin/runtimes/"
+    kqlextension_runtimes = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
+    for f in os.listdir(kqlextension_local_runtimes):
+        compare_and_copy_bin(kqlextension_local_runtimes + f, kqlextension_runtimes + f)
+
 def is_arc_installed():
     """
     Check if this is an Arc machine
