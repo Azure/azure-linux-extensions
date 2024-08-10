@@ -38,6 +38,7 @@ import shutil
 import re
 import hashlib
 import fileinput
+import contextlib
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile
@@ -312,7 +313,9 @@ def copy_mdsd_fluentbit_binaries():
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
         compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
 
-    compare_and_copy_bin(fluentbit_bin_local_path, fluentbit_bin)
+    canUseSharedfluentbit, _ = run_command_and_log('ldd ' + fluentbit_bin_local_path + ' | grep "not found"')
+    if canUseSharedfluentbit != 0:
+        compare_and_copy_bin(fluentbit_bin_local_path, fluentbit_bin)
 
     rmtree(os.getcwd() + "/lib")    
 
@@ -1149,7 +1152,7 @@ def metrics_watcher(hutil_error, hutil_log):
                         portUpdated = True
 
                 if portUpdated == True:
-                    with fileinput.FileInput(FluentCfgPath, inplace=True, backup='.bak') as file:
+                    with contextlib.closing(fileinput.FileInput(FluentCfgPath, inplace=True, backup='.bak')) as file:
                         for line in file:
                             if defaultPortSetting in line:
                                 print(portSetting, end='')
@@ -1432,7 +1435,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
 
             if portUpdated == True:
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
-                with fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak') as file:
+                with contextlib.closing(fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak')) as file:
                     for line in file:
                         print(line.replace(defaultPortSetting, portSetting), end='')
                 os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
@@ -1463,7 +1466,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
 
             if portUpdated == True:
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
-                with fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak') as file:
+                with contextlib.closing(fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak')) as file:
                     for line in file:
                         print(line.replace(defaultPortSetting, portSetting), end='')
                 os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
