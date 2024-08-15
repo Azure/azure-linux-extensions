@@ -280,7 +280,7 @@ class FreeBSDDistro(GenericDistro):
 
 
     # noinspection PyMethodOverriding
-    def chpasswd(self, user, password):
+    def chpasswd(self, user, password, **kwargs):
         return ext_utils.run_send_stdin(['pw', 'usermod', 'user', '-h', '0'], password, log_cmd=False)
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
