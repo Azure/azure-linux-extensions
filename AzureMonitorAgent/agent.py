@@ -35,11 +35,10 @@ import json
 import base64
 import inspect
 import shutil
-import crypt
-import xml.dom.minidom
 import re
 import hashlib
 import fileinput
+import contextlib
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile
@@ -314,7 +313,9 @@ def copy_mdsd_fluentbit_binaries():
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
         compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
 
-    compare_and_copy_bin(fluentbit_bin_local_path, fluentbit_bin)
+    canUseSharedfluentbit, _ = run_command_and_log('ldd ' + fluentbit_bin_local_path + ' | grep "not found"')
+    if canUseSharedfluentbit != 0:
+        compare_and_copy_bin(fluentbit_bin_local_path, fluentbit_bin)
 
     rmtree(os.getcwd() + "/lib")    
 
@@ -624,7 +625,7 @@ def enable():
     if platform.machine() != 'aarch64':
         check_dotnet, dotnetcmd_output = run_command_and_log("dotnet --list-runtimes",log_cmd=False)
         if check_dotnet != 0:
-            hutil_log_info(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+            hutil_log_info(".NET 8.0 is not installed. Please install .NET 8.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
             #ensure kql extension service is not running. do not block if it fails
             kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
             if kql_exit_code != 0:
@@ -632,14 +633,14 @@ def enable():
                 kql_exit_code, status_output = run_command_and_log(status_command)
                 hutil_log_info(status_output)
         else:
-            if "7.0" in dotnetcmd_output:
-                hutil_log_info("Found .NET 7.0 installed")
+            if "8.0" in dotnetcmd_output:
+                hutil_log_info("Found .NET 8.0 installed")
                 if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
                     # start/enable kql extension only in 3P mode and non aarch64
                     kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
                     output += kql_output # do not block if kql start fails
             else:
-                hutil_log_info(".NET 7.0 is not installed. Please install .NET 7.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+                hutil_log_info(".NET 8.0 is not installed. Please install .NET 8.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
                 #ensure kql extension service is not running
                 kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
                 if kql_exit_code != 0:
@@ -1151,7 +1152,7 @@ def metrics_watcher(hutil_error, hutil_log):
                         portUpdated = True
 
                 if portUpdated == True:
-                    with fileinput.FileInput(FluentCfgPath, inplace=True, backup='.bak') as file:
+                    with contextlib.closing(fileinput.FileInput(FluentCfgPath, inplace=True, backup='.bak')) as file:
                         for line in file:
                             if defaultPortSetting in line:
                                 print(portSetting, end='')
@@ -1434,7 +1435,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
 
             if portUpdated == True:
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
-                with fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak') as file:
+                with contextlib.closing(fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak')) as file:
                     for line in file:
                         print(line.replace(defaultPortSetting, portSetting), end='')
                 os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
@@ -1465,7 +1466,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
 
             if portUpdated == True:
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
-                with fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak') as file:
+                with contextlib.closing(fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak')) as file:
                     for line in file:
                         print(line.replace(defaultPortSetting, portSetting), end='')
                 os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
@@ -1679,6 +1680,15 @@ def find_vm_distro(operation):
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
+    
+    # initialize them to empty string so that .lower() is valid in case we weren't able to retrieve it
+    # downstream callers expect a string and not NoneType
+    if not vm_dist:
+        vm_dist = ""
+
+    if not vm_ver:
+        vm_ver = ""
+
     return vm_dist.lower(), vm_ver.lower()
 
 
@@ -1825,6 +1835,11 @@ def copy_kqlextension_binaries():
     
     for f in os.listdir(kqlextension_bin_local_path):
         compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
+
+    kqlextension_local_runtimes = os.getcwd() + "/KqlExtensionBin/runtimes/"
+    kqlextension_runtimes = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
+    for f in os.listdir(kqlextension_local_runtimes):
+        compare_and_copy_bin(kqlextension_local_runtimes + f, kqlextension_runtimes + f)
 
 def is_arc_installed():
     """
@@ -2210,10 +2225,11 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    output = output.encode('utf-8')
+    if type(output) == str:
+        output = output.encode('utf-8')
 
     # On python 3, encode returns a byte object, so we must decode back to a string
-    if sys.version_info >= (3,):
+    if sys.version_info >= (3,) and type(output) == bytes:
         output = output.decode('utf-8', 'ignore')
 
     return exit_code, output.strip()
