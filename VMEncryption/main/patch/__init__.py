@@ -17,19 +17,20 @@
 # Requires Python 2.4+
 
 import os
-import re
 import platform
+import re
 
-from .UbuntuPatching import UbuntuPatching
-from .debianPatching import debianPatching
-from .redhatPatching import redhatPatching
+from .azurelinuxPatching import azurelinuxPatching
 from .centosPatching import centosPatching
-from .SuSEPatching import SuSEPatching
-from .oraclePatching import oraclePatching
+from .debianPatching import debianPatching
 from .marinerPatching import marinerPatching
+from .oraclePatching import oraclePatching
+from .redhatPatching import redhatPatching
+from .SuSEPatching import SuSEPatching
+from .UbuntuPatching import UbuntuPatching
 
 try:
-    import distro # python3.8+
+    import distro  # python3.8+
 except:
     pass
 
