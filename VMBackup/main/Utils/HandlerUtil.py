@@ -116,7 +116,11 @@ class HandlerUtility:
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
-
+    
+    # It is possible in certain restore scenarios, where old setting files are present in the config folder
+    # When new VM is created with same extension, the seq# starts with 0 again. 
+    # We should not read older setting files because of relying on reading the highest sequence number.
+    # Instead, we need to get the seq# of the .settings file with the latest LAST modified file time
     def _get_current_seq_no(self, config_folder):
         seq_no = -1
         cur_seq_no = -1
@@ -330,8 +334,8 @@ class HandlerUtility:
                 return None
             else:
                 if(self.operation is not None and self.operation.lower() == "enable"):
-                    # we should keep the current status file
-                    self.backup_settings_status_file(self._context._seq_no)
+                    # we should keep the current settings file
+                    self.backup_settings_file(self._context._seq_no)
             self._context._config = self._parse_config(ctxt)
         except Exception as e:
             errorMsg = "Unable to parse context, error: %s, stack trace: %s" % (str(e), traceback.format_exc())
@@ -660,10 +664,6 @@ class HandlerUtility:
         stat_rept_file = self.do_status_json(operation, status, sub_stat, status_code, message, None, taskId, commandStartTimeUTCTicks, None, None,total_size,failure_flag)
         stat_rept_file =  "[" + json.dumps(stat_rept_file, cls = ComplexEncoder) + "]"
 
-        # rename all other status files, or the WALA would report the wrong
-        # status file.
-        # because the wala choose the status file with the highest sequence
-        # number to report.
         return stat_rept, stat_rept_file
 
     def write_to_status_file(self, stat_rept_file):
@@ -687,8 +687,10 @@ class HandlerUtility:
             self.log("exception is getting status file" + traceback.format_exc())
             return False
 
-    def backup_settings_status_file(self, _seq_no):
-        self.log("current seq no is " + _seq_no)
+    # Identify all settings files in the directory that are not of the current sequence number, and 
+    # Rename them to not have the .settings suffix.
+    def backup_settings_file(self, _seq_no):
+        self.log("current seq no  is " + _seq_no)
         for subdir, dirs, files in os.walk(self._context._config_dir):
             for file in files:
                 try:
@@ -696,16 +698,7 @@ class HandlerUtility:
                         new_file_name = file.replace(".","_")
                         os.rename(join(self._context._config_dir,file), join(self._context._config_dir,new_file_name))
                 except Exception as e:
-                    self.log("failed to rename the status file.")
-
-        for subdir, dirs, files in os.walk(self._context._status_dir):
-            for file in files:
-                try:
-                    if(file.endswith('.status') and file != (_seq_no + ".status")):
-                        new_file_name = file.replace(".","_")
-                        os.rename(join(self._context._status_dir,file), join(self._context._status_dir, new_file_name))
-                except Exception as e:
-                    self.log("failed to rename the status file.")
+                    self.log("failed to rename the settings file.")
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
@@ -731,7 +724,12 @@ class HandlerUtility:
         last_seq = curr_seq - 1
         if last_seq >= 0:
             self.log("previous status and path: " + str(last_seq) + "  " + str(self._context._status_dir))
-            status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
+            status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '.status')
+            
+            #Adding below for backward compatibility, where prev code version would replace older status files with _status
+            if not os.path.isfile(status_file_prev):
+                status_file_prev = os.path.join(self._context._status_dir, str(last_seq) + '_status')
+
             if os.path.isfile(status_file_prev) and os.access(status_file_prev, os.R_OK):
                 searchfile = open(status_file_prev, "r")
                 for line in searchfile:
