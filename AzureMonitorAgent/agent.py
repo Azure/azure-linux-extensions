@@ -1128,9 +1128,9 @@ def metrics_watcher(hutil_error, hutil_log):
     if error_msg:
         hutil_error('Failed to determine managed identity settings; MSI token retreival will rely on default identity, if any. {0}.'.format(error_msg))
     if identifier_name and identifier_value:
-        managed_identity = "uai{0}#{1}".format(identifier_name, identifier_value)
+        managed_identity_str = "uai#{0}#{1}".format(identifier_name, identifier_value)
     else:
-        managed_identity = "sai"
+        managed_identity_str = "sai"
 
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
@@ -1237,7 +1237,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
-                            me_handler.setup_me(is_lad=False, managed_identity, HUtilObj=HUtilObject)
+                            me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
 
                             start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
                             if start_telegraf_res:
