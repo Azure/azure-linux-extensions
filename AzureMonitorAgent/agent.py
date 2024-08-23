@@ -1127,6 +1127,10 @@ def metrics_watcher(hutil_error, hutil_log):
     identifier_name, identifier_value, error_msg = get_managed_identity()
     if error_msg:
         hutil_error('Failed to determine managed identity settings; MSI token retreival will rely on default identity, if any. {0}.'.format(error_msg))
+    if identifier_name and identifier_value:
+        managed_identity_str = "uai#{0}#{1}".format(identifier_name, identifier_value)
+    else:
+        managed_identity_str = "sai"
 
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
@@ -1233,7 +1237,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
-                            me_handler.setup_me(is_lad=False, HUtilObj=HUtilObject)
+                            me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
 
                             start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
                             if start_telegraf_res:
@@ -1242,7 +1246,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_error(log_messages)
 
 
-                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
                             if start_metrics_out:
                                 hutil_log("Successfully started metrics-extension.")
                             else:
@@ -1313,7 +1317,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                     hutil_log(me_msg)
                                 else:
                                     hutil_error(me_msg)
-                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
 
                                 if start_metrics_out:
                                     hutil_log("Successfully started metrics-extension.")
