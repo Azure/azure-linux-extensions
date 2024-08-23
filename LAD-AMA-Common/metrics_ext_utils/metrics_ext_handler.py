@@ -347,7 +347,7 @@ def get_ArcA_MSI_token(resource = "https://monitoring.azs"):
     return True, token_string, log_messages
 
 
-def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port, HUtilObj=None):
+def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port, managed_identity="sai", HUtilObj=None):
     """
     Setup the metrics service if VM is using systemd
     :param configFolder: Path for the config folder for metrics extension
@@ -371,6 +371,7 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
             os.system(r"sed -i 's+%ME_INFLUX_PORT%+{1}+' {0}".format(me_service_path, me_influx_port))
             os.system(r"sed -i 's+%ME_DATA_DIRECTORY%+{1}+' {0}".format(me_service_path, configFolder))
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
+            os.system(r"sed -i 's+%ME_MANAGED_IDENTITY%+{1}+' {0}".format(me_service_path, managed_identity))
             daemon_reload_status = os.system("systemctl daemon-reload")
             if daemon_reload_status != 0:
                 message = "Unable to reload systemd after ME service file change. Failed to set up ME service. Check system for hardening. Exit code:" + str(daemon_reload_status)
@@ -387,7 +388,7 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
 
 
 
-def start_metrics(is_lad):
+def start_metrics(is_lad, managed_identity="sai"):
     """
     Start the metrics service if VM is using is systemd, otherwise start the binary as a process and store the pid,
     to a file in the MetricsExtension config directory,
@@ -433,7 +434,12 @@ def start_metrics(is_lad):
 
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
-        binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbHost 127.0.0.1 -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
+        # If LAD, use ME startup arguments for LAD, otherwise use ME startup arguments for AMA
+        if is_lad:
+            binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbHost 127.0.0.1 -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
+        else:
+            binary_exec_command = "{0} -TokenSource AMCS -ManagedIdentity {1} -Input influxdb_udp,otlp_grpc,otlp_grpc_prom -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -LogLevel Error".format(metrics_ext_bin, managed_identity)
+        
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
         p = proc.poll()
@@ -779,7 +785,7 @@ def get_metrics_extension_service_name(is_lad):
     else:
         return metrics_constants.metrics_extension_service_name
         
-def setup_me(is_lad, HUtilObj=None):
+def setup_me(is_lad, managed_identity="sai", HUtilObj=None):
     """
     The main method for creating and writing MetricsExtension configuration as well as service setup
     :param is_lad: Boolean value for whether the extension is Lad or not (AMA)
@@ -888,6 +894,6 @@ def setup_me(is_lad, HUtilObj=None):
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
     if metrics_utils.is_systemd():
-        setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port, HUtilObj)
+        setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port, managed_identity, HUtilObj)
 
     return True
