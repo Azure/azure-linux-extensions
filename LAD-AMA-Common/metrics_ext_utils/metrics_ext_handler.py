@@ -388,7 +388,7 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
 
 
 
-def start_metrics(is_lad):
+def start_metrics(is_lad, managed_identity="sai"):
     """
     Start the metrics service if VM is using is systemd, otherwise start the binary as a process and store the pid,
     to a file in the MetricsExtension config directory,
@@ -434,7 +434,12 @@ def start_metrics(is_lad):
 
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
-        binary_exec_command = "{0} -TokenSource AMCS -Input influxdb_udp,otlp_grpc,otlp_grpc_prom -InfluxDbHost 127.0.0.1 -InfluxDbUdpPort {1} -LogLevel Error".format(metrics_ext_bin, me_influx_port)
+        # If LAD, use ME startup arguments for LAD, otherwise use ME startup arguments for AMA
+        if is_lad:
+            binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbHost 127.0.0.1 -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
+        else:
+            binary_exec_command = "{0} -TokenSource AMCS -ManagedIdentity {1} -Input influxdb_udp,otlp_grpc,otlp_grpc_prom -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -LogLevel Error".format(metrics_ext_bin, managed_identity)
+        
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
         p = proc.poll()

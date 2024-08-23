@@ -1246,7 +1246,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_error(log_messages)
 
 
-                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
                             if start_metrics_out:
                                 hutil_log("Successfully started metrics-extension.")
                             else:
@@ -1317,7 +1317,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                     hutil_log(me_msg)
                                 else:
                                     hutil_error(me_msg)
-                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
 
                                 if start_metrics_out:
                                     hutil_log("Successfully started metrics-extension.")
