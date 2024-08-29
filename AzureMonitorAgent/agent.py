@@ -2229,11 +2229,11 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    if type(output) == unicode:
+    if type(output) == 'unicode':
         output = output.encode('utf-8')
 
     # On python 3, encode returns a byte object, so we must decode back to a string
-    if sys.version_info >= (3,) and type(output) == bytes:
+    if sys.version_info >= (3,) and type(output) == 'bytes':
         output = output.decode('utf-8', 'ignore')
 
     return exit_code, output.strip()
