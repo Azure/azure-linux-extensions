@@ -1,6 +1,7 @@
 MetricsExtensionBin/
 metrics_ext_utils/
 packages/
+services/
 telegraf_utils/
 Utils/
 waagent
