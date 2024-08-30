@@ -35,14 +35,15 @@ import json
 import base64
 import inspect
 import shutil
-import crypt
-import xml.dom.minidom
 import re
 import hashlib
 import fileinput
+import contextlib
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile
+from shutil import copytree
+from shutil import rmtree
 
 from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
@@ -114,6 +115,7 @@ MdsdCounterJsonPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/metricC
 FluentCfgPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf'
 AMASyslogConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.marker'
 AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslog.port'
+AMAFluentPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluent.port'
 PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/previewFeatures/'
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
@@ -293,18 +295,29 @@ def copy_amacoreagent_binaries():
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
 
-def copy_mdsd_binaries():
+def copy_mdsd_fluentbit_binaries():
     current_arch = platform.machine()
     mdsd_bin_local_path = os.getcwd() + "/mdsdBin/mdsd_" + current_arch
     mdsdmgr_bin_local_path = os.getcwd() + "/mdsdBin/mdsdmgr_" + current_arch
+    fluentbit_bin_local_path = os.getcwd() + "/fluentBitBin/fluent-bit_" + current_arch
     mdsd_bin = "/opt/microsoft/azuremonitoragent/bin/mdsd"
     mdsdmgr_bin = "/opt/microsoft/azuremonitoragent/bin/mdsdmgr"
+    fluentbit_bin = "/opt/microsoft/azuremonitoragent/bin/fluent-bit"
 
+    # copy the required libs to our test directory first
+    copytree("/opt/microsoft/azuremonitoragent/lib", os.getcwd() + "/lib")
+    
     canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
     canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
     if canUseSharedmdsd != 0 and canUseSharedmdsdmgr != 0:        
         compare_and_copy_bin(mdsd_bin_local_path, mdsd_bin)
         compare_and_copy_bin(mdsdmgr_bin_local_path, mdsdmgr_bin)
+
+    canUseSharedfluentbit, _ = run_command_and_log('ldd ' + fluentbit_bin_local_path + ' | grep "not found"')
+    if canUseSharedfluentbit != 0:
+        compare_and_copy_bin(fluentbit_bin_local_path, fluentbit_bin)
+
+    rmtree(os.getcwd() + "/lib")    
 
 def install():
     """
@@ -337,7 +350,16 @@ def install():
                                                                     DEBIAN_FRONTEND=noninteractive apt-get install -y rsyslog")
             if rsyslog_exit_code != 0:
                 return rsyslog_exit_code, rsyslog_output
-
+    
+    # Check if Amazon 2023 VMs have rsyslog package (required for AMA 1.31+)
+    if (vm_dist.startswith('amzn')) and vm_ver.startswith('2023'):
+        check_rsyslog, _ = run_command_and_log("dnf list installed | grep rsyslog.x86_64")
+        if check_rsyslog != 0:
+            hutil_log_info("'rsyslog' package missing from Amazon Linux 2023 machine, installing to allow AMA to run.")
+            rsyslog_exit_code, rsyslog_output = run_command_and_log("dnf install -y rsyslog")
+            if rsyslog_exit_code != 0:
+                return rsyslog_exit_code, rsyslog_output
+            
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
     os.chmod(bundle_path, 100)
@@ -364,12 +386,16 @@ def install():
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
-    # Copy mdsd with OpenSSL dynamically linked
+    # Copy Kqle xtension binaries
+    # Needs to be revisited for aarch64
+    copy_kqlextension_binaries()
+
+    # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
         # Check if they have libssl.so.1.1 since AMA is built against this version
         libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
         if libssl1_1 == 0:
-            copy_mdsd_binaries()
+            copy_mdsd_fluentbit_binaries()
             
     # Comment out the following check in AMA 1.31 as the coreagent & agentlauncher services are not installed with the aarch64 deb/rpm packages.
     #
@@ -462,7 +488,7 @@ def enable():
         ("MDSD_LOG_DIR", "/var/opt/microsoft/azuremonitoragent/log"),
         ("MDSD_ROLE_PREFIX", "/run/azuremonitoragent/default"),
         ("MDSD_SPOOL_DIRECTORY", "/var/opt/microsoft/azuremonitoragent"),
-        ("MDSD_OPTIONS", "\"{}-A -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"".format(flags)),
+        ("MDSD_OPTIONS", "\"{}-A -R -c /etc/opt/microsoft/azuremonitoragent/mdsd.xml -d -r $MDSD_ROLE_PREFIX -S $MDSD_SPOOL_DIRECTORY/eh -L $MDSD_SPOOL_DIRECTORY/events\"".format(flags)),
         ("MDSD_USE_LOCAL_PERSISTENCY", "true"),
         ("MDSD_TCMALLOC_RELEASE_FREQ_SEC", "1"),
         ("MONITORING_USE_GENEVA_CONFIG_SERVICE", "false"),
@@ -594,6 +620,33 @@ def enable():
             if status_exit_code != 0:
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
                 return exit_code, output
+
+    # check if .NET is installed to start Kql extension process
+    if platform.machine() != 'aarch64':
+        check_dotnet, dotnetcmd_output = run_command_and_log("dotnet --list-runtimes",log_cmd=False)
+        if check_dotnet != 0:
+            hutil_log_info(".NET 8.0 is not installed. Please install .NET 8.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+            #ensure kql extension service is not running. do not block if it fails
+            kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+            if kql_exit_code != 0:
+                status_command = get_service_command("azuremonitor-kqlextension", "status")
+                kql_exit_code, status_output = run_command_and_log(status_command)
+                hutil_log_info(status_output)
+        else:
+            if "8.0" in dotnetcmd_output:
+                hutil_log_info("Found .NET 8.0 installed")
+                if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
+                    # start/enable kql extension only in 3P mode and non aarch64
+                    kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
+                    output += kql_output # do not block if kql start fails
+            else:
+                hutil_log_info(".NET 8.0 is not installed. Please install .NET 8.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
+                #ensure kql extension service is not running
+                kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+                if kql_exit_code != 0:
+                    status_command = get_service_command("azuremonitor-kqlextension", "status")
+                    kql_exit_code, status_output = run_command_and_log(status_command)
+                    hutil_log_info(status_output)
 
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
@@ -754,7 +807,13 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
 
         if (data != ''):
             json_data = json.loads(data)
-            if json_data is not None and "proxy.url" in json_data:
+            BypassProxy = False
+            if json_data is not None and "proxy.bypass" in json_data:
+                bypass = json_data["proxy.bypass"]
+                if bypass == "AMA":
+                    BypassProxy = True
+                    
+            if not BypassProxy and json_data is not None and "proxy.url" in json_data:
                 url = json_data["proxy.url"]
                 # only non-authenticated proxy config is supported
                 if url != '':
@@ -827,6 +886,14 @@ def disable():
 
             if status_exit_code != 0:
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
+
+    if platform.machine() != 'aarch64':
+        # stop kql extensionso that is not started after system reboot. Do not block if it fails.
+        kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
+        if kql_exit_code != 0:
+            status_command = get_service_command("azuremonitor-kqlextension", "status")
+            kql_exit_code, kql_status_output = run_command_and_log(status_command)
+            hutil_log_info(kql_status_output)
 
     return exit_code, output
 
@@ -1060,6 +1127,10 @@ def metrics_watcher(hutil_error, hutil_log):
     identifier_name, identifier_value, error_msg = get_managed_identity()
     if error_msg:
         hutil_error('Failed to determine managed identity settings; MSI token retreival will rely on default identity, if any. {0}.'.format(error_msg))
+    if identifier_name and identifier_value:
+        managed_identity_str = "uai#{0}#{1}".format(identifier_name, identifier_value)
+    else:
+        managed_identity_str = "sai"
 
     # Sleep before starting the monitoring
     time.sleep(sleepTime)
@@ -1069,6 +1140,41 @@ def metrics_watcher(hutil_error, hutil_log):
 
     while True:
         try:
+            # update fluent config for fluent port if needed
+            fluent_port = ''
+            if os.path.isfile(AMAFluentPortFilePath):
+                f = open(AMAFluentPortFilePath, "r")
+                fluent_port = f.read()
+                f.close()
+            
+            if fluent_port != '' and os.path.isfile(FluentCfgPath):
+                portSetting = "    Port    "  + fluent_port
+                defaultPortSetting = 'Port    '
+                portUpdated = False
+                with open(FluentCfgPath) as f:
+                    if portSetting not in f.read():
+                        portUpdated = True
+
+                if portUpdated == True:
+                    with contextlib.closing(fileinput.FileInput(FluentCfgPath, inplace=True, backup='.bak')) as file:
+                        for line in file:
+                            if defaultPortSetting in line:
+                                print(portSetting, end='')
+                            else:
+                                print(line, end='')
+                    os.chmod(FluentCfgPath, stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+
+                    # add SELinux rules if needed
+                    if os.path.exists('/etc/selinux/config') and fluent_port != '':
+                        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
+                        if sedisabled != 0:                        
+                            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
+                            if check_semanage == 0:
+                                fluentPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False)
+                                if fluentPortEnabled != 0:                    
+                                    # allow the fluent port in SELinux
+                                    run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False)
+
             if os.path.isfile(FluentCfgPath):
                 f = open(FluentCfgPath, "r")
                 data = f.read()
@@ -1076,7 +1182,7 @@ def metrics_watcher(hutil_error, hutil_log):
                 if (data != ''):
                     crc_fluent = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
-                    if (crc_fluent != last_crc_fluent):
+                    if (crc_fluent != last_crc_fluent):                        
                         restart_launcher()
                         last_crc_fluent = crc_fluent
            
@@ -1131,7 +1237,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
-                            me_handler.setup_me(is_lad=False, HUtilObj=HUtilObject)
+                            me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
 
                             start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
                             if start_telegraf_res:
@@ -1140,7 +1246,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_error(log_messages)
 
 
-                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
                             if start_metrics_out:
                                 hutil_log("Successfully started metrics-extension.")
                             else:
@@ -1211,7 +1317,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                     hutil_log(me_msg)
                                 else:
                                     hutil_error(me_msg)
-                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False)
+                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
 
                                 if start_metrics_out:
                                     hutil_log("Successfully started metrics-extension.")
@@ -1333,7 +1439,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
 
             if portUpdated == True:
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/10-azuremonitoragent-omfwd.conf","/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
-                with fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak') as file:
+                with contextlib.closing(fileinput.FileInput('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', inplace=True, backup='.bak')) as file:
                     for line in file:
                         print(line.replace(defaultPortSetting, portSetting), end='')
                 os.chmod('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
@@ -1364,7 +1470,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
 
             if portUpdated == True:
                 copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/syslog-ngconf/azuremonitoragent-tcp.conf","/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf")
-                with fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak') as file:
+                with contextlib.closing(fileinput.FileInput('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', inplace=True, backup='.bak')) as file:
                     for line in file:
                         print(line.replace(defaultPortSetting, portSetting), end='')
                 os.chmod('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf', stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
@@ -1517,7 +1623,7 @@ def find_package_manager(operation):
     dist, _ = find_vm_distro(operation)
 
     dpkg_set = set(["debian", "ubuntu"])
-    rpm_set = set(["oracle", "ol", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "rhel", "rocky", "alma", "amzn"])
+    rpm_set = set(["oracle", "ol", "redhat", "centos", "red hat", "suse", "sles", "opensuse", "cbl-mariner", "mariner", "azurelinux", "rhel", "rocky", "alma", "amzn"])
     for dpkg_dist in dpkg_set:
         if dist.startswith(dpkg_dist):
             PackageManager = "dpkg"
@@ -1578,6 +1684,15 @@ def find_vm_distro(operation):
                         vm_ver = vm_ver.replace('\"', '').replace('\n', '')
         except:
             log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
+    
+    # initialize them to empty string so that .lower() is valid in case we weren't able to retrieve it
+    # downstream callers expect a string and not NoneType
+    if not vm_dist:
+        vm_dist = ""
+
+    if not vm_ver:
+        vm_ver = ""
+
     return vm_dist.lower(), vm_ver.lower()
 
 
@@ -1597,14 +1712,15 @@ def is_vm_supported_for_extension(operation):
                        'oracle' : ['7', '8', '9'], # Oracle
                        'ol' : ['7', '8', '9'], # Oracle Linux
                        'debian' : ['9', '10', '11', '12'], # Debian
-                       'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
+                       'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'cbl-mariner' : ['1'], # Mariner 1.0
                        'mariner' : ['1', '2'], # Mariner
+                       'azurelinux' : ['3'], # Mariner 3
                        'rocky' : ['8', '9'], # Rocky
                        'alma' : ['8', '9'], # Alma
                        'opensuse' : ['15'], # openSUSE
-                       'amzn' : ['2'] # Amazon Linux 2
+                       'amzn' : ['2', '2023'] # Amazon Linux 2
     }
 
     supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
@@ -1704,7 +1820,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
-    for name in ['centos', 'redhat', 'red hat', 'oracle', 'ol', 'cbl-mariner', 'mariner', 'rhel', 'rocky', 'alma', 'amzn']:
+    for name in ['centos', 'redhat', 'red hat', 'oracle', 'ol', 'cbl-mariner', 'mariner', 'azurelinux', 'rhel', 'rocky', 'alma', 'amzn']:
         if distro.startswith(name):
             return 'SSL_CERT_FILE', '/etc/pki/tls/certs/ca-bundle.crt'
 
@@ -1717,6 +1833,17 @@ def get_ssl_cert_info(operation):
 
     log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
 
+def copy_kqlextension_binaries():
+    kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
+    kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
+    
+    for f in os.listdir(kqlextension_bin_local_path):
+        compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
+
+    kqlextension_local_runtimes = os.getcwd() + "/KqlExtensionBin/runtimes/"
+    kqlextension_runtimes = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
+    for f in os.listdir(kqlextension_local_runtimes):
+        compare_and_copy_bin(kqlextension_local_runtimes + f, kqlextension_runtimes + f)
 
 def is_arc_installed():
     """
@@ -2102,10 +2229,11 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    output = output.encode('utf-8')
+    if all(ord(c) < 128 for c in output):
+        output = output.encode('utf-8')
 
     # On python 3, encode returns a byte object, so we must decode back to a string
-    if sys.version_info >= (3,):
+    if sys.version_info >= (3,) and type(output) == bytes:
         output = output.decode('utf-8', 'ignore')
 
     return exit_code, output.strip()
