@@ -47,7 +47,14 @@ import zipfile
 import json
 import datetime
 import xml.sax.saxutils
-from distutils.version import LooseVersion
+# distutils.version was deprecated in Python 3.10 and removed in Python 3.12
+def import_loose_version():
+    if sys.version_info >= (3, 12):
+        return LooseVersionComparator
+    else:
+        from distutils.version import LooseVersion
+        return LooseVersion
+
 
 if sys.version_info[0] == 3:
     import http.client as httpclient
@@ -154,6 +161,55 @@ Please do not use this disk for storing any personal or application data.
 For additional details to please refer to the MSDN documentation at : http://msdn.microsoft.com/en-us/library/windowsazure/jj672979.aspx
 """
 
+class LooseVersionComparator:
+    """
+    Class to parse and compare versions with pre-release tags
+    Based on LooseVersion from distutils.version as that was removed in python 3.12.
+    Python's standard library does not include a direct replacement for `distutils.version.LooseVersion` 
+    or `StrictVersion` for arbitrary version string comparison outside of the context of installed packages.
+    This is needed to avoid installing pip.
+    
+    """
+    def __init__(self, version):
+        self.version, self.prerelease = self.parse_version(version)
+    
+    def parse_version(self, version):
+        # Regular expression to parse versions with pre-release tags
+        match = re.match(r'^(\d+(?:\.\d+)*)(?:-([\da-zA-Z-]+))?$', version)
+        if not match:
+            raise ValueError("Invalid version format: {0}".format(version))
+        
+        main_version = tuple(map(int, match.group(1).split('.')))
+        prerelease = match.group(2)
+        return main_version, prerelease
+
+    def __lt__(self, other):
+        if self.version == other.version:
+            return self._compare_prerelease(self.prerelease, other.prerelease) < 0
+        return self.version < other.version
+
+    def __gt__(self, other):
+        if self.version == other.version:
+            return self._compare_prerelease(self.prerelease, other.prerelease) > 0
+        return self.version > other.version
+
+    def __eq__(self, other):
+        return self.version == other.version and self.prerelease == other.prerelease
+
+    def __str__(self):
+        return ".".join(map(str, self.version)) + ("-{0}".format(self.prerelease) if self.prerelease else "")
+
+    @staticmethod
+    def _compare_prerelease(pr1, pr2):
+        if pr1 is None and pr2 is None:
+            return 0
+        if pr1 is None:
+            return 1
+        if pr2 is None:
+            return -1
+        return (pr1 > pr2) - (pr1 < pr2)
+
+LooseVersion = import_loose_version()
 
 ############################################################
 # BEGIN DISTRO CLASS DEFS
