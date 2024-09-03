@@ -280,6 +280,15 @@ class redhatPatching(AbstractPatching):
             # Should not be called when actual instance is of subclass like oracle
             if LooseVersion(self.distro_info[1]) >= LooseVersion('9.3'):
                 extra_parameters = extra_parameters + "--update-bls-cmdline"
+            else:
+                installed_package = self.get_installed_package_version('grub2-tools')
+                if installed_package is not None:
+                    extract_version = self.extract_version(installed_package)
+                    if extract_version is not None and LooseVersion(extract_version) >= LooseVersion('2.06.69'):
+                        extra_parameters = extra_parameters + "--update-bls-cmdline"
+
+        self.logger.log("final extra_parameter {}".format(extra_parameters))
+        
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
             self.command_executor.ExecuteInBash('grub2-mkconfig -o {0} {1}'.format(grub_cfg_path, extra_parameters), True)
 
@@ -316,3 +325,22 @@ class redhatPatching(AbstractPatching):
             self.append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
                                           '/etc/dracut.conf.d/ade.conf')
             self.add_kernelopts(["root=/dev/mapper/osencrypt"])
+
+    def get_installed_package_version(self, package_name):
+        try:
+            result = self.command_executor.Execute("rpm -q " + " ".join(package_name))
+            if result.returncode == 0:
+                self.logger.log("Package: {} with version {}.".format(package_name, result.stdout.strip()))
+                return result.stdout.strip()
+            else:
+                self.logger.log("Package: {} not found.".format(package_name))
+                return None
+        except Exception as e:
+            self.logger.log("Exception: {}".format(str(e)))
+            return None
+
+    def extract_version(package_string):
+        match = re.search(r'(\d+\.\d+-\d+)', package_string)
+        if match:
+            return match.group(1).replace('-','.')
+        return None
