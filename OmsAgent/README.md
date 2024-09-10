@@ -1,4 +1,7 @@
-# OmsAgent Extension
+# [DEPRECATED] OmsAgent Extension
+
+> :warning: The Log Analytics agent has been **deprecatated** and has no support as of **August 31, 2024.** If you use the Log Analytics agent to ingest data to Azure Monitor, [migrate now to the new Azure Monitor agent](https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-migration).
+>
 
 [See the latest version and extension-bundle mapping.](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/oms-linux#agent-and-vm-extension-version)
 
