@@ -278,20 +278,17 @@ class redhatPatching(AbstractPatching):
         extra_parameters = ""
         if type(self).__name__.startswith('redhat'):
             # Should not be called when actual instance is of subclass like oracle
-            if LooseVersion(self.distro_info[1]) >= LooseVersion('9.5'):
+            if LooseVersion(self.distro_info[1]) >= LooseVersion('9.3'):
                 extra_parameters = extra_parameters + "--update-bls-cmdline"
             else:
-                self.logger.log("Starting finding out the version")
                 installed_package = self.get_installed_package_version('grub2-tools')
-
                 if installed_package is not None:
                     extract_version = self.extract_version(installed_package)
-                    self.logger.log("Starting Extract Version: {}".format(extract_version))
+                    self.logger.log("grub tool Version: {}".format(extract_version))
                     if extract_version is not None and LooseVersion(extract_version) >= LooseVersion('2.06.69'):
-                        self.logger.log("Starting ")
                         extra_parameters = extra_parameters + "--update-bls-cmdline"
                     
-        self.logger.log("final extra_parameter {}".format(extra_parameters))
+        self.logger.log("Extra Parameters for grub2-mkconfig {}".format(extra_parameters))
         
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
             self.command_executor.ExecuteInBash('grub2-mkconfig -o {0} {1}'.format(grub_cfg_path, extra_parameters), True)
@@ -300,9 +297,7 @@ class redhatPatching(AbstractPatching):
         try:
             proc_comm = ProcessCommunicator()
             result = self.command_executor.Execute("rpm -q {}".format(package_name), communicator=proc_comm)
-            self.logger.log("Result------{}".format(proc_comm))
             if result == 0:
-                self.logger.log("Package: {} with version {}.".format(package_name, proc_comm.stdout.strip()))
                 return proc_comm.stdout.strip()
             else:
                 self.logger.log("Package: {} not found.".format(package_name))
