@@ -345,4 +345,3 @@ class redhatPatching(AbstractPatching):
             self.append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
                                           '/etc/dracut.conf.d/ade.conf')
             self.add_kernelopts(["root=/dev/mapper/osencrypt"])
-
