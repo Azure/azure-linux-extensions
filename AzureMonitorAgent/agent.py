@@ -1714,9 +1714,9 @@ def is_vm_supported_for_extension(operation):
                        'debian' : ['9', '10', '11', '12'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
-                       'cbl-mariner' : ['1'], # Mariner 1.0
+                       'cbl-mariner' : ['1'], # Mariner 1
                        'mariner' : ['1', '2'], # Mariner
-                       'azurelinux' : ['3'], # Mariner 3
+                       'azurelinux' : ['3'], # Azure Linux / Mariner 3
                        'rocky' : ['8', '9'], # Rocky
                        'alma' : ['8', '9'], # Alma
                        'opensuse' : ['15'], # openSUSE
@@ -1727,7 +1727,8 @@ def is_vm_supported_for_extension(operation):
                        'ubuntu' : ['18.04', '20.04', '22.04'], # Ubuntu
                        'alma' : ['8'], # Alma
                        'centos' : ['7'], # CentOS
-                       'mariner' : ['2'], # Mariner 2.0
+                       'mariner' : ['2'], # Mariner 2
+                       'azurelinux' : ['3'], # Azure Linux / Mariner 3
                        'sles' : ['15'], # SLES
                        'debian' : ['11'] # Debian
     }
