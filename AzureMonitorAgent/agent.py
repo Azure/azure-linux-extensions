@@ -2230,7 +2230,7 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    if all(ord(c) < 128 for c in output):
+    if all(ord(c) < 128 for c in output) or (sys.version_info < (3,) and type(output) == unicode) or (sys.version_info >= (3,) and type(output) == str):
         output = output.encode('utf-8')
 
     # On python 3, encode returns a byte object, so we must decode back to a string
