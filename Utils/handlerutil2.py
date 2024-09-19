@@ -191,11 +191,15 @@ class HandlerUtility:
                 cert = constants.LibDir + '/' + thumb + '.crt'
                 pkey = constants.LibDir + '/' + thumb + '.prv'
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
-                openSSLcmd = ['openssl', 'smime', '-inform', 'DER', '-decrypt', '-recip' , cert,  '-inkey', pkey]
-                cleartxt = ext_utils.run_send_stdin(openSSLcmd, unencodedSettings)[1]
+                openSSLcmd_cms = ['openssl', 'cms', '-inform', 'DER', '-decrypt', '-recip' , cert, '-inkey', pkey]
+                cleartxt = ext_utils.run_send_stdin(openSSLcmd_cms, unencodedSettings)[1]
                 if cleartxt is None:
-                    self.error("OpenSSL decode error using  thumbprint " + thumb)
-                    self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
+                    self.log("OpenSSL decode error using cms command with thumbprint" + thumb + "\n trying smime command")
+                    openSSLcmd_smime = ['openssl', 'smime', '-inform', 'DER', '-decrypt', '-recip' , cert, '-inkey', pkey]
+                    cleartxt = ext_utils.run_send_stdin(openSSLcmd_cms, unencodedSettings)[1]
+                    if cleartxt is None:
+                        self.error("OpenSSL decode error using smime command with thumbprint " + thumb)
+                        self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
                 jctxt = ''
                 try:
                     jctxt = json.loads(cleartxt)
