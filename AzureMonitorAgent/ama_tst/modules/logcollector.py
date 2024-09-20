@@ -19,7 +19,15 @@ PS_CMD_RSS = "ps aux --sort -rss | head -10"
 PS_CMD_VSZ = "ps aux --sort -vsz | head -10"
 DU_CMD = "du -h -d 1 {0} /var/opt/microsoft/azuremonitoragent/events"
 VAR_DU_CMD = "du -h -d 1 {0} /var"
+LS_CMD = "ls -al {0}"
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
+PERMISSION_CHECK_FILES = ["/etc/opt/microsoft/azuremonitoragent/config-cache",
+                            "/etc/opt/microsoft/azuremonitoragent",
+                            "/var/opt/microsoft/azuremonitoragent",
+                            "/var/run/azuremonitoragent",
+                            "/opt/microsoft/azuremonitoragent",
+                            "/run/azuremonitoragent",
+                            "/var/lib/waagent/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-*"]
 
 
 # File copying functions
@@ -252,6 +260,14 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write("Output of command: {0}\n".format(du_full_cmd))
             outfile.write("========================================\n")
             outfile.write(helpers.run_cmd_output(du_full_cmd))
+            outfile.write("--------------------------------------------------------------------------------\n")
+            
+        # file permission check
+        for file in PERMISSION_CHECK_FILES:
+            file_permission_cmd = LS_CMD.format(file)
+            outfile.write("Output of command: {0}\n".format(file_permission_cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(file_permission_cmd))
             outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
 
