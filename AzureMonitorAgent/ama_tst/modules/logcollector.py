@@ -19,7 +19,7 @@ PS_CMD_RSS = "ps aux --sort -rss | head -10"
 PS_CMD_VSZ = "ps aux --sort -vsz | head -10"
 DU_CMD = "du -h -d 1 {0} /var/opt/microsoft/azuremonitoragent/events"
 VAR_DU_CMD = "du -h -d 1 {0} /var"
-
+ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 
 
 # File copying functions
@@ -100,6 +100,8 @@ def collect_arc_logs(output_dirpath, pkg_manager):
         # collect AMA config and status information for all AzureMonitorLinuxAgent-* directories
         ver = (config_dir.split('-'))[-1]
         copy_dircontents(os.path.join("/var/lib/GuestConfig/extension_logs",config_dir), os.path.join(output_dirpath,ver+"-extension_logs"))
+
+    copy_file(ArcSettingsFile, os.path.join(output_dirpath,"Arc"))
     
     # collect logs same to both Arc + Azure VM
     collect_logs(output_dirpath, pkg_manager)
