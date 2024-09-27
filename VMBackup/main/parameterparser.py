@@ -35,7 +35,8 @@ class ParameterParser(object):
         self.snapshotTaskToken = ''
         self.includedDisks = None
         self.dynamicConfigsFromCRP = None
-        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False, CommonVariables.useMccfForLad: False, CommonVariables.enableSnapshotExtensionPolling: False}
+        self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False,
+                                      CommonVariables.useMccfForLad: False, CommonVariables.enableSnapshotExtensionPolling: False, CommonVariables.isVmmdBlobIncluded : False}
         settingKeysMapping= {}
         settingKeysMapping[CommonVariables.isSnapshotTtlEnabled.lower()] = CommonVariables.isSnapshotTtlEnabled
         settingKeysMapping[CommonVariables.useMccfToFetchDsasForAllDisks.lower()] = CommonVariables.useMccfToFetchDsasForAllDisks
@@ -126,4 +127,8 @@ class ParameterParser(object):
             except Exception as e:
                 errorMsg = "Exception occurred while populating settings, Exception: %s" % (str(e))
                 backup_logger.log(errorMsg, True)
+        
+        if(CommonVariables.isVmmdBlobIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isVmmdBlobIncluded] == True):
+            self.wellKnownSettingFlags[CommonVariables.isVmmdBlobIncluded] = True
+                
         backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
