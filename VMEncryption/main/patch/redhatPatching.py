@@ -280,9 +280,38 @@ class redhatPatching(AbstractPatching):
             # Should not be called when actual instance is of subclass like oracle
             if LooseVersion(self.distro_info[1]) >= LooseVersion('9.3'):
                 extra_parameters = extra_parameters + "--update-bls-cmdline"
+            else:
+                installed_package = self.get_installed_package_version('grub2-tools')
+                if installed_package is not None:
+                    extract_version = self.extract_version(installed_package)
+                    self.logger.log("grub tool Version: {}".format(extract_version))
+                    if extract_version is not None and LooseVersion(extract_version) >= LooseVersion('2.06.69'):
+                        extra_parameters = extra_parameters + "--update-bls-cmdline"
+                    
+        self.logger.log("Extra Parameters for grub2-mkconfig {}".format(extra_parameters))
+        
         for grub_cfg_path, grub_env_path in grub_cfg_paths:
             self.command_executor.ExecuteInBash('grub2-mkconfig -o {0} {1}'.format(grub_cfg_path, extra_parameters), True)
 
+    def get_installed_package_version(self, package_name):
+        try:
+            proc_comm = ProcessCommunicator()
+            result = self.command_executor.Execute("rpm -q {}".format(package_name), communicator=proc_comm)
+            if result == 0:
+                return proc_comm.stdout.strip()
+            else:
+                self.logger.log("Package: {} not found.".format(package_name))
+                return None
+        except Exception as e:
+            self.logger.log("Exception: {}".format(str(e)))
+            return None
+
+    def extract_version(self, package_string):
+        match = re.search(r'(\d+\.\d+-\d+)', package_string)
+        if match:
+            return match.group(1).replace('-','.')
+        return None
+    
     def pack_initial_root_fs(self):
         self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)
 
