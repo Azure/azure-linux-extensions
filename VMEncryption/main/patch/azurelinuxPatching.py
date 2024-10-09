@@ -26,7 +26,7 @@ class azurelinuxPatching(redhatPatching):
         ]
 
     def pack_initial_root_fs(self):
-        self.command_executor.ExecuteInBash('mkinitrd -f -v', True)
+        self.command_executor.ExecuteInBash('dracut -f -v --regenerate-all', True)
 
     def add_kernelopts(self, args_to_add):
         self.add_args_to_default_grub(args_to_add)
