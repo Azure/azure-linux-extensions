@@ -46,6 +46,7 @@ class CommonVariables:
     useMccfForLad = 'useMccfForLad'
     useMccfToFetchDsasForAllDisks = 'useMccfToFetchDsasForAllDisks'
     enableSnapshotExtensionPolling = "EnableSnapshotExtensionPolling"
+    isVmmdBlobIncluded = 'isVmmdBlobIncluded'
     key = 'Key'
     value = 'Value'
     snapshotTtlHeader = 'x-ms-snapshot-ttl-expiry-hours'

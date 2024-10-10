@@ -19,7 +19,17 @@ PS_CMD_RSS = "ps aux --sort -rss | head -10"
 PS_CMD_VSZ = "ps aux --sort -vsz | head -10"
 DU_CMD = "du -h -d 1 {0} /var/opt/microsoft/azuremonitoragent/events"
 VAR_DU_CMD = "du -h -d 1 {0} /var"
+LS_CMD = "ls -al {0}"
+NAMEI_CMD = "namei -om {0}"
+TAIL_SYSLOG_CMD = "tail -10000 /var/log/{0} > {1}"
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
+PERMISSION_CHECK_FILES = ["/etc/opt/microsoft/azuremonitoragent/config-cache",
+                            "/etc/opt/microsoft/azuremonitoragent",
+                            "/var/opt/microsoft/azuremonitoragent",
+                            "/var/run/azuremonitoragent",
+                            "/opt/microsoft/azuremonitoragent",
+                            "/run/azuremonitoragent",
+                            "/var/lib/waagent/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-*"]
 
 
 # File copying functions
@@ -79,7 +89,7 @@ def collect_logs(output_dirpath, pkg_manager):
         system_logs = "messages"
     if (system_logs != ""):
         for systemlog_file in filter((lambda x : x.startswith(system_logs)), os.listdir("/var/log")):
-            copy_file(os.path.join("/var/log",systemlog_file), os.path.join(output_dirpath,"system_logs"))
+            helpers.run_cmd_output(TAIL_SYSLOG_CMD.format(systemlog_file, os.path.join(output_dirpath,"system_logs")))
 
     # collect rsyslog information (if present)
     copy_file("/etc/rsyslog.conf", os.path.join(output_dirpath,"rsyslog"))
@@ -252,6 +262,23 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write("Output of command: {0}\n".format(du_full_cmd))
             outfile.write("========================================\n")
             outfile.write(helpers.run_cmd_output(du_full_cmd))
+            outfile.write("--------------------------------------------------------------------------------\n")
+            
+        # file permission check
+        for file in PERMISSION_CHECK_FILES:
+            file_permission_cmd = LS_CMD.format(file)
+            outfile.write("Output of command: {0}\n".format(file_permission_cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(file_permission_cmd))
+            outfile.write("--------------------------------------------------------------------------------\n")
+        outfile.write("--------------------------------------------------------------------------------\n")
+        
+        # parent directory permission check
+        for file in PERMISSION_CHECK_FILES:
+            dir_permission_cmd = NAMEI_CMD.format(file)
+            outfile.write("Output of command: {0}\n".format(dir_permission_cmd))
+            outfile.write("========================================\n")
+            outfile.write(helpers.run_cmd_output(dir_permission_cmd))
             outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
 
