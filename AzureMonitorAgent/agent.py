@@ -61,6 +61,12 @@ elif sys.version_info[0] == 2:
     from urlparse import urlparse
     import urllib2 as urlerror
 
+# python shim can only make IMDS calls which shouldn't go through proxy
+try:
+    urllib.getproxies = lambda x = None: {}
+except Exception as e:
+    print('Resetting proxies failed with error: {0}'.format(e))    
+
 try:
     from Utils.WAAgentUtil import waagent
     import Utils.HandlerUtil as HUtil
