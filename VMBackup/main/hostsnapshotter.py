@@ -180,7 +180,8 @@ class HostSnapshotter(object):
                         except:
                             creationTimeObj = datetime.datetime.strptime(creationTimeString, "%Y-%m-%dT%H:%M:%SZ")
                         self.logger.log("Converting the creationTime string received in UTC format to UTC Ticks")
-                        timestamp = (creationTimeObj - epochTime).total_seconds()
+                        delta = creationTimeObj - epochTime
+                        timestamp = delta.days * 86400 + delta.seconds + delta.microseconds / 1e6
                         creationTimeUTCTicks = str(int(timestamp * 1000)) 
                         ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeUTCTicks , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'])
                         self.logger.log("ddSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id))
