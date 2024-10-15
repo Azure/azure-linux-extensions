@@ -20,8 +20,9 @@ class EventLogger:
     _lock = threading.Lock()
     
     
-    def __init__(self, event_directory, severity_level, use_async_event_logging = 0):
+    def __init__(self, event_directory, severity_level, use_async_event_logging = 0, use_tempdir_tolog = 0):
         global logger
+        self.temporary_directory = os.path.join(event_directory, 'Temp')
         self.space_available_in_event_directory = 0
         self.event_processing_interval = 0
         self.disposed = False
@@ -32,15 +33,22 @@ class EventLogger:
         self.events_folder = event_directory
         self.event_logging_enabled = bool(self.events_folder)
         self.async_event_logging = use_async_event_logging
+        self.use_tempdir_tolog = use_tempdir_tolog
         self.filehelper = FileHelpers()
+        self.logging_folder = self.events_folder
 
         if self.event_logging_enabled:
             self.extension_version = os.path.basename(os.getcwd())
             self.operation_id = uuid.UUID(int=0)
             self.log_severity_level = severity_level
-            logger.log("Information: EventLogging severity level setting is {0}".format(self.log_severity_level))
-            
-            FileHelpers.clearOldJsonFilesInDirectory(self.events_folder)
+            logger.log("Information: EventLogging severity level setting is {0}".format(self.log_severity_level))           
+            if(use_tempdir_tolog == 1):
+                # creating a temp directory
+                if not os.path.exists(self.temporary_directory):
+                    os.makedirs(self.temporary_directory)
+                self.logging_folder = self.temporary_directory
+
+            FileHelpers.clearOldJsonFilesInDirectory(self.logging_folder)
             
             self.current_message = ''
             self.event_queue = queue.Queue()
@@ -59,14 +67,14 @@ class EventLogger:
             print("Warning: EventsFolder parameter is empty. Guest Agent does not support event logging.")
             
     @staticmethod
-    def GetInstance(backup_logger, event_directory, severity_level, use_async_event_logging = 0):
+    def GetInstance(backup_logger, event_directory, severity_level, use_async_event_logging = 0, use_tempdir_tolog = 0):
         global logger
         try:
             logger = backup_logger
             if EventLogger._instance is None:
                 with EventLogger._lock:
                     if EventLogger._instance is None:
-                        EventLogger._instance = EventLogger(event_directory, severity_level, use_async_event_logging)
+                        EventLogger._instance = EventLogger(event_directory, severity_level, use_async_event_logging, use_tempdir_tolog)
         except Exception as e:
             print("Exception has occurred {0}".format(str(e)))
         return EventLogger._instance
@@ -168,9 +176,9 @@ class EventLogger:
                     return
             if not self.event_queue.empty():
                 if sys.version_info[0] == 2:
-                    event_file_path = os.path.join(self.events_folder, "{}.json".format(int(time.time() * 1000000000)))
+                    event_file_path = os.path.join(self.logging_folder, "{}.json".format(int(time.time() * 1000000000)))
                 else:
-                    event_file_path = os.path.join(self.events_folder, "{}.json".format(int(datetime.datetime.utcnow().timestamp() * 1000000000)))
+                    event_file_path = os.path.join(self.logging_folder, "{}.json".format(int(datetime.datetime.utcnow().timestamp() * 1000000000)))
                 with self._create_event_file(event_file_path) as file:
                     if file is None:
                         logger.log("Warning: Could not create the event file in the path mentioned.")
@@ -180,6 +188,8 @@ class EventLogger:
                     self.event_queue = queue.Queue()
                     #self._check_space_in_event_directory(event_file_path)
                     self._write_events_to_event_file(file, old_queue, event_file_path)
+                if(self.use_tempdir_tolog == 1):
+                    self._send_event_file_to_event_directory(event_file_path, self.events_folder)
                 
         except Exception as e:
             print("Exception occurred in _process_events {0}".format(str(e)))
@@ -211,20 +221,22 @@ class EventLogger:
         if not json_data:
             print("Warning: Unable to serialize events. Events for this iteration will not be reported.")
             return
-        try:
-            if sys.version_info[0] == 2:
-                file_size = len(json_data) # Since in python2.x we get a string of bytes so no need of encoding.
-            else:
-                file_size = len(json_data.encode('utf-8'))
-        except Exception as e:
-            print("Warning: Error calculating the size of the event file. Exception: {0}".format(str(e)))
+        
+        if self.use_tempdir_tolog == 0: # using the event dir to log
+            try:
+                if sys.version_info[0] == 2:
+                    file_size = len(json_data) # Since in python2.x we get a string of bytes so no need of encoding.
+                else:
+                    file_size = len(json_data.encode('utf-8'))
+            except Exception as e:
+                print("Warning: Error calculating the size of the event file. Exception: {0}".format(str(e)))
 
-        if self.space_available_in_event_directory - file_size >= 0:
-            self.space_available_in_event_directory -= file_size
-        else:
-            self.space_available_in_event_directory = 0
-            print("Information: Event reporting has paused due to reaching maximum capacity in the Event directory. Reporting will resume once space is available. Events for this iteration will not be reported.")
-            return
+            if self.space_available_in_event_directory - file_size >= 0:
+                self.space_available_in_event_directory -= file_size
+            else:
+                self.space_available_in_event_directory = 0
+                print("Information: Event reporting has paused due to reaching maximum capacity in the Event directory. Reporting will resume once space is available. Events for this iteration will not be reported.")
+                return
 
         success_msg = "Successfully wrote events to file: %s" % event_file_path
         retry_msg = "Failed to write events to file: %s. Retrying..." % event_file_path
@@ -239,6 +251,41 @@ class EventLogger:
             lambda: file.write(json_data)
         )
     
+    def _send_event_file_to_event_directory(self, file_path, events_folder):
+        file_info = os.stat(file_path)
+        file_size = file_info.st_size
+
+        if self.space_available_in_event_directory - file_size >= 0:
+            new_path_for_event_file = os.path.join(events_folder, os.path.basename(file_path))
+            success_msg = "Successfully moved event file to event directory: %s" % new_path_for_event_file
+            retry_msg = "Unable to move event file to event directory: %s. Retrying..." % file_path
+            err_msg = "Unable to move event file to event directory: %s . No longer retrying. Events for this iteration will not be reported." % file_path
+
+            self.filehelper.execute_with_retries(
+                LoggingConstants.MaxAttemptsForEventFileCreationWriteMove,
+                LoggingConstants.ThreadSleepDuration,
+                success_msg,
+                retry_msg,
+                err_msg,
+                lambda: shutil.move(file_path, new_path_for_event_file)
+            )
+
+            self.space_available_in_event_directory -= file_size
+        else:
+            self.space_available_in_event_directory = 0
+            FileHelpers.deleteFile(file_path)
+            print("Information: Event reporting has paused due to reaching maximum capacity in the Event directory. Reporting will resume once space is available. Events for this iteration will not be reported.")
+
+    def clear_temp_directory(self, directory_path):
+        try:
+            if os.path.exists(directory_path):
+                if len(os.listdir(directory_path)) == 0:
+                    os.rmdir(directory_path)
+                else:
+                    shutil.rmtree(directory_path)
+        except Exception as ex:
+            print("Warning: Error clearing the temp directory. Exception: {0}".format(str(ex)))
+
     def dispose(self):
         print("Information: Dispose(), called on EventLogger. Event processing is terminating...")
         self._dispose(True)
