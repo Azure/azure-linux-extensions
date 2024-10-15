@@ -5,6 +5,12 @@
       "MinSupportedVersion" : "2.0"
     }
   ],
+  "azurelinux": [
+    {
+      "Version" : "3",
+      "MinSupportedVersion" : "3.0"
+    }
+  ],
   "redhat": [
         {
           "Version" : "9",
