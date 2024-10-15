@@ -83,7 +83,7 @@ def main():
         use_async_event_logging = hutil.get_intvalue_from_configfile("async_event_logging ", 0)
         use_tempdir_tolog = hutil.get_intvalue_from_configfile("tempdir_tolog", 0)
         if disable_event_logging == 0 or hutil.event_dir is not None :
-            eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level, use_async_event_logging, use_eventsdir_tolog)
+            eventlogger = EventLogger.GetInstance(backup_logger, hutil.event_dir, hutil.severity_level, use_async_event_logging, use_tempdir_tolog)
         else:
             eventlogger = None
         hutil.set_event_logger(eventlogger)
