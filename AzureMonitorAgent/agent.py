@@ -954,6 +954,8 @@ def set_proxy(address, username, password):
         os.system('chmod {1} {0}'.format("/etc/systemd/system/metrics-extension.service.d/proxy.conf", 400))
 
         run_command_and_log("systemctl daemon-reload")
+        run_command_and_log('systemctl restart azuremonitor-coreagent')
+        run_command_and_log('systemctl restart metrics-extension')
         
     except:
         log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and /etc/systemd/system/metrics-extension.service.d" )
@@ -978,6 +980,9 @@ def unset_proxy():
             
         if hasSettings:
             run_command_and_log("systemctl daemon-reload")
+            run_command_and_log('systemctl restart azuremonitor-coreagent')
+            run_command_and_log('systemctl restart metrics-extension')
+        
         
     except:
         log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to remove /etc/systemd/system/azuremonitor-coreagent.service.d and /etc/systemd/system/metrics-extension.service.d" )
