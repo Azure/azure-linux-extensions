@@ -23,11 +23,18 @@ if command -v systemctl >/dev/null; then
     systemctl start cryptsetup.target
 fi
 
-# Wait for the encrypted disk to be unlocked
-echo "Waiting for /dev/mapper/osencrypt to become available..." >> /var/log/boot_decrypt.log
-while ! [ -b /dev/mapper/osencrypt ]; do
+MAX_WAIT=15
+WAIT_TIME=0
+while ! [ -b /dev/mapper/osencrypt ] && [ $WAIT_TIME -lt $MAX_WAIT ]; do
     sleep 1
+    WAIT_TIME=$((WAIT_TIME+1))
 done
+
+if ! [ -b /dev/mapper/osencrypt ]; then
+    echo "Failed to unlock /dev/mapper/osencrypt after $MAX_WAIT seconds" >> /var/log/boot_decrypt.log
+    # Optionally reboot or drop into a shell for further troubleshooting
+fi
+
 
 if [ -b /dev/mapper/osencrypt ]; then
     echo "/dev/mapper/osencrypt is available, unmounting /boot and /bek..." >> /var/log/boot_decrypt.log
