@@ -786,6 +786,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     default_configs["PA_FLUENT_SOCKET_PORT"] = "13005"
     # this port will be dynamic in future
     default_configs["PA_DATA_PORT"] = "13005"
+    proxySet = False
 
     # fetch proxy settings
     if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
@@ -801,10 +802,12 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                 default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
                 set_proxy(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], default_configs["MDSD_PROXY_PASSWORD"])
+                proxySet = True
             else:
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
         else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+            proxySet = True
     
     # is this Arc? If so, check for proxy     
     if os.path.isfile(ArcSettingsFile):
@@ -825,7 +828,11 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 if url != '':
                     default_configs["MDSD_PROXY_ADDRESS"] = url
                     set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
-                    
+                    proxySet = True
+
+    if not proxySet:
+        unset_proxy()
+        
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
 
@@ -949,8 +956,32 @@ def set_proxy(address, username, password):
         run_command_and_log("systemctl daemon-reload")
         
     except:
-        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and mkdir -p /etc/systemd/system/metrics-extension.service.d" )
+        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and /etc/systemd/system/metrics-extension.service.d" )
+
+def unset_proxy():
+    """
+    # Unset proxy http_proxy env var in dependent services
+    """
     
+    try:
+        hasSettings=False
+        
+        # Update Coreagent
+        if os.path.exists("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf"):
+            os.remove("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
+            hasSettings=True
+            
+        # Update ME
+        if os.path.exists("/etc/systemd/system/metrics-extension.service.d/proxy.conf"):
+            os.remove("/etc/systemd/system/metrics-extension.service.d/proxy.conf")
+            hasSettings=True
+            
+        if hasSettings:
+            run_command_and_log("systemctl daemon-reload")
+        
+    except:
+        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to remove /etc/systemd/system/azuremonitor-coreagent.service.d and /etc/systemd/system/metrics-extension.service.d" )
+
 def get_managed_identity():
     """
     # Determine Managed Identity (MI) settings
