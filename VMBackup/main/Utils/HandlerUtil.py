@@ -80,7 +80,7 @@ import subprocess
 import datetime
 import Utils.Status
 from Utils.EventLoggerUtil import EventLogger
-from Utils.LogHelper import LoggingLevel, LoggingConstants
+from Utils.LogHelper import LoggingLevel, LoggingConstants, FileHelpers
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -117,6 +117,8 @@ class HandlerUtility:
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
 
+    # Look through all .settings files in the config folder and,
+    # Retrieve the most recent modified file's seq#
     def _get_current_seq_no(self, config_folder):
         seq_no = -1
         cur_seq_no = -1
@@ -687,25 +689,32 @@ class HandlerUtility:
             self.log("exception is getting status file" + traceback.format_exc())
             return False
 
+    # Rename all .settings and .status files that do not belong to current seq# with '_' suffix
+    # Clear older files in the respective directories
     def backup_settings_status_file(self, _seq_no):
         self.log("current seq no is " + _seq_no)
+        file_extn_settings = '.settings'
+        file_extn_status = '.status'
+        maxLimitOfFiles = 60
         for subdir, dirs, files in os.walk(self._context._config_dir):
             for file in files:
                 try:
-                    if(file.endswith('.settings') and file != (_seq_no + ".settings")):
+                    if(file.endswith(file_extn_settings) and file != (_seq_no + file_extn_settings)):
                         new_file_name = file.replace(".","_")
                         os.rename(join(self._context._config_dir,file), join(self._context._config_dir,new_file_name))
                 except Exception as e:
                     self.log("failed to rename the status file.")
+                FileHelpers.clearOldFilesInDirectory(self._context._config_dir, '_settings', maxLimitOfFiles)
 
         for subdir, dirs, files in os.walk(self._context._status_dir):
             for file in files:
                 try:
-                    if(file.endswith('.status') and file != (_seq_no + ".status")):
+                    if(file.endswith(file_extn_status) and file != (_seq_no + file_extn_status)):
                         new_file_name = file.replace(".","_")
                         os.rename(join(self._context._status_dir,file), join(self._context._status_dir, new_file_name))
                 except Exception as e:
                     self.log("failed to rename the status file.")
+                FileHelpers.clearOldFilesInDirectory(self._context._status_dir, '_status', maxLimitOfFiles)
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:

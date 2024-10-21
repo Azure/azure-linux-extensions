@@ -76,6 +76,49 @@ class FileHelpers:
         except Exception as ex:
             print("Warning: Failed to delete old JSON files at path {0}. Exception: {1}".format(file_path, str(ex)))
 
+    @staticmethod
+    def clearOldFilesInDirectory(directory, extension, file_limit):
+        """
+        Deletes older files if the number of files with the given extension exceeds the file_limit.
+        
+        Parameters:
+        directory (str): The directory to clean up.
+        extension (str): The file extension to filter (e.g., ".status", ".settings").
+        file_limit (int): Maximum allowed number of files with the given extension.
+        """
+        try:
+            # Ensure the directory exists
+            if not os.path.isdir(directory):
+                print("Directory '{}' does not exist.".format(directory))
+                return
+
+            # Collect all files with the specified extension
+            files_with_ext = [
+                os.path.join(directory, f)
+                for f in os.listdir(directory)
+                if f.endswith(extension) and os.path.isfile(os.path.join(directory, f))
+            ]
+
+            # Sort the files by modification time (oldest first)
+            files_with_ext.sort(key=lambda f: os.path.getmtime(f))
+
+            # Check if the number of files exceeds the limit
+            if len(files_with_ext) > file_limit:
+                files_to_delete = files_with_ext[:len(files_with_ext) - file_limit]
+
+                # Delete the excess files
+                for file in files_to_delete:
+                    try:
+                        os.remove(file)
+                        print("Deleted: {}".format(file))
+                    except Exception as e:
+                        print("Error deleting {}: {}".format(file, str(e)))
+            else:
+                print("No files need to be deleted. Total files ({}) are within the limit.".format(len(files_with_ext)))
+        
+        except Exception as e:
+            print("An unexpected error occurred while clearing old files: {}".format(str(e)))
+
     def execute_with_retries(self, max_attempts, delay, success_msg, retry_msg, err_msg, operation):
         attempts = 0
         while attempts < max_attempts:
