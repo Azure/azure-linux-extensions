@@ -181,7 +181,7 @@ class HostSnapshotter(object):
                             creationTimeObj = datetime.datetime.strptime(creationTimeString, "%Y-%m-%dT%H:%M:%SZ")
                         self.logger.log("Converting the creationTime string received in UTC format to UTC Ticks")
                         delta = creationTimeObj - epochTime
-                        timestamp = self.get_total_seconds(self, delta)
+                        timestamp = self.get_total_seconds(delta)
                         creationTimeUTCTicks = str(int(timestamp * 1000)) 
                         ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeUTCTicks , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'])
                         self.logger.log("ddSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id))
