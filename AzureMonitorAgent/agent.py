@@ -1460,9 +1460,13 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
                 useSyslogTcp = True   
         
     # 1P tenants use omuxsock, so keep using that for customers using 1P
-    if useSyslogTcp == True and syslog_port != '' and not uses_gcs:
+    if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
+            if uses_gcs and not os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                restartRequired = True
+            
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
                 if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
                     os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
