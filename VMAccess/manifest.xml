@@ -14,5 +14,6 @@
   <IsJsonExtension>true</IsJsonExtension>
   <SupportedOS>Linux</SupportedOS>
   <CompanyName>Microsoft</CompanyName>
+  <SafeDeploymentPolicy>Standard</SafeDeploymentPolicy>
   <!--%REGIONS%-->
 </ExtensionImage>
