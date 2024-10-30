@@ -704,7 +704,10 @@ class HandlerUtility:
                         os.rename(join(self._context._config_dir,file), join(self._context._config_dir,new_file_name))
                 except Exception as e:
                     self.log("failed to rename the status file.")
-                FileHelpers.clearOldFilesInDirectory(self._context._config_dir, '_settings', maxLimitOfFiles)
+                try:
+                    FileHelpers.clearOldFilesInDirectory(self._context._config_dir, '_settings', maxLimitOfFiles)
+                except Exception as e:
+                    pass  # Ignore the exception in clearing old files and continue
 
         for subdir, dirs, files in os.walk(self._context._status_dir):
             for file in files:
@@ -714,7 +717,10 @@ class HandlerUtility:
                         os.rename(join(self._context._status_dir,file), join(self._context._status_dir, new_file_name))
                 except Exception as e:
                     self.log("failed to rename the status file.")
-                FileHelpers.clearOldFilesInDirectory(self._context._status_dir, '_status', maxLimitOfFiles)
+                try:
+                    FileHelpers.clearOldFilesInDirectory(self._context._status_dir, '_status', maxLimitOfFiles)
+                except Exception as e:
+                    pass  # Ignore the exception in clearing old files and continue
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
