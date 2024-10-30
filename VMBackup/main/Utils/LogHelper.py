@@ -89,7 +89,7 @@ class FileHelpers:
         try:
             # Ensure the directory exists
             if not os.path.isdir(directory):
-                print("Directory '{}' does not exist.".format(directory))
+                print("Directory '{0}' does not exist.".format(directory))
                 return
 
             # Collect all files with the specified extension
@@ -110,14 +110,14 @@ class FileHelpers:
                 for file in files_to_delete:
                     try:
                         os.remove(file)
-                        print("Deleted: {}".format(file))
+                        print("Deleted: {0}".format(file))
                     except Exception as e:
-                        print("Error deleting {}: {}".format(file, str(e)))
+                        print("Error deleting {0}: {1}".format(file, str(e)))
             else:
-                print("No files need to be deleted. Total files ({}) are within the limit.".format(len(files_with_ext)))
+                print("No files need to be deleted. Total files ({0}) are within the limit.".format(len(files_with_ext)))
         
         except Exception as e:
-            print("An unexpected error occurred while clearing old files: {}".format(str(e)))
+            print("An unexpected error occurred while clearing old files: {0}".format(str(e)))
 
     def execute_with_retries(self, max_attempts, delay, success_msg, retry_msg, err_msg, operation):
         attempts = 0
