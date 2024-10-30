@@ -61,6 +61,12 @@ elif sys.version_info[0] == 2:
     from urlparse import urlparse
     import urllib2 as urlerror
 
+# python shim can only make IMDS calls which shouldn't go through proxy
+try:
+    urllib.getproxies = lambda x = None: {}
+except Exception as e:
+    print('Resetting proxies failed with error: {0}'.format(e))    
+
 try:
     from Utils.WAAgentUtil import waagent
     import Utils.HandlerUtil as HUtil
@@ -780,6 +786,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     default_configs["PA_FLUENT_SOCKET_PORT"] = "13005"
     # this port will be dynamic in future
     default_configs["PA_DATA_PORT"] = "13005"
+    proxySet = False
 
     # fetch proxy settings
     if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
@@ -795,10 +802,12 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
                 default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
                 set_proxy(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], default_configs["MDSD_PROXY_PASSWORD"])
+                proxySet = True
             else:
                 log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
         else:
             set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
+            proxySet = True
     
     # is this Arc? If so, check for proxy     
     if os.path.isfile(ArcSettingsFile):
@@ -819,7 +828,11 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 if url != '':
                     default_configs["MDSD_PROXY_ADDRESS"] = url
                     set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
-                    
+                    proxySet = True
+
+    if not proxySet:
+        unset_proxy()
+        
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
 
@@ -941,10 +954,39 @@ def set_proxy(address, username, password):
         os.system('chmod {1} {0}'.format("/etc/systemd/system/metrics-extension.service.d/proxy.conf", 400))
 
         run_command_and_log("systemctl daemon-reload")
+        run_command_and_log('systemctl restart azuremonitor-coreagent')
+        run_command_and_log('systemctl restart metrics-extension')
         
     except:
-        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and mkdir -p /etc/systemd/system/metrics-extension.service.d" )
+        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and /etc/systemd/system/metrics-extension.service.d" )
+
+def unset_proxy():
+    """
+    # Unset proxy http_proxy env var in dependent services
+    """
     
+    try:
+        hasSettings=False
+        
+        # Update Coreagent
+        if os.path.exists("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf"):
+            os.remove("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
+            hasSettings=True
+            
+        # Update ME
+        if os.path.exists("/etc/systemd/system/metrics-extension.service.d/proxy.conf"):
+            os.remove("/etc/systemd/system/metrics-extension.service.d/proxy.conf")
+            hasSettings=True
+            
+        if hasSettings:
+            run_command_and_log("systemctl daemon-reload")
+            run_command_and_log('systemctl restart azuremonitor-coreagent')
+            run_command_and_log('systemctl restart metrics-extension')
+        
+        
+    except:
+        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to remove /etc/systemd/system/azuremonitor-coreagent.service.d and /etc/systemd/system/metrics-extension.service.d" )
+
 def get_managed_identity():
     """
     # Determine Managed Identity (MI) settings
@@ -971,8 +1013,8 @@ def get_managed_identity():
         identifier_name = managedIdentity.get("identifier-name")
         identifier_value = managedIdentity.get("identifier-value")
 
-        if identifier_name not in ["client_id", "mi_res_id"]:
-            return identifier_name, identifier_value, 'Invalid identifier-name provided; must be "client_id" or "mi_res_id"'
+        if identifier_name not in ["client_id", "mi_res_id", "object_id"]:
+            return identifier_name, identifier_value, 'Invalid identifier-name provided; must be "client_id" or "mi_res_id" or "object_id"'
 
         if not identifier_value:
             return identifier_name, identifier_value, 'Invalid identifier-value provided; cannot be empty'
@@ -1418,9 +1460,13 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
                 useSyslogTcp = True   
         
     # 1P tenants use omuxsock, so keep using that for customers using 1P
-    if useSyslogTcp == True and syslog_port != '' and not uses_gcs:
+    if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
             restartRequired = False
+            if uses_gcs and not os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
+                copyfile("/etc/opt/microsoft/azuremonitoragent/syslog/rsyslogconf/05-azuremonitoragent-loadomuxsock.conf","/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
+                restartRequired = True
+            
             if not os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
                 if os.path.exists('/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf'):
                     os.remove("/etc/rsyslog.d/05-azuremonitoragent-loadomuxsock.conf")
