@@ -7,7 +7,7 @@
       "Type": "simple",
       "Restart": "always",
       "WorkingDirectory": "../..",
-      "ExecStart": ["/usr/bin/env", "python", "main/NodeBased/PollingService.py"]
+      "ExecStart": ["/usr/bin/env", "python", "main/IaaSExtensionSnapshotService/PollingService.py"]
     },
     "Install": {
       "WantedBy": "multi-user.target"

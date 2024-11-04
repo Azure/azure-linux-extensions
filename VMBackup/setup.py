@@ -84,11 +84,11 @@ packages_array.append(target_utils_path)
 """
 copy the NodeBased lib to local
 """
-target_node_based_path = main_folder + '/' + CommonVariables.node_based_path_name
-packages_array.append(target_node_based_path)
+target_snapshot_service_path = main_folder + '/' + CommonVariables.snapshot_service_path_name
+packages_array.append(target_snapshot_service_path)
 
-polling_service_metadata =  target_node_based_path + '/service_metadata.json'
-polling_service_readme =  target_node_based_path + '/README.md'
+polling_service_metadata =  target_snapshot_service_path + '/service_metadata.json'
+polling_service_readme =  target_snapshot_service_path + '/README.md'
 
 """
 generate the HandlerManifest.json file.
@@ -225,12 +225,12 @@ copybinary(workload_customscripts_folder, final_workload_customscripts_path)
 copybinary(workloadutils_folder, final_workloadutils_path)
 
 final_main_folder = final_folder_path + '/main'
-final_node_based_path = final_main_folder + '/' + CommonVariables.node_based_path_name
+final_snapshot_service_path = final_main_folder + '/' + CommonVariables.snapshot_service_path_name
 
 copy(plugin_conf, final_main_folder)
 copy(severity_json, final_main_folder)
-copy(polling_service_metadata, final_node_based_path)
-copy(polling_service_readme, final_node_based_path)
+copy(polling_service_metadata, final_snapshot_service_path)
+copy(polling_service_readme, final_snapshot_service_path)
 copy(manifest, final_folder_path)
 copy(main_entry, final_main_folder)
 

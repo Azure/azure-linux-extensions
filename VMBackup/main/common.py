@@ -19,7 +19,7 @@
 class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
-    node_based_path_name = "NodeBased"
+    snapshot_service_path_name = "IaaSExtensionSnapshotService"
     extension_name = 'MyBackupTestLinuxInt'
     extension_version = "1.0.9120.0"
     extension_zip_version = "1"
