@@ -1,0 +1,15 @@
+{
+    "Unit": {
+      "Description": "Long running Snapshot service for Microsoft Azure Restore Points",
+      "After": "multi-user.target"
+    },
+    "Service": {
+      "Type": "simple",
+      "Restart": "always",
+      "WorkingDirectory": "../..",
+      "ExecStart": ["/usr/bin/env", "python", "main/NodeBased/PollingService.py"]
+    },
+    "Install": {
+      "WantedBy": "multi-user.target"
+    }
+}
