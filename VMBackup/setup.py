@@ -81,6 +81,14 @@ target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
 #print('copying end')
 packages_array.append(target_utils_path)
 
+"""
+copy the NodeBased lib to local
+"""
+target_snapshot_service_path = main_folder + '/' + CommonVariables.snapshot_service_path_name
+packages_array.append(target_snapshot_service_path)
+
+polling_service_metadata =  target_snapshot_service_path + '/service_metadata.json'
+polling_service_readme =  target_snapshot_service_path + '/README.md'
 
 """
 generate the HandlerManifest.json file.
@@ -201,23 +209,30 @@ def copy(src, dst):
     shutil.copy2(src, dst)
 
 final_folder_path = target_zip_file_location + target_folder_name
+
 final_binary_path= final_folder_path + '/main/safefreeze'
 final_Arm64binary_path= final_folder_path + '/main/safefreezeArm64'
 final_plugin_path = final_folder_path + '/main/tempPlugin'
 final_workloadscripts_path = final_folder_path + '/main/workloadPatch/DefaultScripts'
 final_workload_customscripts_path = final_folder_path + '/main/workloadPatch/CustomScripts'
 final_workloadutils_path = final_folder_path + '/main/workloadPatch/WorkloadUtils'
-copybinary(workloadscripts_folder, final_workloadscripts_path) 
-copybinary(workload_customscripts_folder, final_workload_customscripts_path)
-copybinary(workloadutils_folder, final_workloadutils_path)
-final_plugin_conf_path = final_folder_path + '/main'
-final_severity_json_path = final_folder_path + '/main'
+
 copybinary(binary_entry, final_binary_path)
 copybinary(arm64_binary_entry, final_Arm64binary_path)
 copybinary(plugin_folder, final_plugin_path)
-copy(plugin_conf, final_plugin_conf_path)
-copy(severity_json, final_severity_json_path)
-copy(manifest,final_folder_path)
-copy(main_entry,final_plugin_conf_path)
+copybinary(workloadscripts_folder, final_workloadscripts_path) 
+copybinary(workload_customscripts_folder, final_workload_customscripts_path)
+copybinary(workloadutils_folder, final_workloadutils_path)
+
+final_main_folder = final_folder_path + '/main'
+final_snapshot_service_path = final_main_folder + '/' + CommonVariables.snapshot_service_path_name
+
+copy(plugin_conf, final_main_folder)
+copy(severity_json, final_main_folder)
+copy(polling_service_metadata, final_snapshot_service_path)
+copy(polling_service_readme, final_snapshot_service_path)
+copy(manifest, final_folder_path)
+copy(main_entry, final_main_folder)
+
 zip(final_folder_path, target_zip_file_path)
 

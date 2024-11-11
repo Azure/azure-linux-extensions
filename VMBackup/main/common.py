@@ -19,6 +19,7 @@
 class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
+    snapshot_service_path_name = "IaaSExtensionSnapshotService"
     extension_name = 'MyBackupTestLinuxInt'
     extension_version = "1.0.9120.0"
     extension_zip_version = "1"
@@ -42,10 +43,12 @@ class CommonVariables:
     statusBlobUploadError = 'statusBlobUploadError'
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
+    
+    # -------------------- Dynamic Settings from CRP --------------------
     isSnapshotTtlEnabled = 'isSnapshotTtlEnabled'
     useMccfForLad = 'useMccfForLad'
     useMccfToFetchDsasForAllDisks = 'useMccfToFetchDsasForAllDisks'
-    enableSnapshotExtensionPolling = "EnableSnapshotExtensionPolling"
+    enableSnapshotExtensionPolling = "EnableVMSnapshotExtensionPolling"
     isVmmdBlobIncluded = 'isVmmdBlobIncluded'
     key = 'Key'
     value = 'Value'
