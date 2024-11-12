@@ -55,6 +55,10 @@ pythonVersionList="python3.8 python3.7 python3.6 python3.5 python3.4 python3.3 p
 for pythonVersion in ${pythonVersionList};
 do
 	cmnd="/usr/bin/${pythonVersion}"
+	if [ ! -f "${cmnd}" ]
+	then
+        cmnd="/usr/local/bin/${pythonVersion}"
+    fi
 	if [ -f "${cmnd}" ]
     then
 		echo "`date -u`- ${pythonVersion} path exists" >> $logfile
