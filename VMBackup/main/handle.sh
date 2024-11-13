@@ -58,9 +58,9 @@ do
 	if [ ! -f "${cmnd}" ]
 	then
 		cmnd="/usr/local/bin/${pythonVersion}"
-    fi
+	fi
 	if [ -f "${cmnd}" ]
-    then
+	then
 		echo "`date -u`- ${pythonVersion} path exists" >> $logfile
 		$cmnd main/handle.py -$configSeqNo -$1
 		rc=$?
