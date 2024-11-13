@@ -57,7 +57,7 @@ do
 	cmnd="/usr/bin/${pythonVersion}"
 	if [ ! -f "${cmnd}" ]
 	then
-        cmnd="/usr/local/bin/${pythonVersion}"
+		cmnd="/usr/local/bin/${pythonVersion}"
     fi
 	if [ -f "${cmnd}" ]
     then
