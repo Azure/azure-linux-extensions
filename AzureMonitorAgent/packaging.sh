@@ -67,11 +67,16 @@ cp tmp/opt/microsoft/azuremonitoragent/bin/fluent-bit fluentBitBin/fluent-bit_aa
 rm -rf tmp/
 
 cp $input_path/MetricsExtension* MetricsExtensionBin/
-cp $input_path/amacoreagent amaCoreAgentBin/
+cp $input_path/x86_64/amacoreagent amaCoreAgentBin/amacoreagent_x86_64
 cp -r $input_path/KqlExtension/* KqlExtensionBin/
-cp $input_path/liblz4x64.so amaCoreAgentBin/
-cp $input_path/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
-cp $input_path/agentlauncher agentLauncherBin/
+cp $input_path/x86_64/liblz4x64.so amaCoreAgentBin/
+cp $input_path/x86_64/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
+cp $input_path/x86_64/agentlauncher agentLauncherBin/agentlauncher_x86_64
+
+
+cp $input_path/arm64/amacoreagent amaCoreAgentBin/amacoreagent_aarch64
+cp $input_path/arm64/libgrpc_csharp_ext.arm64.so amaCoreAgentBin/
+cp $input_path/arm64/agentlauncher agentLauncherBin/agentlauncher_aarch64
 
 # make the shim.sh file executable
 chmod +x shim.sh
