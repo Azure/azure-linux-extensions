@@ -103,15 +103,15 @@ uncompressed_size=$(du -sb $output_path/unzipped | cut -f1)
 compressed_size=$(du -sb $output_path/$PACKAGE_NAME | cut -f1)
 rm -rf $output_path/unzipped
 
-# if [[ $uncompressed_size -gt $max_uncompressed_size ]]; then
-#     echo "Uncompressed size of $PACKAGE_NAME is $uncompressed_size bytes, which exceeds the limit of $max_uncompressed_size bytes"
-#     exit 1
-# fi
+if [[ $uncompressed_size -gt $max_uncompressed_size ]]; then
+    echo "Uncompressed size of $PACKAGE_NAME is $uncompressed_size bytes, which exceeds the limit of $max_uncompressed_size bytes"
+#    exit 1
+fi
 
-# if [[ $compressed_size -gt $max_compressed_size ]]; then
-#     echo "Compressed size of $PACKAGE_NAME is $compressed_size bytes, which exceeds the limit of $max_compressed_size bytes"
+if [[ $compressed_size -gt $max_compressed_size ]]; then
+    echo "Compressed size of $PACKAGE_NAME is $compressed_size bytes, which exceeds the limit of $max_compressed_size bytes"
 #     exit 1
-# fi
+fi
 
 # cleanup newly added dir or files
 rm -rf Utils/ waagent
