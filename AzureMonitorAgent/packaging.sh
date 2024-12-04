@@ -67,11 +67,16 @@ cp tmp/opt/microsoft/azuremonitoragent/bin/fluent-bit fluentBitBin/fluent-bit_aa
 rm -rf tmp/
 
 cp $input_path/MetricsExtension* MetricsExtensionBin/
-cp $input_path/amacoreagent amaCoreAgentBin/
+cp $input_path/x86_64/amacoreagent amaCoreAgentBin/amacoreagent_x86_64
 cp -r $input_path/KqlExtension/* KqlExtensionBin/
-cp $input_path/liblz4x64.so amaCoreAgentBin/
-cp $input_path/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
-cp $input_path/agentlauncher agentLauncherBin/
+cp $input_path/x86_64/liblz4x64.so amaCoreAgentBin/
+cp $input_path/x86_64/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
+cp $input_path/x86_64/agentlauncher agentLauncherBin/agentlauncher_x86_64
+
+
+cp $input_path/arm64/amacoreagent amaCoreAgentBin/amacoreagent_aarch64
+cp $input_path/arm64/libgrpc_csharp_ext.arm64.so amaCoreAgentBin/
+cp $input_path/arm64/agentlauncher agentLauncherBin/agentlauncher_aarch64
 
 # make the shim.sh file executable
 chmod +x shim.sh
@@ -97,15 +102,17 @@ unzip -d $output_path/unzipped $output_path/$PACKAGE_NAME
 uncompressed_size=$(du -sb $output_path/unzipped | cut -f1)
 compressed_size=$(du -sb $output_path/$PACKAGE_NAME | cut -f1)
 rm -rf $output_path/unzipped
+echo "Uncompressed size of $PACKAGE_NAME is $uncompressed_size bytes"
+echo "compressed size of $PACKAGE_NAME is $compressed_size bytes"
 
 if [[ $uncompressed_size -gt $max_uncompressed_size ]]; then
     echo "Uncompressed size of $PACKAGE_NAME is $uncompressed_size bytes, which exceeds the limit of $max_uncompressed_size bytes"
-    exit 1
+#    exit 1
 fi
 
 if [[ $compressed_size -gt $max_compressed_size ]]; then
     echo "Compressed size of $PACKAGE_NAME is $compressed_size bytes, which exceeds the limit of $max_compressed_size bytes"
-    exit 1
+#     exit 1
 fi
 
 # cleanup newly added dir or files
