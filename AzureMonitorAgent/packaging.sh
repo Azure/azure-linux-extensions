@@ -102,6 +102,8 @@ unzip -d $output_path/unzipped $output_path/$PACKAGE_NAME
 uncompressed_size=$(du -sb $output_path/unzipped | cut -f1)
 compressed_size=$(du -sb $output_path/$PACKAGE_NAME | cut -f1)
 rm -rf $output_path/unzipped
+echo "Uncompressed size of $PACKAGE_NAME is $uncompressed_size bytes"
+echo "compressed size of $PACKAGE_NAME is $compressed_size bytes"
 
 if [[ $uncompressed_size -gt $max_uncompressed_size ]]; then
     echo "Uncompressed size of $PACKAGE_NAME is $uncompressed_size bytes, which exceeds the limit of $max_uncompressed_size bytes"
