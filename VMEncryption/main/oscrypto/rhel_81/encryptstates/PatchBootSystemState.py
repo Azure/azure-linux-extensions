@@ -95,7 +95,7 @@ class PatchBootSystemState(OSEncryptionState):
 
             sleep(5)
             # the restarted vm shall see the marker and advance the state machine
-            # self.command_executor.Execute('reboot')
+            self.command_executor.Execute('reboot')
             # reboot race condition sleep
             sleep(5)
         else:
