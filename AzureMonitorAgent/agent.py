@@ -332,15 +332,6 @@ def install():
     set_os_arch('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
-    # Check if SUSE 15 VMs have /sbin/insserv package (required for AMA 1.14.4+)
-    if (vm_dist.startswith('suse') or vm_dist.startswith('sles') or vm_dist.startswith('opensuse')) and vm_ver.startswith('15'):
-        check_insserv, _ = run_command_and_log("which insserv")
-        if check_insserv != 0:
-            hutil_log_info("'insserv-compat' package missing from SUSE 15 machine, installing to allow AMA to run.")
-            insserv_exit_code, insserv_output = run_command_and_log("zypper --non-interactive install insserv-compat")
-            if insserv_exit_code != 0:
-                return insserv_exit_code, insserv_output
-
     # Check if Debian 12 VMs have rsyslog package (required for AMA 1.31+)
     if (vm_dist.startswith('debian')) and vm_ver.startswith('12'):
         check_rsyslog, _ = run_command_and_log("dpkg -s rsyslog")
