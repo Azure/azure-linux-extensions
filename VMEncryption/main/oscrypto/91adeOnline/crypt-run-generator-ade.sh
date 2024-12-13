@@ -20,8 +20,10 @@ if command -v systemctl >/dev/null; then
     systemctl daemon-reload
     systemctl start bek.mount
     systemctl start boot.mount
-    /usr/sbin/cryptsetup luksOpen /dev/disk/azure/root-part3 osencrypt --header /boot/luks/osluksheader -d /bek/LinuxPassPhraseFileName
-    # systemctl start cryptsetup.target
+    systemctl start cryptsetup.target
+    # manual unlock fix
+    # /usr/sbin/cryptsetup luksOpen /dev/disk/azure/root-part3 osencrypt --header /boot/luks/osluksheader -d /bek/LinuxPassPhraseFileName
+
 fi
 
 MAX_WAIT=15
