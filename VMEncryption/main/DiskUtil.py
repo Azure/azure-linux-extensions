@@ -1048,7 +1048,7 @@ class DiskUtil(object):
                         if property_item_pair[0] == 'MODEL':
                             device_item.model = property_item_pair[1].strip('"')
 
-                        if property_item_pair[0] == 'MAJ:MIN':
+                        if property_item_pair[0] == 'MAJ:MIN' or property_item_pair[0] == "MAJ_MIN":
                             device_item.majmin = property_item_pair[1].strip('"')
 
                     device_item.device_id = self.get_device_id(self.get_device_path(device_item.name))
