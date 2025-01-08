@@ -196,7 +196,7 @@ class HandlerUtility:
                 if cleartxt is None:
                     self.log("OpenSSL decode error using cms command with thumbprint" + thumb + "\n trying smime command")
                     openSSLcmd_smime = ['openssl', 'smime', '-inform', 'DER', '-decrypt', '-recip' , cert, '-inkey', pkey]
-                    cleartxt = ext_utils.run_send_stdin(openSSLcmd_cms, unencodedSettings)[1]
+                    cleartxt = ext_utils.run_send_stdin(openSSLcmd_smime, unencodedSettings)[1]
                     if cleartxt is None:
                         self.error("OpenSSL decode error using smime command with thumbprint " + thumb)
                         self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
