@@ -495,7 +495,7 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
-    _, _, _, az_environment, _ = me_handler.get_imds_values(is_lad=False)
+    _, _, _, az_environment, _ = me_handler.get_imds_values(is_lad=False, HUtilObj=HUtilObject)
     if az_environment.lower() == me_handler.ArcACloudName:
         _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
         default_configs["customRegionalEndpoint"] = mcs_endpoint

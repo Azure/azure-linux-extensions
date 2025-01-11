@@ -580,7 +580,7 @@ def get_handler_vars():
     return logFolder, configFolder
 
 
-def get_imds_values(is_lad):
+def get_imds_values(is_lad, HUtilObj=None):
     """
     Query imds to get required values for MetricsExtension config for this VM
     """
@@ -599,6 +599,12 @@ def get_imds_values(is_lad):
             is_arc = True
         else:
             imds_url = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+
+    message = "IMDS url to query: " + imds_url
+    if HUtilObj is not None:
+        HUtilObj.log(message)
+    else:
+        print('Info: {0}'.format(message))
 
     data = None
     while retries <= max_retries:
