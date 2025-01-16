@@ -263,6 +263,21 @@ class UbuntuDistro(GenericDistro):
         self.sudoers_dir_base = '/usr/local/etc'
         self.distro_name = 'Ubuntu'
 
+    def restart_ssh_service(self):
+        """
+        Service call to re(start) the SSH service
+        starting with Ubuntu 22.10, the service name is ssh not sshd, adding fallback incase sshd fails
+        """
+        ssh_restart_cmd = [self.service_cmd, self.ssh_service_name, self.ssh_service_restart_option]
+        ret_code = ext_utils.run(ssh_restart_cmd)
+        if ret_code != 0:
+            self.ssh_service_name = 'ssh'
+            ssh_restart_cmd = [self.service_cmd, self.ssh_service_name, self.ssh_service_restart_option]
+            ret_code = ext_utils.run(ssh_restart_cmd)
+            if ret_code != 0:
+                logger.error("Failed to restart SSH service with return code:" + str(ret_code))
+        return ret_code
+
 class FreeBSDDistro(GenericDistro):
     """
     """
