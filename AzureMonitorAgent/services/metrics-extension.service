@@ -3,7 +3,7 @@ Description=Metrics Extension service for Linux Agent metrics sourcing
 After=network.target
 
 [Service]
-ExecStart=%ME_BIN% -TokenSource AMCS -ManagedIdentity %ME_MANAGED_IDENTITY% -Input influxdb_local,otlp_grpc,otlp_grpc_prom -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -LogLevel Error
+ExecStart=%ME_BIN% -TokenSource AMCS -ManagedIdentity %ME_MANAGED_IDENTITY% -Input influxdb_local,otlp_grpc,otlp_grpc_prom -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -LogLevel Error -ConfigOverrides {\"publishMinMaxByDefault\":true}
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartForceExitStatus=SIGPIPE
