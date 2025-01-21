@@ -1,3 +1,13 @@
+1.4.0.9
+- Rollover the new version
+
+1.4.0.8
+- Update bls cmdline if grub2 version is greater than 2.06.69
+
+1.4.0.7
+- Onboard Ubuntu 24.04 to online encryption
+- Add support for RHEL 9.3 
+
 1.4.0.6
 - Cleaned SP and DP branches of non ADE files (Build compliance)
 - Fix xfs corruption issue on Ubuntu 22
