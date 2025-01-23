@@ -1,3 +1,7 @@
+1.4.0.10
+- Fix LVM encryption on RHEL 9
+- Fix null char in stdout 
+
 1.4.0.9
 - Rollover the new version
 
