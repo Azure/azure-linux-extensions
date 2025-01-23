@@ -898,7 +898,6 @@ def enable():
                       message=msg)
     finally:
         lock.release_lock()
-        logger.log("exiting enable lock, PID {0}".format(os.getpid()))
 
 def are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation):
     are_data_disk_encrypted = True if encryption_status['data'] == 'Encrypted' else False
