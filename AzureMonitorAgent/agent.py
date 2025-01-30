@@ -1181,8 +1181,8 @@ def metrics_watcher(hutil_error, hutil_log):
                 f.close()
             
             if fluent_port != '' and os.path.isfile(FluentCfgPath):
-                portSetting = "    Port    "  + fluent_port
-                defaultPortSetting = 'Port    '
+                portSetting = "    Port                       "  + fluent_port
+                defaultPortSetting = '    Port                       '
                 portUpdated = False
                 with open(FluentCfgPath) as f:
                     if portSetting not in f.read():
@@ -1192,7 +1192,7 @@ def metrics_watcher(hutil_error, hutil_log):
                     with contextlib.closing(fileinput.FileInput(FluentCfgPath, inplace=True, backup='.bak')) as file:
                         for line in file:
                             if defaultPortSetting in line:
-                                print(portSetting, end='')
+                                print(portSetting + "\n", end='')
                             else:
                                 print(line, end='')
                     os.chmod(FluentCfgPath, stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
