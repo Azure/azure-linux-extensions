@@ -1185,7 +1185,7 @@ def metrics_watcher(hutil_error, hutil_log):
                 defaultPortSetting = 'Port'
                 portUpdated = False
                 with open(FluentCfgPath) as f:
-                    found = re.search(".*Port.*" + fluent_port + "$", f.read())
+                    found = re.search(".*Port.*" + fluent_port, f.read())
                     if not found:
                         portUpdated = True
 
