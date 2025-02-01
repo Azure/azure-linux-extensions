@@ -1181,12 +1181,14 @@ def metrics_watcher(hutil_error, hutil_log):
                 f.close()
             
             if fluent_port != '' and os.path.isfile(FluentCfgPath):
-                portSetting = "    Port    "  + fluent_port
-                defaultPortSetting = 'Port    '
-                portUpdated = False
-                with open(FluentCfgPath) as f:
-                    if portSetting not in f.read():
-                        portUpdated = True
+                portSetting = "    Port                       "  + fluent_port + "\n"
+                defaultPortSetting = 'Port'
+                portUpdated = True                
+                with open(FluentCfgPath, 'r') as f:                    
+                    for line in f:                        
+                        found = re.search("^\s{0,}Port\s{1,}" + fluent_port + "$", line)
+                        if found:
+                            portUpdated = False
 
                 if portUpdated == True:
                     with contextlib.closing(fileinput.FileInput(FluentCfgPath, inplace=True, backup='.bak')) as file:
