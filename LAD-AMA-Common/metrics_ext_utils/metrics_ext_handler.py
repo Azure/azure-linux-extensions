@@ -597,10 +597,12 @@ def get_imds_values(is_lad):
     data = None
     while retries <= max_retries:
 
-        # Query imds to get the required information
-        req = urllib.Request(imds_url, headers={'Metadata':'true'})
-        res = urllib.urlopen(req)
-        data = json.loads(res.read().decode('utf-8', 'ignore'))
+        try:
+            req = urllib.Request(imds_url, headers={'Metadata':'true'})
+            res = urllib.urlopen(req)
+            data = json.loads(res.read().decode('utf-8', 'ignore'))
+        except:
+            pass
 
         if "compute" not in data:
             retries += 1
@@ -650,10 +652,12 @@ def get_arca_endpoints_from_himds():
     data = None
     while retries <= max_retries:
 
-        # Query imds to get the required information
-        req = urllib.Request(imds_url, headers={'Metadata':'true'})
-        res = urllib.urlopen(req)
-        data = json.loads(res.read().decode('utf-8', 'ignore'))
+        try:
+            req = urllib.Request(imds_url, headers={'Metadata':'true'})
+            res = urllib.urlopen(req)
+            data = json.loads(res.read().decode('utf-8', 'ignore'))
+        except:
+            pass
 
         if "dataplaneEndpoints" not in data or "resourceManager" not in data:
             retries += 1
