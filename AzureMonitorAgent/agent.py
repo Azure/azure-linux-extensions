@@ -495,13 +495,6 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
-    az_environment, _ = get_azure_environment_and_region()
-    if az_environment.lower() == me_handler.ArcACloudName:
-        _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
-        default_configs["customRegionalEndpoint"] = mcs_endpoint
-        default_configs["customGlobalEndpoint"] = mcs_endpoint
-        default_configs["customResourceEndpoint"] = "https://monitoring.azs"
-
     """
     Decide the mode and configuration. There are two supported configuration schema, mix-and-match between schemas is disallowed:
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
@@ -822,7 +815,19 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
 
     if not proxySet:
         unset_proxy()
-        
+
+    # set arc autonomous endpoints
+    az_environment, _ = get_azure_environment_and_region()
+    if az_environment.lower() == me_handler.ArcACloudName:
+        try:
+            _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
+        except Exception as ex:
+            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Failed to get Arc autonomous endpoints. {0}'.format(ex))
+
+        default_configs["customRegionalEndpoint"] = mcs_endpoint
+        default_configs["customGlobalEndpoint"] = mcs_endpoint
+        default_configs["customResourceEndpoint"] = "https://monitoring.azs"
+
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
 
