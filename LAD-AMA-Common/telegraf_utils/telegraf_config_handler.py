@@ -174,7 +174,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 if plugin not in storage_namepass_list:
                     storage_namepass_list.append(plugin + "_mdsd")
             else:
-                ama_plugin_name = plugin + "_total"
+                ama_plugin_name = plugin + "_mdsd_la_perf"
                 ama_rename_str += "\n[[processors.rename]]\n"
                 ama_rename_str += " "*2 + "namepass = [\"" + ama_plugin_name + "\"]\n"
                 if ama_plugin_name not in storage_namepass_list:
