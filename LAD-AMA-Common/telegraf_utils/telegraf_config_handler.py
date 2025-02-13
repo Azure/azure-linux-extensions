@@ -164,21 +164,23 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
 
             # If it's a lad config then add the namepass fields for sending totals to storage
-            if is_lad:
-                lad_plugin_name = plugin + "_total"
+            lad_plugin_name = plugin + "_total"
+            if lad_plugin_name not in storage_namepass_list:
+                storage_namepass_list.append(lad_plugin_name)
+
+            ama_plugin_name = plugin + "_mdsd_la_perf"
+            if ama_plugin_name not in storage_namepass_list:
+                storage_namepass_list.append(ama_plugin_name)
+            
+            if is_lad:                
                 lad_specific_rename_str += "\n[[processors.rename]]\n"
-                lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"
-                if lad_plugin_name not in storage_namepass_list:
-                    storage_namepass_list.append(lad_plugin_name)
+                lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"                
             elif is_vmi  or is_vmi_rate_counter:                
                 if plugin not in storage_namepass_list:
                     storage_namepass_list.append(plugin + "_mdsd")
-            else:
-                ama_plugin_name = plugin + "_mdsd_la_perf"
+            else:                
                 ama_rename_str += "\n[[processors.rename]]\n"
-                ama_rename_str += " "*2 + "namepass = [\"" + ama_plugin_name + "\"]\n"
-                if ama_plugin_name not in storage_namepass_list:
-                    storage_namepass_list.append(ama_plugin_name)
+                ama_rename_str += " "*2 + "namepass = [\"" + ama_plugin_name + "\"]\n"                
 
             namespace = MetricsExtensionNamepsace
             if is_vmi or is_vmi_rate_counter:
