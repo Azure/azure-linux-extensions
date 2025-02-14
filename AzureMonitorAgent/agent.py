@@ -1385,8 +1385,11 @@ def metrics_watcher(hutil_error, hutil_log):
                             if check_semanage == 0:
                                 fluentPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False)
                                 if fluentPortEnabled != 0:                    
-                                    # allow the fluent port in SELinux
-                                    run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False)
+                                    # also check SELinux config paths for Oracle/RH
+                                    fluentPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False)
+                                    if fluentPortEnabled != 0:                    
+                                        # allow the fluent port in SELinux
+                                        run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False)
 
             if os.path.isfile(FluentCfgPath):
                 f = open(FluentCfgPath, "r")
@@ -1692,8 +1695,11 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
             if check_semanage == 0 and syslog_port != '':
                 syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
                 if syslogPortEnabled != 0:                    
-                    # allow the syslog port in SELinux
-                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
+                    # also check SELinux config paths for Oracle/RH
+                    syslogPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
+                    if syslogPortEnabled != 0:                    
+                        # allow the syslog port in SELinux
+                        run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
                 useSyslogTcp = True   
         
     # 1P tenants use omuxsock, so keep using that for customers using 1P
