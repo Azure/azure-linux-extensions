@@ -326,7 +326,7 @@ def start_metrics(is_lad):
         #query imds to get the subscription id
         az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
 
-        monitoring_account = "CUSTOMMETRIC_"+ subscription_id + "_" +location
+        monitoringAccount = "CUSTOMMETRIC_"+ subscription_id + "_" +location
 
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
