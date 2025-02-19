@@ -818,7 +818,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
 
     # set arc autonomous endpoints
     az_environment, _ = get_azure_environment_and_region()
-    if az_environment.lower() == me_handler.ArcACloudName:
+    if az_environment == me_handler.ArcACloudName:
         try:
             _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
         except Exception as ex:
@@ -1946,18 +1946,20 @@ def get_azure_environment_and_region():
     environment = region = None
 
     try:
-        response = json.loads(urllib.urlopen(req).read())
+        response = json.loads(urllib.urlopen(req).read().decode('utf-8', 'ignore'))
 
         if ('compute' in response):
             if ('azEnvironment' in response['compute']):
-                environment = response['compute']['azEnvironment']
+                environment = response['compute']['azEnvironment'].lower()
             if ('location' in response['compute']):
                 region = response['compute']['location'].lower()
     except urlerror.HTTPError as e:
         hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
         hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
-    except:
-        hutil_log_error('Unexpected error from Metadata service')
+    except Exception as e:
+        hutil_log_error('Unexpected error from Metadata service: {0}'.format(e))
+
+    hutil_log_info('Detected environment: {0}, region: {1}'.format(environment, region))
 
     return environment, region
 
