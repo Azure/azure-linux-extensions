@@ -610,32 +610,11 @@ def enable():
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
                 return exit_code, output
 
-    # check if .NET is installed to start Kql extension process
     if platform.machine() != 'aarch64':
-        check_dotnet, dotnetcmd_output = run_command_and_log("dotnet --list-runtimes",log_cmd=False)
-        if check_dotnet != 0:
-            hutil_log_info(".NET 8.0 is not installed. Please install .NET 8.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
-            #ensure kql extension service is not running. do not block if it fails
-            kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-            if kql_exit_code != 0:
-                status_command = get_service_command("azuremonitor-kqlextension", "status")
-                kql_exit_code, status_output = run_command_and_log(status_command)
-                hutil_log_info(status_output)
-        else:
-            if "8.0" in dotnetcmd_output:
-                hutil_log_info("Found .NET 8.0 installed")
-                if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-                    # start/enable kql extension only in 3P mode and non aarch64
-                    kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
-                    output += kql_output # do not block if kql start fails
-            else:
-                hutil_log_info(".NET 8.0 is not installed. Please install .NET 8.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
-                #ensure kql extension service is not running
-                kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-                if kql_exit_code != 0:
-                    status_command = get_service_command("azuremonitor-kqlextension", "status")
-                    kql_exit_code, status_output = run_command_and_log(status_command)
-                    hutil_log_info(status_output)
+        if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
+            # start/enable kql extension only in 3P mode and non aarch64
+            kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
+            output += kql_output # do not block if kql start fails
 
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
@@ -1880,14 +1859,9 @@ def get_ssl_cert_info(operation):
 def copy_kqlextension_binaries():
     kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
     kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
-    
     for f in os.listdir(kqlextension_bin_local_path):
         compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
 
-    kqlextension_local_runtimes = os.getcwd() + "/KqlExtensionBin/runtimes/"
-    kqlextension_runtimes = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
-    for f in os.listdir(kqlextension_local_runtimes):
-        compare_and_copy_bin(kqlextension_local_runtimes + f, kqlextension_runtimes + f)
 
 def is_arc_installed():
     """
