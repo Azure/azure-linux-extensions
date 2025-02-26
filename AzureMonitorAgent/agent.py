@@ -379,6 +379,11 @@ def install():
     if exit_code != 0:
         return exit_code, output
 
+    # System daemon reload is required for systemd to pick up the new service
+    exit_code, output = run_command_and_log("systemctl daemon-reload")
+    if exit_code != 0:
+        return exit_code, output
+
     # Copy the AMACoreAgent and agentlauncher binaries
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
