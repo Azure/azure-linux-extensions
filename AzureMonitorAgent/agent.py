@@ -379,6 +379,11 @@ def install():
     if exit_code != 0:
         return exit_code, output
 
+    # System daemon reload is required for systemd to pick up the new service
+    exit_code, output = run_command_and_log("systemctl daemon-reload")
+    if exit_code != 0:
+        return exit_code, output
+
     # Copy the AMACoreAgent and agentlauncher binaries
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
@@ -495,14 +500,6 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
-    _, _, _, az_environment, _ = me_handler.get_imds_values(is_lad=False, HUtilObj=HUtilObject)
-    if az_environment.lower() == me_handler.ArcACloudName:
-        _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
-        default_configs["customRegionalEndpoint"] = mcs_endpoint
-        default_configs["customGlobalEndpoint"] = mcs_endpoint
-        default_configs["customResourceEndpoint"] = "https://monitoring.azs"
-
-
     """
     Decide the mode and configuration. There are two supported configuration schema, mix-and-match between schemas is disallowed:
         Legacy:          allows one of [MCS, GCS single tenant, or GCS multi tenant ("Auto-Config")] modes
@@ -618,32 +615,11 @@ def enable():
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
                 return exit_code, output
 
-    # check if .NET is installed to start Kql extension process
     if platform.machine() != 'aarch64':
-        check_dotnet, dotnetcmd_output = run_command_and_log("dotnet --list-runtimes",log_cmd=False)
-        if check_dotnet != 0:
-            hutil_log_info(".NET 8.0 is not installed. Please install .NET 8.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
-            #ensure kql extension service is not running. do not block if it fails
-            kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-            if kql_exit_code != 0:
-                status_command = get_service_command("azuremonitor-kqlextension", "status")
-                kql_exit_code, status_output = run_command_and_log(status_command)
-                hutil_log_info(status_output)
-        else:
-            if "8.0" in dotnetcmd_output:
-                hutil_log_info("Found .NET 8.0 installed")
-                if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-                    # start/enable kql extension only in 3P mode and non aarch64
-                    kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
-                    output += kql_output # do not block if kql start fails
-            else:
-                hutil_log_info(".NET 8.0 is not installed. Please install .NET 8.0 if you are using Kql transformation. See more here https://learn.microsoft.com/en-us/dotnet/core/install/linux")
-                #ensure kql extension service is not running
-                kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-                if kql_exit_code != 0:
-                    status_command = get_service_command("azuremonitor-kqlextension", "status")
-                    kql_exit_code, status_output = run_command_and_log(status_command)
-                    hutil_log_info(status_output)
+        if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
+            # start/enable kql extension only in 3P mode and non aarch64
+            kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
+            output += kql_output # do not block if kql start fails
 
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
@@ -823,7 +799,19 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
 
     if not proxySet:
         unset_proxy()
-        
+
+    # set arc autonomous endpoints
+    az_environment, _ = get_azure_environment_and_region()
+    if az_environment == me_handler.ArcACloudName:
+        try:
+            _, mcs_endpoint = me_handler.get_arca_endpoints_from_himds()
+        except Exception as ex:
+            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Failed to get Arc autonomous endpoints. {0}'.format(ex))
+
+        default_configs["customRegionalEndpoint"] = mcs_endpoint
+        default_configs["customGlobalEndpoint"] = mcs_endpoint
+        default_configs["customResourceEndpoint"] = "https://monitoring.azs"
+
     # add managed identity settings if they were provided
     identifier_name, identifier_value, error_msg = get_managed_identity()
 
@@ -1181,12 +1169,14 @@ def metrics_watcher(hutil_error, hutil_log):
                 f.close()
             
             if fluent_port != '' and os.path.isfile(FluentCfgPath):
-                portSetting = "    Port    "  + fluent_port
-                defaultPortSetting = 'Port    '
-                portUpdated = False
-                with open(FluentCfgPath) as f:
-                    if portSetting not in f.read():
-                        portUpdated = True
+                portSetting = "    Port                       "  + fluent_port + "\n"
+                defaultPortSetting = 'Port'
+                portUpdated = True                
+                with open(FluentCfgPath, 'r') as f:                    
+                    for line in f:                        
+                        found = re.search("^\s{0,}Port\s{1,}" + fluent_port + "$", line)
+                        if found:
+                            portUpdated = False
 
                 if portUpdated == True:
                     with contextlib.closing(fileinput.FileInput(FluentCfgPath, inplace=True, backup='.bak')) as file:
@@ -1205,8 +1195,11 @@ def metrics_watcher(hutil_error, hutil_log):
                             if check_semanage == 0:
                                 fluentPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False)
                                 if fluentPortEnabled != 0:                    
-                                    # allow the fluent port in SELinux
-                                    run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False)
+                                    # also check SELinux config paths for Oracle/RH
+                                    fluentPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False)
+                                    if fluentPortEnabled != 0:                    
+                                        # allow the fluent port in SELinux
+                                        run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False)
 
             if os.path.isfile(FluentCfgPath):
                 f = open(FluentCfgPath, "r")
@@ -1446,8 +1439,11 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
             if check_semanage == 0 and syslog_port != '':
                 syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
                 if syslogPortEnabled != 0:                    
-                    # allow the syslog port in SELinux
-                    run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
+                    # also check SELinux config paths for Oracle/RH
+                    syslogPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
+                    if syslogPortEnabled != 0:                    
+                        # allow the syslog port in SELinux
+                        run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
                 useSyslogTcp = True   
         
     # 1P tenants use omuxsock, so keep using that for customers using 1P
@@ -1874,14 +1870,9 @@ def get_ssl_cert_info(operation):
 def copy_kqlextension_binaries():
     kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
     kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
-    
     for f in os.listdir(kqlextension_bin_local_path):
         compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
 
-    kqlextension_local_runtimes = os.getcwd() + "/KqlExtensionBin/runtimes/"
-    kqlextension_runtimes = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
-    for f in os.listdir(kqlextension_local_runtimes):
-        compare_and_copy_bin(kqlextension_local_runtimes + f, kqlextension_runtimes + f)
 
 def is_arc_installed():
     """
@@ -1940,18 +1931,20 @@ def get_azure_environment_and_region():
     environment = region = None
 
     try:
-        response = json.loads(urllib.urlopen(req).read())
+        response = json.loads(urllib.urlopen(req).read().decode('utf-8', 'ignore'))
 
         if ('compute' in response):
             if ('azEnvironment' in response['compute']):
-                environment = response['compute']['azEnvironment']
+                environment = response['compute']['azEnvironment'].lower()
             if ('location' in response['compute']):
                 region = response['compute']['location'].lower()
     except urlerror.HTTPError as e:
         hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
         hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
-    except:
-        hutil_log_error('Unexpected error from Metadata service')
+    except Exception as e:
+        hutil_log_error('Unexpected error from Metadata service: {0}'.format(e))
+
+    hutil_log_info('Detected environment: {0}, region: {1}'.format(environment, region))
 
     return environment, region
 
