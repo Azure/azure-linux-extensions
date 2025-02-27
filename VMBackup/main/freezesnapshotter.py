@@ -270,8 +270,15 @@ class FreezeSnapshotter(object):
                         any_failed = True
                 elif blob_snapshot_info != None and blob_snapshot_info.isSuccessful == False:
                     any_failed = True
-
-        if run_result == CommonVariables.success and all_failed:
+        
+        if run_result == CommonVariables.success and all_failed and HandlerUtil.HandlerUtility.get_telemetry_data(CommonVariables.hostStatusCodeDoSnapshot) == "556" and HandlerUtil.HandlerUtility.get_telemetry_data(CommonVariables.hostStatusCodePreSnapshot) == "200":
+            run_status = 'error'
+            run_result = CommonVariables.FailedHostSnapshotRemoteServerError
+            error_msg = 'T:S Enable failed with FailedHostSnapshotRemoteServerError errror'
+            self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHostSnapshotRemoteServerError
+            error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
+            self.logger.log(error_msg, True, 'Error')
+        elif run_result == CommonVariables.success and all_failed:
             run_status = 'error'
             run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
             error_msg = 'T:S Enable failed with FailedRetryableSnapshotFailedNoNetwork errror'
