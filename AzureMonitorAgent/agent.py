@@ -1729,7 +1729,9 @@ def is_vm_supported_for_extension(operation):
                        'centos' : ['7'], # CentOS
                        'mariner' : ['2'], # Mariner 2.0
                        'sles' : ['15'], # SLES
-                       'debian' : ['11'] # Debian
+                       'debian' : ['11'], # Debian
+                       'rocky linux' : ['8', '9'], # Rocky
+                       'rocky' : ['8', '9'] # Rocky
     }
 
     if platform.machine() == 'aarch64':
