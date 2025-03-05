@@ -590,6 +590,10 @@ class HandlerUtility:
     def add_to_telemetery_data(key,value):
         HandlerUtility.telemetry_data[key]=value
 
+    @staticmethod
+    def get_telemetry_data(key):
+        return HandlerUtility.telemetry_data[key]
+    
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
         workloads = self.get_workload_running()

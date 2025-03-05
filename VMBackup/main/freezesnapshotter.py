@@ -270,12 +270,19 @@ class FreezeSnapshotter(object):
                         any_failed = True
                 elif blob_snapshot_info != None and blob_snapshot_info.isSuccessful == False:
                     any_failed = True
+        
+        if all_failed:
+            doSnapshot_status = HandlerUtil.HandlerUtility.get_telemetry_data(CommonVariables.hostStatusCodeDoSnapshot)
+            preSnapshot_status = HandlerUtil.HandlerUtility.get_telemetry_data(CommonVariables.hostStatusCodePreSnapshot)
 
-        if run_result == CommonVariables.success and all_failed:
-            run_status = 'error'
-            run_result = CommonVariables.FailedRetryableSnapshotFailedNoNetwork
-            error_msg = 'T:S Enable failed with FailedRetryableSnapshotFailedNoNetwork errror'
-            self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
+            if run_result == CommonVariables.success and doSnapshot_status == "556" and preSnapshot_status == "200":
+                run_result = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHostSnapshotRemoteServerError
+                error_msg = 'T:S Enable failed with FailedHostSnapshotRemoteServerError error'
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHostSnapshotRemoteServerError
+            else: 
+                run_result = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
+                error_msg = 'T:S Enable failed with FailedRetryableSnapshotFailedNoNetwork error'
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
             error_msg = error_msg + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(self.extensionErrorCode)
             self.logger.log(error_msg, True, 'Error')
         elif run_result == CommonVariables.success and any_failed:
