@@ -285,19 +285,25 @@ def compare_and_copy_bin(src, dest):
         os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
 
 def copy_amacoreagent_binaries():
-    amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
+    current_arch = platform.machine()
+    amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent_" + current_arch
     amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
 
-    liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
-    liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
-    compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
+    if current_arch == 'x86_64':
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x86_64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x86_64.so"
+        compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
 
-    libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
-    libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
-    compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
+        liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
+        liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
+        compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)   
+    elif current_arch == 'aarch64':
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.arm64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.arm64.so"
+        compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
                   
-    agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
+    agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher_" + current_arch
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
 
@@ -385,7 +391,6 @@ def install():
         return exit_code, output
 
     # Copy the AMACoreAgent and agentlauncher binaries
-    # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
     # Copy Kqle xtension binaries
@@ -398,13 +403,6 @@ def install():
         libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
         if libssl1_1 == 0:
             copy_mdsd_fluentbit_binaries()
-            
-    # Comment out the following check in AMA 1.31 as the coreagent & agentlauncher services are not installed with the aarch64 deb/rpm packages.
-    #
-    # # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
-    # if is_systemd() and platform.machine() == 'aarch64':
-    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
-    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
     
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
@@ -572,18 +570,16 @@ def enable():
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-        if platform.machine() != 'aarch64':
-            # enable processes for Custom Logs
-            ensure["azuremonitor-agentlauncher"] = True
-            ensure["azuremonitor-coreagent"] = True
+        # enable processes for Custom Logs
+        ensure["azuremonitor-agentlauncher"] = True
+        ensure["azuremonitor-coreagent"] = True
             
         # start the metrics and syslog watcher only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
         # In GCS scenarios, ensure that AMACoreAgent is running
-        if platform.machine() != 'aarch64':
-            ensure["azuremonitor-coreagent"] = True
+        ensure["azuremonitor-coreagent"] = True
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -862,7 +858,7 @@ def disable():
 
     # stop amacoreagent and agent launcher
     hutil_log_info('Handler initiating Core Agent and agent launcher')
-    if is_systemd() and platform.machine() != 'aarch64':
+    if is_systemd():
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
         # in case AL is not cleaning up properly
@@ -899,8 +895,6 @@ def update():
     return 0, ""
 
 def restart_launcher():
-    if platform.machine() == 'aarch64':
-        return
     # start agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
