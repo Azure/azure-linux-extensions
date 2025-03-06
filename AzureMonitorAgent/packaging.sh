@@ -74,9 +74,9 @@ cp $input_path/x86_64/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
 cp $input_path/x86_64/agentlauncher agentLauncherBin/agentlauncher_x86_64
 
 
-cp $input_path/arm64/amacoreagent amaCoreAgentBin/amacoreagent_aarch64
-cp $input_path/arm64/libgrpc_csharp_ext.arm64.so amaCoreAgentBin/
-cp $input_path/arm64/agentlauncher agentLauncherBin/agentlauncher_aarch64
+cp $input_path/aarch64/amacoreagent amaCoreAgentBin/amacoreagent_aarch64
+cp $input_path/aarch64/libgrpc_csharp_ext.arm64.so amaCoreAgentBin/
+cp $input_path/aarch64/agentlauncher agentLauncherBin/agentlauncher_aarch64
 
 # make the shim.sh file executable
 chmod +x shim.sh
