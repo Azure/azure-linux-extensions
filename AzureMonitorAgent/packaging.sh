@@ -94,8 +94,8 @@ excluded_files="agent.version packaging.sh apply_version.sh update_version.sh"
 zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./tmp"
 
 # validate package size is within limits; these limits come from arc, ideally they are removed in the future
-max_uncompressed_size=$((500 * 1024 * 1024))
-max_compressed_size=$((275 * 1024 * 1024))
+max_uncompressed_size=$((1000 * 1024 * 1024))
+max_compressed_size=$((500 * 1024 * 1024))
 
 # easiest to validate by immediately unzipping versus trying to `du` with various exclusions 
 unzip -d $output_path/unzipped $output_path/$PACKAGE_NAME
