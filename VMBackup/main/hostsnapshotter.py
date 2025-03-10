@@ -87,6 +87,17 @@ class HostSnapshotter(object):
                 result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', snapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHostCall = True)
                 self.logger.log('****** 6. Snaphotting (Host) Completed')
                 self.logger.log("dosnapshot responseBody: " + responseBody)
+                #performing thaw
+                if g_fsfreeze_on :
+                    time_before_thaw = datetime.datetime.now()
+                    thaw_result, unable_to_sleep = freezer.thaw_safe()
+                    time_after_thaw = datetime.datetime.now()
+                    HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
+                    self.logger.log('T:S thaw result ' + str(thaw_result))
+                    if(thaw_result is not None and len(thaw_result.errors) > 0):
+                        is_inconsistent = True
+                
+                # Http response check(After thawing)
                 if(httpResp != None):
                     HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(httpResp.status))
                     if(int(httpResp.status) == 200 or int(httpResp.status) == 201) and (responseBody == None or responseBody == "") :
@@ -102,15 +113,6 @@ class HostSnapshotter(object):
                     # HttpCall failed
                     HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(555))
                     self.logger.log("presnapshot Hitting wrong WireServer IP")
-                #performing thaw
-                if g_fsfreeze_on :
-                    time_before_thaw = datetime.datetime.now()
-                    thaw_result, unable_to_sleep = freezer.thaw_safe()
-                    time_after_thaw = datetime.datetime.now()
-                    HandlerUtil.HandlerUtility.add_to_telemetery_data("ThawTime", str(time_after_thaw-time_before_thaw))
-                    self.logger.log('T:S thaw result ' + str(thaw_result))
-                    if(thaw_result is not None and len(thaw_result.errors) > 0):
-                        is_inconsistent = True
         except Exception as e:
             errorMsg = "Failed to do the snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
