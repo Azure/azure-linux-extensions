@@ -355,19 +355,15 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             if is_vmi:
                 splitResult = plugin.split('_')
                 telegraf_plugin = splitResult[0]
-            
-            input_str_with_tags = ""
-            if is_lad:
-                input_str_with_tags += input_str + "\n"                
-            else:         
+
+            if not is_lad:
                 configIds = pluginConfigIdMap[telegraf_plugin]
                 for configId in configIds:
-                    input_str_with_tags += input_str + "\n"
-                    input_str_with_tags += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
-                    input_str_with_tags += " "*4 + "configurationId=\"" + configId + "\"\n\n"
+                    input_str += "\n"
+                    input_str += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
+                    input_str += " "*4 + "configurationId=\"" + configId + "\"\n\n"
 
-            config_file["data"] = input_str_with_tags + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
-
+            config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
             output.append(config_file)
             config_file = {}
 
