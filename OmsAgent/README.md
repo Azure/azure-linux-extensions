@@ -6,7 +6,7 @@
 [See the latest version and extension-bundle mapping.](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/oms-linux#agent-and-vm-extension-version)
 
 You can read the User Guide below.
-* [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
+* [Learn more: Azure Virtual Machine Extensions](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/oms-linux)
 
 OmsAgent Extension can:
 * Install the omsagent
