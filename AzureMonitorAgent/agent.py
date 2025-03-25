@@ -124,6 +124,7 @@ AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslo
 AMAFluentPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluent.port'
 PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/previewFeatures/'
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
+AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -172,6 +173,8 @@ def main():
             operation = 'Metrics'
         elif re.match('^([-/]*)(syslogconfig)', option):
             operation = 'Syslogconfig'
+        elif re.match('^([-/]*)(transformconfig)', option):
+            operation = 'Transformconfig'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -574,7 +577,7 @@ def enable():
         ensure["azuremonitor-agentlauncher"] = True
         ensure["azuremonitor-coreagent"] = True
             
-        # start the metrics and syslog watcher only in 3P mode
+        # start the metrics, agent transform and syslog watchers only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
@@ -616,6 +619,8 @@ def enable():
             # start/enable kql extension only in 3P mode and non aarch64
             kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
             output += kql_output # do not block if kql start fails
+            # start transformation config watcher process
+            start_transformconfig_process()
 
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
@@ -856,6 +861,9 @@ def disable():
     #stop syslog config watcher process
     stop_syslogconfig_process()
 
+    #stop agent transform config watcher process
+    stop_transformconfig_process()
+
     # stop amacoreagent and agent launcher
     hutil_log_info('Handler initiating Core Agent and agent launcher')
     if is_systemd():
@@ -899,6 +907,12 @@ def restart_launcher():
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
+
+def restart_kqlextension():
+    # start agent transformation extension process
+    hutil_log_info('Handler initiating agent transformation extension (KqlExtension) restart and enable')
+    if is_systemd():
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-kqlextension && systemctl enable azuremonitor-kqlextension')
 
 def set_proxy(address, username, password):
     """
@@ -1095,6 +1109,21 @@ def is_syslogconfig_process_running():
 
     return False
 
+def is_transformconfig_process_running():
+    pids_filepath = os.path.join(os.getcwd(),'amatransformconfig.pid')
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA transform config watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-transformconfig") >= 0:
+                            return True
+
+    return False
+
 def start_metrics_process():
     """
     Start metrics process that performs periodic monitoring activities
@@ -1129,6 +1158,42 @@ def start_syslogconfig_process():
         log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
         hutil_log_info('start syslog watcher process '+str(args))
         subprocess.Popen(args, stdout=log, stderr=log)
+
+def start_transformconfig_process():
+    """
+    Start agent transform check process that performs periodic DCR monitoring activities and looks for agent transformation config changes
+    :return: None
+    """
+
+    # test
+    if not is_transformconfig_process_running():
+        stop_transformconfig_process()
+
+        # Start agent transform config watcher
+        ama_path = os.path.join(os.getcwd(), 'agent.py')
+        args = [sys.executable, ama_path, '-transformconfig']
+        log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+        hutil_log_info('start agent transform config watcher process '+str(args))
+        subprocess.Popen(args, stdout=log, stderr=log)
+
+def stop_transformconfig_process():
+
+    pids_filepath = os.path.join(os.getcwd(),'amatransformconfig.pid')
+
+    # kill existing agent transform config watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA tranform config watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-transformconfig") >= 0:
+                            kill_cmd = "kill " + pid
+                            run_command_and_log(kill_cmd)
+
+        run_command_and_log("rm "+ pids_filepath)
 
 def metrics_watcher(hutil_error, hutil_log):
     """
@@ -1401,6 +1466,39 @@ def syslogconfig_watcher(hutil_error, hutil_log):
         finally:
             time.sleep(sleepTime)
 
+def transformconfig_watcher(hutil_error, hutil_log):
+    """
+    Watcher thread to monitor agent transformation configuration changes and to take action on them
+    """
+    # Check for config changes every 30 seconds
+    sleepTime =  30
+
+    # Sleep before starting the monitoring
+    time.sleep(sleepTime)
+    last_crc = None
+
+    while True:
+        try:
+            if os.path.isfile(AMAAstTransformConfigMarkerPath):
+                f = open(AMAAstTransformConfigMarkerPath, "r")
+                data = f.read()
+                if (data != ''):
+                    crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
+
+                    if (crc != last_crc):
+                        restart_kqlextension()
+                        last_crc = crc
+                f.close()
+
+        except IOError as e:
+            hutil_error('I/O error in setting up agent transform config watcher. Exception={0}'.format(e))
+
+        except Exception as e:
+            hutil_error('Error in setting up agent transform config watcher. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
+
 def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     """
     Install local syslog configuration files if not present and restart syslog
@@ -1580,6 +1678,21 @@ def syslogconfig():
 
     return 0, ""
 
+def transformconfig():
+    """
+    Take care of setting up agent transformation configuration change watcher
+    """
+    pids_filepath = os.path.join(os.getcwd(), 'amatransformconfig.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = transformconfig_watcher, args = [hutil_log_error, hutil_log_info])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
+
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
               'Uninstall' : uninstall,
@@ -1587,7 +1700,8 @@ operations = {'Disable' : disable,
               'Enable' : enable,
               'Update' : update,
               'Metrics' : metrics,
-              'Syslogconfig' : syslogconfig
+              'Syslogconfig' : syslogconfig,
+              'Transformconfig' : transformconfig
 }
 
 
