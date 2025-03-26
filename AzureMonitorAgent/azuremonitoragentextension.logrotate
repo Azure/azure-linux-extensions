@@ -1,0 +1,11 @@
+/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/extension.log
+{
+    copytruncate
+    rotate 7
+    daily
+    missingok
+    notifempty
+    delaycompress
+    compress
+    size 10M
+}
