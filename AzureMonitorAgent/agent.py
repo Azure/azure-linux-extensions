@@ -386,7 +386,7 @@ def install():
     # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
-    # Copy Kqle xtension binaries
+    # Copy KqlExtension binaries
     # Needs to be revisited for aarch64
     copy_kqlextension_binaries()
 
@@ -1973,6 +1973,14 @@ def get_ssl_cert_info(operation):
 def copy_kqlextension_binaries():
     kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
     kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
+    kqlextension_runtimesbin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
+    if os.path.exists(kqlextension_runtimesbin):
+        # only for versions of AMA with .NET runtimes
+        rmtree(kqlextension_runtimesbin)
+        # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
+        for f in os.listdir(kqlextension_bin):
+            os.remove(os.path.join(kqlextension_bin, f))
+
     for f in os.listdir(kqlextension_bin_local_path):
         compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
 
