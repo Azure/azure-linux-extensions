@@ -78,7 +78,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         raise Exception("No url provided for Influxdb output plugin to ME, AMA.")
 
     telegraf_json = {}
-    pluginConfigIdMap = {}
+    counterConfigIdMap = {}
 
     for item in data:
         sink = item["sink"]
@@ -96,10 +96,10 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 splitResult = plugin.split('_')
                 telegraf_plugin = splitResult[0]            
                 
-            if telegraf_plugin not in pluginConfigIdMap:
-                pluginConfigIdMap[telegraf_plugin] = []
+            if counter not in counterConfigIdMap:
+                counterConfigIdMap[counter] = []
 
-            configIds = pluginConfigIdMap[telegraf_plugin]
+            configIds = counterConfigIdMap[counter]
 
             configurationIds = item["configurationId"]
 
@@ -357,11 +357,12 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 telegraf_plugin = splitResult[0]
 
             if not is_lad:
-                configIds = pluginConfigIdMap[telegraf_plugin]
+                configIds = counterConfigIdMap[telegraf_json[omiclass][plugin][field]["displayName"]]
                 for configId in configIds:
                     input_str += "\n"
                     input_str += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
                     input_str += " "*4 + "configurationId=\"" + configId + "\"\n\n"
+                    break
 
             config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
             output.append(config_file)
