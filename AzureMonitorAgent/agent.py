@@ -1722,7 +1722,8 @@ def parse_context(operation):
             # As per VM extension team, we have to manage rotation for our extension.log
             # for now, this is our extension code, but to be moved to HUtil library.
             if not os.path.exists('/etc/logrotate.d/azuremonitoragentextension'):      
-                foo
+                logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
+                copyfile(logrotateFilePath,"/etc/logrotate.d/azuremonitoragentextension")
             
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
