@@ -1190,7 +1190,7 @@ def metrics_watcher(hutil_error, hutil_log):
                 portUpdated = True                
                 with open(FluentCfgPath, 'r') as f:                    
                     for line in f:                        
-                        found = re.search("^\s{0,}Port\s{1,}" + fluent_port + "$", line)
+                        found = re.search(r'^\s{0,}Port\s{1,}' + fluent_port + '$', line)
                         if found:
                             portUpdated = False
 
