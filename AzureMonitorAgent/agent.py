@@ -320,7 +320,15 @@ def copy_mdsd_fluentbit_binaries():
     fluentbit_bin = "/opt/microsoft/azuremonitoragent/bin/fluent-bit"
 
     # copy the required libs to our test directory first
-    copytree("/opt/microsoft/azuremonitoragent/lib", os.getcwd() + "/lib")
+    lib_dir = os.path.join(os.getcwd(), "lib")
+    if os.path.exists(lib_dir):
+        rmtree(lib_dir)
+
+    if sys.version_info >= (3, 8):
+        # dirs_exist_ok parameter was added in Python 3.8
+        copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir, dirs_exist_ok=True)
+    else:
+        copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir)
     
     canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
     canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
