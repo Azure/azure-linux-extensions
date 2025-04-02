@@ -27,10 +27,11 @@ import time
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
-if sys.version_info[0] == 3:
+try:
+    # Python 3+
     import urllib.request as urllib
-
-elif sys.version_info[0] == 2:
+except ImportError:
+    # Python 2
     import urllib2 as urllib
 
 """
