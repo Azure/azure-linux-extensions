@@ -51,15 +51,21 @@ import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
-if sys.version_info[0] == 3:
-    import urllib.request as urllib
-    from urllib.parse import urlparse
-    import urllib.error as urlerror
+try:
+    import urllib.request as urllib # Python 3+
+except ImportError:
+    import urllib2 as urllib # Python 2
 
-elif sys.version_info[0] == 2:
-    import urllib2 as urllib
-    from urlparse import urlparse
-    import urllib2 as urlerror
+try:
+    from urllib.parse import urlparse  # Python 3+
+except ImportError:
+    from urlparse import urlparse  # Python 2
+
+try:
+    import urllib.error as urlerror # Python 3+
+except ImportError:
+    import urllib2 as urlerror # Python 2
+
 
 # python shim can only make IMDS calls which shouldn't go through proxy
 try:
@@ -442,6 +448,7 @@ def uninstall():
 
     exit_if_vm_not_supported('Uninstall')
     find_package_manager("Uninstall")
+    AMAUninstallCommand = ""
     if PackageManager == "dpkg":
         AMAUninstallCommand = "dpkg -P azuremonitoragent"
     elif PackageManager == "rpm":

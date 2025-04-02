@@ -29,15 +29,20 @@ import time
 import signal
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
-if sys.version_info[0] == 3:
-    import urllib.request as urllib
-    import urllib.error as urlerror
-    from urllib.parse import urlparse
+try:
+    import urllib.request as urllib # Python 3+
+except ImportError:
+    import urllib2 as urllib # Python 2
 
-elif sys.version_info[0] == 2:
-    import urllib2 as urllib
-    import urllib2 as urlerror
-    from urlparse import urlparse
+try:
+    import urllib.error as urlerror # Python 3+
+except ImportError:
+    import urllib2 as urlerror # Python 2
+
+try:
+    from urllib.parse import urlparse # Python 3+
+except ImportError:
+    from urlparse import urlparse # Python 2
 
 # Cloud Environments
 PublicCloudName     = "azurepubliccloud"
