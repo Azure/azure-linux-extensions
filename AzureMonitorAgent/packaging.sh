@@ -44,7 +44,7 @@ cp $input_path/azuremonitoragent-$AGENT_VERSION* packages/
 rm -f packages/*dynamicssl*
 
 # validate HandlerManifest.json syntax
-cat HandlerManifest.json | json_pp -f json -t null
+jq empty < HandlerManifest.json
 
 mkdir -p tmp
 cp $input_path/azuremonitoragent_$AGENT_VERSION*dynamicssl_x86_64.deb tmp/
