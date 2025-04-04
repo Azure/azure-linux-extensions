@@ -125,6 +125,7 @@ AMAFluentPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluen
 PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/previewFeatures/'
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
+AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -453,8 +454,13 @@ def uninstall():
     remove_localsyslog_configs()    
 
     # remove the logrotate config
-    if os.path.exists('/etc/logrotate.d/azuremonitoragentextension'):      
-        os.remove('/etc/logrotate.d/azuremonitoragentextension')
+    if os.path.exists(AMAExtensionLogRotateFilePath):   
+        try:
+            os.remove(AMAExtensionLogRotateFilePath)
+        except Exception as ex:
+            output = 'Logrotate removal failed with error: {0}\n' \
+                'Stacktrace: {1}'.format(ex, traceback.format_exc())
+            hutil_log_info(output)
 
     # Retry, since uninstall can fail due to concurrent package operations
     try:
@@ -1725,9 +1731,9 @@ def parse_context(operation):
 
             # As per VM extension team, we have to manage rotation for our extension.log
             # for now, this is our extension code, but to be moved to HUtil library.
-            if not os.path.exists('/etc/logrotate.d/azuremonitoragentextension'):      
+            if not os.path.exists(AMAExtensionLogRotateFilePath):      
                 logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
-                copyfile(logrotateFilePath,"/etc/logrotate.d/azuremonitoragentextension")
+                copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
             
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
