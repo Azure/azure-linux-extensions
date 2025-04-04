@@ -450,7 +450,11 @@ def uninstall():
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
 
-    remove_localsyslog_configs()
+    remove_localsyslog_configs()    
+
+    # remove the logrotate config
+    if os.path.exists('/etc/logrotate.d/azuremonitoragentextension'):      
+        os.remove('/etc/logrotate.d/azuremonitoragentextension')
 
     # Retry, since uninstall can fail due to concurrent package operations
     try:
