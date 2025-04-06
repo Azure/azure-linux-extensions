@@ -158,6 +158,7 @@ def check_supported_OS():
     supported_dists = {'redhat' : ['7', '8'], # CentOS
                        'centos' : ['7', '8'], # CentOS
                        'red hat' : ['7', '8'], # Redhat
+                       'rhel' : ['7', '8'], # Redhat
                        'debian' : ['8', '9', '10'], # Debian
                        'ubuntu' : ['14.04', '16.04', '18.04', '20.04'], # Ubuntu
                        'oracle' : ['7'], # Oracle
