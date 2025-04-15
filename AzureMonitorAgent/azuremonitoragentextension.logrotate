@@ -9,3 +9,26 @@
     compress
     size 10M
 }
+/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/CommandExecution.log
+{
+    copytruncate
+    rotate 7
+    daily
+    missingok
+    notifempty
+    delaycompress
+    compress
+    size 10M
+}
+/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/telegraf.log
+{
+    copytruncate
+    rotate 7
+    daily
+    missingok
+    notifempty
+    delaycompress
+    compress
+    size 10M
+}
+
