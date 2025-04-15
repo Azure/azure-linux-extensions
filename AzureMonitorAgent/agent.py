@@ -807,7 +807,8 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
             BypassProxy = False
             if json_data is not None and "proxy.bypass" in json_data:
                 bypass = json_data["proxy.bypass"]
-                if bypass == "AMA":
+                # proxy.bypass is an array
+                if "AMA" in bypass:
                     BypassProxy = True
                     
             if not BypassProxy and json_data is not None and "proxy.url" in json_data:
