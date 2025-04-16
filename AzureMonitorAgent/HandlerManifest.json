@@ -11,7 +11,7 @@
       "rebootAfterInstall": false,
       "reportHeartbeat": false,
       "updateMode": "UpdateWithInstall",
-      "continueOnUpdateFailure": "true"
+      "continueOnUpdateFailure": true
     },
     "resourceLimits": {
       "services": [

@@ -27,10 +27,11 @@ import time
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
-if sys.version_info[0] == 3:
+try:
+    # Python 3+
     import urllib.request as urllib
-
-elif sys.version_info[0] == 2:
+except ImportError:
+    # Python 2
     import urllib2 as urllib
 
 """
@@ -78,7 +79,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
         raise Exception("No url provided for Influxdb output plugin to ME, AMA.")
 
     telegraf_json = {}
-    pluginConfigIdMap = {}
+    counterConfigIdMap = {}
 
     for item in data:
         sink = item["sink"]
@@ -96,10 +97,10 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 splitResult = plugin.split('_')
                 telegraf_plugin = splitResult[0]            
                 
-            if telegraf_plugin not in pluginConfigIdMap:
-                pluginConfigIdMap[telegraf_plugin] = []
+            if counter not in counterConfigIdMap:
+                counterConfigIdMap[counter] = []
 
-            configIds = pluginConfigIdMap[telegraf_plugin]
+            configIds = counterConfigIdMap[counter]
 
             configurationIds = item["configurationId"]
 
@@ -355,19 +356,16 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
             if is_vmi:
                 splitResult = plugin.split('_')
                 telegraf_plugin = splitResult[0]
-            
-            input_str_with_tags = ""
-            if is_lad:
-                input_str_with_tags += input_str + "\n"                
-            else:         
-                configIds = pluginConfigIdMap[telegraf_plugin]
+
+            if not is_lad:
+                configIds = counterConfigIdMap[telegraf_json[omiclass][plugin][field]["displayName"]]
                 for configId in configIds:
-                    input_str_with_tags += input_str + "\n"
-                    input_str_with_tags += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
-                    input_str_with_tags += " "*4 + "configurationId=\"" + configId + "\"\n\n"
+                    input_str += "\n"
+                    input_str += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
+                    input_str += " "*4 + "configurationId=\"" + configId + "\"\n\n"
+                    break
 
-            config_file["data"] = input_str_with_tags + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
-
+            config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
             output.append(config_file)
             config_file = {}
 

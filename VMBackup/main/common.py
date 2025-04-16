@@ -108,7 +108,7 @@ class CommonVariables:
     FailedFsFreezeTimeout = 122
     FailedUnableToOpenMount = 123
     FailedSafeFreezeBinaryNotFound = 124
-
+    FailedHostSnapshotRemoteServerError = 556
     """
     Pre-Post Plugin error code definitions
     """

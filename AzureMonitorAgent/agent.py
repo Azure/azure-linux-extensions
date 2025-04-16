@@ -51,15 +51,21 @@ import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
 import metrics_ext_utils.metrics_common_utils as metrics_utils
 
-if sys.version_info[0] == 3:
-    import urllib.request as urllib
-    from urllib.parse import urlparse
-    import urllib.error as urlerror
+try:
+    import urllib.request as urllib # Python 3+
+except ImportError:
+    import urllib2 as urllib # Python 2
 
-elif sys.version_info[0] == 2:
-    import urllib2 as urllib
-    from urlparse import urlparse
-    import urllib2 as urlerror
+try:
+    from urllib.parse import urlparse  # Python 3+
+except ImportError:
+    from urlparse import urlparse  # Python 2
+
+try:
+    import urllib.error as urlerror # Python 3+
+except ImportError:
+    import urllib2 as urlerror # Python 2
+
 
 # python shim can only make IMDS calls which shouldn't go through proxy
 try:
@@ -124,6 +130,8 @@ AMASyslogPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/syslo
 AMAFluentPortFilePath = '/etc/opt/microsoft/azuremonitoragent/config-cache/fluent.port'
 PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/previewFeatures/'
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
+AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
+AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -172,6 +180,8 @@ def main():
             operation = 'Metrics'
         elif re.match('^([-/]*)(syslogconfig)', option):
             operation = 'Syslogconfig'
+        elif re.match('^([-/]*)(transformconfig)', option):
+            operation = 'Transformconfig'
     except Exception as e:
         waagent_log_error(str(e))
 
@@ -285,19 +295,25 @@ def compare_and_copy_bin(src, dest):
         os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
 
 def copy_amacoreagent_binaries():
-    amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
+    current_arch = platform.machine()
+    amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent_" + current_arch
     amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
 
-    liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
-    liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
-    compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
+    if current_arch == 'x86_64':
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x86_64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x86_64.so"
+        compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
 
-    libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
-    libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
-    compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
+        liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
+        liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
+        compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)   
+    elif current_arch == 'aarch64':
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.arm64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.arm64.so"
+        compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
                   
-    agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
+    agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher_" + current_arch
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
 
@@ -385,10 +401,9 @@ def install():
         return exit_code, output
 
     # Copy the AMACoreAgent and agentlauncher binaries
-    # TBD: this method needs to be revisited for aarch64
     copy_amacoreagent_binaries()
 
-    # Copy Kqle xtension binaries
+    # Copy KqlExtension binaries
     # Needs to be revisited for aarch64
     copy_kqlextension_binaries()
 
@@ -398,13 +413,6 @@ def install():
         libssl1_1, _ = run_command_and_log('ldconfig -p | grep libssl.so.1.1')
         if libssl1_1 == 0:
             copy_mdsd_fluentbit_binaries()
-            
-    # Comment out the following check in AMA 1.31 as the coreagent & agentlauncher services are not installed with the aarch64 deb/rpm packages.
-    #
-    # # CL is diabled in arm64 until we have arm64 binaries from pipelineAgent
-    # if is_systemd() and platform.machine() == 'aarch64':
-    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
-    #     exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
     
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
@@ -441,6 +449,7 @@ def uninstall():
 
     exit_if_vm_not_supported('Uninstall')
     find_package_manager("Uninstall")
+    AMAUninstallCommand = ""
     if PackageManager == "dpkg":
         AMAUninstallCommand = "dpkg -P azuremonitoragent"
     elif PackageManager == "rpm":
@@ -449,7 +458,16 @@ def uninstall():
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
 
-    remove_localsyslog_configs()
+    remove_localsyslog_configs()    
+
+    # remove the logrotate config
+    if os.path.exists(AMAExtensionLogRotateFilePath):   
+        try:
+            os.remove(AMAExtensionLogRotateFilePath)
+        except Exception as ex:
+            output = 'Logrotate removal failed with error: {0}\n' \
+                'Stacktrace: {1}'.format(ex, traceback.format_exc())
+            hutil_log_info(output)
 
     # Retry, since uninstall can fail due to concurrent package operations
     try:
@@ -572,18 +590,16 @@ def enable():
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-        if platform.machine() != 'aarch64':
-            # enable processes for Custom Logs
-            ensure["azuremonitor-agentlauncher"] = True
-            ensure["azuremonitor-coreagent"] = True
+        # enable processes for Custom Logs
+        ensure["azuremonitor-agentlauncher"] = True
+        ensure["azuremonitor-coreagent"] = True
             
-        # start the metrics and syslog watcher only in 3P mode
+        # start the metrics, agent transform and syslog watchers only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
         # In GCS scenarios, ensure that AMACoreAgent is running
-        if platform.machine() != 'aarch64':
-            ensure["azuremonitor-coreagent"] = True
+        ensure["azuremonitor-coreagent"] = True
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -620,6 +636,8 @@ def enable():
             # start/enable kql extension only in 3P mode and non aarch64
             kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
             output += kql_output # do not block if kql start fails
+            # start transformation config watcher process
+            start_transformconfig_process()
 
     # Service(s) were successfully configured and started; increment sequence number
     HUtilObject.save_seq()
@@ -786,7 +804,8 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
             BypassProxy = False
             if json_data is not None and "proxy.bypass" in json_data:
                 bypass = json_data["proxy.bypass"]
-                if bypass == "AMA":
+                # proxy.bypass is an array
+                if "AMA" in bypass:
                     BypassProxy = True
                     
             if not BypassProxy and json_data is not None and "proxy.url" in json_data:
@@ -860,9 +879,12 @@ def disable():
     #stop syslog config watcher process
     stop_syslogconfig_process()
 
+    #stop agent transform config watcher process
+    stop_transformconfig_process()
+
     # stop amacoreagent and agent launcher
     hutil_log_info('Handler initiating Core Agent and agent launcher')
-    if is_systemd() and platform.machine() != 'aarch64':
+    if is_systemd():
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
         # in case AL is not cleaning up properly
@@ -899,12 +921,16 @@ def update():
     return 0, ""
 
 def restart_launcher():
-    if platform.machine() == 'aarch64':
-        return
     # start agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
+
+def restart_kqlextension():
+    # start agent transformation extension process
+    hutil_log_info('Handler initiating agent transformation extension (KqlExtension) restart and enable')
+    if is_systemd():
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-kqlextension && systemctl enable azuremonitor-kqlextension')
 
 def set_proxy(address, username, password):
     """
@@ -1101,6 +1127,21 @@ def is_syslogconfig_process_running():
 
     return False
 
+def is_transformconfig_process_running():
+    pids_filepath = os.path.join(os.getcwd(),'amatransformconfig.pid')
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA transform config watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-transformconfig") >= 0:
+                            return True
+
+    return False
+
 def start_metrics_process():
     """
     Start metrics process that performs periodic monitoring activities
@@ -1135,6 +1176,42 @@ def start_syslogconfig_process():
         log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
         hutil_log_info('start syslog watcher process '+str(args))
         subprocess.Popen(args, stdout=log, stderr=log)
+
+def start_transformconfig_process():
+    """
+    Start agent transform check process that performs periodic DCR monitoring activities and looks for agent transformation config changes
+    :return: None
+    """
+
+    # test
+    if not is_transformconfig_process_running():
+        stop_transformconfig_process()
+
+        # Start agent transform config watcher
+        ama_path = os.path.join(os.getcwd(), 'agent.py')
+        args = [sys.executable, ama_path, '-transformconfig']
+        log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
+        hutil_log_info('start agent transform config watcher process '+str(args))
+        subprocess.Popen(args, stdout=log, stderr=log)
+
+def stop_transformconfig_process():
+
+    pids_filepath = os.path.join(os.getcwd(),'amatransformconfig.pid')
+
+    # kill existing agent transform config watcher
+    if os.path.exists(pids_filepath):
+        with open(pids_filepath, "r") as f:
+            for pid in f.readlines():
+                # Verify the pid actually belongs to AMA tranform config watcher.
+                cmd_file = os.path.join("/proc", str(pid.strip("\n")), "cmdline")
+                if os.path.exists(cmd_file):
+                    with open(cmd_file, "r") as pidf:
+                        cmdline = pidf.readlines()
+                        if len(cmdline) > 0 and cmdline[0].find("agent.py") >= 0 and cmdline[0].find("-transformconfig") >= 0:
+                            kill_cmd = "kill " + pid
+                            run_command_and_log(kill_cmd)
+
+        run_command_and_log("rm "+ pids_filepath)
 
 def metrics_watcher(hutil_error, hutil_log):
     """
@@ -1174,7 +1251,7 @@ def metrics_watcher(hutil_error, hutil_log):
                 portUpdated = True                
                 with open(FluentCfgPath, 'r') as f:                    
                     for line in f:                        
-                        found = re.search("^\s{0,}Port\s{1,}" + fluent_port + "$", line)
+                        found = re.search(r'^\s{0,}Port\s{1,}' + fluent_port + '$', line)
                         if found:
                             portUpdated = False
 
@@ -1189,17 +1266,17 @@ def metrics_watcher(hutil_error, hutil_log):
 
                     # add SELinux rules if needed
                     if os.path.exists('/etc/selinux/config') and fluent_port != '':
-                        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
+                        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False, log_output=False)
                         if sedisabled != 0:                        
-                            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
+                            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False, log_output=False)
                             if check_semanage == 0:
-                                fluentPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False)
+                                fluentPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False, log_output=False)
                                 if fluentPortEnabled != 0:                    
                                     # also check SELinux config paths for Oracle/RH
-                                    fluentPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False)
+                                    fluentPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False, log_output=False)
                                     if fluentPortEnabled != 0:                    
                                         # allow the fluent port in SELinux
-                                        run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False)
+                                        run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False, log_output=False)
 
             if os.path.isfile(FluentCfgPath):
                 f = open(FluentCfgPath, "r")
@@ -1407,6 +1484,39 @@ def syslogconfig_watcher(hutil_error, hutil_log):
         finally:
             time.sleep(sleepTime)
 
+def transformconfig_watcher(hutil_error, hutil_log):
+    """
+    Watcher thread to monitor agent transformation configuration changes and to take action on them
+    """
+    # Check for config changes every 30 seconds
+    sleepTime =  30
+
+    # Sleep before starting the monitoring
+    time.sleep(sleepTime)
+    last_crc = None
+
+    while True:
+        try:
+            if os.path.isfile(AMAAstTransformConfigMarkerPath):
+                f = open(AMAAstTransformConfigMarkerPath, "r")
+                data = f.read()
+                if (data != ''):
+                    crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
+
+                    if (crc != last_crc):
+                        restart_kqlextension()
+                        last_crc = crc
+                f.close()
+
+        except IOError as e:
+            hutil_error('I/O error in setting up agent transform config watcher. Exception={0}'.format(e))
+
+        except Exception as e:
+            hutil_error('Error in setting up agent transform config watcher. Exception={0}'.format(e))
+
+        finally:
+            time.sleep(sleepTime)
+
 def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     """
     Install local syslog configuration files if not present and restart syslog
@@ -1431,19 +1541,19 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     if not os.path.exists('/etc/selinux/config'):
         useSyslogTcp = True
     else:        
-        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False)
+        sedisabled, _ = run_command_and_log('getenforce | grep -i "Disabled"',log_cmd=False, log_output=False)
         if sedisabled == 0:
             useSyslogTcp = True
         else:            
-            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False)
+            check_semanage, _ = run_command_and_log("which semanage",log_cmd=False, log_output=False)
             if check_semanage == 0 and syslog_port != '':
-                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
+                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False, log_output=False)
                 if syslogPortEnabled != 0:                    
                     # also check SELinux config paths for Oracle/RH
-                    syslogPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False)
+                    syslogPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False, log_output=False)
                     if syslogPortEnabled != 0:                    
                         # allow the syslog port in SELinux
-                        run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False)
+                        run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False, log_output=False)
                 useSyslogTcp = True   
         
     # 1P tenants use omuxsock, so keep using that for customers using 1P
@@ -1586,6 +1696,21 @@ def syslogconfig():
 
     return 0, ""
 
+def transformconfig():
+    """
+    Take care of setting up agent transformation configuration change watcher
+    """
+    pids_filepath = os.path.join(os.getcwd(), 'amatransformconfig.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = transformconfig_watcher, args = [hutil_log_error, hutil_log_info])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
+
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
               'Uninstall' : uninstall,
@@ -1593,7 +1718,8 @@ operations = {'Disable' : disable,
               'Enable' : enable,
               'Update' : update,
               'Metrics' : metrics,
-              'Syslogconfig' : syslogconfig
+              'Syslogconfig' : syslogconfig,
+              'Transformconfig' : transformconfig
 }
 
 
@@ -1610,6 +1736,13 @@ def parse_context(operation):
             logFileName = 'extension.log'
             hutil = HUtil.HandlerUtility(waagent.Log, waagent.Error, logFileName=logFileName)
             hutil.do_parse_context(operation)
+
+            # As per VM extension team, we have to manage rotation for our extension.log
+            # for now, this is our extension code, but to be moved to HUtil library.
+            if not os.path.exists(AMAExtensionLogRotateFilePath):      
+                logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
+                copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
+            
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
         except KeyError as e:
@@ -1763,7 +1896,9 @@ def is_vm_supported_for_extension(operation):
                        'mariner' : ['2'], # Mariner 2
                        'azurelinux' : ['3'], # Azure Linux / Mariner 3
                        'sles' : ['15'], # SLES
-                       'debian' : ['11'] # Debian
+                       'debian' : ['11'], # Debian
+                       'rocky linux' : ['8', '9'], # Rocky
+                       'rocky' : ['8', '9'] # Rocky
     }
 
     if platform.machine() == 'aarch64':
@@ -1870,6 +2005,14 @@ def get_ssl_cert_info(operation):
 def copy_kqlextension_binaries():
     kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
     kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
+    kqlextension_runtimesbin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
+    if os.path.exists(kqlextension_runtimesbin):
+        # only for versions of AMA with .NET runtimes
+        rmtree(kqlextension_runtimesbin)
+        # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
+        for f in os.listdir(kqlextension_bin):
+            os.remove(os.path.join(kqlextension_bin, f))
+
     for f in os.listdir(kqlextension_bin_local_path):
         compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
 
@@ -1949,7 +2092,7 @@ def get_azure_environment_and_region():
     return environment, region
 
 
-def run_command_and_log(cmd, check_error = True, log_cmd = True):
+def run_command_and_log(cmd, check_error = True, log_cmd = True, log_output = True):
     """
     Run the provided shell command and log its output, including stdout and
     stderr.
@@ -1959,7 +2102,7 @@ def run_command_and_log(cmd, check_error = True, log_cmd = True):
     exit_code, output = run_get_output(cmd, check_error, log_cmd)
     if log_cmd:
         hutil_log_info('Output of command "{0}": \n{1}'.format(cmd.rstrip(), output))
-    else:
+    elif log_output:
         hutil_log_info('Output: \n{0}'.format(output))
 
     if "cannot open Packages database" in output:
