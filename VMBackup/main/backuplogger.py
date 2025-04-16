@@ -32,6 +32,8 @@ class Backuplogger(object):
         self.enforced_local_flag_value = True
         self.hutil = hutil
         self.prev_log = ''
+        #setting the ConsoleLoggingOff flag to true by default
+        self.console_logging_off = self.hutil.get_intvalue_from_configfile('ConsoleLoggingOff', 0)
         self.logging_off = False
 
     def enforce_local_flag(self, enforced_local):
@@ -68,16 +70,17 @@ class Backuplogger(object):
                 self.hutil.log(str(msg),level)
 
     def log_to_con(self, msg):
-        try:
-            with open(self.con_path, "wb") as C :
-                message = "".join(list(filter(lambda x : x in string.printable, msg)))
-                C.write(message.encode('ascii','ignore'))
-        except IOError as e:
-            pass
-        except Exception as e:
-            pass
+        if self.console_logging_off != 0:
+            try:
+                with open(self.con_path, "wb") as C :
+                    message = "".join(list(filter(lambda x : x in string.printable, msg)))
+                    C.write(message.encode('ascii','ignore'))
+            except IOError as e:
+                pass
+            except Exception as e:
+                pass
 
-    def log_to_con_py3(self, msg, level='Info'):
+    def log_to_con_py3(self, msg, level='Info'):       
         log_msg = ""
         try:
             if type(msg) is not str:
@@ -85,8 +88,8 @@ class Backuplogger(object):
             time = datetime.datetime.utcnow().strftime(u'%Y/%m/%d %H:%M:%S.%f')
             log_msg = u"{0}  {1}  {2} \n".format(time , level , msg)
             log_msg= str(log_msg.encode('ascii', "backslashreplace"), 
-                         encoding="ascii")
-            if(self.enforced_local_flag_value != False):
+                            encoding="ascii")
+            if(self.enforced_local_flag_value != False and self.console_logging_off != 0):
                 with open(self.con_path, "w") as C :
                     C.write(log_msg)
         except IOError:
