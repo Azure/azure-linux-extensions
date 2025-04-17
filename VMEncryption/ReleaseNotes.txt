@@ -1,3 +1,10 @@
+1.4.0.11
+- Shipping Azure Linux 3.0 support
+- MAJ_MIN bug fix
+
+1.4.0.10
+- <notes from release manager>
+
 1.4.0.9
 - Rollover the new version
 
