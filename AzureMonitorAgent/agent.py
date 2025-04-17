@@ -389,7 +389,7 @@ def install():
         return exit_code, output
 
     # Copy the AMACoreAgent and agentlauncher binaries
-    if is_amaca_supported():
+    if is_amaca_supported(operation):
         copy_amacoreagent_binaries()
 
     # Copy KqlExtension binaries
@@ -580,7 +580,7 @@ def enable():
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
         # In GCS scenarios, ensure that AMACoreAgent is running
-        if is_amaca_supported():
+        if is_amaca_supported(operation):
             ensure["azuremonitor-coreagent"] = True
 
     hutil_log_info('Handler initiating onboarding.')
@@ -865,7 +865,7 @@ def disable():
 
     # stop amacoreagent and agent launcher
     hutil_log_info('Handler initiating Core Agent and agent launcher')
-    if is_systemd() and is_amaca_supported():
+    if is_systemd() and is_amaca_supported(operation):
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
         # in case AL is not cleaning up properly
@@ -903,7 +903,7 @@ def update():
 
 def restart_launcher():
     # start agent launcher
-    if not is_amaca_supported():
+    if not is_amaca_supported(operation):
         return
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
