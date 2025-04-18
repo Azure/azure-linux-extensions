@@ -288,19 +288,25 @@ def compare_and_copy_bin(src, dest):
         os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
 
 def copy_amacoreagent_binaries():
-    amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent"
+    current_arch = platform.machine()
+    amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent_" + current_arch
     amacoreagent_bin = "/opt/microsoft/azuremonitoragent/bin/amacoreagent"
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
 
-    liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
-    liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
-    compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)
+    if current_arch == 'x86_64':
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x86_64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x86_64.so"
+        compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
 
-    libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
-    libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
-    compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
+        liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
+        liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
+        compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)   
+    elif current_arch == 'aarch64':
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.arm64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.arm64.so"
+        compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
                   
-    agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher"
+    agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher_" + current_arch
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
     compare_and_copy_bin(agentlauncher_bin_local_path, agentlauncher_bin)
 
@@ -384,7 +390,8 @@ def install():
 
     # Copy the AMACoreAgent and agentlauncher binaries
     # TBD: this method needs to be revisited for aarch64
-    copy_amacoreagent_binaries()
+    if platform.machine() == 'x86_64':
+        copy_amacoreagent_binaries()
 
     # Copy KqlExtension binaries
     # Needs to be revisited for aarch64
