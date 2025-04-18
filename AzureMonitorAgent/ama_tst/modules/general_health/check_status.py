@@ -12,8 +12,9 @@ def check_restart_status(interactive):
     """
     subcomponents = {'azuremonitoragent': 'azuremonitoragent'}
 
-    subcomponents['azuremonitor-agentlauncher'] = 'agentlauncher'
-    subcomponents['azuremonitor-coreagent'] = 'amacoreagent'
+    if platform.machine() != 'aarch64':
+        subcomponents['azuremonitor-agentlauncher'] = 'agentlauncher'
+        subcomponents['azuremonitor-coreagent'] = 'amacoreagent'
     if is_metrics_configured():
         subcomponents['metrics-extension'] = 'MetricsExtension'
         subcomponents['metrics-sourcer'] = 'Telegraf'

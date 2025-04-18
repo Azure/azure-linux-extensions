@@ -67,16 +67,11 @@ cp tmp/opt/microsoft/azuremonitoragent/bin/fluent-bit fluentBitBin/fluent-bit_aa
 rm -rf tmp/
 
 cp $input_path/MetricsExtension* MetricsExtensionBin/
-cp $input_path/x86_64/amacoreagent amaCoreAgentBin/amacoreagent_x86_64
+cp $input_path/amacoreagent amaCoreAgentBin/
 cp -r $input_path/KqlExtension/* KqlExtensionBin/
-cp $input_path/x86_64/liblz4x64.so amaCoreAgentBin/
-cp $input_path/x86_64/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
-cp $input_path/x86_64/agentlauncher agentLauncherBin/agentlauncher_x86_64
-
-
-cp $input_path/aarch64/amacoreagent amaCoreAgentBin/amacoreagent_aarch64
-cp $input_path/aarch64/libgrpc_csharp_ext.arm64.so amaCoreAgentBin/
-cp $input_path/aarch64/agentlauncher agentLauncherBin/agentlauncher_aarch64
+cp $input_path/liblz4x64.so amaCoreAgentBin/
+cp $input_path/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
+cp $input_path/agentlauncher agentLauncherBin/
 
 # make the shim.sh file executable
 chmod +x shim.sh
@@ -94,8 +89,8 @@ excluded_files="agent.version packaging.sh apply_version.sh update_version.sh"
 zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./tmp"
 
 # validate package size is within limits; these limits come from arc, ideally they are removed in the future
-max_uncompressed_size=$((1000 * 1024 * 1024))
-max_compressed_size=$((500 * 1024 * 1024))
+max_uncompressed_size=$((400 * 1024 * 1024))
+max_compressed_size=$((275 * 1024 * 1024))
 
 # easiest to validate by immediately unzipping versus trying to `du` with various exclusions 
 unzip -d $output_path/unzipped $output_path/$PACKAGE_NAME

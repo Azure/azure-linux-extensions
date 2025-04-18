@@ -38,8 +38,9 @@ def check_workspace():
 def check_subcomponents(): 
 
     services = ['azuremonitoragent']
-    services.append('azuremonitor-coreagent')
-    services.append('azuremonitor-agentlauncher')
+    if platform.machine() != 'aarch64':
+        services.append('azuremonitor-coreagent')
+        services.append('azuremonitor-agentlauncher')
 
     if is_metrics_configured():
         services.append('metrics-sourcer')
