@@ -2475,7 +2475,7 @@ def is_amaca_supported():
         return True
     elif platform.machine() == 'aarch64':
         vm_supported = False
-        vm_dist, vm_ver = find_vm_distro('Enable')
+        vm_dist, vm_ver = find_vm_distro(operation)
         # Find this VM distribution in the supported list
         for supported_dist in list(supported_dists_aarch64.keys()):
             if not vm_dist.startswith(supported_dist):
