@@ -389,8 +389,7 @@ def install():
         return exit_code, output
 
     # Copy the AMACoreAgent and agentlauncher binaries
-    if is_amaca_supported():
-        copy_amacoreagent_binaries()
+    copy_amacoreagent_binaries()
 
     # Copy KqlExtension binaries
     # Needs to be revisited for aarch64
@@ -570,18 +569,15 @@ def enable():
 
     if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
         # enable processes for Custom Logs
-
-        if is_amaca_supported:
-            ensure["azuremonitor-agentlauncher"] = True
-            ensure["azuremonitor-coreagent"] = True
+        ensure["azuremonitor-agentlauncher"] = True
+        ensure["azuremonitor-coreagent"] = True
             
         # start the metrics, agent transform and syslog watchers only in 3P mode
         start_metrics_process()
         start_syslogconfig_process()
     elif ensure.get("azuremonitoragentmgr") or is_gcs_single_tenant:
         # In GCS scenarios, ensure that AMACoreAgent is running
-        if is_amaca_supported():
-            ensure["azuremonitor-coreagent"] = True
+        ensure["azuremonitor-coreagent"] = True
 
     hutil_log_info('Handler initiating onboarding.')
 
@@ -865,7 +861,7 @@ def disable():
 
     # stop amacoreagent and agent launcher
     hutil_log_info('Handler initiating Core Agent and agent launcher')
-    if is_systemd() and is_amaca_supported():
+    if is_systemd():
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
         exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
         # in case AL is not cleaning up properly
@@ -903,8 +899,6 @@ def update():
 
 def restart_launcher():
     # start agent launcher
-    if not is_amaca_supported():
-        return
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
@@ -2464,50 +2458,6 @@ def log_and_exit(operation, exit_code = GenericErrorCode, message = ''):
         update_status_file(operation, str(exit_code), exit_status, message)
         sys.exit(exit_code)
 
-def is_amaca_supported():
-    supported_dists_aarch64 = {'ubuntu' : ['22.04', '24.04'], # Ubuntu
-                       'mariner' : ['2'], # Mariner 2
-                       'azurelinux' : ['3'], # Azure Linux / Mariner 3
-                       'rocky linux' : ['9'], # Rocky
-                       'rocky' : ['9'] } # Rocky
-
-    if platform.machine() == 'x86_64':
-        return True
-    elif platform.machine() == 'aarch64':
-        vm_supported = False
-        vm_dist, vm_ver = find_vm_distro(operation)
-        # Find this VM distribution in the supported list
-        for supported_dist in list(supported_dists_aarch64.keys()):
-            if not vm_dist.startswith(supported_dist):
-                continue
-
-            # Check if this VM distribution version is supported
-            vm_ver_split = vm_ver.split('.')
-            for supported_ver in supported_dists_aarch64[supported_dist]:
-                supported_ver_split = supported_ver.split('.')
-
-                # If vm_ver is at least as precise (at least as many digits) as
-                # supported_ver and matches all the supported_ver digits, then
-                # this VM is guaranteed to be supported
-                vm_ver_match = True
-                for idx, supported_ver_num in enumerate(supported_ver_split):
-                    try:
-                        supported_ver_num = int(supported_ver_num)
-                        vm_ver_num = int(vm_ver_split[idx])
-                    except IndexError:
-                        vm_ver_match = False
-                        break
-                    if vm_ver_num != supported_ver_num:
-                        vm_ver_match = False
-                        break
-                if vm_ver_match:
-                    vm_supported = True
-                    break
-
-            if vm_supported:
-                break
-
-        return vm_supported
 
 # Exceptions
 # If these exceptions are expected to be caught by the main method, they
