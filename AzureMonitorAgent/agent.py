@@ -2008,8 +2008,9 @@ def copy_kqlextension_binaries():
     if os.path.exists(kqlextension_runtimesbin):
         # only for versions of AMA with .NET runtimes
         rmtree(kqlextension_runtimesbin)
-        # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
-        for f in os.listdir(kqlextension_bin):
+    # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
+    for f in os.listdir(kqlextension_bin):
+        if f != 'KqlExtension' and f != 'appsettings.json':
             os.remove(os.path.join(kqlextension_bin, f))
 
     for f in os.listdir(kqlextension_bin_local_path):
