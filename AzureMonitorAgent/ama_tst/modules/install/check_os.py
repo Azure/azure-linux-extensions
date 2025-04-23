@@ -8,21 +8,21 @@ supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
                     'rhel' : ['7', '8', '9'], # Rhel
                     'centos' : ['7', '8'], # CentOS
                     'red hat' : ['7', '8', '9'], # Oracle, RHEL
-                    'oracle' : ['7', '8'], # Oracle
-                    'debian' : ['9', '10', '11'], # Debian
+                    'oracle' : ['7', '8', '9'], # Oracle
+                    'debian' : ['9', '10', '11', '12'], # Debian
                     'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
                     'suse' : ['12'], 'sles' : ['15'], # SLES
                     'cbl-mariner' : ['1'], # Mariner 1.0
                     'mariner' : ['2'], # Mariner 2.0
-                    'rocky' : ['8'], # Rocky
-                    'alma' : ['8'], # Alma
+                    'rocky' : ['8', '9'], # Rocky
+                    'alma' : ['8', '9'], # Alma
                     'opensuse' : ['15'], # openSUSE
                     'amzn' : ['2'] # Amazon Linux 2
 }
 
 supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
                     'ubuntu' : ['18.04', '20.04'], # Ubuntu
-                    'alma' : ['8'], # Alma
+                    'alma' : ['8', '9'], # Alma
                     'centos' : ['7'], # CentOS
                     'mariner' : ['2'], # Mariner 2.0
                     'sles' : ['15'], # SLES
