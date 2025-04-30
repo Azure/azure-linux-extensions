@@ -1326,6 +1326,13 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/mdm_influxdb.socket",
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
+                            me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
+                            if os.path.exists(me_service_template_path):
+                                os.remove(me_service_template_path)
+                            if is_feature_enabled("enableCMV2"):                                
+                                copyfile(os.getcwd() + "/services/metrics-extension-otlp.service", me_service_template_path)
+                            else:
+                                copyfile(os.getcwd() + "/services/metrics-extension-cmv1.service", me_service_template_path)
 
                             me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
 
@@ -1935,7 +1942,10 @@ def is_feature_enabled(feature):
     """
     Checks if the feature is enabled in the current region
     """
-    feature_support_matrix = {'useDynamicSSL' : ['all'] }
+    feature_support_matrix = {
+        'useDynamicSSL' : ['all'],
+        'enableCMV2'    : ['eastus2euap', 'northcentralus']
+    }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
     if os.path.exists(featurePreviewFlagPath):
