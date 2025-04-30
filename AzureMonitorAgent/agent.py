@@ -1966,7 +1966,7 @@ def is_feature_enabled(feature):
     """
     feature_support_matrix = {
         'useDynamicSSL' : ['all'],
-        'enableCMV2'    : ['centraluseuap', 'northcentralus']
+        'enableCMV2'    : ['eastus2euap', 'northcentralus']
     }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
