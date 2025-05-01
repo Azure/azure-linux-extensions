@@ -3,31 +3,7 @@ import platform
 from error_codes import *
 from errors      import error_info
 from helpers     import find_vm_bits, find_vm_distro
-
-supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
-                    'rhel' : ['7', '8', '9'], # Rhel
-                    'centos' : ['7', '8'], # CentOS
-                    'red hat' : ['7', '8', '9'], # Oracle, RHEL
-                    'oracle' : ['7', '8'], # Oracle
-                    'debian' : ['9', '10', '11'], # Debian
-                    'ubuntu' : ['16.04', '18.04', '20.04', '22.04'], # Ubuntu
-                    'suse' : ['12'], 'sles' : ['15'], # SLES
-                    'cbl-mariner' : ['1'], # Mariner 1.0
-                    'mariner' : ['2'], # Mariner 2.0
-                    'rocky' : ['8'], # Rocky
-                    'alma' : ['8'], # Alma
-                    'opensuse' : ['15'], # openSUSE
-                    'amzn' : ['2'] # Amazon Linux 2
-}
-
-supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
-                    'ubuntu' : ['18.04', '20.04'], # Ubuntu
-                    'alma' : ['8'], # Alma
-                    'centos' : ['7'], # CentOS
-                    'mariner' : ['2'], # Mariner 2.0
-                    'sles' : ['15'], # SLES
-                    'debian' : ['11'] # Debian
-}
+import Utils.constants as constants
     
 def format_alternate_versions(supported_dist, versions):
     """
@@ -43,9 +19,9 @@ def format_alternate_versions(supported_dist, versions):
 
 def check_vm_supported(vm_dist, vm_ver):
     if platform.machine() == 'aarch64':
-        supported_dists = supported_dists_aarch64
+        supported_dists = constants.supported_dists_aarch64
     else:
-        supported_dists = supported_dists_x86_64
+        supported_dists = constants.supported_dists_x86_64
 
     vm_supported = False
 
