@@ -1,9 +1,15 @@
 import platform
-
+import os
+import sys
 from error_codes import *
 from errors      import error_info
 from helpers     import find_vm_bits, find_vm_distro
-import Utils.constants as constants
+
+# Import constants from Utils directory
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+sys.path.insert(0, parent_dir) 
+from Utils import constants
+sys.path.pop(0)
     
 def format_alternate_versions(supported_dist, versions):
     """
