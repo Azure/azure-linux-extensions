@@ -39,6 +39,7 @@ import re
 import hashlib
 import fileinput
 import contextlib
+import distro
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile
@@ -807,7 +808,7 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
                 # proxy.bypass is an array
                 if "AMA" in bypass:
                     BypassProxy = True
-                    
+
             if not BypassProxy and json_data is not None and "proxy.url" in json_data:
                 url = json_data["proxy.url"]
                 # only non-authenticated proxy config is supported
@@ -1828,12 +1829,11 @@ def find_vm_distro(operation):
     # platform commands used below aren't available after Python 3.6
     if sys.version_info < (3,7):
         try:
-            vm_dist, vm_ver, vm_id = platform.linux_distribution()
+            vm_dist = distro.id()
+            vm_ver = distro.version()
+            vm_id = distro.codename()
         except AttributeError:
-            try:
-                vm_dist, vm_ver, vm_id = platform.dist()
-            except AttributeError:
-                hutil_log_info("Falling back to /etc/os-release distribution parsing")
+            hutil_log_info("Falling back to /etc/os-release distribution parsing")
 
         # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
         # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
@@ -1872,7 +1872,7 @@ def find_vm_distro(operation):
 def is_vm_supported_for_extension(operation):
     """
     Checks if the VM this extension is running on is supported by AzureMonitorAgent
-    Returns for platform.linux_distribution() vary widely in format, such as
+    Returns for distro.linux_distribution() vary widely in format, such as
     '7.3.1611' returned for a VM with CentOS 7, so the first provided
     digits must match
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
