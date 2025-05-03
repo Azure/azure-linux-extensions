@@ -1,6 +1,4 @@
 import platform
-import os
-import sys
 from error_codes import *
 from errors      import error_info
 from helpers     import find_vm_bits, find_vm_distro
