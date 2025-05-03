@@ -4,12 +4,8 @@ import sys
 from error_codes import *
 from errors      import error_info
 from helpers     import find_vm_bits, find_vm_distro
+import install.supported_distros as supported_distros
 
-# Import constants from Utils directory
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
-sys.path.insert(0, parent_dir) 
-from Utils import constants
-sys.path.pop(0)
     
 def format_alternate_versions(supported_dist, versions):
     """
@@ -25,9 +21,9 @@ def format_alternate_versions(supported_dist, versions):
 
 def check_vm_supported(vm_dist, vm_ver):
     if platform.machine() == 'aarch64':
-        supported_dists = constants.supported_dists_aarch64
+        supported_dists = supported_distros.supported_dists_aarch64
     else:
-        supported_dists = constants.supported_dists_x86_64
+        supported_dists = supported_distros.supported_dists_x86_64
 
     vm_supported = False
 

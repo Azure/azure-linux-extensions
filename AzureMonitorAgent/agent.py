@@ -39,7 +39,7 @@ import re
 import hashlib
 import fileinput
 import contextlib
-import Utils.constants as constants
+import ama_tst.modules.install.supported_distros as supported_distros
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile
@@ -1881,9 +1881,9 @@ def is_vm_supported_for_extension(operation):
     """
 
     if platform.machine() == 'aarch64':
-        supported_dists = constants.supported_dists_aarch64
+        supported_dists = supported_distros.supported_dists_aarch64
     else:
-        supported_dists = constants.supported_dists_x86_64
+        supported_dists = supported_distros.supported_dists_x86_64
 
     vm_supported = False
     vm_dist, vm_ver = find_vm_distro(operation)
