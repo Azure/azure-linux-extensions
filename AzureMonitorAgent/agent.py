@@ -294,8 +294,8 @@ def copy_amacoreagent_binaries():
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
 
     if current_arch == 'x86_64':
-        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x86_64.so"
-        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x86_64.so"
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
         compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
 
         liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
