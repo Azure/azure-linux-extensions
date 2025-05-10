@@ -35,18 +35,18 @@ class TestScriptUtil(unittest.TestCase):
         test_script = "mock.sh"
         os.chdir(os.path.join(env.root, "test"))
         exit_code = su.run_command(hutil, ["sh", test_script, "0"], os.getcwd(), 'RunScript-0', 'TestExtension', '1.0', True, 0.1)
-        self.assertEquals(0, exit_code)
-        self.assertEquals("do_exit", hutil.last)
+        self.assertEqual(0, exit_code)
+        self.assertEqual("do_exit", hutil.last)
         exit_code = su.run_command(hutil, ["sh", test_script, "75"], os.getcwd(), 'RunScript-1', 'TestExtension', '1.0', False, 0.1)
-        self.assertEquals(75, exit_code)
-        self.assertEquals("do_status_report", hutil.last)
+        self.assertEqual(75, exit_code)
+        self.assertEqual("do_status_report", hutil.last)
     
     def test_log_or_exit(self):        
         hutil = MockUtil(self)
         su.log_or_exit(hutil, True, 0, 'LogOrExit-0', 'Message1')
-        self.assertEquals("do_exit", hutil.last)
+        self.assertEqual("do_exit", hutil.last)
         su.log_or_exit(hutil, False, 0, 'LogOrExit-1', 'Message2')
-        self.assertEquals("do_status_report", hutil.last)
+        self.assertEqual("do_status_report", hutil.last)
         
 if __name__ == '__main__':
     unittest.main()

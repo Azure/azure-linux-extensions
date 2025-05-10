@@ -23,10 +23,10 @@ class TestLogUtil(unittest.TestCase):
         with open("/tmp/testtail", "w+") as F:
             F.write(u"abcdefghijklmnopqrstu\u6211vwxyz".encode("utf-8"))
         tail = lu.tail("/tmp/testtail", 2)
-        self.assertEquals("yz", tail)
+        self.assertEqual("yz", tail)
 
         tail = lu.tail("/tmp/testtail")
-        self.assertEquals("abcdefghijklmnopqrstuvwxyz", tail)
+        self.assertEqual("abcdefghijklmnopqrstuvwxyz", tail)
 
 if __name__ == '__main__':
     unittest.main()
