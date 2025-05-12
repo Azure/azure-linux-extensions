@@ -2092,54 +2092,112 @@ def find_package_manager(operation):
 
 def find_vm_distro(operation):
     """
-    Finds the Linux Distribution this vm is running on.
+    Finds the Linux Distribution this VM is running on by directly parsing
+    distribution-specific files for reliable detection.
     """
-    vm_dist = vm_id = vm_ver =  None
-    parse_manually = False
-
-    # platform commands used below aren't available after Python 3.6
-    if sys.version_info < (3,7):
-        try:
-            vm_dist, vm_ver, vm_id = platform.linux_distribution()
-        except AttributeError:
-            try:
-                vm_dist, vm_ver, vm_id = platform.dist()
-            except AttributeError:
-                hutil_log_info("Falling back to /etc/os-release distribution parsing")
-
-        # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
-        # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
-        try:
-            temp_vm_ver = int(vm_ver.split('.')[0])
-        except:
-            parse_manually = True
-    else:
-        parse_manually = True    
-
-    if (not vm_dist and not vm_ver) or parse_manually: # SLES 15 and others
-        try:
-            with open('/etc/os-release', 'r') as fp:
-                for line in fp:
-                    if line.startswith('ID='):
-                        vm_dist = line.split('=')[1]
-                        vm_dist = vm_dist.split('-')[0]
-                        vm_dist = vm_dist.replace('\"', '').replace('\n', '')
-                    elif line.startswith('VERSION_ID='):
-                        vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.replace('\"', '').replace('\n', '')
-        except:
-            log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
+    vm_dist = vm_ver = ""
     
-    # initialize them to empty string so that .lower() is valid in case we weren't able to retrieve it
-    # downstream callers expect a string and not NoneType
+    # Try to read from /etc/os-release first (most modern distributions)
+    try:
+        with open('/etc/os-release', 'r') as fp:
+            os_release = {}
+            for line in fp:
+                if line.strip() and '=' in line:
+                    k, v = line.strip().split('=', 1)
+                    os_release[k] = v.strip('"\'').strip()
+            
+            if 'ID' in os_release:
+                vm_dist = os_release['ID'].lower()
+                # Clean up the ID by removing any vendor-specific suffixes
+                vm_dist = vm_dist.split('-')[0]
+            
+            if 'VERSION_ID' in os_release:
+                vm_ver = os_release['VERSION_ID'].lower()
+    except:
+        # If /etc/os-release doesn't exist or can't be read, try alternative methods
+        pass
+    
+    # If we couldn't get the distribution from /etc/os-release, try other files
+    if not vm_dist or not vm_ver:
+        # SUSE specific detection (for the reported problem case)
+        if os.path.exists('/etc/SuSE-release'):
+            try:
+                with open('/etc/SuSE-release', 'r') as fp:
+                    content = fp.read()
+                    if 'SUSE Linux Enterprise Server' in content:
+                        vm_dist = 'sles'
+                    elif 'openSUSE' in content:
+                        vm_dist = 'opensuse'
+                    else:
+                        vm_dist = 'suse'
+                    
+                    # Try to extract the version
+                    version_match = re.search(r'VERSION\s*=\s*(\d+)', content)
+                    if version_match:
+                        vm_ver = version_match.group(1)
+                    
+                    # Also look for service pack level
+                    sp_match = re.search(r'PATCHLEVEL\s*=\s*(\d+)', content)
+                    if sp_match and vm_ver:
+                        vm_ver = '{0}.{1}'.format(vm_ver, sp_match.group(1))
+            except:
+                pass
+        
+        # Red Hat based systems
+        elif os.path.exists('/etc/redhat-release'):
+            try:
+                with open('/etc/redhat-release', 'r') as fp:
+                    content = fp.read().lower()
+                    if 'red hat' in content:
+                        vm_dist = 'redhat'
+                    elif 'centos' in content:
+                        vm_dist = 'centos'
+                    elif 'oracle' in content:
+                        vm_dist = 'oracle'
+                    elif 'fedora' in content:
+                        vm_dist = 'fedora'
+                    elif 'rocky' in content:
+                        vm_dist = 'rocky'
+                    elif 'alma' in content:
+                        vm_dist = 'alma'
+                    else:
+                        vm_dist = 'redhat'  # Default to redhat for RHEL-based systems
+                    
+                    # Try to extract version
+                    version_match = re.search(r'release\s+(\d+(\.\d+)?)', content)
+                    if version_match:
+                        vm_ver = version_match.group(1)
+            except:
+                pass
+        
+        # Debian based systems
+        elif os.path.exists('/etc/lsb-release'):
+            try:
+                with open('/etc/lsb-release', 'r') as fp:
+                    for line in fp:
+                        if line.strip() and '=' in line:
+                            k, v = line.strip().split('=', 1)
+                            if k == 'DISTRIB_ID':
+                                vm_dist = v.lower()
+                            elif k == 'DISTRIB_RELEASE':
+                                vm_ver = v.lower()
+            except:
+                pass
+        
+        # Debian specific
+        elif os.path.exists('/etc/debian_version'):
+            try:
+                with open('/etc/debian_version', 'r') as fp:
+                    vm_ver = fp.read().strip()
+                vm_dist = 'debian'
+            except:
+                pass
+    
+    # If we still couldn't determine the OS, throw an error
     if not vm_dist:
-        vm_dist = ""
-
-    if not vm_ver:
-        vm_ver = ""
-
+        log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
+    
     return vm_dist.lower(), vm_ver.lower()
-
 
 def is_vm_supported_for_extension(operation):
     """
