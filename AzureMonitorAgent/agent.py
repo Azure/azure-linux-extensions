@@ -1051,7 +1051,7 @@ def install_azureotelcollector():
     MetricsExtension is responsible for writing the configuration file.
     Only if configuration is present, otelcollector process will start to run, the watcher service is responsible to monitor the configurartion file.
     """
-    if is_systemd():
+    if is_feature_enabled("enableAzureOTelCollector") and is_systemd():
         find_package_manager("Install")
         azureotelcollector_install_command = get_otelcollector_installation_command()
         hutil_log_info('Running command "{0}"'.format(azureotelcollector_install_command))
@@ -1123,38 +1123,32 @@ def remove_azureotelcollector():
     This method will uninstall azureotelcollector services.
     No need to stop it separately as the package maintainer script handles it upon uninstalling.
     """
-    azureotelcollector_uninstall_command = ""
-    find_package_manager("Uninstall")
+    if is_feature_enabled("enableAzureOTelCollector"):
+        # Only remove azureotelcollector if file exists
+        if os.path.exists("/lib/systemd/system/azureotelcollector-watcher.path"):
+            azureotelcollector_uninstall_command = ""
+            find_package_manager("Uninstall")
 
-    if PackageManager == "dpkg":
-        azureotelcollector_uninstall_command = "dpkg --purge azureotelcollector"
-    elif PackageManager == "rpm":
-        azureotelcollector_uninstall_command = "rpm --erase azureotelcollector"
-    else:
-        log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
+            if PackageManager == "dpkg":
+                azureotelcollector_uninstall_command = "dpkg --purge azureotelcollector"
+            elif PackageManager == "rpm":
+                azureotelcollector_uninstall_command = "rpm --erase azureotelcollector"
+            else:
+                log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
 
-    hutil_log_info('Running command "{0}"'.format(azureotelcollector_uninstall_command))
+            hutil_log_info('Running command "{0}"'.format(azureotelcollector_uninstall_command))
 
-    exit_code, output = run_command_with_retries_output(
-        azureotelcollector_uninstall_command,
-        retries = 5,
-        retry_check = retry_if_dpkg_or_rpm_locked,
-        final_check = final_check_if_dpkg_or_rpm_locked
-    )
+            exit_code, output = run_command_with_retries_output(
+                azureotelcollector_uninstall_command,
+                retries = 5,
+                retry_check = retry_if_dpkg_or_rpm_locked,
+                final_check = final_check_if_dpkg_or_rpm_locked
+            )
 
-    if exit_code == 0:
-        hutil_log_info('Successfully removed azureotelcollector')
-    else:
-        hutil_log_error('Error removing azureotelcollector "{0}"'.format(output))
-
-
-def stop_azureotelcollector():
-    """
-    This method will stop and disable azureotelcollector services.
-    """
-    run_command_and_log('systemctl stop azureotelcollector-watcher.path && systemctl disable azureotelcollector-watcher.path')
-    run_command_and_log('systemctl stop azureotelcollector-watcher.service && systemctl disable azureotelcollector-watcher.service')
-    run_command_and_log('systemctl stop azureotelcollector && systemctl disable azureotelcollector')
+            if exit_code == 0:
+                hutil_log_info('Successfully removed azureotelcollector')
+            else:
+                hutil_log_error('Error removing azureotelcollector "{0}"'.format(output))
 
 
 def stop_metrics_process():
@@ -1187,9 +1181,8 @@ def stop_metrics_process():
         else:
             hutil_log_error(me_rm_msg)
 
-    # stop and disable azureotelcollector service
-    if azureotelcollector_is_active():
-        stop_azureotelcollector()
+    # remove azureotelcollector service
+    remove_azureotelcollector()
 
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
@@ -1480,7 +1473,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             enabled_me_CMv2_mode = False
 
                             try:
-                                if is_feature_enabled("enableAzureOTelCollector") and install_azureotelcollector() and azureotelcollector_is_active():
+                                if install_azureotelcollector() and azureotelcollector_is_active():
                                     copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
                                     me_handler.setup_me(
                                         is_lad=False,

@@ -944,11 +944,16 @@ def ensure_user_and_group(user, group, create_if_missing=False):
         print('Group {0} exists.'.format(group))
     except KeyError:
         if create_if_missing:
-            result = subprocess.run(['groupadd', group])
-            if result.returncode != 0:
-                print('Failed to create group {0}.'.format(group))
+            try:
+                process = subprocess.Popen(['groupadd', group], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = process.communicate()
+                if process.returncode != 0:
+                    print('Failed to create group {0}. stderr: {1}'.format(group, err))
+                    return False
+                print('Group {0} created.'.format(group))
+            except Exception as e:
+                print('Error while creating group {0}: {1}'.format(group, e))
                 return False
-            print('Group {0} created.'.format(group))
         else:
             print('Group {0} does not exist.'.format(group))
             return False
@@ -959,23 +964,37 @@ def ensure_user_and_group(user, group, create_if_missing=False):
         print('User {0} exists.'.format(user))
     except KeyError:
         if create_if_missing:
-            result = subprocess.run(['useradd', '--no-create-home', '--system', '--shell', '/usr/sbin/nologin', user])
-            if result.returncode != 0:
-                print('Failed to create user {0}.'.format(user))
+            try:
+                process = subprocess.Popen([
+                    'useradd', '--no-create-home', '--system', '--shell', '/usr/sbin/nologin', user
+                ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = process.communicate()
+                if process.returncode != 0:
+                    print('Failed to create user {0}. stderr: {1}'.format(user, err))
+                    return False
+                print('User {0} created.'.format(user))
+            except Exception as e:
+                print('Error while creating user {0}: {1}'.format(user, e))
                 return False
-            print('User {0} created.'.format(user))
         else:
             print('User {0} does not exist.'.format(user))
             return False
 
     # Add user to group
-    result = subprocess.run(['usermod', '-aG', group, user])
-    if result.returncode != 0:
-        print('Failed to add user {0} to group {1}.'.format(user, group))
+    try:
+        process = subprocess.Popen(['usermod', '-aG', group, user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        if process.returncode != 0:
+            print('Failed to add user {0} to group {1}. stderr: {2}'.format(user, group, err))
+            return False
+        print('User {0} added to group {1}.'.format(user, group))
+    except Exception as e:
+        print('Error while adding user {0} to group {1}: {2}'.format(user, group, e))
         return False
 
     print('User {0} added to group {1} (or already a member).'.format(user, group))
     return True
+
 
 
 def remove_file(file_path):
@@ -1031,7 +1050,7 @@ def create_empty_data_directory(me_config_dir, user=None, group=None, mode=0o755
         # Clear older config directory if exists.
         if os.path.exists(me_config_dir):
             rmtree(me_config_dir)
-        os.mkdir(me_config_dir, mode=mode)
+        os.makedirs(me_config_dir, mode=mode)
 
         if user and group:
             # Get UID and GID from user and group names
