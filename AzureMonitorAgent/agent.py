@@ -40,6 +40,7 @@ import re
 import hashlib
 import fileinput
 import contextlib
+import ama_tst.modules.install.supported_distros as supported_distros
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile
@@ -302,8 +303,8 @@ def copy_amacoreagent_binaries():
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
 
     if current_arch == 'x86_64':
-        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x86_64.so"
-        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x86_64.so"
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
         compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
 
         liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
@@ -328,7 +329,15 @@ def copy_mdsd_fluentbit_binaries():
     fluentbit_bin = "/opt/microsoft/azuremonitoragent/bin/fluent-bit"
 
     # copy the required libs to our test directory first
-    copytree("/opt/microsoft/azuremonitoragent/lib", os.getcwd() + "/lib")
+    lib_dir = os.path.join(os.getcwd(), "lib")
+    if os.path.exists(lib_dir):
+        rmtree(lib_dir)
+
+    if sys.version_info >= (3, 8):
+        # dirs_exist_ok parameter was added in Python 3.8
+        copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir, dirs_exist_ok=True)
+    else:
+        copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir)
     
     canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
     canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
@@ -2027,39 +2036,11 @@ def is_vm_supported_for_extension(operation):
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
-                       'rhel' : ['7', '8', '9'], # Rhel
-                       'centos' : ['7', '8'], # CentOS
-                       'red hat' : ['7', '8', '9'], # Oracle, RHEL
-                       'oracle' : ['7', '8', '9'], # Oracle
-                       'ol' : ['7', '8', '9'], # Oracle Linux
-                       'debian' : ['9', '10', '11', '12'], # Debian
-                       'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04'], # Ubuntu
-                       'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
-                       'mariner' : ['2'], # Mariner
-                       'azurelinux' : ['3'], # Azure Linux / Mariner 3
-                       'rocky' : ['8', '9'], # Rocky
-                       'alma' : ['8', '9'], # Alma
-                       'opensuse' : ['15'], # openSUSE
-                       'amzn' : ['2', '2023'] # Amazon Linux 2
-    }
-
-    supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
-                       'ubuntu' : ['18.04', '20.04', '22.04', '24.04'], # Ubuntu
-                       'alma' : ['8'], # Alma
-                       'centos' : ['7'], # CentOS
-                       'mariner' : ['2'], # Mariner 2
-                       'azurelinux' : ['3'], # Azure Linux / Mariner 3
-                       'sles' : ['15'], # SLES
-                       'debian' : ['11'], # Debian
-                       'rocky linux' : ['8', '9'], # Rocky
-                       'rocky' : ['8', '9'] # Rocky
-    }
 
     if platform.machine() == 'aarch64':
-        supported_dists = supported_dists_aarch64
+        supported_dists = supported_distros.supported_dists_aarch64
     else:
-        supported_dists = supported_dists_x86_64
+        supported_dists = supported_distros.supported_dists_x86_64
 
     vm_supported = False
     vm_dist, vm_ver = find_vm_distro(operation)
