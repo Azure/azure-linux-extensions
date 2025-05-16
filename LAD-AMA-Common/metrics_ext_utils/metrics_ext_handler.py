@@ -1060,6 +1060,6 @@ def create_empty_data_directory(me_config_dir, user=None, group=None, mode=0o755
             # Set the ownership
             os.chown(me_config_dir, uid, gid)
 
-        print('Directory {0} created with ownership {0}:{1}.'.format(me_config_dir, user, group))
+        print('Directory {0} created with ownership {1}:{2}.'.format(me_config_dir, user, group))
     except Exception as e:
         print('Failed to create directory: {0}'.format(e))
