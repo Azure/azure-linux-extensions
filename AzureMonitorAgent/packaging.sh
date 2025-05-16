@@ -33,8 +33,8 @@ cp -r  ../LAD-AMA-Common/telegraf_utils .
 cp -f  ../Diagnostic/services/metrics-sourcer.service services/metrics-sourcer.service
 
 # cleanup packages, ext
-rm -rf packages MetricsExtensionBin amaCoreAgentBin KqlExtensionBin agentLauncherBin mdsdBin fluentBitBin tmp
-mkdir -p packages MetricsExtensionBin amaCoreAgentBin KqlExtensionBin agentLauncherBin mdsdBin fluentBitBin
+rm -rf packages MetricsExtensionBin azureotelcollector amaCoreAgentBin KqlExtensionBin agentLauncherBin mdsdBin fluentBitBin tmp
+mkdir -p packages MetricsExtensionBin azureotelcollector amaCoreAgentBin KqlExtensionBin agentLauncherBin mdsdBin fluentBitBin
 
 # copy shell bundle to packages/
 cp $input_path/azuremonitoragent_$AGENT_VERSION* packages/
@@ -67,6 +67,7 @@ cp tmp/opt/microsoft/azuremonitoragent/bin/fluent-bit fluentBitBin/fluent-bit_aa
 rm -rf tmp/
 
 cp $input_path/MetricsExtension* MetricsExtensionBin/
+cp $input_path/azureotelcollector/* azureotelcollector/
 cp $input_path/x86_64/amacoreagent amaCoreAgentBin/amacoreagent_x86_64
 cp -r $input_path/KqlExtension/* KqlExtensionBin/
 cp $input_path/x86_64/liblz4x64.so amaCoreAgentBin/

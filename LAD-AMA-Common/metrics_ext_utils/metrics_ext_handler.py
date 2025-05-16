@@ -22,6 +22,8 @@ import json
 import os
 from shutil import copyfile, rmtree
 import stat
+import grp
+import pwd
 import filecmp
 import metrics_ext_utils.metrics_constants as metrics_constants
 import subprocess
@@ -791,6 +793,7 @@ def get_metrics_extension_service_path(is_lad):
         else:
             raise Exception("Systemd unit files do not exist at /etc/systemd/system, /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
 
+
 def get_metrics_extension_service_name(is_lad):
     """
     Utility method to get the service name
@@ -799,75 +802,87 @@ def get_metrics_extension_service_name(is_lad):
         return metrics_constants.lad_metrics_extension_service_name
     else:
         return metrics_constants.metrics_extension_service_name
-        
-def setup_me(is_lad, managed_identity="sai", HUtilObj=None):
+
+
+def setup_me(is_lad, managed_identity="sai", HUtilObj=None, is_local_control_channel=True, user=None, group=None):
     """
     The main method for creating and writing MetricsExtension configuration as well as service setup
     :param is_lad: Boolean value for whether the extension is Lad or not (AMA)
+    :param is_local_control_channel: Boolean value for whether MetricsExtension needs to be run in `-LocalControlChannel` mode (CMv1 only)
+    :param user: User that would own MetricsExtension process. If not specified, would default to the caller, in this case being root
+    :param group: Group that would own MetricsExtension process. If not specified, would default to the caller, in this case being root
     """
+    _, config_folder = get_handler_vars()
+    me_config_dir = config_folder + "/metrics_configs/"
+    create_empty_data_directory(me_config_dir)
 
-    # query imds to get the required information
-    az_resource_id, subscription_id, location, az_environment, data = get_imds_values(is_lad)
-    arm_domain = get_arm_domain(az_environment)
+    if not is_local_control_channel:
+        # CMv2 and related modes
+        me_monitoring_account = ""
+        if user and group:
+            # Removing it as permissions might not match, and ME will create this with the right permissions
+            remove_file("/var/run/azuremonitoragent/mdm_influxdb.socket")
+            # Create user/group for metrics-extension.service if it is requested
+            ensure_user_and_group(user, group, True)
+            # Append group permissions for folder containing influxDB socket file, so the user can create them - in this case ME
+            setup_user_and_group_access("/var/run/azuremonitoragent/", user)
+            # In CMv2 with user and group specified, create directory for MetricsExtension config caching
+            me_config_dir = "/var/run/azuremetricsext"
+            create_empty_data_directory(me_config_dir, user, group)
+    else:
+        # query imds to get the required information
+        az_resource_id, subscription_id, location, az_environment, data = get_imds_values(is_lad)
+        arm_domain = get_arm_domain(az_environment)
 
-    # get tenantID
-    # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
-    aad_auth_url = ""
-    arm_url = "https://{0}/subscriptions/{1}?api-version=2014-04-01".format(arm_domain, subscription_id)
-    try:
-        req = urllib.Request(arm_url, headers={'Content-Type':'application/json'})
+        # get tenantID
+        # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
+        aad_auth_url = ""
+        arm_url = "https://{0}/subscriptions/{1}?api-version=2014-04-01".format(arm_domain, subscription_id)
+        try:
+            req = urllib.Request(arm_url, headers={'Content-Type':'application/json'})
 
-        res = urllib.urlopen(req)
+            res = urllib.urlopen(req)
 
-    except urlerror.HTTPError as e:
-        err_res = e.headers["WWW-Authenticate"]
-        for line in err_res.split(","):
-                if "Bearer authorization_uri" in line:
-                        data = line.split("=")
-                        aad_auth_url = data[1][1:-1] # Removing the quotes from the front and back
-                        break
-    
-    except Exception as e:
-        message = "Failed to retrieve AAD Authentication URL from " + arm_url + " with Exception='{0}'. ".format(e)
-        message += "Continuing with metrics setup without AAD auth url."
-        if HUtilObj is not None:
-            HUtilObj.log(message)
+        except urlerror.HTTPError as e:
+            err_res = e.headers["WWW-Authenticate"]
+            for line in err_res.split(","):
+                    if "Bearer authorization_uri" in line:
+                            data = line.split("=")
+                            aad_auth_url = data[1][1:-1] # Removing the quotes from the front and back
+                            break
+
+        except Exception as e:
+            message = "Failed to retrieve AAD Authentication URL from " + arm_url + " with Exception='{0}'. ".format(e)
+            message += "Continuing with metrics setup without AAD auth url."
+            if HUtilObj is not None:
+                HUtilObj.log(message)
+            else:
+                print('Info: {0}'.format(message))
+
+        #create metrics conf
+        me_conf = create_metrics_extension_conf(az_resource_id, aad_auth_url)
+
+        #create custom metrics conf
+        if az_environment.lower() == ArcACloudName:
+            ingestion_endpoint = get_arca_ingestion_endpoint_from_mcs()
+            custom_conf = create_custom_metrics_conf(location, ingestion_endpoint)
         else:
-            print('Info: {0}'.format(message))
+            custom_conf = create_custom_metrics_conf(location)
 
-    #create metrics conf
-    me_conf = create_metrics_extension_conf(az_resource_id, aad_auth_url)
+        #write configs to disk
+        me_conf_path = me_config_dir + "MetricsExtensionV1_Configuration.json"
+        with open(me_conf_path, "w") as f:
+            f.write(me_conf)
 
-    #create custom metrics conf
-    if az_environment.lower() == ArcACloudName:
-        ingestion_endpoint = get_arca_ingestion_endpoint_from_mcs()
-        custom_conf = create_custom_metrics_conf(location, ingestion_endpoint)
-    else:
-        custom_conf = create_custom_metrics_conf(location)
+        if is_lad:
+            me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
+        else:
+            me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + "_" +location
 
-    #write configs to disk
-    logFolder, configFolder = get_handler_vars()
-    me_config_dir = configFolder + "/metrics_configs/"
+        custom_conf_path = me_config_dir + me_monitoring_account.lower() +"_MonitoringAccount_Configuration.json"
 
-    # Clear older config directory if exists.
-    if os.path.exists(me_config_dir):
-        rmtree(me_config_dir)
-    os.mkdir(me_config_dir)
-
-
-    me_conf_path = me_config_dir + "MetricsExtensionV1_Configuration.json"
-    with open(me_conf_path, "w") as f:
-        f.write(me_conf)
-
-    if is_lad:
-        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
-    else:
-        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + "_" +location
-
-    custom_conf_path = me_config_dir + me_monitoring_account.lower() +"_MonitoringAccount_Configuration.json"
-
-    with open(custom_conf_path, "w") as f:
-        f.write(custom_conf)
+        with open(custom_conf_path, "w") as f:
+            f.write(custom_conf)
 
     # Copy MetricsExtension Binary to the bin location
     me_bin_local_path = os.getcwd() + "/MetricsExtensionBin/MetricsExtension"
@@ -912,3 +927,139 @@ def setup_me(is_lad, managed_identity="sai", HUtilObj=None):
         setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port, managed_identity, HUtilObj)
 
     return True
+
+
+def ensure_user_and_group(user, group, create_if_missing=False):
+    """
+    Ensures if the user and group exists, optionally creating them if it does not exist.
+    Group is checked, user is checked and then user is added to the group.
+    Returns True if all of them are available (or created), else returns False.
+    :param user: linux user
+    :param group: linux group
+    :param create_if_missing: boolean if true, create the requested user and group, where user belongs to the group
+    """
+    # Check/Create group if missing
+    try:
+        grp.getgrnam(group)
+        print('Group {0} exists.'.format(group))
+    except KeyError:
+        if create_if_missing:
+            try:
+                process = subprocess.Popen(['groupadd', group], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = process.communicate()
+                if process.returncode != 0:
+                    print('Failed to create group {0}. stderr: {1}'.format(group, err))
+                    return False
+                print('Group {0} created.'.format(group))
+            except Exception as e:
+                print('Error while creating group {0}: {1}'.format(group, e))
+                return False
+        else:
+            print('Group {0} does not exist.'.format(group))
+            return False
+
+    # Check/Create user if missing
+    try:
+        pwd.getpwnam(user)
+        print('User {0} exists.'.format(user))
+    except KeyError:
+        if create_if_missing:
+            try:
+                process = subprocess.Popen([
+                    'useradd', '--no-create-home', '--system', '--shell', '/usr/sbin/nologin', user
+                ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = process.communicate()
+                if process.returncode != 0:
+                    print('Failed to create user {0}. stderr: {1}'.format(user, err))
+                    return False
+                print('User {0} created.'.format(user))
+            except Exception as e:
+                print('Error while creating user {0}: {1}'.format(user, e))
+                return False
+        else:
+            print('User {0} does not exist.'.format(user))
+            return False
+
+    # Add user to group
+    try:
+        process = subprocess.Popen(['usermod', '-aG', group, user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        if process.returncode != 0:
+            print('Failed to add user {0} to group {1}. stderr: {2}'.format(user, group, err))
+            return False
+        print('User {0} added to group {1}.'.format(user, group))
+    except Exception as e:
+        print('Error while adding user {0} to group {1}: {2}'.format(user, group, e))
+        return False
+
+    print('User {0} added to group {1} (or already a member).'.format(user, group))
+    return True
+
+
+
+def remove_file(file_path):
+    """
+    Removes existing file.
+    Note: This is important as the older MetricsExtension might have created the socket file with root permissions.
+    This mechanism can be removed in the future, if the socket file is renamed.
+    """
+    try:
+        os.remove(file_path)
+        print('File {0} has been removed.'.format(file_path))
+    except Exception as e:
+        print('Error while deleting file {0}: {1}.'.format(file_path, e))
+
+
+def setup_user_and_group_access(directory, user):
+    """
+    Gets the group that owns the directory and enables write and execution permissions for group users.
+    Then the provided user is added to the group so that it is allowed to write and execute in the directory.
+    """
+    try:
+        # Step 1: Get the group owning the directory
+        dir_stat = os.stat(directory)
+        gid = dir_stat.st_gid
+        dir_group_name = grp.getgrgid(gid).gr_name
+        print('Directory group: {0}.'.format(dir_group_name))
+
+        # Step 2: Adjust directory permissions to ensure all group users can write and execute (to create socket file)
+        mode = stat.S_IMODE(dir_stat.st_mode)
+        desired_bits = stat.S_IWGRP | stat.S_IXGRP
+
+        if (mode & desired_bits) != desired_bits:
+            new_mode = mode | desired_bits
+            os.chmod(directory, new_mode)
+            print('Updated directory permissions to add group write+execute: {0} ({1}).'.format(oct(new_mode), directory))
+        else:
+            print('Directory already has group write+execute permission: {0} ({1}).'.format(oct(mode), directory))
+
+        # Step 3: Ensure user exists and is in the directory's group, else create it
+        return ensure_user_and_group(user, dir_group_name, create_if_missing=True)
+    except Exception as e:
+        print('Error in setup_user_and_group_access: {0}.'.format(e))
+        return False
+
+
+def create_empty_data_directory(me_config_dir, user=None, group=None, mode=0o755):
+    '''
+    Creates an empty data directory where MetricsExtension can store cached configurations.
+    For CMv1, MetricsExtension requires mdsd to provide all configurations on disk.
+    For CMv2, MetricsExtension requires an empty data directory where it can cache its configurations.
+    '''
+    try:
+        # Clear older config directory if exists.
+        if os.path.exists(me_config_dir):
+            rmtree(me_config_dir)
+        os.makedirs(me_config_dir, mode=mode)
+
+        if user and group:
+            # Get UID and GID from user and group names
+            uid = pwd.getpwnam(user).pw_uid
+            gid = grp.getgrnam(group).gr_gid
+
+            # Set the ownership
+            os.chown(me_config_dir, uid, gid)
+
+        print('Directory {0} created with ownership {0}:{1}.'.format(me_config_dir, user, group))
+    except Exception as e:
+        print('Failed to create directory: {0}'.format(e))
