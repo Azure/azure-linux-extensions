@@ -15,7 +15,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import sys
+import os
 from Common import CommonVariables
 from IMDSUtil import IMDSStoredResults
 from BekUtilVolumeImpl import BekUtilVolumeImpl
@@ -42,6 +43,19 @@ class BekUtil(object):
 
     def generate_passphrase(self):
         return self.bekUtilImpl.generate_passphrase()
+
+    def store_bek_passphrase_file_name(self,encryption_config, passphrase,key_file_name):
+        '''this function is used to store passphrase to specific file name'''
+        #update new passphrase to key_file_path.
+        key_file_dir = os.path.dirname(self.get_bek_passphrase_file(encryption_config))
+        key_file_path = os.path.join(key_file_dir,key_file_name)
+        if sys.version_info[0] < 3:
+            if isinstance(passphrase, str):
+                passphrase = passphrase.decode('utf-8')
+        with open(key_file_path, 'wb') as f:
+            f.write(passphrase)
+        #making sure the permissions are read only to root user.
+        os.chmod(key_file_path,0o400)
 
     def store_bek_passphrase(self, encryption_config, passphrase):
         return self.bekUtilImpl.store_bek_passphrase(encryption_config,passphrase)
