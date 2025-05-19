@@ -395,8 +395,8 @@ def install():
             return 0, "This version of azuremonitoragent package is already installed. Quitting install."
         # make sure a different AMA binary does not exist, if so, log error and exit
         elif package_name != '.deb' and package_name != BundleFileNameDeb:
-            hutil_log_info("A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm.")
-            return 1, "A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm."
+            hutil_log_info("A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg --force-all -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm.")
+            return 1, "A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg --force-all -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm."
     elif PackageManager == "rpm":
         exit_code, package_name = run_command_and_log("rpm -qa | grep azuremonitoragent")
         # append .rpm to end of package name
@@ -408,8 +408,8 @@ def install():
             return 0, "This version of azuremonitoragent package is already installed. Quitting install."
         # make sure a different AMA binary does not exist, if so, log error and exit
         elif package_name != '.rpm' and package_name != BundleFileNameRpm:
-            hutil_log_info("A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm.")
-            return 1, "A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm."
+            hutil_log_info("A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg --force-all -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm.")
+            return 1, "A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg --force-all -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm."
     
     package_directory = os.path.join(os.getcwd(), PackagesDirectory)
     bundle_path = os.path.join(package_directory, BundleFileName)
