@@ -386,22 +386,23 @@ def install():
     # Check if the package is already installed
     if PackageManager == "dpkg":
         exit_code, output = run_command_and_log("dpkg -l | grep azuremonitoragent")
-        # Split the string into parts
-        parts = output.split()
-        # Create the package name to compare
-        if parts[3] == 'amd64':
-            pkg_file = f"{parts[1]}_{parts[2]}_x86_64.deb"
-        elif parts[3] == 'arm64':
-            pkg_file = f"{parts[1]}_{parts[2]}_aarch64.deb"
-        hutil_log_info("package name: {0}".format(pkg_file))
-        hutil_log_info("package name compared to bundlefilename: {0} and {1}".format(pkg_file, BundleFileNameDeb))
-        if pkg_file == BundleFileNameDeb:
-            hutil_log_info("This version of azuremonitoragent package is already installed. Quitting install.")
-            return 0, "This version of azuremonitoragent package is already installed. Quitting install."
-        # make sure a different AMA binary does not exist, if so, log error and exit
-        elif package_name != '.deb' and pkg_file != BundleFileNameDeb:
-            hutil_log_info("A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm.")
-            return 1, "A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm."
+        if (output != ''):
+            # Split the string into parts
+            parts = output.split()
+            # Create the package name to compare with the bundle filename
+            if parts[3] == 'amd64':
+                pkg_file = f"{parts[1]}_{parts[2]}_x86_64.deb"
+            elif parts[3] == 'arm64':
+                pkg_file = f"{parts[1]}_{parts[2]}_aarch64.deb"
+            hutil_log_info("package name: {0}".format(pkg_file))
+            hutil_log_info("package name compared to bundlefilename: {0} and {1}".format(pkg_file, BundleFileNameDeb))
+            if pkg_file == BundleFileNameDeb:
+                hutil_log_info("This version of azuremonitoragent package is already installed. Quitting install.")
+                return 0, "This version of azuremonitoragent package is already installed. Quitting install."
+            # make sure a different AMA binary does not exist, if so, log error and exit
+            elif package_name != '.deb' and pkg_file != BundleFileNameDeb:
+                hutil_log_info("A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm.")
+                return 1, "A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'dpkg -P azuremonitoragent' for deb or 'rpm -e --noscripts --nodeps azuremonitoragent' for rpm."
     elif PackageManager == "rpm":
         exit_code, package_name = run_command_and_log("rpm -qa | grep azuremonitoragent")
         # append .rpm to end of package name
