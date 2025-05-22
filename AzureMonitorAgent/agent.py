@@ -390,9 +390,9 @@ def install():
             # Split the string into parts
             parts = output.split()
             # Create the package name to compare with the bundle filename
-            if parts[3] == 'amd64':
+            if len(parts) >= 4 and parts[3].lower() == 'amd64':
                 pkg_file = "{}_{}_x86_64.deb".format(parts[1], parts[2])
-            elif parts[3] == 'arm64':
+            elif len(parts) >= 4 and parts[3].lower() == 'arm64':
                 pkg_file = "{}_{}_aarch64.deb".format(parts[1], parts[2])
             hutil_log_info("package name: {0}".format(pkg_file))
             hutil_log_info("package name compared to bundlefilename: {0} and {1}".format(pkg_file, BundleFileNameDeb))
