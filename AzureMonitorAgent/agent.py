@@ -488,7 +488,7 @@ def install():
             except:
                 log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
 
-    return exit_code, output
+    return exit_code, "Azure Monitor Agent package installed successfully"
 
 def uninstall():
     """
