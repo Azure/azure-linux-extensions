@@ -382,33 +382,73 @@ def install():
             rsyslog_exit_code, rsyslog_output = run_command_and_log("dnf install -y rsyslog")
             if rsyslog_exit_code != 0:
                 return rsyslog_exit_code, rsyslog_output
-            
-    package_directory = os.path.join(os.getcwd(), PackagesDirectory)
-    bundle_path = os.path.join(package_directory, BundleFileName)
-    os.chmod(bundle_path, 100)
-    print(PackageManager, " and ", BundleFileName)
-    AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
-    hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
+    
+    # Flag to indicate if the package of the same version as BundleFileNameDeb/BundleFileNameRpm is already installed
+    PackageAlreadyInstalled = False
 
-    # Retry, since install can fail due to concurrent package operations
-    exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
-                                         retry_check = retry_if_dpkg_or_rpm_locked,
-                                         final_check = final_check_if_dpkg_or_rpm_locked)
+    # Check if the package is already installed
+    if PackageManager == "dpkg":
+        exit_code, output = run_command_and_log("dpkg -l | grep azuremonitoragent")
+        if output != '':
+            # Split the string into parts
+            parts = output.split()
+            # Create the package name to compare with the bundle filename
+            if len(parts) >= 4 and parts[3].lower() == 'amd64':
+                pkg_file = "{}_{}_x86_64.deb".format(parts[1], parts[2])
+            elif len(parts) >= 4 and parts[3].lower() == 'arm64':
+                pkg_file = "{}_{}_aarch64.deb".format(parts[1], parts[2])
+            hutil_log_info("package name: {0}".format(pkg_file))
+            hutil_log_info("package name compared to bundlefilename: {0} and {1}".format(pkg_file, BundleFileNameDeb))
+            if pkg_file == BundleFileNameDeb:
+                hutil_log_info("This version of azuremonitoragent package is already installed. Skippng package install.")
+                PackageAlreadyInstalled = True
+            # since there is another AMA binary and it does not match the bundle filename, it has to be a different one, exit with error.
+            else:
+                hutil_log_info("A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'rm /var/lib/dpkg/info/azuremonitoragent.*' followed by 'dpkg --force-all -P azuremonitoragent'")
+                return 1, "A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'rm /var/lib/dpkg/info/azuremonitoragent.*' followed by 'dpkg --force-all -P azuremonitoragent'"
+    elif PackageManager == "rpm":
+        exit_code, package_name = run_command_and_log("rpm -qa | grep azuremonitoragent")
+        if package_name != '':
+            # append .rpm to end of package name
+            package_name = package_name + ".rpm"
+            hutil_log_info("package name: {0}".format(package_name))
+            hutil_log_info("package name compared to bundlefilename: {0} and {1}".format(package_name, BundleFileNameRpm))
+            if package_name == BundleFileNameRpm:
+                hutil_log_info("This version of azuremonitoragent package is already installed. Skippng package install.")
+                PackageAlreadyInstalled = True
+            # since there is another AMA binary and it does not match the bundle filename, it has to be a different one, exit with error.
+            else:
+                hutil_log_info("A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'rpm -e --noscripts --nodeps azuremonitoragent'")
+                return 1, "A different version of azuremonitoragent package is already installed. Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'. If that does not work you may need to repair manually by running 'rpm -e --noscripts --nodeps azuremonitoragent'"
 
-    # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
-    # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
-    if vm_dist.replace(' ','').lower().startswith('redhat') and vm_ver == '8.6' and platform.machine() == 'aarch64':
+    if not PackageAlreadyInstalled:
+        hutil_log_info("No previous package found, installing Azure Monitor Agent package.")
+        package_directory = os.path.join(os.getcwd(), PackagesDirectory)
+        bundle_path = os.path.join(package_directory, BundleFileName)
+        os.chmod(bundle_path, 100)
+        print(PackageManager, " and ", BundleFileName)
+        AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
+        hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
+
+        # Try to install with retry, since install can fail due to concurrent package operations
         exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
-                                         retry_check = retry_if_dpkg_or_rpm_locked,
-                                         final_check = final_check_if_dpkg_or_rpm_locked)
+                                            retry_check = retry_if_dpkg_or_rpm_locked,
+                                            final_check = final_check_if_dpkg_or_rpm_locked)
 
-    if exit_code != 0:
-        return exit_code, output
+        # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
+        # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
+        if vm_dist.replace(' ','').lower().startswith('redhat') and vm_ver == '8.6' and platform.machine() == 'aarch64':
+            exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
+                                            retry_check = retry_if_dpkg_or_rpm_locked,
+                                            final_check = final_check_if_dpkg_or_rpm_locked)
 
-    # System daemon reload is required for systemd to pick up the new service
-    exit_code, output = run_command_and_log("systemctl daemon-reload")
-    if exit_code != 0:
-        return exit_code, output
+        if exit_code != 0:
+            return exit_code, output
+
+        # System daemon reload is required for systemd to pick up the new service
+        exit_code, output = run_command_and_log("systemctl daemon-reload")
+        if exit_code != 0:
+            return exit_code, output
 
     # Copy the AMACoreAgent and agentlauncher binaries
     copy_amacoreagent_binaries()
@@ -448,7 +488,7 @@ def install():
             except:
                 log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
 
-    return exit_code, output
+    return exit_code, "Azure Monitor Agent package installed successfully"
 
 def uninstall():
     """
@@ -487,6 +527,31 @@ def uninstall():
         exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
                                             retry_check = retry_if_dpkg_or_rpm_locked,
                                             final_check = final_check_if_dpkg_or_rpm_locked)
+
+        # check if the uninstall was successful
+        if PackageManager == "dpkg":
+            _, check_installed = run_command_and_log("dpkg -l | grep azuremonitoragent | wc -l")
+        elif PackageManager == "rpm":
+            _, check_installed = run_command_and_log("rpm -qa | grep azuremonitoragent | wc -l")
+
+        # If there is still a package leftover
+        if check_installed != '0':
+            # do a force uninstall since the package is still installed
+            if PackageManager == "dpkg":
+                # we can remove the post and pre scripts first then purge
+                RemoveScriptsCommand = "rm /var/lib/dpkg/info/azuremonitoragent.*"
+                run_command_with_retries_output(RemoveScriptsCommand, retries = 4,
+                                                retry_check = retry_if_dpkg_or_rpm_locked,
+                                                final_check = final_check_if_dpkg_or_rpm_locked)
+                AMAUninstallCommandForce = "dpkg --force-all -P azuremonitoragent"
+            elif PackageManager == "rpm":
+                AMAUninstallCommandForce = "rpm -e --noscripts --nodeps azuremonitoragent"
+
+            hutil_log_info("Forcing uninstall due to something missing")
+            exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
+                                                retry_check = retry_if_dpkg_or_rpm_locked,
+                                                final_check = final_check_if_dpkg_or_rpm_locked)
+        
     except Exception as ex:
         exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
