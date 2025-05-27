@@ -353,14 +353,14 @@ def copy_mdsd_fluentbit_binaries():
 def get_installed_package_version(package_name):
     """
     Get the installed version of a package, including architecture.
-    In the case of dpkg, we need to rstrip() the architecture part, see below for why.
-    Examples of version_strings:
+    In the case of dpkg, we need to rsplit() the architecture part, see below for why.
+    Examples of version_string:
       - RPM: azuremonitoragent-1.33.4-build.main.872.x86_64.rpm -> 1.33.4-build.main.000.x86_64
       - DEB: azuremonitoragent_1.35.4-971_x86_64.deb -> 1.35.4-000
     Returns: (is_installed, version_string)
     """
     if PackageManager == "dpkg":
-        # We need Architecture to get the build number
+        # We need Architecture to match BundleFileNameDeb
         cmd = "dpkg-query -W -f='${{Version}}.${{Architecture}}' {0} 2>/dev/null".format(package_name)
     elif PackageManager == "rpm":
         cmd = "rpm -q --qf '%{{VERSION}}-%{{RELEASE}}.%{{ARCH}}' {0} 2>/dev/null".format(package_name)
