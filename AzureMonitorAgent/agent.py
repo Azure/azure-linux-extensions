@@ -36,7 +36,6 @@ import json
 import base64
 import inspect
 import shutil
-import re
 import hashlib
 import fileinput
 import contextlib
@@ -373,12 +372,12 @@ def get_installed_package_version(package_name):
     if exit_code != 0 or not output:
         return False, "Package not found"
 
+    version_string = output.strip()
+
     if PackageManager == "dpkg":
         # For dpkg, the version string is in the format: 1.33.4-build.main.872.amd64
         # We want to return just the version part: 1.33.4-build.main.872
-        version_string = output.rsplit('.', 1)[0]
-
-    version_string = output.strip()
+        version_string = version_string.rsplit('.', 1)[0]
     return True, version_string
 
 def get_bundle_version():
