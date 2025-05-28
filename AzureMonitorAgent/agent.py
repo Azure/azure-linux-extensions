@@ -1265,7 +1265,7 @@ def remove_azureotelcollector():
                 azureotelcollector_uninstall_command,
                 retries = 5,
                 retry_check = retry_if_dpkg_or_rpm_locked,
-                final_check = final_check_if_dpkg_or rpm_locked
+                final_check = final_check_if_dpkg_or_rpm_locked
             )
 
             if exit_code == 0:
