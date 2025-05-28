@@ -2264,6 +2264,12 @@ def find_vm_distro(operation):
         vm_dist = 'redhat'
     elif vm_dist == 'ol':
         vm_dist = 'oracle'
+
+    if vm_ver and '.' in vm_ver and vm_dist != 'ubuntu':
+        # For Ubuntu, keep major.minor format (e.g., "18.04")
+        # For other distributions, extract only the major version
+        # This is needed for matching with supported_distros.py
+        vm_ver = vm_ver.split('.')[0]
     
     # Add debugging info
     hutil_log_info("Final OS detection result: {0} {1}".format(vm_dist.lower(), vm_ver.lower()))
