@@ -1265,7 +1265,7 @@ def remove_azureotelcollector():
                 azureotelcollector_uninstall_command,
                 retries = 5,
                 retry_check = retry_if_dpkg_or_rpm_locked,
-                final_check = final_check_if_dpkg_or_rpm_locked
+                final_check = final_check_if_dpkg_or rpm_locked
             )
 
             if exit_code == 0:
@@ -2123,9 +2123,9 @@ def find_vm_distro(operation):
                     vm_dist = os_release['ID_LIKE'].lower().split()[0].strip('"\'')
                     vm_dist = vm_dist.split('-')[0]
                 
-                hutil_log_info(f"OS detected from /etc/os-release: {vm_dist} {vm_ver}")
+                hutil_log_info("OS detected from /etc/os-release: {0} {1}".format(vm_dist, vm_ver))
         except Exception as e:
-            hutil_log_error(f"Error reading /etc/os-release: {str(e)}")
+            hutil_log_error("Error reading /etc/os-release: {0}".format(str(e)))
     
     # If we couldn't get the distribution from /etc/os-release, try other files
     if not vm_dist or not vm_ver:
@@ -2141,9 +2141,9 @@ def find_vm_distro(operation):
                         version_match = re.search(r'release\s+(\d+(\.\d+)?)', content)
                         if version_match:
                             vm_ver = version_match.group(1)
-                        hutil_log_info(f"OS detected from /etc/system-release: {vm_dist} {vm_ver}")
+                        hutil_log_info("OS detected from /etc/system-release: {0} {1}".format(vm_dist, vm_ver))
             except Exception as e:
-                hutil_log_error(f"Error reading /etc/system-release: {str(e)}")
+                hutil_log_error("Error reading /etc/system-release: {0}".format(str(e)))
         
         # SUSE specific detection
         if not vm_dist and os.path.exists('/etc/SuSE-release'):
@@ -2168,9 +2168,9 @@ def find_vm_distro(operation):
                     if sp_match and vm_ver:
                         vm_ver = '{0}.{1}'.format(vm_ver, sp_match.group(1))
                     
-                    hutil_log_info(f"OS detected from /etc/SuSE-release: {vm_dist} {vm_ver}")
+                    hutil_log_info("OS detected from /etc/SuSE-release: {0} {1}".format(vm_dist, vm_ver))
             except Exception as e:
-                hutil_log_error(f"Error reading /etc/SuSE-release: {str(e)}")
+                hutil_log_error("Error reading /etc/SuSE-release: {0}".format(str(e)))
         
         # Red Hat based systems
         if not vm_dist and os.path.exists('/etc/redhat-release'):
@@ -2199,9 +2199,9 @@ def find_vm_distro(operation):
                     if version_match:
                         vm_ver = version_match.group(1)
                     
-                    hutil_log_info(f"OS detected from /etc/redhat-release: {vm_dist} {vm_ver}")
+                    hutil_log_info("OS detected from /etc/redhat-release: {0} {1}".format(vm_dist, vm_ver))
             except Exception as e:
-                hutil_log_error(f"Error reading /etc/redhat-release: {str(e)}")
+                hutil_log_error("Error reading /etc/redhat-release: {0}".format(str(e)))
         
         # Debian based systems with lsb-release
         if not vm_dist and os.path.exists('/etc/lsb-release'):
@@ -2219,9 +2219,9 @@ def find_vm_distro(operation):
                 if 'DISTRIB_RELEASE' in lsb_data:
                     vm_ver = lsb_data['DISTRIB_RELEASE'].lower()
                 
-                hutil_log_info(f"OS detected from /etc/lsb-release: {vm_dist} {vm_ver}")
+                hutil_log_info("OS detected from /etc/lsb-release: {0} {1}".format(vm_dist, vm_ver))
             except Exception as e:
-                hutil_log_error(f"Error reading /etc/lsb-release: {str(e)}")
+                hutil_log_error("Error reading /etc/lsb-release: {0}".format(str(e)))
         
         # Debian specific detection
         if not vm_dist and os.path.exists('/etc/debian_version'):
@@ -2230,9 +2230,9 @@ def find_vm_distro(operation):
                 with open('/etc/debian_version', 'r') as fp:
                     vm_ver = fp.read().strip()
                 vm_dist = 'debian'
-                hutil_log_info(f"OS detected from /etc/debian_version: {vm_dist} {vm_ver}")
+                hutil_log_info("OS detected from /etc/debian_version: {0} {1}".format(vm_dist, vm_ver))
             except Exception as e:
-                hutil_log_error(f"Error reading /etc/debian_version: {str(e)}")
+                hutil_log_error("Error reading /etc/debian_version: {0}".format(str(e)))
     
     # Final fallback - try /proc/version
     if not vm_dist and os.path.exists('/proc/version'):
@@ -2250,13 +2250,13 @@ def find_vm_distro(operation):
                     vm_dist = 'suse'
                 
                 # Try to extract version - not always reliable from /proc/version
-                hutil_log_info(f"OS detected from /proc/version: {vm_dist}")
+                hutil_log_info("OS detected from /proc/version: {0}".format(vm_dist))
         except Exception as e:
-            hutil_log_error(f"Error reading /proc/version: {str(e)}")
+            hutil_log_error("Error reading /proc/version: {0}".format(str(e)))
     
     # If we still couldn't determine the OS, log what we tried and throw an error
     if not vm_dist:
-        error_msg = f'Indeterminate operating system. Files checked: {", ".join(detection_files_checked)}'
+        error_msg = 'Indeterminate operating system. Files checked: {0}'.format(", ".join(detection_files_checked))
         log_and_exit(operation, IndeterminateOperatingSystem, error_msg)
     
     # Normalize distribution names
@@ -2266,7 +2266,7 @@ def find_vm_distro(operation):
         vm_dist = 'oracle'
     
     # Add debugging info
-    hutil_log_info(f"Final OS detection result: {vm_dist.lower()} {vm_ver.lower()}")
+    hutil_log_info("Final OS detection result: {0} {1}".format(vm_dist.lower(), vm_ver.lower()))
     
     return vm_dist.lower(), vm_ver.lower()
 
