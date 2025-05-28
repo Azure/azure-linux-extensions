@@ -30,6 +30,7 @@ import Utils.extensionutils as ext_utils
 import Utils.distroutils as dist_utils
 import Utils.constants as constants
 import Utils.ovfutils as ovf_utils
+import errrorclarification as error_code
 
 # Define global variables
 ExtensionShortName = 'VMAccess'
@@ -131,10 +132,12 @@ def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
 
-
+errorstatus = error_code.ErrorCode.SYSTEM_ERROR
 def enable():
     hutil = handler_util.HandlerUtility()
     hutil.do_parse_context('Enable')
+    global errorstatus
+
     try:
         hutil.exit_if_enabled(remove_protected_settings=True)  # If no new seqNum received, exit.
 
@@ -177,7 +180,7 @@ def enable():
     except Exception as e:
         hutil.error(("Failed to enable the extension with error: {0}, "
                      "stack trace: {1}").format(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(str(e)))
+        hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(str(e)),errorstatus.value)
 
 
 def _forcibly_reset_chap(hutil):
@@ -231,6 +234,7 @@ def _remove_user_account(user_name, hutil):
 
 def _set_user_account_pub_key(protect_settings, hutil):
     ovf_env = None
+    global errorstatus
     try:
         ovf_xml = ext_utils.get_file_contents('/var/lib/waagent/ovf-env.xml')
         if ovf_xml is not None:
@@ -255,6 +259,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     no_convert = False
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
+        errorstatus = error_code.ErrorCode.USER_ERROR
         raise Exception("No password or ssh_key is specified.")
 
     if user_pass is not None and len(user_pass) == 0:
@@ -550,6 +555,7 @@ def _insert_rule_if_not_exists(rule_string):
 
 def check_and_repair_disk(hutil):
     public_settings = hutil.get_public_settings()
+    global errorstatus
     if public_settings:
         check_disk = public_settings.get('check_disk')
         repair_disk = public_settings.get('repair_disk')
@@ -558,8 +564,9 @@ def check_and_repair_disk(hutil):
         if check_disk and repair_disk:
             err_msg = ("check_disk and repair_disk was both specified."
                        "Only one of them can be specified")
+            errorstatus = error_code.ErrorCode.USER_ERROR
             hutil.error(err_msg)
-            hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
+            hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.', errorstatus.value)
 
         if check_disk:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="check_disk")
@@ -575,6 +582,7 @@ def check_and_repair_disk(hutil):
 
 
 def _fsck_check(hutil):
+    global errorstatus
     try:
         retcode = ext_utils.run(['fsck', '-As', '-y'])
         if retcode > 0:
@@ -585,11 +593,12 @@ def _fsck_check(hutil):
     except Exception as e:
         hutil.error("Failed to run disk check with error: {0}, {1}".format(
             str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Check', 'error', '0', 'Check failed.')
+        hutil.do_exit(1, 'Check', 'error', '0', 'Check failed.',errorstatus.value)
 
 
 def _fsck_repair(hutil, disk_name):
     # first unmount disks and loop devices lazy + forced
+    global errorstatus
     try:
         cmd_result = ext_utils.run(['umount', '-f', '/' + disk_name])
         if cmd_result != 0:
@@ -606,7 +615,7 @@ def _fsck_repair(hutil, disk_name):
             raise Exception("Failed to mount disks")
     except Exception as e:
         hutil.error("{0}, {1}".format(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Repair', 'error', '0', 'Repair failed.')
+        hutil.do_exit(1, 'Repair', 'error', '0', 'Repair failed.',errorstatus.value)
 
 
 if __name__ == '__main__':
