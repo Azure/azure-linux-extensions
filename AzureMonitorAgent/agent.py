@@ -494,6 +494,9 @@ def install():
     # Needs to be revisited for aarch64
     copy_kqlextension_binaries()
 
+    # Install azureotelcollector
+    install_azureotelcollector()
+
     # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
         # Check if they have libssl.so.1.1 since AMA is built against this version
@@ -553,8 +556,7 @@ def uninstall():
 
     remove_localsyslog_configs()
 
-    # remove azureotelcollector service
-    remove_azureotelcollector()
+    uninstall_azureotelcollector()
 
     # remove the logrotate config
     if os.path.exists(AMAExtensionLogRotateFilePath):   
@@ -1241,7 +1243,7 @@ def find_otelcollector_package_file(directory, pkg_type):
     return max(matches, key=os.path.getmtime)
 
 
-def remove_azureotelcollector():
+def uninstall_azureotelcollector():
     """
     This method will uninstall azureotelcollector services.
     No need to stop it separately as the package maintainer script handles it upon uninstalling.
@@ -1303,9 +1305,6 @@ def stop_metrics_process():
             hutil_log_info(me_rm_msg)
         else:
             hutil_log_error(me_rm_msg)
-
-    # remove azureotelcollector service
-    remove_azureotelcollector()
 
     pids_filepath = os.path.join(os.getcwd(),'amametrics.pid')
 
@@ -1481,9 +1480,43 @@ def metrics_watcher(hutil_error, hutil_log):
     last_crc = None
     last_crc_fluent = None
     me_msi_token_expiry_epoch = None
+    enabled_me_CMv2_mode = False
+    log_messages = ""
 
     while True:
         try:
+            if not me_handler.is_running(is_lad=False):
+                me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
+                if os.path.exists(me_service_template_path):
+                    os.remove(me_service_template_path)
+
+                try:
+                    if is_feature_enabled("enableAzureOTelCollector") and azureotelcollector_is_active():
+                        copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
+                        me_handler.setup_me(
+                            is_lad=False,
+                            managed_identity=managed_identity_str,
+                            HUtilObj=HUtilObject,
+                            is_local_control_channel=False,
+                            user="azuremetricsext",
+                            group="azuremonitoragent")
+                        enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
+                    elif is_feature_enabled("enableCMV2"):
+                        copyfile(os.getcwd() + "/services/metrics-extension-otlp.service", me_service_template_path)
+                        me_handler.setup_me(
+                            is_lad=False,
+                            managed_identity=managed_identity_str,
+                            HUtilObj=HUtilObject,
+                            is_local_control_channel=False)
+                        enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
+                except Exception as e:
+                    hutil_log_error("Error in setting up metrics-extension.service in CMv2 mode. Exception={0}".format(e))
+
+                if enabled_me_CMv2_mode:
+                    hutil_log_info("Successfully started metrics-extension.")
+                elif log_messages:
+                    hutil_log_error(log_messages)
+
             # update fluent config for fluent port if needed
             fluent_port = ''
             if os.path.isfile(AMAFluentPortFilePath):
@@ -1559,7 +1592,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(tel_rm_msg)
 
-                        if me_handler.is_running(is_lad=False):
+                        if not enabled_me_CMv2_mode and me_handler.is_running(is_lad=False):
                             me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
                             if me_out:
                                 hutil_log(me_msg)
@@ -1571,9 +1604,6 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_log(me_rm_msg)
                             else:
                                 hutil_error(me_rm_msg)
-
-                        # Removing azureotelcollector service
-                        remove_azureotelcollector()
 
                     else:
                         crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
@@ -1589,37 +1619,6 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/mdm_influxdb.socket",
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
-                            me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
-                            if os.path.exists(me_service_template_path):
-                                os.remove(me_service_template_path)
-
-                            enabled_me_CMv2_mode = False
-
-                            try:
-                                if install_azureotelcollector() and azureotelcollector_is_active():
-                                    copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
-                                    me_handler.setup_me(
-                                        is_lad=False,
-                                        managed_identity=managed_identity_str,
-                                        HUtilObj=HUtilObject,
-                                        is_local_control_channel=False,
-                                        user="azuremetricsext",
-                                        group="azuremonitoragent")
-                                    enabled_me_CMv2_mode = True
-                                elif is_feature_enabled("enableCMV2"):
-                                    copyfile(os.getcwd() + "/services/metrics-extension-otlp.service", me_service_template_path)
-                                    me_handler.setup_me(
-                                        is_lad=False,
-                                        managed_identity=managed_identity_str,
-                                        HUtilObj=HUtilObject,
-                                        is_local_control_channel=False)
-                                    enabled_me_CMv2_mode = True
-                            except Exception as e:
-                                hutil_error('Error in setting up metrics-extension.service in CMv2 mode. Exception={0}'.format(e))
-
-                            if not enabled_me_CMv2_mode:
-                                copyfile(os.getcwd() + "/services/metrics-extension-cmv1.service", me_service_template_path)
-                                me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
 
                             start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
                             if start_telegraf_res:
@@ -1627,12 +1626,19 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(log_messages)
 
+                            if not enabled_me_CMv2_mode:
+                                me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
+                                if os.path.exists(me_service_template_path):
+                                    os.remove(me_service_template_path)
 
-                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
-                            if start_metrics_out:
-                                hutil_log("Successfully started metrics-extension.")
-                            else:
-                                hutil_error(log_messages)
+                                copyfile(os.getcwd() + "/services/metrics-extension-cmv1.service", me_service_template_path)
+                                me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
+
+                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
+                                if start_metrics_out:
+                                    hutil_log("Successfully started metrics-extension.")
+                                else:
+                                    hutil_error(log_messages)
 
                             last_crc = crc
 
