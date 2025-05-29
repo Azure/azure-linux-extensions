@@ -567,6 +567,7 @@ def uninstall():
 
     # Retry, since uninstall can fail due to concurrent package operations
     try:
+        is_still_installed = False
         exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
                                             retry_check = retry_if_dpkg_or_rpm_locked,
                                             final_check = final_check_if_dpkg_or_rpm_locked)
@@ -581,6 +582,7 @@ def uninstall():
 
         # If there is still a package leftover
         if is_still_installed:
+            AMAUninstallCommandForce = ""
             # do a force uninstall since the package is still installed
             if PackageManager == "dpkg":
                 # we can remove the post and pre scripts first then purge
