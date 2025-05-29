@@ -2092,54 +2092,189 @@ def find_package_manager(operation):
 
 def find_vm_distro(operation):
     """
-    Finds the Linux Distribution this vm is running on.
+    Finds the Linux Distribution this VM is running on by directly parsing
+    distribution-specific files for reliable detection.
     """
-    vm_dist = vm_id = vm_ver =  None
-    parse_manually = False
-
-    # platform commands used below aren't available after Python 3.6
-    if sys.version_info < (3,7):
-        try:
-            vm_dist, vm_ver, vm_id = platform.linux_distribution()
-        except AttributeError:
-            try:
-                vm_dist, vm_ver, vm_id = platform.dist()
-            except AttributeError:
-                hutil_log_info("Falling back to /etc/os-release distribution parsing")
-
-        # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
-        # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
-        try:
-            temp_vm_ver = int(vm_ver.split('.')[0])
-        except:
-            parse_manually = True
-    else:
-        parse_manually = True    
-
-    if (not vm_dist and not vm_ver) or parse_manually: # SLES 15 and others
+    vm_dist = vm_ver = ""
+    detection_files_checked = []
+    
+    # Try to read from /etc/os-release first (most modern distributions)
+    if os.path.exists('/etc/os-release'):
+        detection_files_checked.append('/etc/os-release')
         try:
             with open('/etc/os-release', 'r') as fp:
+                os_release = {}
                 for line in fp:
-                    if line.startswith('ID='):
-                        vm_dist = line.split('=')[1]
-                        vm_dist = vm_dist.split('-')[0]
-                        vm_dist = vm_dist.replace('\"', '').replace('\n', '')
-                    elif line.startswith('VERSION_ID='):
-                        vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.replace('\"', '').replace('\n', '')
-        except:
-            log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
+                    if line.strip() and '=' in line:
+                        k, v = line.strip().split('=', 1)
+                        os_release[k] = v.strip('"\'').strip()
+                
+                if 'ID' in os_release:
+                    vm_dist = os_release['ID'].lower()
+                    # Clean up the ID by removing any vendor-specific suffixes
+                    vm_dist = vm_dist.split('-')[0]
+                
+                if 'VERSION_ID' in os_release:
+                    vm_ver = os_release['VERSION_ID'].lower()
+                
+                # Fallback for ID_LIKE if direct ID isn't recognized
+                if not vm_dist and 'ID_LIKE' in os_release:
+                    # Get first value from ID_LIKE
+                    vm_dist = os_release['ID_LIKE'].lower().split()[0].strip('"\'')
+                    vm_dist = vm_dist.split('-')[0]
+                
+                hutil_log_info("OS detected from /etc/os-release: {0} {1}".format(vm_dist, vm_ver))
+        except Exception as e:
+            hutil_log_error("Error reading /etc/os-release: {0}".format(str(e)))
     
-    # initialize them to empty string so that .lower() is valid in case we weren't able to retrieve it
-    # downstream callers expect a string and not NoneType
+    # If we couldn't get the distribution from /etc/os-release, try other files
+    if not vm_dist or not vm_ver:
+        # Try /etc/system-release first (used by Amazon Linux and others)
+        if os.path.exists('/etc/system-release'):
+            detection_files_checked.append('/etc/system-release')
+            try:
+                with open('/etc/system-release', 'r') as fp:
+                    content = fp.read().lower()
+                    if 'amazon' in content:
+                        vm_dist = 'amzn'
+                        # Try to extract version
+                        version_match = re.search(r'release\s+(\d+(\.\d+)?)', content)
+                        if version_match:
+                            vm_ver = version_match.group(1)
+                        hutil_log_info("OS detected from /etc/system-release: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/system-release: {0}".format(str(e)))
+        
+        # SUSE specific detection
+        if not vm_dist and os.path.exists('/etc/SuSE-release'):
+            detection_files_checked.append('/etc/SuSE-release')
+            try:
+                with open('/etc/SuSE-release', 'r') as fp:
+                    content = fp.read()
+                    if 'SUSE Linux Enterprise Server' in content:
+                        vm_dist = 'sles'
+                    elif 'openSUSE' in content:
+                        vm_dist = 'opensuse'
+                    else:
+                        vm_dist = 'suse'
+                    
+                    # Try to extract the version
+                    version_match = re.search(r'VERSION\s*=\s*(\d+)', content)
+                    if version_match:
+                        vm_ver = version_match.group(1)
+                    
+                    # Also look for service pack level
+                    sp_match = re.search(r'PATCHLEVEL\s*=\s*(\d+)', content)
+                    if sp_match and vm_ver:
+                        vm_ver = '{0}.{1}'.format(vm_ver, sp_match.group(1))
+                    
+                    hutil_log_info("OS detected from /etc/SuSE-release: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/SuSE-release: {0}".format(str(e)))
+        
+        # Red Hat based systems
+        if not vm_dist and os.path.exists('/etc/redhat-release'):
+            detection_files_checked.append('/etc/redhat-release')
+            try:
+                with open('/etc/redhat-release', 'r') as fp:
+                    content = fp.read().lower()
+                    if 'red hat' in content:
+                        vm_dist = 'redhat'
+                    elif 'centos' in content:
+                        vm_dist = 'centos'
+                    elif 'oracle' in content:
+                        vm_dist = 'oracle'
+                    elif 'fedora' in content:
+                        vm_dist = 'fedora'
+                    elif 'rocky' in content:
+                        vm_dist = 'rocky'
+                    elif 'alma' in content:
+                        vm_dist = 'alma'
+                    else:
+                        vm_dist = 'redhat'  # Default to redhat for RHEL-based systems
+                    
+                    # Try to extract version using a more flexible pattern
+                    # This handles formats like "release 8.6" or "release 7.9.2009"
+                    version_match = re.search(r'release\s+(\d+(\.\d+){0,2})', content)
+                    if version_match:
+                        vm_ver = version_match.group(1)
+                    
+                    hutil_log_info("OS detected from /etc/redhat-release: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/redhat-release: {0}".format(str(e)))
+        
+        # Debian based systems with lsb-release
+        if not vm_dist and os.path.exists('/etc/lsb-release'):
+            detection_files_checked.append('/etc/lsb-release')
+            try:
+                lsb_data = {}
+                with open('/etc/lsb-release', 'r') as fp:
+                    for line in fp:
+                        if line.strip() and '=' in line:
+                            k, v = line.strip().split('=', 1)
+                            lsb_data[k] = v.strip('"\'')
+                
+                if 'DISTRIB_ID' in lsb_data:
+                    vm_dist = lsb_data['DISTRIB_ID'].lower()
+                if 'DISTRIB_RELEASE' in lsb_data:
+                    vm_ver = lsb_data['DISTRIB_RELEASE'].lower()
+                
+                hutil_log_info("OS detected from /etc/lsb-release: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/lsb-release: {0}".format(str(e)))
+        
+        # Debian specific detection
+        if not vm_dist and os.path.exists('/etc/debian_version'):
+            detection_files_checked.append('/etc/debian_version')
+            try:
+                with open('/etc/debian_version', 'r') as fp:
+                    vm_ver = fp.read().strip()
+                vm_dist = 'debian'
+                hutil_log_info("OS detected from /etc/debian_version: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/debian_version: {0}".format(str(e)))
+    
+    # Final fallback - try /proc/version
+    if not vm_dist and os.path.exists('/proc/version'):
+        detection_files_checked.append('/proc/version')
+        try:
+            with open('/proc/version', 'r') as fp:
+                content = fp.read().lower()
+                if 'debian' in content:
+                    vm_dist = 'debian'
+                elif 'ubuntu' in content:
+                    vm_dist = 'ubuntu'
+                elif 'red hat' in content or 'redhat' in content:
+                    vm_dist = 'redhat'
+                elif 'suse' in content:
+                    vm_dist = 'suse'
+                
+                # Try to extract version - not always reliable from /proc/version
+                hutil_log_info("OS detected from /proc/version: {0}".format(vm_dist))
+        except Exception as e:
+            hutil_log_error("Error reading /proc/version: {0}".format(str(e)))
+    
+    # If we still couldn't determine the OS, log what we tried and throw an error
     if not vm_dist:
-        vm_dist = ""
+        error_msg = 'Indeterminate operating system. Files checked: {0}'.format(", ".join(detection_files_checked))
+        log_and_exit(operation, IndeterminateOperatingSystem, error_msg)
+    
+    # Normalize distribution names
+    if vm_dist == 'rhel':
+        vm_dist = 'redhat'
+    elif vm_dist == 'ol':
+        vm_dist = 'oracle'
 
-    if not vm_ver:
-        vm_ver = ""
-
+    if vm_ver and '.' in vm_ver and vm_dist != 'ubuntu':
+        # For Ubuntu, keep major.minor format (e.g., "18.04")
+        # For other distributions, extract only the major version
+        # This is needed for matching with supported_distros.py
+        vm_ver = vm_ver.split('.')[0]
+    
+    # Add debugging info
+    hutil_log_info("Final OS detection result: {0} {1}".format(vm_dist.lower(), vm_ver.lower()))
+    
     return vm_dist.lower(), vm_ver.lower()
-
 
 def is_vm_supported_for_extension(operation):
     """
