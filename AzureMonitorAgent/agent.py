@@ -571,6 +571,7 @@ def uninstall():
                                             retry_check = retry_if_dpkg_or_rpm_locked,
                                             final_check = final_check_if_dpkg_or_rpm_locked)
 
+        is_still_installed = False
         # check if the uninstall was successful
         if PackageManager == "dpkg":
             exit_code, _ = run_command_and_log("dpkg-query -W -f='${Status}' azuremonitoragent 2>/dev/null", check_error=False)
@@ -581,6 +582,7 @@ def uninstall():
 
         # If there is still a package leftover
         if is_still_installed:
+            AMAUninstallCommandForce = ""
             # do a force uninstall since the package is still installed
             if PackageManager == "dpkg":
                 # we can remove the post and pre scripts first then purge
