@@ -2,6 +2,7 @@ import datetime
 import os
 import platform
 import shutil
+import json
 
 import helpers
 from error_codes        import *
@@ -54,6 +55,20 @@ def copy_dircontents(src, dst):
         print("Copying contents of directory {0}".format(src))
         try:
             shutil.copytree(src, dst)
+            auth_token_path = os.path.join(dst, "metrics_configs", "AuthToken-MSI.json")
+            if (os.path.isfile(auth_token_path)):
+                print("Found AuthToken-MSI.json")
+                try:
+                    with open(auth_token_path, 'r') as auth_token:
+                        auth_token_json = json.load(auth_token)
+                    if (auth_token_json and "access_token" in auth_token_json):
+                        print("Removing access_token value from AuthToken-MSI.json")
+                        auth_token_json["access_token"] = ""
+                        with open(auth_token_path, 'w') as auth_token:
+                            json.dump(auth_token_json, auth_token, indent=4)
+                        print("Successfully removed access_token value from AuthToken-MSI.json")
+                except Exception as e:
+                    print("ERROR: Could not decode JSON from {0}: {1}".format(auth_token_path, e))
         except Exception as e:
             print("ERROR: Could not copy {0}: {1}".format(src, e))
             print("Skipping over contents of directory {0}".format(src))
@@ -331,6 +346,10 @@ def run_logcollector(output_location):
     tgz_filepath = os.path.join(output_location, tgz_filename)
     print("--------------------------------------------------------------------------------")
     print(helpers.run_cmd_output("cd {0}; tar -zcf {1} {2}".format(output_location, tgz_filename, output_dirname)))
+    # This makes archive not readable by anyone else but the user who created it
+    print("Setting permissions on the archive to 600 so only the user who created it can read it")
+    print("--------------------------------------------------------------------------------")
+    os.chmod(tgz_filepath, 0o600)
     shutil.rmtree(output_dirpath, ignore_errors=True)
 
     print("--------------------------------------------------------------------------------")
