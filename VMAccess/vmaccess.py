@@ -185,6 +185,8 @@ def enable():
                 hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.', errorstatus.value)
             if errorstatus == error_code.ErrorCode.CHECK_DISK_ERROR:
                 hutil.do_exit(1, 'Enable', 'error', '0', 'Check disk failed.', errorstatus.value)
+            if errorstatus == error_code.ErrorCode.REPAIR_DISK_ERROR:
+                hutil.do_exit(1, 'Enable', 'error', '0', 'Repair disk failed.', errorstatus.value)
             
 
             
