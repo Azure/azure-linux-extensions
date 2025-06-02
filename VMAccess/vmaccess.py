@@ -179,7 +179,15 @@ def enable():
         if _is_sshd_config_modified(protect_settings):
             MyDistro.restart_ssh_service()
 
-        check_and_repair_disk(hutil)
+        errorstatus = check_and_repair_disk(hutil)
+        if errorstatus is not None:
+            if errorstatus == error_code.ErrorCode.CHECK_REPAIR_DISK_ERROR:
+                hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.', errorstatus.value)
+            if errorstatus == error_code.ErrorCode.CHECK_DISK_ERROR:
+                hutil.do_exit(1, 'Enable', 'error', '0', 'Check disk failed.', errorstatus.value)
+            
+
+            
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable succeeded.')
     except Exception as e:
         hutil.error(("Failed to enable the extension with error: {0}, "
@@ -567,17 +575,22 @@ def check_and_repair_disk(hutil):
             err_msg = ("check_disk and repair_disk was both specified."
                        "Only one of them can be specified")
             hutil.error(err_msg)
+            return error_code.ErrorCode.CHECK_REPAIR_DISK_ERROR
             hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.', errorstatus.value)
 
         if check_disk:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="check_disk")
             outretcode = _fsck_check(hutil)
+            if outretcode is not None:
+                return outretcode
             hutil.log("Successfully checked disk")
             return outretcode
 
         if repair_disk:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="repair_disk")
             outdata = _fsck_repair(hutil, disk_name)
+            if outdata is not None:
+                return outdata
             hutil.log("Repaired and remounted disk")
             return outdata
 
@@ -589,13 +602,11 @@ def _fsck_check(hutil):
             hutil.log(retcode)
             raise Exception("Disk check was not successful")
         else:
-            return retcode
+            return None
     except Exception as e:
-        errorstatus = error_code.ErrorCode.SYSTEM_ERROR
         hutil.error("Failed to run disk check with error: {0}, {1}".format(
             str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Check', 'error', '0', 'Check failed.',errorstatus.value)
-
+        return error_code.ErrorCode.CHECK_DISK_ERROR
 
 def _fsck_repair(hutil, disk_name):
     # first unmount disks and loop devices lazy + forced
@@ -614,10 +625,8 @@ def _fsck_repair(hutil, disk_name):
         else:
             raise Exception("Failed to mount disks")
     except Exception as e:
-        errorstatus = error_code.ErrorCode.SYSTEM_ERROR
         hutil.error("{0}, {1}".format(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Repair', 'error', '0', 'Repair failed.',errorstatus.value)
-
+        return error_code.ErrorCode.REPAIR_DISK_ERROR
 
 if __name__ == '__main__':
     main()

@@ -351,10 +351,10 @@ class HandlerUtility:
     def do_exit(self, exit_code, operation, status, code, message,error_code=None):
         try:
             if error_code is not None:
-                substatus = {
+                substatus = [{
                     "Name": "ErrorClarification",
                     "Code": error_code
-                }
+                }]
             self.do_status_report(operation, status, code, message,error_code=None, substatus=None)
         except Exception as e:
             self.log("Can't update status: " + str(e))
