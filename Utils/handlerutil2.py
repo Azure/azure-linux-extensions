@@ -315,7 +315,7 @@ class HandlerUtility:
     def _set_most_recent_seq(self, seq):
         ext_utils.set_file_contents('mrseq', str(seq))
 
-    def do_status_report(self, operation, status, status_code, message, error_code=None):
+    def do_status_report(self, operation, status, status_code, message, error_code=None, substatus=None):
         if error_code is not None:
             message = "{0} (error code: {1})".format(message, error_code)
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
@@ -332,7 +332,8 @@ class HandlerUtility:
                     "lang": "en-US",
                     "message": message
                 }
-            }
+            } , 
+            "SubStatus": substatus
         }]
         stat_rept = json.dumps(stat)
         if self._context._status_file:
@@ -349,7 +350,12 @@ class HandlerUtility:
 
     def do_exit(self, exit_code, operation, status, code, message,error_code=None):
         try:
-            self.do_status_report(operation, status, code, message,error_code=None)
+            if error_code is not None:
+                substatus = {
+                    "Name": "ErrorClarification",
+                    "Code": error_code
+                }
+            self.do_status_report(operation, status, code, message,error_code=None, substatus=None)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
