@@ -132,8 +132,9 @@ def install():
     hutil.do_parse_context('Install')
     hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
 
-errorstatus = error_code.ErrorCode.SYSTEM_ERROR
+
 def enable():
+    errorstatus = error_code.ErrorCode.SYSTEM_ERROR
     hutil = handler_util.HandlerUtility()
     hutil.do_parse_context('Enable')
 
@@ -262,7 +263,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     # user name must be provided if set ssh key or password
     if not protect_settings or 'username' not in protect_settings:
-        return
+        return None
 
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
@@ -578,7 +579,7 @@ def check_and_repair_disk(hutil):
                        "Only one of them can be specified")
             hutil.error(err_msg)
             return error_code.ErrorCode.CHECK_REPAIR_DISK_ERROR
-            hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.', errorstatus.value)
+            # hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.', errorstatus.value)
 
         if check_disk:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="check_disk")
