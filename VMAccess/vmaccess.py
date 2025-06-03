@@ -263,7 +263,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     # user name must be provided if set ssh key or password
     if not protect_settings or 'username' not in protect_settings:
-        return None
+        return None,None
 
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
