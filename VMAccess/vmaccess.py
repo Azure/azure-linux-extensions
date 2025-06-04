@@ -172,8 +172,11 @@ def enable():
             if errorstatus is not None:
                 raise Exception(errormsg)
 
-        errorstatus,errormsg = _set_user_account_pub_key(protect_settings, hutil)
-        if errorstatus is not None:
+        
+        output = _set_user_account_pub_key(protect_settings, hutil)
+
+        if output is not None:
+                errorstatus,errormsg = output[0], output[1]
                 raise Exception(errormsg)
         
 
