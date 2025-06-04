@@ -355,7 +355,7 @@ class HandlerUtility:
                     "Name": "ErrorClarification",
                     "Code": error_code
                 }]
-            self.do_status_report(operation, status, code, message,error_code=None, substatus=None)
+            self.do_status_report(operation, status, code, message,error_code, substatus)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
