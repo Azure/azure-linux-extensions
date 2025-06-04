@@ -173,11 +173,11 @@ def enable():
                 raise Exception(errormsg)
 
         
-        output = _set_user_account_pub_key(protect_settings, hutil)
+        _set_user_account_pub_key(protect_settings, hutil)
 
-        if output is not None:
-                errorstatus,errormsg = output[0], output[1]
-                raise Exception(errormsg)
+        # if output is not None:
+        #         errorstatus,errormsg = output[0], output[1]
+        #         raise Exception(errormsg)
         
 
         if _is_sshd_config_modified(protect_settings):
