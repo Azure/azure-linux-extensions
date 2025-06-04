@@ -605,7 +605,7 @@ def _fsck_check(hutil):
     try:
         retcode = ext_utils.run(['fsck', '-As', '-y'])
         if retcode > 0:
-            hutil.log(retcode)
+            hutil.log(str(retcode))
             raise Exception("Disk check was not successful")
         else:
             return None
