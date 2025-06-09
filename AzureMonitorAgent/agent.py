@@ -1487,11 +1487,11 @@ def metrics_watcher(hutil_error, hutil_log):
         try:
             if not me_handler.is_running(is_lad=False):
                 me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
-                if os.path.exists(me_service_template_path):
-                    os.remove(me_service_template_path)
 
                 try:
                     if is_feature_enabled("enableAzureOTelCollector") and azureotelcollector_is_active():
+                        if os.path.exists(me_service_template_path):
+                            os.remove(me_service_template_path)
                         copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
                         me_handler.setup_me(
                             is_lad=False,
@@ -1502,6 +1502,8 @@ def metrics_watcher(hutil_error, hutil_log):
                             group="azuremonitoragent")
                         enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
                     elif is_feature_enabled("enableCMV2"):
+                        if os.path.exists(me_service_template_path):
+                            os.remove(me_service_template_path)
                         copyfile(os.getcwd() + "/services/metrics-extension-otlp.service", me_service_template_path)
                         me_handler.setup_me(
                             is_lad=False,
