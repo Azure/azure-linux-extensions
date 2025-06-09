@@ -355,7 +355,7 @@ class HandlerUtility:
             if error_code is not None:
                 substatus = [{
                     "Name": self._context._error_clarification_name,
-                    "Code": error_codefh
+                    "Code": error_code
                 }]
             self.do_status_report(operation, status, code, message,error_code, substatus)
         except Exception as e:
