@@ -407,6 +407,7 @@ def install():
 
     exit_if_vm_not_supported('Install')
     find_package_manager("Install")
+    # cleanup_broken_package_manager()
     set_os_arch('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
@@ -465,6 +466,11 @@ def install():
         os.chmod(bundle_path, 100)
         print(PackageManager, " and ", BundleFileName)
         AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
+
+        if is_systemd() and "INVOCATION_ID" in os.environ:
+            hutil_log_info("Wrapping install command with systemd-inhibit to prevent shutdown/sleep.")
+            AMAInstallCommand = ("systemd-inhibit --what=shutdown:sleep --why='Installing Azure Monitor Agent' " + AMAInstallCommand)
+
         hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
 
         # Try to install with retry, since install can fail due to concurrent package operations
