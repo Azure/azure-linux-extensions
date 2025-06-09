@@ -83,6 +83,7 @@ class HandlerContext:
         self._status_file = None
         self._settings_file = None
         self._config = None
+        self._error_clarification_name = "ErrorClarification"
         return
 
 
@@ -333,7 +334,7 @@ class HandlerUtility:
                     "message": message
                 }
             } , 
-            "SubStatus": substatus
+            "substatus": substatus
         }]
         stat_rept = json.dumps(stat)
         if self._context._status_file:
@@ -348,12 +349,13 @@ class HandlerUtility:
         if ext_utils.set_file_contents(heartbeat_file, health_report) is None:
             self.error('Unable to wite heartbeat info to ' + heartbeat_file)
 
-    def do_exit(self, exit_code, operation, status, code, message,error_code=None):
+    def do_exit(self, exit_code, operation, status, code, message, error_code=None):
         try:
+            substatus = None
             if error_code is not None:
                 substatus = [{
-                    "Name": "ErrorClarification",
-                    "Code": error_code
+                    "Name": self._context._error_clarification_name,
+                    "Code": error_codefh
                 }]
             self.do_status_report(operation, status, code, message,error_code, substatus)
         except Exception as e:
