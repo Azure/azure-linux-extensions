@@ -65,6 +65,10 @@ class CommonVariables:
     dataDiskLunList = 'dataDiskLunList'
     isOSDiskIncluded = 'isOSDiskIncluded'
     isVmgsBlobIncluded = 'isVmgsBlobIncluded'
+    isVMADEEnabled = 'isVMADEEnabled'
+    isOsDiskADEEncrypted = 'isOsDiskADEEncrypted'
+    areDataDisksADEEncrypted = 'areDataDisksADEEncrypted'
+    encryptionDetails = 'encryptionDetails'
     isAnyWADiskIncluded = 'isAnyWADiskIncluded'
     isAnyDirectDriveDiskIncluded = 'isAnyDirectDriveDiskIncluded'
 

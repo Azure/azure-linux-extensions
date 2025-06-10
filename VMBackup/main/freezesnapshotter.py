@@ -358,6 +358,10 @@ class FreezeSnapshotter(object):
                 all_snapshots_failed = True
                 return run_result, run_status, blob_snapshot_info_array, all_failed, all_snapshots_failed, unable_to_sleep, is_inconsistent
 
+            if(self.para_parser.isVMADEEnabled == True and self.para_parser.blobs != None):
+                # fetch the disk encryption details
+                self.fetchDiskBlobMetadata()
+
             if self.g_fsfreeze_on :
                 run_result, run_status = self.freeze()
 
@@ -374,7 +378,10 @@ class FreezeSnapshotter(object):
                 snap_shotter = GuestSnapshotter(self.logger, self.hutil)
                 self.logger.log('T:S doing snapshot now...')
                 time_before_snapshot = datetime.datetime.now()
-                snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
+                if(len(self.additional_headers) != 0):
+                    snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on, self.additional_headers)
+                else:
+                    snapshot_result, blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep, all_snapshots_failed = snap_shotter.snapshotall(self.para_parser, self.freezer, self.g_fsfreeze_on)
                 time_after_snapshot = datetime.datetime.now()
                 snapshotTimeTaken = time_after_snapshot-time_before_snapshot
                 self.logger.log('T:S ***** takeSnapshotFromGuest, time_before_snapshot=' + str(time_before_snapshot) + ", time_after_snapshot=" + str(time_after_snapshot) + ", snapshotTimeTaken=" + str(snapshotTimeTaken))
@@ -423,7 +430,7 @@ class FreezeSnapshotter(object):
         unable_to_sleep = False
         blob_snapshot_info_array = None
         snap_shotter = HostSnapshotter(self.logger, self.hostIp)
-        pre_snapshot_statuscode, responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
+        pre_snapshot_statuscode, responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId, True)
 
         if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
@@ -479,8 +486,8 @@ class FreezeSnapshotter(object):
                 pre_snapshot_statuscode,responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId)
                 
                 if(int(pre_snapshot_statuscode) == 200 or int(pre_snapshot_statuscode) == 201) and (responseBody != None and responseBody != "") :
-                    resonse = json.loads(responseBody)
-                    dateTimeNow = datetime.datetime(resonse['responseTime']['year'], resonse['responseTime']['month'], resonse['responseTime']['day'], resonse['responseTime']['hour'], resonse['responseTime']['minute'], resonse['responseTime']['second'])
+                    response = json.loads(responseBody)
+                    dateTimeNow = datetime.datetime(response['responseTime']['year'], response['responseTime']['month'], response['responseTime']['day'], response['responseTime']['hour'], response['responseTime']['minute'], response['responseTime']['second'])
                     self.logger.log('Date and time extracted from pre-snapshot request: '+ str(dateTimeNow))
             except Exception as e:
                 self.logger.log('Error in getting Host time falling back to using system time. Exception %s, stack trace: %s' % (str(e), traceback.format_exc()))
@@ -511,4 +518,35 @@ class FreezeSnapshotter(object):
             return delta.days * 86400 + delta.seconds
         else:
             return delta.total_seconds()
+
+    def fetchDiskBlobMetadata(self):
+        self.logger.log("****")
+        additional_headers = []
+        headers = self.generate_headers()
+        http_util = HttpUtil(self.logger)
+        for blob in self.para_parser.blobs:
+            sasuri_obj = urlparser.urlparse(blob + '&comp=metadata')
+            result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
+            if(result == CommonVariables.success and httpResp != None):
+                resp_headers = httpResp.getheaders()
+                key = "x-ms-meta-DiskEncryptionSettings"
+                value = ""
+                for k,v in resp_headers:
+                    if key == k:
+                        value = str(v)
+                        #self.additional_headers.append((key,str(v)))
+                        break  # Stop once found
+                additional_headers.append((key,value))
+                self.logger.log(str(additional_headers))
+        self.para_parser.disk_encryption_details = additional_headers
+        self.logger.log("para parser disk encryptiond etails")
+        self.logger.log(str(self.para_parser.disk_encryption_details))
+
+    def generate_headers(self):
+        """Generates headers for the request using SAS token, x-ms-date, and x-ms-version."""
+        headers = {
+            "x-ms-date": datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT'),
+            "x-ms-version": "2018-03-28"
+            }
+        return headers
 
