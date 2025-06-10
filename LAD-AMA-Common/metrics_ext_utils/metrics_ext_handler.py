@@ -389,6 +389,31 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
     return True
 
 
+def start_metrics_cmv2():
+    """
+    Start the metrics service in CMv2 mode
+    """
+
+    # Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
+    log_messages = ""
+
+    metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
+    if not os.path.isfile(metrics_ext_bin):
+        log_messages += "Metrics Extension binary does not exist. Failed to start ME service."
+        return False, log_messages
+
+    # If the VM has systemd, then we use that to start/stop
+    metrics_service_name = get_metrics_extension_service_name(False)
+    if metrics_utils.is_systemd():
+        service_restart_status = os.system("systemctl restart {0}".format(metrics_service_name))
+        if service_restart_status != 0:
+            log_messages += "Unable to start {0} using systemctl. Failed to start ME service. Check system for hardening.".format(metrics_service_name)
+            return False, log_messages
+        else:
+            return True, log_messages
+
+    return False, log_messages
+
 
 def start_metrics(is_lad, managed_identity="sai"):
     """
