@@ -16,6 +16,7 @@ sed -i "s/^BundleFileNameDeb = .*$/BundleFileNameDeb = '$MDSD_DEB_PACKAGE_NAME'/
 sed -i "s/^BundleFileNameRpm = .*$/BundleFileNameRpm = '$MDSD_RPM_PACKAGE_NAME'/" agent.py
 
 sed -i "s/AMA_VERSION/$AGENT_VERSION/" services/metrics-extension-otlp.service
+sed -i "s/AMA_VERSION/$AGENT_VERSION/" services/metrics-extension-cmv2.service
 
 # updating manifest.xml
 # check <Version>...</Version>
