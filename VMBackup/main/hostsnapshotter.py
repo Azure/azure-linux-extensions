@@ -162,7 +162,7 @@ class HostSnapshotter(object):
                         self.logger.log("PreSnapshot:responseBody is empty but http status code is success")
                         statusCode = 557
                     elif(responseBody != None):
-                        if (self.paras.isVMADEEnabled == True):
+                        if (paras.isVMADEEnabled == True):
                             response = json.loads(responseBody)
                             self.isOsDiskADEEncrypted = response[CommonVariables.isOsDiskADEEncrypted]
                             self.areDataDisksADEEncrypted = response[CommonVariables.areDataDisksADEEncrypted]
