@@ -539,7 +539,7 @@ class FreezeSnapshotter(object):
                 additional_headers.append((key,value))
                 self.logger.log(str(additional_headers))
         self.para_parser.disk_encryption_details = additional_headers
-        self.logger.log("para parser disk encryptiond etails")
+        self.logger.log("para parser disk encryption details")
         self.logger.log(str(self.para_parser.disk_encryption_details))
 
     def generate_headers(self):
