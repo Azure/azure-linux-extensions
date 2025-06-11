@@ -95,7 +95,7 @@ class GuestSnapshotter(object):
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
                 if(disk_encryption_details != None):
-                    headers[disk_encryption_details[0]] = headers[disk_encryption_details[1]]
+                    headers[disk_encryption_details[0]] = disk_encryption_details[1]
                 if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
                     self.logger.log("Not passing the TTL header via Guest path though it is enabled")
                 temp_logger = temp_logger + str(headers)
