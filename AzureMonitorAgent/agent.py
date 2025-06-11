@@ -23,6 +23,7 @@ import os.path
 import datetime
 import signal
 import pwd
+import glob
 import grp
 import re
 import filecmp
@@ -35,10 +36,10 @@ import json
 import base64
 import inspect
 import shutil
-import re
 import hashlib
 import fileinput
 import contextlib
+import ama_tst.modules.install.supported_distros as supported_distros
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile
@@ -301,8 +302,8 @@ def copy_amacoreagent_binaries():
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
 
     if current_arch == 'x86_64':
-        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x86_64.so"
-        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x86_64.so"
+        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
+        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
         compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
 
         liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
@@ -327,7 +328,15 @@ def copy_mdsd_fluentbit_binaries():
     fluentbit_bin = "/opt/microsoft/azuremonitoragent/bin/fluent-bit"
 
     # copy the required libs to our test directory first
-    copytree("/opt/microsoft/azuremonitoragent/lib", os.getcwd() + "/lib")
+    lib_dir = os.path.join(os.getcwd(), "lib")
+    if os.path.exists(lib_dir):
+        rmtree(lib_dir)
+
+    if sys.version_info >= (3, 8):
+        # dirs_exist_ok parameter was added in Python 3.8
+        copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir, dirs_exist_ok=True)
+    else:
+        copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir)
     
     canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
     canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
@@ -340,6 +349,53 @@ def copy_mdsd_fluentbit_binaries():
         compare_and_copy_bin(fluentbit_bin_local_path, fluentbit_bin)
 
     rmtree(os.getcwd() + "/lib")    
+
+def get_installed_package_version(package_name):
+    """
+    Get the installed version of a package, including architecture.
+    In the case of dpkg, we need to rsplit() the architecture part, see below for why.
+    Examples of version_string:
+      - RPM: azuremonitoragent-1.33.4-build.main.872.x86_64.rpm -> 1.33.4-build.main.000.x86_64
+      - DEB: azuremonitoragent_1.35.4-971_x86_64.deb -> 1.35.4-000
+    Returns: (is_installed, version_string)
+    """
+    if PackageManager == "dpkg":
+        # We need Architecture to match BundleFileNameDeb
+        cmd = "dpkg-query -W -f='${{Version}}.${{Architecture}}' {0} 2>/dev/null".format(package_name)
+    elif PackageManager == "rpm":
+        cmd = "rpm -q --qf '%{{VERSION}}-%{{RELEASE}}.%{{ARCH}}' {0} 2>/dev/null".format(package_name)
+    else:
+        return False, "Could not determine package manager"
+
+    exit_code, output = run_command_and_log(cmd, check_error=False)
+
+    if exit_code != 0 or not output:
+        return False, "Package not found"
+
+    version_string = output.strip()
+
+    if PackageManager == "dpkg":
+        # For dpkg, the version string is in the format: 1.33.4-build.main.872.amd64
+        # We want to return just the version part: 1.33.4-build.main.872
+        version_string = version_string.rsplit('.', 1)[0]
+    return True, version_string
+
+def get_bundle_version():
+    """
+    Extract version number from bundle filename. (i.e. 1.3***...<build #>)
+    Examples:
+      - RPM: azuremonitoragent-1.33.4-build.main.000.x86_64.rpm -> 1.33.4-build.main.000.x86_64
+      - DEB: azuremonitoragent_1.35.4-971_x86_64.deb -> 1.35.4-000
+    """
+    if PackageManager == "dpkg":
+        # Match between first underscore and next underscore (version)
+        match = re.search(r'azuremonitoragent_([^_]+)_', BundleFileNameDeb)
+    else:  # rpm
+        # Match between first dash and last dot before arch (version)
+        match = re.search(r'azuremonitoragent-([^-]+(?:-[^-]+)*)\.', BundleFileNameRpm)
+    if match:
+        return match.group(1)
+    return ""
 
 def install():
     """
@@ -372,33 +428,64 @@ def install():
             rsyslog_exit_code, rsyslog_output = run_command_and_log("dnf install -y rsyslog")
             if rsyslog_exit_code != 0:
                 return rsyslog_exit_code, rsyslog_output
-            
-    package_directory = os.path.join(os.getcwd(), PackagesDirectory)
-    bundle_path = os.path.join(package_directory, BundleFileName)
-    os.chmod(bundle_path, 100)
-    print(PackageManager, " and ", BundleFileName)
-    AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
-    hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
+    
+    # Flag to handle the case where the same package is already installed
+    same_package_installed = False
 
-    # Retry, since install can fail due to concurrent package operations
-    exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
-                                         retry_check = retry_if_dpkg_or_rpm_locked,
-                                         final_check = final_check_if_dpkg_or_rpm_locked)
+    # Check if the package is already installed with the correct version
+    is_installed, installed_version = get_installed_package_version("azuremonitoragent")
+    bundle_version = get_bundle_version()
 
-    # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
-    # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
-    if vm_dist.replace(' ','').lower().startswith('redhat') and vm_ver == '8.6' and platform.machine() == 'aarch64':
+    # Check if the package is already installed, if so determine if it is the same as the bundle or not
+    if is_installed:
+        hutil_log_info("Found installed azuremonitoragent version: {0}".format(installed_version))
+        hutil_log_info("Bundle version: {0}".format(bundle_version))
+
+        if installed_version == bundle_version:
+            hutil_log_info("This version of azuremonitoragent package is already installed. Skipping package install.")
+            same_package_installed = True
+        else:
+            error_msg = "A different version of azuremonitoragent package is already installed."
+            troubleshooting = "Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'."
+
+            if PackageManager == "dpkg":
+                manual_fix = "If that does not work you may need to repair manually by running 'rm /var/lib/dpkg/info/azuremonitoragent.*' followed by 'dpkg --force-all -P azuremonitoragent'"
+            else:  # rpm
+                manual_fix = "If that does not work you may need to repair manually by running 'rpm -e --noscripts --nodeps azuremonitoragent'"
+
+            full_msg = "{0} {1} {2}".format(error_msg, troubleshooting, manual_fix)
+            hutil_log_info(full_msg)
+            return 1, full_msg
+
+    # If the package is not already installed, proceed with installation otherwise skip since it is the same package version
+    if not same_package_installed:
+        hutil_log_info("No previous package found, installing Azure Monitor Agent package.")
+        package_directory = os.path.join(os.getcwd(), PackagesDirectory)
+        bundle_path = os.path.join(package_directory, BundleFileName)
+        os.chmod(bundle_path, 100)
+        print(PackageManager, " and ", BundleFileName)
+        AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
+        hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
+
+        # Try to install with retry, since install can fail due to concurrent package operations
         exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
-                                         retry_check = retry_if_dpkg_or_rpm_locked,
-                                         final_check = final_check_if_dpkg_or_rpm_locked)
+                                            retry_check = retry_if_dpkg_or_rpm_locked,
+                                            final_check = final_check_if_dpkg_or_rpm_locked)
 
-    if exit_code != 0:
-        return exit_code, output
+        # Retry install for aarch64 rhel8 VMs as initial install fails to create symlink to /etc/systemd/system/azuremonitoragent.service
+        # in /etc/systemd/system/multi-user.target.wants/azuremonitoragent.service
+        if vm_dist.replace(' ','').lower().startswith('redhat') and vm_ver == '8.6' and platform.machine() == 'aarch64':
+            exit_code, output = run_command_with_retries_output(AMAInstallCommand, retries = 15,
+                                            retry_check = retry_if_dpkg_or_rpm_locked,
+                                            final_check = final_check_if_dpkg_or_rpm_locked)
 
-    # System daemon reload is required for systemd to pick up the new service
-    exit_code, output = run_command_and_log("systemctl daemon-reload")
-    if exit_code != 0:
-        return exit_code, output
+        if exit_code != 0:
+            return exit_code, output
+
+        # System daemon reload is required for systemd to pick up the new service
+        exit_code, output = run_command_and_log("systemctl daemon-reload")
+        if exit_code != 0:
+            return exit_code, output
 
     # Copy the AMACoreAgent and agentlauncher binaries
     copy_amacoreagent_binaries()
@@ -406,6 +493,9 @@ def install():
     # Copy KqlExtension binaries
     # Needs to be revisited for aarch64
     copy_kqlextension_binaries()
+
+    # Install azureotelcollector
+    install_azureotelcollector()
 
     # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
@@ -416,29 +506,28 @@ def install():
     
     # Set task limits to max of 65K in suse 12
     # Based on Task 9764411: AMA broken after 1.7 in sles 12 - https://dev.azure.com/msazure/One/_workitems/edit/9764411
-    if exit_code == 0:
-        vm_dist, _ = find_vm_distro('Install')
-        if (vm_dist.startswith('suse') or vm_dist.startswith('sles')):
-            try:
-                suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
-                if suse_exit_code != 0:
-                    return suse_exit_code, suse_output
+    vm_dist, _ = find_vm_distro('Install')
+    if (vm_dist.startswith('suse') or vm_dist.startswith('sles')):
+        try:
+            suse_exit_code, suse_output = run_command_and_log("mkdir -p /etc/systemd/system/azuremonitoragent.service.d")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
 
-                suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitoragent.service.d/override.conf")
-                if suse_exit_code != 0:
-                    return suse_exit_code, suse_output
+            suse_exit_code, suse_output = run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitoragent.service.d/override.conf")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
 
-                suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/azuremonitoragent.service.d/override.conf")
-                if suse_exit_code != 0:
-                    return suse_exit_code, suse_output
+            suse_exit_code, suse_output = run_command_and_log("echo 'TasksMax=65535' >> /etc/systemd/system/azuremonitoragent.service.d/override.conf")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
 
-                suse_exit_code, suse_output = run_command_and_log("systemctl daemon-reload")
-                if suse_exit_code != 0:
-                    return suse_exit_code, suse_output
-            except:
-                log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
+            suse_exit_code, suse_output = run_command_and_log("systemctl daemon-reload")
+            if suse_exit_code != 0:
+                return suse_exit_code, suse_output
+        except:
+            log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
 
-    return exit_code, output
+    return 0, "Azure Monitor Agent package installed successfully"
 
 def uninstall():
     """
@@ -449,6 +538,13 @@ def uninstall():
 
     exit_if_vm_not_supported('Uninstall')
     find_package_manager("Uninstall")
+
+    # Before we uninstall, we need to ensure AMA is installed to begin with
+    is_installed, _ = get_installed_package_version("azuremonitoragent")
+    if not is_installed:
+        hutil_log_info("Azure Monitor Agent is not installed, nothing to uninstall.")
+        return 0, "Azure Monitor Agent is not installed, nothing to uninstall."
+
     AMAUninstallCommand = ""
     if PackageManager == "dpkg":
         AMAUninstallCommand = "dpkg -P azuremonitoragent"
@@ -458,7 +554,9 @@ def uninstall():
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
     hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
 
-    remove_localsyslog_configs()    
+    remove_localsyslog_configs()
+
+    uninstall_azureotelcollector()
 
     # remove the logrotate config
     if os.path.exists(AMAExtensionLogRotateFilePath):   
@@ -471,9 +569,42 @@ def uninstall():
 
     # Retry, since uninstall can fail due to concurrent package operations
     try:
+        is_still_installed = False
         exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
                                             retry_check = retry_if_dpkg_or_rpm_locked,
                                             final_check = final_check_if_dpkg_or_rpm_locked)
+
+        # check if the uninstall was successful
+        if PackageManager == "dpkg":
+            exit_code, _ = run_command_and_log("dpkg-query -W -f='${Status}' azuremonitoragent 2>/dev/null", check_error=False)
+            is_still_installed = (exit_code == 0)
+        elif PackageManager == "rpm":
+            exit_code, _ = run_command_and_log("rpm -q azuremonitoragent", check_error=False)
+            is_still_installed = (exit_code == 0)
+
+        # If there is still a package leftover
+        if is_still_installed:
+            AMAUninstallCommandForce = ""
+            # do a force uninstall since the package is still installed
+            if PackageManager == "dpkg":
+                # we can remove the post and pre scripts first then purge
+                RemoveScriptsCommand = "rm /var/lib/dpkg/info/azuremonitoragent.*"
+                run_command_with_retries_output(RemoveScriptsCommand, retries = 4,
+                                                retry_check = retry_if_dpkg_or_rpm_locked,
+                                                final_check = final_check_if_dpkg_or_rpm_locked)
+                AMAUninstallCommandForce = "dpkg --force-all -P azuremonitoragent"
+            elif PackageManager == "rpm":
+                AMAUninstallCommandForce = "rpm -e --noscripts --nodeps azuremonitoragent"
+
+            hutil_log_info("Forcing uninstall due to something missing")
+            exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
+                                                retry_check = retry_if_dpkg_or_rpm_locked,
+                                                final_check = final_check_if_dpkg_or_rpm_locked)
+        else:
+            # If the package is not installed our exit code is non-zero so we need to "reset" it to 0
+            hutil_log_info("Uninstall command executed successfully, package is no longer installed.")
+            output = "Azure Monitor Agent package uninstalled successfully"
+            exit_code = 0
     except Exception as ex:
         exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
@@ -1031,6 +1162,122 @@ def get_managed_identity():
 
     return identifier_name, identifier_value, ""
 
+
+def azureotelcollector_is_active():
+    """
+    Checks if `azureotelcollector` is installed to run as a systemd service.
+    """
+    if is_systemd():
+        return 0 == os.system('systemctl is-active --quiet azureotelcollector-watcher.path')
+    return False
+
+
+def install_azureotelcollector():
+    """
+    This method will install the azureotelcollector package and start a systemd file watcher service that watches for configuration file changes.
+    MetricsExtension is responsible for writing the configuration file.
+    Only if configuration is present, otelcollector process will start to run, the watcher service is responsible to monitor the configurartion file.
+    """
+    if is_feature_enabled("enableAzureOTelCollector") and is_systemd():
+        find_package_manager("Install")
+        azureotelcollector_install_command = get_otelcollector_installation_command()
+        hutil_log_info('Running command "{0}"'.format(azureotelcollector_install_command))
+
+        # Retry, since install can fail due to concurrent package operations
+        exit_code, output = run_command_with_retries_output(
+            azureotelcollector_install_command,
+            retries = 5,
+            retry_check = retry_if_dpkg_or_rpm_locked,
+            final_check = final_check_if_dpkg_or_rpm_locked
+        )
+
+        if exit_code == 0:
+            hutil_log_info('Successfully installed azureotelcollector')
+            return True
+
+        hutil_log_error('Error installing azureotelcollector "{0}"'.format(output))
+
+    return False
+
+
+def get_otelcollector_installation_command():
+    """
+    This method provides the installation command to install an azureotelcollector package as a systemd service
+    """
+    find_package_manager("Install")
+    dir_path = os.getcwd() + "/azureotelcollector/"
+    if PackageManager == "dpkg":
+        package_path = find_otelcollector_package_file(dir_path, "deb")
+    elif PackageManager == "rpm":
+        package_path = find_otelcollector_package_file(dir_path, "rpm")
+    else:
+        raise Exception("Unsupported package manager to install azureotelcollector: {0}.".format(PackageManager))
+
+    return "{0} {1} --install {2}".format(PackageManager, PackageManagerOptions, package_path)
+
+
+def find_otelcollector_package_file(directory, pkg_type):
+    """
+    Finds the otelcollector package in a given path for a given package type using name globbing.
+    """
+    arch = platform.machine()
+
+    # Create pattern based on type and arch
+    if pkg_type == "deb":
+        if arch == "x86_64":
+            pattern = "azureotelcollector_*_amd64.deb"
+        elif arch == "aarch64":
+            pattern = "azureotelcollector_*_arm64.deb"
+        else:
+            raise Exception("Unsupported architecture for deb package: {0}".format(arch))
+    elif pkg_type == "rpm":
+        pattern = "azureotelcollector-*{0}.rpm".format(arch)
+    else:
+        raise Exception("Unsupported package type to install azureotelcollector: {0}".format(pkg_type))
+
+    search_pattern = os.path.join(directory, pattern)
+    matches = glob.glob(search_pattern)
+
+    if not matches:
+        raise IOError("No {0} package found for arch '{1}' in {2} with pattern '{3}'".format(pkg_type, arch, directory, pattern))
+
+    # Return the most recently modified match
+    return max(matches, key=os.path.getmtime)
+
+
+def uninstall_azureotelcollector():
+    """
+    This method will uninstall azureotelcollector services.
+    No need to stop it separately as the package maintainer script handles it upon uninstalling.
+    """
+    if is_feature_enabled("enableAzureOTelCollector"):
+        # Only remove azureotelcollector if file exists
+        if os.path.exists("/lib/systemd/system/azureotelcollector-watcher.path"):
+            azureotelcollector_uninstall_command = ""
+            find_package_manager("Uninstall")
+
+            if PackageManager == "dpkg":
+                azureotelcollector_uninstall_command = "dpkg --purge azureotelcollector"
+            elif PackageManager == "rpm":
+                azureotelcollector_uninstall_command = "rpm --erase azureotelcollector"
+            else:
+                log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
+
+            hutil_log_info('Running command "{0}"'.format(azureotelcollector_uninstall_command))
+
+            exit_code, output = run_command_with_retries_output(
+                azureotelcollector_uninstall_command,
+                retries = 5,
+                retry_check = retry_if_dpkg_or_rpm_locked,
+                final_check = final_check_if_dpkg_or_rpm_locked
+            )
+
+            if exit_code == 0:
+                hutil_log_info('Successfully removed azureotelcollector')
+            else:
+                hutil_log_error('Error removing azureotelcollector "{0}"'.format(output))
+
+
 def stop_metrics_process():
 
     if telhandler.is_running(is_lad=False):
@@ -1235,9 +1482,45 @@ def metrics_watcher(hutil_error, hutil_log):
     last_crc = None
     last_crc_fluent = None
     me_msi_token_expiry_epoch = None
+    enabled_me_CMv2_mode = False
+    log_messages = ""
 
     while True:
         try:
+            if not me_handler.is_running(is_lad=False):
+                me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
+
+                try:
+                    if is_feature_enabled("enableAzureOTelCollector") and azureotelcollector_is_active():
+                        if os.path.exists(me_service_template_path):
+                            os.remove(me_service_template_path)
+                        copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
+                        me_handler.setup_me(
+                            is_lad=False,
+                            managed_identity=managed_identity_str,
+                            HUtilObj=HUtilObject,
+                            is_local_control_channel=False,
+                            user="azuremetricsext",
+                            group="azuremonitoragent")
+                        enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
+                    elif is_feature_enabled("enableCMV2"):
+                        if os.path.exists(me_service_template_path):
+                            os.remove(me_service_template_path)
+                        copyfile(os.getcwd() + "/services/metrics-extension-otlp.service", me_service_template_path)
+                        me_handler.setup_me(
+                            is_lad=False,
+                            managed_identity=managed_identity_str,
+                            HUtilObj=HUtilObject,
+                            is_local_control_channel=False)
+                        enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
+                except Exception as e:
+                    hutil_log_error("Error in setting up metrics-extension.service in CMv2 mode. Exception={0}".format(e))
+
+                if enabled_me_CMv2_mode:
+                    hutil_log_info("Successfully started metrics-extension.")
+                elif log_messages:
+                    hutil_log_error(log_messages)
+
             # update fluent config for fluent port if needed
             fluent_port = ''
             if os.path.isfile(AMAFluentPortFilePath):
@@ -1313,7 +1596,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(tel_rm_msg)
 
-                        if me_handler.is_running(is_lad=False):
+                        if not enabled_me_CMv2_mode and me_handler.is_running(is_lad=False):
                             me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
                             if me_out:
                                 hutil_log(me_msg)
@@ -1325,6 +1608,7 @@ def metrics_watcher(hutil_error, hutil_log):
                                 hutil_log(me_rm_msg)
                             else:
                                 hutil_error(me_rm_msg)
+
                     else:
                         crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
@@ -1340,20 +1624,25 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
-                            me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
-
                             start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
                             if start_telegraf_res:
                                 hutil_log("Successfully started metrics-sourcer.")
                             else:
                                 hutil_error(log_messages)
 
+                            if not enabled_me_CMv2_mode:
+                                me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
+                                if os.path.exists(me_service_template_path):
+                                    os.remove(me_service_template_path)
 
-                            start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
-                            if start_metrics_out:
-                                hutil_log("Successfully started metrics-extension.")
-                            else:
-                                hutil_error(log_messages)
+                                copyfile(os.getcwd() + "/services/metrics-extension-cmv1.service", me_service_template_path)
+                                me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
+
+                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
+                                if start_metrics_out:
+                                    hutil_log("Successfully started metrics-extension.")
+                                else:
+                                    hutil_error(log_messages)
 
                             last_crc = crc
 
@@ -1813,54 +2102,189 @@ def find_package_manager(operation):
 
 def find_vm_distro(operation):
     """
-    Finds the Linux Distribution this vm is running on.
+    Finds the Linux Distribution this VM is running on by directly parsing
+    distribution-specific files for reliable detection.
     """
-    vm_dist = vm_id = vm_ver =  None
-    parse_manually = False
-
-    # platform commands used below aren't available after Python 3.6
-    if sys.version_info < (3,7):
-        try:
-            vm_dist, vm_ver, vm_id = platform.linux_distribution()
-        except AttributeError:
-            try:
-                vm_dist, vm_ver, vm_id = platform.dist()
-            except AttributeError:
-                hutil_log_info("Falling back to /etc/os-release distribution parsing")
-
-        # Some python versions *IF BUILT LOCALLY* (ex 3.5) give string responses (ex. 'bullseye/sid') to platform.dist() function
-        # This causes exception in the method below. Thus adding a check to switch to manual parsing in this case
-        try:
-            temp_vm_ver = int(vm_ver.split('.')[0])
-        except:
-            parse_manually = True
-    else:
-        parse_manually = True    
-
-    if (not vm_dist and not vm_ver) or parse_manually: # SLES 15 and others
+    vm_dist = vm_ver = ""
+    detection_files_checked = []
+    
+    # Try to read from /etc/os-release first (most modern distributions)
+    if os.path.exists('/etc/os-release'):
+        detection_files_checked.append('/etc/os-release')
         try:
             with open('/etc/os-release', 'r') as fp:
+                os_release = {}
                 for line in fp:
-                    if line.startswith('ID='):
-                        vm_dist = line.split('=')[1]
-                        vm_dist = vm_dist.split('-')[0]
-                        vm_dist = vm_dist.replace('\"', '').replace('\n', '')
-                    elif line.startswith('VERSION_ID='):
-                        vm_ver = line.split('=')[1]
-                        vm_ver = vm_ver.replace('\"', '').replace('\n', '')
-        except:
-            log_and_exit(operation, IndeterminateOperatingSystem, 'Indeterminate operating system')
+                    if line.strip() and '=' in line:
+                        k, v = line.strip().split('=', 1)
+                        os_release[k] = v.strip('"\'').strip()
+                
+                if 'ID' in os_release:
+                    vm_dist = os_release['ID'].lower()
+                    # Clean up the ID by removing any vendor-specific suffixes
+                    vm_dist = vm_dist.split('-')[0]
+                
+                if 'VERSION_ID' in os_release:
+                    vm_ver = os_release['VERSION_ID'].lower()
+                
+                # Fallback for ID_LIKE if direct ID isn't recognized
+                if not vm_dist and 'ID_LIKE' in os_release:
+                    # Get first value from ID_LIKE
+                    vm_dist = os_release['ID_LIKE'].lower().split()[0].strip('"\'')
+                    vm_dist = vm_dist.split('-')[0]
+                
+                hutil_log_info("OS detected from /etc/os-release: {0} {1}".format(vm_dist, vm_ver))
+        except Exception as e:
+            hutil_log_error("Error reading /etc/os-release: {0}".format(str(e)))
     
-    # initialize them to empty string so that .lower() is valid in case we weren't able to retrieve it
-    # downstream callers expect a string and not NoneType
+    # If we couldn't get the distribution from /etc/os-release, try other files
+    if not vm_dist or not vm_ver:
+        # Try /etc/system-release first (used by Amazon Linux and others)
+        if os.path.exists('/etc/system-release'):
+            detection_files_checked.append('/etc/system-release')
+            try:
+                with open('/etc/system-release', 'r') as fp:
+                    content = fp.read().lower()
+                    if 'amazon' in content:
+                        vm_dist = 'amzn'
+                        # Try to extract version
+                        version_match = re.search(r'release\s+(\d+(\.\d+)?)', content)
+                        if version_match:
+                            vm_ver = version_match.group(1)
+                        hutil_log_info("OS detected from /etc/system-release: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/system-release: {0}".format(str(e)))
+        
+        # SUSE specific detection
+        if not vm_dist and os.path.exists('/etc/SuSE-release'):
+            detection_files_checked.append('/etc/SuSE-release')
+            try:
+                with open('/etc/SuSE-release', 'r') as fp:
+                    content = fp.read()
+                    if 'SUSE Linux Enterprise Server' in content:
+                        vm_dist = 'sles'
+                    elif 'openSUSE' in content:
+                        vm_dist = 'opensuse'
+                    else:
+                        vm_dist = 'suse'
+                    
+                    # Try to extract the version
+                    version_match = re.search(r'VERSION\s*=\s*(\d+)', content)
+                    if version_match:
+                        vm_ver = version_match.group(1)
+                    
+                    # Also look for service pack level
+                    sp_match = re.search(r'PATCHLEVEL\s*=\s*(\d+)', content)
+                    if sp_match and vm_ver:
+                        vm_ver = '{0}.{1}'.format(vm_ver, sp_match.group(1))
+                    
+                    hutil_log_info("OS detected from /etc/SuSE-release: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/SuSE-release: {0}".format(str(e)))
+        
+        # Red Hat based systems
+        if not vm_dist and os.path.exists('/etc/redhat-release'):
+            detection_files_checked.append('/etc/redhat-release')
+            try:
+                with open('/etc/redhat-release', 'r') as fp:
+                    content = fp.read().lower()
+                    if 'red hat' in content:
+                        vm_dist = 'redhat'
+                    elif 'centos' in content:
+                        vm_dist = 'centos'
+                    elif 'oracle' in content:
+                        vm_dist = 'oracle'
+                    elif 'fedora' in content:
+                        vm_dist = 'fedora'
+                    elif 'rocky' in content:
+                        vm_dist = 'rocky'
+                    elif 'alma' in content:
+                        vm_dist = 'alma'
+                    else:
+                        vm_dist = 'redhat'  # Default to redhat for RHEL-based systems
+                    
+                    # Try to extract version using a more flexible pattern
+                    # This handles formats like "release 8.6" or "release 7.9.2009"
+                    version_match = re.search(r'release\s+(\d+(\.\d+){0,2})', content)
+                    if version_match:
+                        vm_ver = version_match.group(1)
+                    
+                    hutil_log_info("OS detected from /etc/redhat-release: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/redhat-release: {0}".format(str(e)))
+        
+        # Debian based systems with lsb-release
+        if not vm_dist and os.path.exists('/etc/lsb-release'):
+            detection_files_checked.append('/etc/lsb-release')
+            try:
+                lsb_data = {}
+                with open('/etc/lsb-release', 'r') as fp:
+                    for line in fp:
+                        if line.strip() and '=' in line:
+                            k, v = line.strip().split('=', 1)
+                            lsb_data[k] = v.strip('"\'')
+                
+                if 'DISTRIB_ID' in lsb_data:
+                    vm_dist = lsb_data['DISTRIB_ID'].lower()
+                if 'DISTRIB_RELEASE' in lsb_data:
+                    vm_ver = lsb_data['DISTRIB_RELEASE'].lower()
+                
+                hutil_log_info("OS detected from /etc/lsb-release: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/lsb-release: {0}".format(str(e)))
+        
+        # Debian specific detection
+        if not vm_dist and os.path.exists('/etc/debian_version'):
+            detection_files_checked.append('/etc/debian_version')
+            try:
+                with open('/etc/debian_version', 'r') as fp:
+                    vm_ver = fp.read().strip()
+                vm_dist = 'debian'
+                hutil_log_info("OS detected from /etc/debian_version: {0} {1}".format(vm_dist, vm_ver))
+            except Exception as e:
+                hutil_log_error("Error reading /etc/debian_version: {0}".format(str(e)))
+    
+    # Final fallback - try /proc/version
+    if not vm_dist and os.path.exists('/proc/version'):
+        detection_files_checked.append('/proc/version')
+        try:
+            with open('/proc/version', 'r') as fp:
+                content = fp.read().lower()
+                if 'debian' in content:
+                    vm_dist = 'debian'
+                elif 'ubuntu' in content:
+                    vm_dist = 'ubuntu'
+                elif 'red hat' in content or 'redhat' in content:
+                    vm_dist = 'redhat'
+                elif 'suse' in content:
+                    vm_dist = 'suse'
+                
+                # Try to extract version - not always reliable from /proc/version
+                hutil_log_info("OS detected from /proc/version: {0}".format(vm_dist))
+        except Exception as e:
+            hutil_log_error("Error reading /proc/version: {0}".format(str(e)))
+    
+    # If we still couldn't determine the OS, log what we tried and throw an error
     if not vm_dist:
-        vm_dist = ""
+        error_msg = 'Indeterminate operating system. Files checked: {0}'.format(", ".join(detection_files_checked))
+        log_and_exit(operation, IndeterminateOperatingSystem, error_msg)
+    
+    # Normalize distribution names
+    if vm_dist == 'rhel':
+        vm_dist = 'redhat'
+    elif vm_dist == 'ol':
+        vm_dist = 'oracle'
 
-    if not vm_ver:
-        vm_ver = ""
-
+    if vm_ver and '.' in vm_ver and vm_dist != 'ubuntu':
+        # For Ubuntu, keep major.minor format (e.g., "18.04")
+        # For other distributions, extract only the major version
+        # This is needed for matching with supported_distros.py
+        vm_ver = vm_ver.split('.')[0]
+    
+    # Add debugging info
+    hutil_log_info("Final OS detection result: {0} {1}".format(vm_dist.lower(), vm_ver.lower()))
+    
     return vm_dist.lower(), vm_ver.lower()
-
 
 def is_vm_supported_for_extension(operation):
     """
@@ -1871,40 +2295,11 @@ def is_vm_supported_for_extension(operation):
     The supported distros of the AzureMonitorLinuxAgent are allowed to utilize
     this VM extension. All other distros will get error code 51
     """
-    supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
-                       'rhel' : ['7', '8', '9'], # Rhel
-                       'centos' : ['7', '8'], # CentOS
-                       'red hat' : ['7', '8', '9'], # Oracle, RHEL
-                       'oracle' : ['7', '8', '9'], # Oracle
-                       'ol' : ['7', '8', '9'], # Oracle Linux
-                       'debian' : ['9', '10', '11', '12'], # Debian
-                       'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04'], # Ubuntu
-                       'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
-                       'cbl-mariner' : ['1'], # Mariner 1
-                       'mariner' : ['1', '2'], # Mariner
-                       'azurelinux' : ['3'], # Azure Linux / Mariner 3
-                       'rocky' : ['8', '9'], # Rocky
-                       'alma' : ['8', '9'], # Alma
-                       'opensuse' : ['15'], # openSUSE
-                       'amzn' : ['2', '2023'] # Amazon Linux 2
-    }
-
-    supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
-                       'ubuntu' : ['18.04', '20.04', '22.04', '24.04'], # Ubuntu
-                       'alma' : ['8'], # Alma
-                       'centos' : ['7'], # CentOS
-                       'mariner' : ['2'], # Mariner 2
-                       'azurelinux' : ['3'], # Azure Linux / Mariner 3
-                       'sles' : ['15'], # SLES
-                       'debian' : ['11'], # Debian
-                       'rocky linux' : ['8', '9'], # Rocky
-                       'rocky' : ['8', '9'] # Rocky
-    }
 
     if platform.machine() == 'aarch64':
-        supported_dists = supported_dists_aarch64
+        supported_dists = supported_distros.supported_dists_aarch64
     else:
-        supported_dists = supported_dists_x86_64
+        supported_dists = supported_distros.supported_dists_x86_64
 
     vm_supported = False
     vm_dist, vm_ver = find_vm_distro(operation)
@@ -1958,7 +2353,11 @@ def is_feature_enabled(feature):
     """
     Checks if the feature is enabled in the current region
     """
-    feature_support_matrix = {'useDynamicSSL' : ['all'] }
+    feature_support_matrix = {
+        'useDynamicSSL'             : ['all'],
+        'enableCMV2'                : ['all'],
+        'enableAzureOTelCollector'  : ['eastus2euap', 'northcentralus']
+    }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
     if os.path.exists(featurePreviewFlagPath):
@@ -2009,8 +2408,9 @@ def copy_kqlextension_binaries():
     if os.path.exists(kqlextension_runtimesbin):
         # only for versions of AMA with .NET runtimes
         rmtree(kqlextension_runtimesbin)
-        # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
-        for f in os.listdir(kqlextension_bin):
+    # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
+    for f in os.listdir(kqlextension_bin):
+        if f != 'KqlExtension' and f != 'appsettings.json':
             os.remove(os.path.join(kqlextension_bin, f))
 
     for f in os.listdir(kqlextension_bin_local_path):

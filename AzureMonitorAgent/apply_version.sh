@@ -15,6 +15,9 @@ sed -i "s/\"version\".*$/\"version\": \"$AGENT_VERSION\",/g" HandlerManifest.jso
 sed -i "s/^BundleFileNameDeb = .*$/BundleFileNameDeb = '$MDSD_DEB_PACKAGE_NAME'/" agent.py
 sed -i "s/^BundleFileNameRpm = .*$/BundleFileNameRpm = '$MDSD_RPM_PACKAGE_NAME'/" agent.py
 
+sed -i "s/AMA_VERSION/$AGENT_VERSION/" services/metrics-extension-otlp.service
+sed -i "s/AMA_VERSION/$AGENT_VERSION/" services/metrics-extension-cmv2.service
+
 # updating manifest.xml
 # check <Version>...</Version>
 sed -i -e "s|<Version>[0-9a-z.]\{1,\}</Version>|<Version>$AGENT_VERSION</Version>|g" manifest.xml
