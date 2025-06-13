@@ -170,7 +170,7 @@ class HostSnapshotter(object):
                             self.logger.log("PreSnapshotResponse: isOsDiskADEEncrypted: "+ self.isOsDiskADEEncrypted)
                             self.logger.log("PreSnapshotResponse: areDataDisksADEEncrypted: "+ self.areDataDisksADEEncrypted)
                             if(self.encryptionDetails != NULL):
-                                self.logger.log("PreSnapshotResponse: encryptionDetails: "+ len(self.encryptionDetails))
+                                self.logger.log("PreSnapshotResponse: encryptionDetails: "+ str(len(self.encryptionDetails)))
                             else:
                                 self.logger.log("PreSnapshotResponse: EncryptionDetails are null")
                         else:
