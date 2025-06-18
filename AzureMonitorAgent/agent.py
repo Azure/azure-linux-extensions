@@ -295,6 +295,20 @@ def compare_and_copy_bin(src, dest):
         
         os.chmod(dest, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
 
+def set_metrics_binaries():
+    current_arch = platform.machine()
+    # Rename the Arch appropriate metrics extension binary to MetricsExtension
+    MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
+    SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
+
+    if os.path.exists(SupportedMEPath):
+        os.rename(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
+
+    # Cleanup unused ME binaries
+    for f in os.listdir(MetricsExtensionDir):
+        if f != 'MetricsExtension':
+            os.remove(os.path.join(MetricsExtensionDir, f))
+
 def copy_amacoreagent_binaries():
     current_arch = platform.machine()
     amacoreagent_bin_local_path = os.getcwd() + "/amaCoreAgentBin/amacoreagent_" + current_arch
@@ -489,6 +503,8 @@ def install():
 
     # Copy the AMACoreAgent and agentlauncher binaries
     copy_amacoreagent_binaries()
+
+    set_metrics_binaries()
 
     # Copy KqlExtension binaries
     # Needs to be revisited for aarch64
@@ -2052,22 +2068,6 @@ def set_os_arch(operation):
 
         # Replace the AMA package name according to architecture
         BundleFileName = BundleFileName.replace('x86_64', current_arch)
-        
-        # Rename the Arch appropriate metrics extension binary to MetricsExtension
-        MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
-        SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
-
-        vm_dist, vm_ver = find_vm_distro(operation)
-        if current_arch == 'aarch64' and vm_dist.startswith('centos') and vm_ver.startswith('7'): 
-            SupportedMEPath += '_centos7' 
- 
-        if os.path.exists(SupportedMEPath):
-            os.rename(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
-
-        # Cleanup unused ME binaries
-        for f in os.listdir(MetricsExtensionDir):
-            if f != 'MetricsExtension':
-                os.remove(os.path.join(MetricsExtensionDir, f))
     
 
 def find_package_manager(operation):
