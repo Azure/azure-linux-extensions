@@ -66,14 +66,16 @@ cp tmp/opt/microsoft/azuremonitoragent/bin/mdsdmgr mdsdBin/mdsdmgr_aarch64
 cp tmp/opt/microsoft/azuremonitoragent/bin/fluent-bit fluentBitBin/fluent-bit_aarch64
 rm -rf tmp/
 
-cp $input_path/MetricsExtension* MetricsExtensionBin/
+cp $input_path/x86_64/MetricsExtension MetricsExtensionBin/MetricsExtension_x86_64
+cp $input_path/aarch64/MetricsExtension MetricsExtensionBin/MetricsExtension_aarch64
+
 cp $input_path/azureotelcollector/* azureotelcollector/
-cp $input_path/x86_64/amacoreagent amaCoreAgentBin/amacoreagent_x86_64
 cp -r $input_path/KqlExtension/* KqlExtensionBin/
+
+cp $input_path/x86_64/amacoreagent amaCoreAgentBin/amacoreagent_x86_64
 cp $input_path/x86_64/liblz4x64.so amaCoreAgentBin/
 cp $input_path/x86_64/libgrpc_csharp_ext.x64.so amaCoreAgentBin/
 cp $input_path/x86_64/agentlauncher agentLauncherBin/agentlauncher_x86_64
-
 
 cp $input_path/aarch64/amacoreagent amaCoreAgentBin/amacoreagent_aarch64
 cp $input_path/aarch64/libgrpc_csharp_ext.arm64.so amaCoreAgentBin/
