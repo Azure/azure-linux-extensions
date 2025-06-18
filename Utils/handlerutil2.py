@@ -325,17 +325,18 @@ class HandlerUtility:
             "version": self._context._version,
             "timestampUTC": tstamp,
             "status": {
-                "name": self._context._name,
-                "operation": operation,
-                "status": status,
-                "code": status_code,
-                "formattedMessage": {
-                    "lang": "en-US",
-                    "message": message
-                }
-            } , 
-            "substatus": substatus
+            "name": self._context._name,
+            "operation": operation,
+            "status": status,
+            "code": status_code,
+            "formattedMessage": {
+                "lang": "en-US",
+                "message": message
+            }
+            }
         }]
+        if substatus is not None:
+            stat[0]["substatus"] = substatus
         stat_rept = json.dumps(stat)
         if self._context._status_file:
             tmp = "%s.tmp" % (self._context._status_file)

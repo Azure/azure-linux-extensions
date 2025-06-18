@@ -176,7 +176,7 @@ def enable():
 
         if output is not None:
                 errorstatus,errormsg = output[0], output[1]
-                raise Exception(errormsg)
+                hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(errormsg),errorstatus.value)
         
         if _is_sshd_config_modified(protect_settings):
             MyDistro.restart_ssh_service()
@@ -262,7 +262,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     # user name must be provided if set ssh key or password
     if not protect_settings or 'username' not in protect_settings:
-        return
+        return None
 
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
