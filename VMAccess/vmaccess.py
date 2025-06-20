@@ -168,14 +168,14 @@ def enable():
 
         if remove_user:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="remove-user")
-            errorstatus,errormsg = _remove_user_account(remove_user, hutil)
+            errorstatus, errormsg = _remove_user_account(remove_user, hutil)
             if errorstatus is not None:
                 raise Exception(errormsg)
 
         output = _set_user_account_pub_key(protect_settings, hutil)
 
         if output is not None:
-                errorstatus,errormsg = output[0], output[1]
+                errorstatus, errormsg = output[0], output[1]
                 hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(errormsg),errorstatus.value)
         
         if _is_sshd_config_modified(protect_settings):
@@ -595,7 +595,7 @@ def _fsck_check(hutil):
     if retcode > 0:
         hutil.log(str(retcode))
         hutil.error("Failed to run disk check with error: {0}, {1}".format(
-        str("Disk check was not successful"), traceback.format_exc()))
+        "Disk check was not successful", traceback.format_exc()))
         return error_code.ErrorCode.CHECK_DISK_ERROR
     else:
         hutil.log("Successfully checked disk")

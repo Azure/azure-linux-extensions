@@ -68,6 +68,7 @@ from os.path import join
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 MANIFEST_XML = "manifest.xml"
+_error_clarification_name = "ErrorClarification"
 
 
 class HandlerContext:
@@ -83,7 +84,6 @@ class HandlerContext:
         self._status_file = None
         self._settings_file = None
         self._config = None
-        self._error_clarification_name = "ErrorClarification"
         return
 
 
@@ -325,14 +325,14 @@ class HandlerUtility:
             "version": self._context._version,
             "timestampUTC": tstamp,
             "status": {
-            "name": self._context._name,
-            "operation": operation,
-            "status": status,
-            "code": status_code,
-            "formattedMessage": {
-                "lang": "en-US",
-                "message": message
-            }
+                "name": self._context._name,
+                "operation": operation,
+                "status": status,
+                "code": status_code,
+                "formattedMessage": {
+                    "lang": "en-US",
+                    "message": message
+                }
             }
         }]
         if substatus is not None:
@@ -355,7 +355,7 @@ class HandlerUtility:
             substatus = None
             if error_code is not None:
                 substatus = [{
-                    "Name": self._context._error_clarification_name,
+                    "Name": _error_clarification_name,
                     "Code": error_code
                 }]
             self.do_status_report(operation, status, code, message,error_code, substatus)
