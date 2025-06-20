@@ -176,7 +176,7 @@ def enable():
 
         if output is not None:
                 errorstatus, errormsg = output[0], output[1]
-                hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(errormsg),errorstatus.value)
+                hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(errormsg), errorstatus.value)
         
         if _is_sshd_config_modified(protect_settings):
             MyDistro.restart_ssh_service()
