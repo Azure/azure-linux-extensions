@@ -67,6 +67,7 @@ class CommonVariables:
     isVmgsBlobIncluded = 'isVmgsBlobIncluded'
     isAnyWADiskIncluded = 'isAnyWADiskIncluded'
     isAnyDirectDriveDiskIncluded = 'isAnyDirectDriveDiskIncluded'
+    instantAccessDurationMinutes = 'instantAccessDurationMinutes'
 
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'
