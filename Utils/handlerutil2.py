@@ -68,7 +68,7 @@ from os.path import join
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 MANIFEST_XML = "manifest.xml"
-_error_clarification_name = "ErrorClarification"
+from VMAccess.vmaccess import ErrorClarificationName
 
 
 class HandlerContext:
@@ -355,7 +355,7 @@ class HandlerUtility:
             substatus = None
             if error_code is not None:
                 substatus = [{
-                    "Name": _error_clarification_name,
+                    "Name": ErrorClarificationName,
                     "Code": error_code
                 }]
             self.do_status_report(operation, status, code, message,error_code, substatus)

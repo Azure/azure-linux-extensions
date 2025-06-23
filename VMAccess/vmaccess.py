@@ -40,6 +40,7 @@ BeginSSHTag = '---- BEGIN SSH2 PUBLIC KEY ----'
 OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
 SshdConfigBackupPath = '/var/cache/vmaccess/backup'
+ErrorClarificationName = "ErrorClarification"
 
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
@@ -594,8 +595,7 @@ def _fsck_check(hutil):
     retcode = ext_utils.run(['fsck', '-As', '-y'])
     if retcode > 0:
         hutil.log(str(retcode))
-        hutil.error("Failed to run disk check with error: {0}, {1}".format(
-        "Disk check was not successful", traceback.format_exc()))
+        hutil.error("Failed to run disk check with error: {0}, {1}".format("Disk check was not successful", traceback.format_exc()))
         return error_code.ErrorCode.CHECK_DISK_ERROR
     else:
         hutil.log("Successfully checked disk")
