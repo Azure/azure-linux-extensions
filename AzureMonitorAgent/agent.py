@@ -299,7 +299,7 @@ def set_metrics_binaries():
     current_arch = platform.machine()
     # Rename the Arch appropriate metrics extension binary to MetricsExtension
     MetricsExtensionDir = os.path.join(os.getcwd(), 'MetricsExtensionBin')
-    SupportedMEPath = os.path.join(MetricsExtensionDir, 'MetricsExtension_'+current_arch)
+    SupportedMEPath = os.path.join(MetricsExtensionDir, 'metricsextension_'+current_arch)
 
     if os.path.exists(SupportedMEPath):
         os.rename(SupportedMEPath, os.path.join(MetricsExtensionDir, 'MetricsExtension'))
