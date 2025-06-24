@@ -66,8 +66,8 @@ cp tmp/opt/microsoft/azuremonitoragent/bin/mdsdmgr mdsdBin/mdsdmgr_aarch64
 cp tmp/opt/microsoft/azuremonitoragent/bin/fluent-bit fluentBitBin/fluent-bit_aarch64
 rm -rf tmp/
 
-cp $input_path/x86_64/MetricsExtension MetricsExtensionBin/MetricsExtension_x86_64
-cp $input_path/aarch64/MetricsExtension MetricsExtensionBin/MetricsExtension_aarch64
+cp $input_path/x86_64/metricsextension MetricsExtensionBin/metricsextension_x86_64
+cp $input_path/aarch64/metricsextension MetricsExtensionBin/metricsextension_aarch64
 
 cp $input_path/azureotelcollector/* azureotelcollector/
 cp -r $input_path/KqlExtension/* KqlExtensionBin/
