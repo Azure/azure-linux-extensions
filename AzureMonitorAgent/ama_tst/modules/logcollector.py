@@ -81,50 +81,74 @@ def copy_dircontents(src, dst):
 
 # Log collecting functions
 
-def collect_process_environ(output_dirpath, process_name):
-    """Collect environment variables for a specific process and save to a file"""
-    process_dir = os.path.join(output_dirpath, process_name)
-    if not os.path.isdir(process_dir):
-        os.makedirs(process_dir)
+def collect_process_environ(output_dirpath, process_name, outfile_handle=None):
+    """
+    Collect environment variables for a specific process.
+    If outfile_handle is provided, writes to that file handle (for main log).
+    If outfile_handle is None, creates a separate file in the process directory.
+    """
     
-    environ_file_path = os.path.join(process_dir, "{0}_environ.txt".format(process_name))
-    
-    try:
-        with open(environ_file_path, 'w') as environ_file:
-            environ_file.write("{0} Environment Variables Collection\n".format(process_name.upper()))
-            environ_file.write("=====================================\n")
-            environ_file.write("Collected on: {0}\n\n".format(datetime.datetime.utcnow().isoformat()))
-            
-            # Get all process PIDs
-            process_pids_output = helpers.run_cmd_output("pidof {0}".format(process_name))
-            if process_pids_output.strip():
-                process_pids = process_pids_output.strip().split()
-                for pid in process_pids:
-                    environ_file.write("PID: {0}\n".format(pid))
-                    environ_path = "/proc/{0}/environ".format(pid)
-                    if os.path.isfile(environ_path):
-                        try:
-                            with open(environ_path, 'rb') as proc_environ_file:
-                                environ_data = proc_environ_file.read()
-                                # Convert null-separated variables to readable format
-                                # Use try/except for Python 2/3 compatibility with decode errors parameter
-                                try:
-                                    environ_vars = environ_data.decode('utf-8', errors='replace').replace('\x00', '')
-                                except TypeError:
-                                    # Python 2.6 doesn't support errors parameter
-                                    environ_vars = environ_data.decode('utf-8').replace('\x00', '')
-                                environ_file.write("{0}\n".format(environ_vars))
-                        except Exception as e:
-                            environ_file.write("Error reading environment variables for PID {0}: {1}\n".format(pid, e))
-                    else:
-                        environ_file.write("Environment file not found for PID {0}\n".format(pid))
-                    environ_file.write("=====================================\n")
-            else:
-                environ_file.write("No {0} processes found\n".format(process_name))
+    if outfile_handle is None:
+        # Create separate file mode
+        process_dir = os.path.join(output_dirpath, process_name)
+        if not os.path.isdir(process_dir):
+            os.makedirs(process_dir)
         
-        print("{0} environment variables saved to {1}".format(process_name.upper(), environ_file_path))
-    except Exception as e:
-        print("ERROR: Could not create {0} environment variables file: {1}".format(process_name, e))
+        environ_file_path = os.path.join(process_dir, "{0}_environ.txt".format(process_name))
+        
+        try:
+            with open(environ_file_path, 'w') as environ_file:
+                _write_process_environ_data(environ_file, process_name, separate_file=True)
+            print("{0} environment variables saved to {1}".format(process_name.upper(), environ_file_path))
+        except Exception as e:
+            print("ERROR: Could not create {0} environment variables file: {1}".format(process_name, e))
+    else:
+        # Write to existing file handle mode (for main log)
+        _write_process_environ_data(outfile_handle, process_name, separate_file=False)
+
+
+def _write_process_environ_data(file_handle, process_name, separate_file=True):
+    """Helper function to write process environment data to a file handle"""
+    if separate_file:
+        # Format for separate file
+        file_handle.write("{0} Environment Variables Collection\n".format(process_name.upper()))
+        file_handle.write("=====================================\n")
+        file_handle.write("Collected on: {0}\n\n".format(datetime.datetime.utcnow().isoformat()))
+    else:
+        # Format for main log file
+        file_handle.write("{0} Environment Variables:\n".format(process_name.upper()))
+        file_handle.write("========================================\n")
+    
+    # Get all process PIDs
+    process_pids_output = helpers.run_cmd_output("pidof {0}".format(process_name))
+    if process_pids_output.strip():
+        process_pids = process_pids_output.strip().split()
+        for pid in process_pids:
+            file_handle.write("PID: {0}\n".format(pid))
+            environ_path = "/proc/{0}/environ".format(pid)
+            if os.path.isfile(environ_path):
+                try:
+                    with open(environ_path, 'rb') as proc_environ_file:
+                        environ_data = proc_environ_file.read()
+                        # Convert null-separated variables to readable format
+                        # Use try/except for Python 2/3 compatibility with decode errors parameter
+                        try:
+                            environ_vars = environ_data.decode('utf-8', errors='replace').replace('\x00', '')
+                        except TypeError:
+                            # Python 2.6 doesn't support errors parameter
+                            environ_vars = environ_data.decode('utf-8').replace('\x00', '')
+                        file_handle.write("{0}\n".format(environ_vars))
+                except Exception as e:
+                    file_handle.write("Error reading environment variables for PID {0}: {1}\n".format(pid, e))
+            else:
+                file_handle.write("Environment file not found for PID {0}\n".format(pid))
+            file_handle.write("=====================================\n")
+    else:
+        file_handle.write("No {0} processes found\n".format(process_name))
+    
+    if not separate_file:
+        # Add separator for main log file
+        file_handle.write("--------------------------------------------------------------------------------\n")
 
 def collect_logs(output_dirpath, pkg_manager):
     # collect MDSD information
@@ -199,39 +223,6 @@ def collect_azurevm_logs(output_dirpath, pkg_manager):
 
 
 
-# Helper function to write process environment variables to the main output file
-def write_process_environ_to_outfile(outfile, process_name):
-    outfile.write("{0} Environment Variables:\n".format(process_name.upper()))
-    outfile.write("========================================\n")
-    # Get all process PIDs
-    process_pids_output = helpers.run_cmd_output("pidof {0}".format(process_name))
-    if process_pids_output.strip():
-        process_pids = process_pids_output.strip().split()
-        for pid in process_pids:
-            outfile.write("PID: {0}\n".format(pid))
-            environ_path = "/proc/{0}/environ".format(pid)
-            if os.path.isfile(environ_path):
-                try:
-                    with open(environ_path, 'rb') as environ_file:
-                        environ_data = environ_file.read()
-                        # Convert null-separated variables to readable format
-                        # Use try/except for Python 2/3 compatibility with decode errors parameter
-                        try:
-                            environ_vars = environ_data.decode('utf-8', errors='replace').replace('\x00', '')
-                        except TypeError:
-                            # Python 2.6 doesn't support errors parameter
-                            environ_vars = environ_data.decode('utf-8').replace('\x00', '')
-                        outfile.write("{0}\n".format(environ_vars))
-                except Exception as e:
-                    outfile.write("Error reading environment variables for PID {0}: {1}\n".format(pid, e))
-            else:
-                outfile.write("Environment file not found for PID {0}\n".format(pid))
-            outfile.write("=====================================\n")
-    else:
-        outfile.write("No {0} processes found\n".format(process_name))
-    outfile.write("--------------------------------------------------------------------------------\n")
-
-
 # Outfile function
     
 def create_outfile(output_dirpath, logs_date, pkg_manager):
@@ -286,7 +277,7 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
         outfile.write("--------------------------------------------------------------------------------\n")
         outfile.write("--------------------------------------------------------------------------------\n")
 
-
+ 
         # AMA install status
         (ama_vers, _) = helpers.find_ama_version()
         (ama_installed, ama_unique) = helpers.check_ama_installed(ama_vers)
@@ -327,8 +318,8 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write("--------------------------------------------------------------------------------\n")
         
         # process environment variables output
-        write_process_environ_to_outfile(outfile, "mdsd")
-        write_process_environ_to_outfile(outfile, "amacoreagent")
+        collect_process_environ(output_dirpath, "mdsd", outfile)
+        collect_process_environ(output_dirpath, "amacoreagent", outfile)
 
         # rsyslog / syslog-ng status via systemctl
         for syslogd in ["rsyslog", "syslog-ng"]:
