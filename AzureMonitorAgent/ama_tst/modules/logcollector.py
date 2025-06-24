@@ -81,25 +81,25 @@ def copy_dircontents(src, dst):
 
 # Log collecting functions
 
-def collect_mdsd_environ(output_dirpath):
-    """Collect mdsd environment variables and save to a file"""
-    mdsd_dir = os.path.join(output_dirpath, "mdsd")
-    if not os.path.isdir(mdsd_dir):
-        os.makedirs(mdsd_dir)
+def collect_process_environ(output_dirpath, process_name):
+    """Collect environment variables for a specific process and save to a file"""
+    process_dir = os.path.join(output_dirpath, process_name)
+    if not os.path.isdir(process_dir):
+        os.makedirs(process_dir)
     
-    environ_file_path = os.path.join(mdsd_dir, "mdsd_environ.txt")
+    environ_file_path = os.path.join(process_dir, "{0}_environ.txt".format(process_name))
     
     try:
         with open(environ_file_path, 'w') as environ_file:
-            environ_file.write("MDSD Environment Variables Collection\n")
+            environ_file.write("{0} Environment Variables Collection\n".format(process_name.upper()))
             environ_file.write("=====================================\n")
             environ_file.write("Collected on: {0}\n\n".format(datetime.datetime.utcnow().isoformat()))
             
-            # Get all mdsd PIDs
-            mdsd_pids_output = helpers.run_cmd_output("pidof mdsd")
-            if mdsd_pids_output.strip():
-                mdsd_pids = mdsd_pids_output.strip().split()
-                for pid in mdsd_pids:
+            # Get all process PIDs
+            process_pids_output = helpers.run_cmd_output("pidof {0}".format(process_name))
+            if process_pids_output.strip():
+                process_pids = process_pids_output.strip().split()
+                for pid in process_pids:
                     environ_file.write("PID: {0}\n".format(pid))
                     environ_path = "/proc/{0}/environ".format(pid)
                     if os.path.isfile(environ_path):
@@ -120,11 +120,11 @@ def collect_mdsd_environ(output_dirpath):
                         environ_file.write("Environment file not found for PID {0}\n".format(pid))
                     environ_file.write("=====================================\n")
             else:
-                environ_file.write("No mdsd processes found\n")
+                environ_file.write("No {0} processes found\n".format(process_name))
         
-        print("MDSD environment variables saved to {0}".format(environ_file_path))
+        print("{0} environment variables saved to {1}".format(process_name.upper(), environ_file_path))
     except Exception as e:
-        print("ERROR: Could not create mdsd environment variables file: {0}".format(e))
+        print("ERROR: Could not create {0} environment variables file: {1}".format(process_name, e))
 
 def collect_logs(output_dirpath, pkg_manager):
     # collect MDSD information
@@ -132,7 +132,9 @@ def collect_logs(output_dirpath, pkg_manager):
     copy_file("/var/opt/microsoft/azuremonitoragent/events/taskstate.json", os.path.join(output_dirpath,"mdsd"))
     copy_dircontents("/var/opt/microsoft/azuremonitoragent/log", os.path.join(output_dirpath,"mdsd","logs"))
     # collect MDSD environment variables
-    collect_mdsd_environ(output_dirpath)
+    collect_process_environ(output_dirpath, "mdsd")
+    # collect AMA Core Agent environment variables
+    collect_process_environ(output_dirpath, "amacoreagent")
     # collect AMA DCR
     copy_dircontents("/etc/opt/microsoft/azuremonitoragent", os.path.join(output_dirpath,"DCR"))
 
@@ -195,6 +197,39 @@ def collect_azurevm_logs(output_dirpath, pkg_manager):
     print("Azure VM logs collected")
     return
 
+
+
+# Helper function to write process environment variables to the main output file
+def write_process_environ_to_outfile(outfile, process_name):
+    outfile.write("{0} Environment Variables:\n".format(process_name.upper()))
+    outfile.write("========================================\n")
+    # Get all process PIDs
+    process_pids_output = helpers.run_cmd_output("pidof {0}".format(process_name))
+    if process_pids_output.strip():
+        process_pids = process_pids_output.strip().split()
+        for pid in process_pids:
+            outfile.write("PID: {0}\n".format(pid))
+            environ_path = "/proc/{0}/environ".format(pid)
+            if os.path.isfile(environ_path):
+                try:
+                    with open(environ_path, 'rb') as environ_file:
+                        environ_data = environ_file.read()
+                        # Convert null-separated variables to readable format
+                        # Use try/except for Python 2/3 compatibility with decode errors parameter
+                        try:
+                            environ_vars = environ_data.decode('utf-8', errors='replace').replace('\x00', '')
+                        except TypeError:
+                            # Python 2.6 doesn't support errors parameter
+                            environ_vars = environ_data.decode('utf-8').replace('\x00', '')
+                        outfile.write("{0}\n".format(environ_vars))
+                except Exception as e:
+                    outfile.write("Error reading environment variables for PID {0}: {1}\n".format(pid, e))
+            else:
+                outfile.write("Environment file not found for PID {0}\n".format(pid))
+            outfile.write("=====================================\n")
+    else:
+        outfile.write("No {0} processes found\n".format(process_name))
+    outfile.write("--------------------------------------------------------------------------------\n")
 
 
 # Outfile function
@@ -291,36 +326,9 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
             outfile.write(helpers.run_cmd_output(ps_process_cmd))
             outfile.write("--------------------------------------------------------------------------------\n")
         
-        # mdsd environment variables output
-        outfile.write("MDSD Environment Variables:\n")
-        outfile.write("========================================\n")
-        # Get all mdsd PIDs
-        mdsd_pids_output = helpers.run_cmd_output("pidof mdsd")
-        if mdsd_pids_output.strip():
-            mdsd_pids = mdsd_pids_output.strip().split()
-            for pid in mdsd_pids:
-                outfile.write("PID: {0}\n".format(pid))
-                environ_path = "/proc/{0}/environ".format(pid)
-                if os.path.isfile(environ_path):
-                    try:
-                        with open(environ_path, 'rb') as environ_file:
-                            environ_data = environ_file.read()
-                            # Convert null-separated variables to readable format
-                            # Use try/except for Python 2/3 compatibility with decode errors parameter
-                            try:
-                                environ_vars = environ_data.decode('utf-8', errors='replace').replace('\x00', '')
-                            except TypeError:
-                                # Python 2.6 doesn't support errors parameter
-                                environ_vars = environ_data.decode('utf-8').replace('\x00', '')
-                            outfile.write("{0}\n".format(environ_vars))
-                    except Exception as e:
-                        outfile.write("Error reading environment variables for PID {0}: {1}\n".format(pid, e))
-                else:
-                    outfile.write("Environment file not found for PID {0}\n".format(pid))
-                outfile.write("=====================================\n")
-        else:
-            outfile.write("No mdsd processes found\n")
-        outfile.write("--------------------------------------------------------------------------------\n")
+        # process environment variables output
+        write_process_environ_to_outfile(outfile, "mdsd")
+        write_process_environ_to_outfile(outfile, "amacoreagent")
 
         # rsyslog / syslog-ng status via systemctl
         for syslogd in ["rsyslog", "syslog-ng"]:

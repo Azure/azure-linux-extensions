@@ -74,4 +74,4 @@ The AMA Linux Troubleshooter requires Python 2.6+ installed on the machine, but 
 	* Run through scenarios 1-6 in order
 8. (L) Collect logs
 	* Collects all of the logs needed to troubleshoot AMA in a zip file
-	* Includes MDSD process environment variables
+	* Includes process environment variables
