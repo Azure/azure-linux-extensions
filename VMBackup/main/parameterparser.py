@@ -32,9 +32,11 @@ class ParameterParser(object):
         self.private_config_obj = None
         self.blobs = None
         self.customSettings = None
+        self.isVMADEEnabled = False
         self.snapshotTaskToken = ''
         self.includedDisks = None
         self.dynamicConfigsFromCRP = None
+        self.disk_encryption_details = []
         self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False,
                                       CommonVariables.useMccfForLad: False, CommonVariables.enableSnapshotExtensionPolling: False, CommonVariables.isVmmdBlobIncluded : False}
         settingKeysMapping= {}
@@ -109,7 +111,10 @@ class ParameterParser(object):
                     
                     backup_logger.log("LUN list - " + str(self.includeLunList), True)
                 if(CommonVariables.isVmmdBlobIncluded in self.includedDisks.keys() and self.includedDisks[CommonVariables.isVmmdBlobIncluded] == True):
-                    self.wellKnownSettingFlags[CommonVariables.isVmmdBlobIncluded] = True              
+                    self.wellKnownSettingFlags[CommonVariables.isVmmdBlobIncluded] = True   
+                    
+                if(CommonVariables.isVMADEEnabled in self.includedDisks.keys() and self.includedDisks[CommonVariables.isVMADEEnabled] == True):
+                    self.isVMADEEnabled = True
                     
         except Exception as e:
             errorMsg = "Exception occurred while populating includeLunList, Exception: %s" % (str(e))
