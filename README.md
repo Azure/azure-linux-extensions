@@ -8,7 +8,7 @@ You can read the document [about virtual machine extensions and features](https:
 
 # Extension List
 
-| Name | Lastest Version | Description |
+| Name | Latest Version | Description |
 |:---|:---|:---|
 | [Custom Script](./CustomScript) | 1.5 | Allow the owner of the Azure Virtual Machines to run customized scripts in the VM |
 | [DSC](./DSC) | 2.71 | Allow the owner of the Azure Virtual Machines to configure the VM using Windows PowerShell Desired State Configuration (DSC) for Linux |
