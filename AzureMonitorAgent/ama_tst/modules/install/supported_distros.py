@@ -22,7 +22,7 @@ supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
                     'mariner' : ['2'], # Mariner 2
                     'azurelinux' : ['3'], # Azure Linux / Mariner 3
                     'sles' : ['15'], # SLES
-                    'debian' : ['11'], # Debian
+                    'debian' : ['11', '12'], # Debian
                     'rocky linux' : ['8', '9'], # Rocky
                     'rocky' : ['8', '9'] # Rocky
 }
