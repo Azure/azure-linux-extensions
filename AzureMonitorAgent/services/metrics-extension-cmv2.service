@@ -10,6 +10,8 @@ RestartForceExitStatus=SIGPIPE
 KillMode=control-group
 User=azuremetricsext
 Group=azuremonitoragent
+RuntimeDirectory=azureotelcollector azuremetricsext
+RuntimeDirectoryMode=0755
 
 [Install]
 WantedBy=multi-user.target
