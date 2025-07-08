@@ -156,7 +156,7 @@ class GuestSnapshotter(object):
                     headers[disk_encryption_metadata[0]] = disk_encryption_metadata[1]
                 if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
                     self.logger.log("Not passing the TTL header via Guest path though it is enabled")
-                self.logger.log(str(headers))
+                #self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")

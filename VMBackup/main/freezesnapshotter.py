@@ -58,6 +58,7 @@ class FreezeSnapshotter(object):
         self.isManaged = False
         self.taskId = self.para_parser.taskId
         self.hostIp = '168.63.129.16'
+        self.additional_headers = []
         self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.success
         self.takeCrashConsistentSnapshot = takeCrashConsistentSnapshot
         self.logger.log('FreezeSnapshotter : takeCrashConsistentSnapshot = ' + str(self.takeCrashConsistentSnapshot))
@@ -106,6 +107,10 @@ class FreezeSnapshotter(object):
                             break
             else:
                 self.logger.log('CustomSettings is null in extension input.')
+                snapshotMethodConfigValue = self.hutil.get_strvalue_from_configfile(CommonVariables.SnapshotMethod,CommonVariables.firstHostThenGuest)
+                self.logger.log('snapshotMethodConfigValue : ' + str(snapshotMethodConfigValue))
+                if snapshotMethodConfigValue != None and snapshotMethodConfigValue != '':
+                    self.takeSnapshotFrom = snapshotMethodConfigValue
         except Exception as e:
             errMsg = 'Failed to serialize customSettings with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
@@ -520,8 +525,6 @@ class FreezeSnapshotter(object):
             return delta.total_seconds()
 
     def fetchDiskBlobMetadata(self):
-        self.logger.log("****")
-        additional_headers = []
         headers = self.generate_headers()
         http_util = HttpUtil(self.logger)
         for blob in self.para_parser.blobs:
@@ -534,13 +537,9 @@ class FreezeSnapshotter(object):
                 for k,v in resp_headers:
                     if key == k:
                         value = str(v)
-                        #self.additional_headers.append((key,str(v)))
+                        self.additional_headers.append((key,value))
                         break  # Stop once found
-                additional_headers.append((key,value))
-                self.logger.log(str(additional_headers))
-        self.para_parser.disk_encryption_details = additional_headers
-        self.logger.log("para parser disk encryption details")
-        self.logger.log(str(self.para_parser.disk_encryption_details))
+        self.para_parser.disk_encryption_details = self.additional_headers
 
     def generate_headers(self):
         """Generates headers for the request using SAS token, x-ms-date, and x-ms-version."""

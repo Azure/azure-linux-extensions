@@ -16,7 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from asyncio.windows_events import NULL
 import os
 try:
     import urlparse as urlparser
@@ -80,10 +79,13 @@ class HostSnapshotter(object):
                         temp_dict[CommonVariables.key] = flag
                         temp_dict[CommonVariables.value] = paras.wellKnownSettingFlags[flag]
                         settings.append(temp_dict)
+                '''
+                HostBased changes, hence commenting out
                 if(paras.isVMADEEnabled == True):
                     settings.append({CommonVariables.key:CommonVariables.isOsDiskADEEncrypted, CommonVariables.value:self.isOsDiskADEEncrypted})
                     settings.append({CommonVariables.key:CommonVariables.areDataDisksADEEncrypted, CommonVariables.value:self.areDataDisksADEEncrypted})
                     meta_data.append({CommonVariables.key:CommonVariables.encryptionDetails, CommonVariables.value:self.encryptionDetails})
+                '''
 
                 hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, settings, paras.snapshotTaskToken, meta_data)
                 body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
@@ -164,12 +166,12 @@ class HostSnapshotter(object):
                     elif(responseBody != None):
                         if (paras.isVMADEEnabled == True):
                             response = json.loads(responseBody)
-                            self.isOsDiskADEEncrypted = response[CommonVariables.isOsDiskADEEncrypted]
-                            self.areDataDisksADEEncrypted = response[CommonVariables.areDataDisksADEEncrypted]
-                            self.encryptionDetails = response[CommonVariables.encryptionDetails]
-                            self.logger.log("PreSnapshotResponse: isOsDiskADEEncrypted: "+ self.isOsDiskADEEncrypted)
-                            self.logger.log("PreSnapshotResponse: areDataDisksADEEncrypted: "+ self.areDataDisksADEEncrypted)
-                            if(self.encryptionDetails != NULL):
+                            self.isOsDiskADEEncrypted = response.get(CommonVariables.isOsDiskADEEncrypted)
+                            self.areDataDisksADEEncrypted = response.get(CommonVariables.areDataDisksADEEncrypted)
+                            self.encryptionDetails = response.get(CommonVariables.encryptionDetails)
+                            self.logger.log("PreSnapshotResponse: isOsDiskADEEncrypted: "+ str(self.isOsDiskADEEncrypted))
+                            self.logger.log("PreSnapshotResponse: areDataDisksADEEncrypted: "+ str(self.areDataDisksADEEncrypted))
+                            if self.encryptionDetails is not None:
                                 self.logger.log("PreSnapshotResponse: encryptionDetails: "+ str(len(self.encryptionDetails)))
                             else:
                                 self.logger.log("PreSnapshotResponse: EncryptionDetails are null")
