@@ -77,27 +77,66 @@ def get_latest_ama_version(curr_version):
             r = r.decode('utf-8')
         # Python 2: urllib2.urlopen().read() returns str, which works fine with regex
             
-        # Find the first data row in tbody and extract the 4th column (Linux column)
-        # This matches the first <tr> after <tbody> and captures the 4th <td> content
-        tbody_row_pattern = r'<tbody>.*?<tr[^>]*>.*?<td[^>]*>.*?</td>.*?<td[^>]*>.*?</td>.*?<td[^>]*>.*?</td>.*?<td[^>]*>(.*?)</td>'
-        match = re.search(tbody_row_pattern, r, re.DOTALL)
+        # Find all table rows in tbody and extract all 4th columns (Linux columns)
+        # This approach is more robust and handles missing values and multiple rows
+        tbody_pattern = r'<tbody>(.*?)</tbody>'
+        tbody_match = re.search(tbody_pattern, r, re.DOTALL)
         
-        if not match:
-            return None, "Could not find version table or Linux column in Microsoft documentation"
+        if not tbody_match:
+            return None, "Could not find version table in Microsoft documentation"
         
-        # Extract the Linux version cell content (4th column)
-        linux_cell = match.group(1)
+        tbody_content = tbody_match.group(1)
         
-        # Remove HTML tags and extract version number
-        clean_content = re.sub(r'<[^>]+>', '', linux_cell).strip()
+        # Find all table rows
+        row_pattern = r'<tr[^>]*>(.*?)</tr>'
+        rows = re.findall(row_pattern, tbody_content, re.DOTALL)
         
-        # Find version number pattern (e.g., 1.35.8)
-        version_match = re.search(r'\b(\d+\.\d+\.\d+(?:\.\d+)?)\b', clean_content)
+        latest_version = None
         
-        if not version_match:
-            return None, "No version number found in Linux column: {0}".format(clean_content[:50])
+        # Process each row to find the latest version
+        # Since rows are in chronological order (newest first), we want the first non-empty row
+        for row in rows:
+            # Extract all cells from this row
+            cell_pattern = r'<td[^>]*>(.*?)</td>'
+            cells = re.findall(cell_pattern, row, re.DOTALL)
+            
+            # Check if we have at least 4 columns and the 4th column (Linux) is not empty
+            if len(cells) >= 4:
+                linux_cell = cells[3]  # 4th column (index 3)
+                
+                # Remove HTML tags and normalize whitespace
+                # First replace <br> tags with spaces to avoid concatenation
+                clean_content = re.sub(r'<br[^>]*>', ' ', linux_cell)
+                # Remove all other HTML tags (including superscript)
+                clean_content = re.sub(r'<[^>]+>', '', clean_content)
+                # Normalize whitespace
+                clean_content = re.sub(r'\s+', ' ', clean_content).strip()
+                
+                # Skip empty cells
+                if not clean_content or clean_content.lower() in ['', 'none', 'n/a']:
+                    continue  # Go to next row
+                
+                # Handle version ranges like "1.26.2-1.26.5"
+                # Replace hyphens between versions with commas for easier parsing
+                clean_content = re.sub(r'(\d+\.\d+\.\d+(?:\.\d+)?)\s*-\s*(\d+\.\d+\.\d+(?:\.\d+)?)', r'\1, \2', clean_content)
+                
+                # Find all version numbers in this cell (handles multiple versions)
+                # More flexible regex that handles superscript and other text
+                version_matches = re.findall(r'(\d+\.\d+\.\d+(?:\.\d+)?)', clean_content)
+                
+                if version_matches:
+                    # If multiple versions found, take the highest one from this cell
+                    cell_latest = None
+                    for version in version_matches:
+                        if cell_latest is None or not comp_versions_ge(cell_latest, version):
+                            cell_latest = version
+                    
+                    # Since this is the first non-empty row we found, use this as the latest
+                    latest_version = cell_latest
+                    break  # Stop processing rows since we found the latest version
         
-        latest_version = version_match.group(1)
+        if not latest_version:
+            return None, "No version numbers found in Linux columns of Microsoft documentation"
         
         # Compare with current version
         if comp_versions_ge(curr_version, latest_version):
