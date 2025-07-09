@@ -71,6 +71,7 @@ class CommonVariables:
     encryptionDetails = 'encryptionDetails'
     isAnyWADiskIncluded = 'isAnyWADiskIncluded'
     isAnyDirectDriveDiskIncluded = 'isAnyDirectDriveDiskIncluded'
+    diskEncryptionKey = "x-ms-meta-DiskEncryptionSettings"
 
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'

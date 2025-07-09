@@ -590,6 +590,7 @@ class HandlerUtility:
     def add_to_telemetery_data(key,value):
         HandlerUtility.telemetry_data[key]=value
 
+    @staticmethod
     def get_telemetry_data(key):
         return HandlerUtility.telemetry_data[key]
     

@@ -532,7 +532,7 @@ class FreezeSnapshotter(object):
             result, httpResp, errMsg = http_util.HttpCallGetResponse('GET', sasuri_obj, None, headers = headers)
             if(result == CommonVariables.success and httpResp != None):
                 resp_headers = httpResp.getheaders()
-                key = "x-ms-meta-DiskEncryptionSettings"
+                key = CommonVariables.diskEncryptionKey
                 value = ""
                 for k,v in resp_headers:
                     if key == k:

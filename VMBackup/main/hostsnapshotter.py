@@ -79,13 +79,6 @@ class HostSnapshotter(object):
                         temp_dict[CommonVariables.key] = flag
                         temp_dict[CommonVariables.value] = paras.wellKnownSettingFlags[flag]
                         settings.append(temp_dict)
-                '''
-                HostBased changes, hence commenting out
-                if(paras.isVMADEEnabled == True):
-                    settings.append({CommonVariables.key:CommonVariables.isOsDiskADEEncrypted, CommonVariables.value:self.isOsDiskADEEncrypted})
-                    settings.append({CommonVariables.key:CommonVariables.areDataDisksADEEncrypted, CommonVariables.value:self.areDataDisksADEEncrypted})
-                    meta_data.append({CommonVariables.key:CommonVariables.encryptionDetails, CommonVariables.value:self.encryptionDetails})
-                '''
 
                 hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, settings, paras.snapshotTaskToken, meta_data)
                 body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
@@ -156,7 +149,20 @@ class HostSnapshotter(object):
                 self.logger.log("start calling the presnapshot rest api")
                 # initiate http call for blob-snapshot and get http response
                 result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', presnapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHostCall = True)
-                self.logger.log("presnapshot responseBody: " + responseBody)
+                if responseBody:
+                    try:
+                        response_json = json.loads(responseBody)
+                        if "bhsVersion" in response_json:
+                            self.logger.log("PreSnapshotResponse: bhsVersion: " + str(response_json["bhsVersion"]))
+                        if "nodeId" in response_json:
+                            self.logger.log("PreSnapshotResponse: nodeId: " + str(response_json["nodeId"]))
+                        if "responseTime" in response_json:
+                            self.logger.log("PreSnapshotResponse: responseTime: " + str(response_json["responseTime"]))
+                        if "result" in response_json:
+                            self.logger.log("PreSnapshotResponse: result: " + str(response_json["result"]))
+                    except Exception as e:
+                        self.logger.log("PreSnapshotResponse: Failed to parse responseBody: " + str(e))
+                
                 if(httpResp != None):
                     statusCode = httpResp.status
                     self.logger.log("PreSnapshot: Status Code: " + str(statusCode))
