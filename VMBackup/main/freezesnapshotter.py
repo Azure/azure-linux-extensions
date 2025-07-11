@@ -432,7 +432,7 @@ class FreezeSnapshotter(object):
         unable_to_sleep = False
         blob_snapshot_info_array = None
         snap_shotter = HostSnapshotter(self.logger, self.hostIp)
-        pre_snapshot_statuscode, responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId, True)
+        pre_snapshot_statuscode, responseBody = snap_shotter.pre_snapshot(self.para_parser, self.taskId, False)
 
         if(pre_snapshot_statuscode == 200 or pre_snapshot_statuscode == 201):
             run_result, run_status, blob_snapshot_info_array, all_failed, unable_to_sleep, is_inconsistent = self.takeSnapshotFromOnlyHost()
