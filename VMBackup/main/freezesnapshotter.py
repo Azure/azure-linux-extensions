@@ -537,7 +537,8 @@ class FreezeSnapshotter(object):
                 for k,v in resp_headers:
                     if key == k:
                         value = str(v)
-                        self.additional_headers.append((key,value))
+                        break
+                self.additional_headers.append((key,value))
         self.para_parser.disk_encryption_details = self.additional_headers
 
     def generate_headers(self):
