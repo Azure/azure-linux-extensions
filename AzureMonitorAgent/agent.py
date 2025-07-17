@@ -2364,7 +2364,7 @@ def is_feature_enabled(feature):
     feature_support_matrix = {
         'useDynamicSSL'             : ['all'],
         'enableCMV2'                : ['all'],
-        'enableAzureOTelCollector'  : ['eastus2euap', 'northcentralus']
+        'enableAzureOTelCollector'  : ['all']
     }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
