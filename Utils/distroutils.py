@@ -9,6 +9,15 @@ import Utils.logger as logger
 import Utils.extensionutils as ext_utils
 import Utils.constants as constants
 
+crypt = get_crypto_module()
+
+def get_crypto_module():
+    import sys
+    if sys.version_info >= (3, 13):
+        import crypt_r as crypt
+    else:
+        import crypt
+    return crypt
 
 def get_my_distro(config, os_name=None):
     if 'FreeBSD' in platform.system():
