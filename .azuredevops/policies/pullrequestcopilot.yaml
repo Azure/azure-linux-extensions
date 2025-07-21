@@ -26,7 +26,7 @@ configuration:
     - security
     - reliability
     - performance
-    - '!refactoring'               # Security reviews are mandatory
+    - '!refactoring'               # Exclude refactoring-focused reviews to prioritize security analysis
 
     onPullRequestCreate:
 
