@@ -1,6 +1,6 @@
 # metadata 
 name: Azure Linux Extensions PullRequest Copilot Configuration
-description: Pull Request Copilot configuration for Azure Disk Encryption and other Linux extensions
+description: Pull Request Copilot configuration for Azure Disk Encryption and other Linux extensions.
 
 # filters
 resource: repository
