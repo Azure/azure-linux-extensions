@@ -18,7 +18,15 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import exceptions
+# Python 2/3 compatibility for exceptions module
+try:
+    import exceptions
+except ImportError:
+    # Python 3 doesn't have the exceptions module
+    import builtins as exceptions
+    # In Python 3, LookupError is a built-in
+    exceptions.LookupError = LookupError
+
 import time
 import subprocess
 import re
@@ -30,7 +38,17 @@ class CommonActions:
         self.logger = logger
 
     def filterNonAsciiCharacters(self, output_msg):
-        return output_msg.encode('utf-8').decode('ascii','ignore')
+        # Python 2/3 compatibility for string handling
+        if isinstance(output_msg, bytes):
+            # If it's already bytes, decode to string first
+            output_msg = output_msg.decode('utf-8', 'ignore')
+        # Now ensure it's ASCII-safe
+        try:
+            # In Python 3, strings are Unicode by default
+            return output_msg.encode('ascii', 'ignore').decode('ascii')
+        except UnicodeDecodeError:
+            # Python 2 fallback
+            return output_msg.encode('utf-8').decode('ascii', 'ignore')
         
     def log_run_get_output(self, cmd, should_log=True):
         """
@@ -223,7 +241,7 @@ class Ubuntu1510OrHigherActions(DebianActions):
         count = len(packages)
         if count == 0:
             return 0, ''
-        package_list = str.join(' ', packages)
+        package_list = ' '.join(packages)
         cmd = '[ $(dpkg -l PACKAGES |grep ^ii |wc -l) -eq \'COUNT\' ] || apt-get install -y PACKAGES'
         cmd = cmd.replace('PACKAGES', package_list).replace('COUNT', str(count))
         if with_timeout:

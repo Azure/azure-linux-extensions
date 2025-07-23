@@ -18,8 +18,21 @@ import traceback
 import xml.dom.minidom
 import binascii
 
+# Add parent directory to path for imports
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from Utils.WAAgentUtil import waagent
 from Utils.lad_exceptions import LadLoggingConfigException
+
+# Python 2/3 compatibility
+try:
+    # Python 2
+    basestring
+except NameError:
+    # Python 3
+    basestring = str
 
 
 def get_extension_operation_type(command):

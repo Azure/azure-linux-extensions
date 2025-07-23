@@ -17,10 +17,19 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import print_function
+
 import datetime
-import urllib2
 import time
 import traceback
+
+# Python 2/3 compatibility for urllib
+try:
+    # Python 2
+    import urllib2
+except ImportError:
+    # Python 3
+    import urllib.request as urllib2
 
 
 def get_imds_data(node, json=True):
@@ -41,7 +50,11 @@ def get_imds_data(node, json=True):
     req = urllib2.Request(url=imds_url, headers=imds_headers)
     resp = urllib2.urlopen(req)
     data = resp.read()
-    data_str = data.decode('utf-8')
+    # Handle both Python 2 and 3 string/bytes differences
+    if hasattr(data, 'decode'):
+        data_str = data.decode('utf-8')
+    else:
+        data_str = data
     return data_str
 
 
@@ -112,20 +125,20 @@ if __name__ == '__main__':
 
     def fake_get_imds_data(node, json=True):
         result = 'fake_get_imds_data(node="{0}", json="{1}")'.format(node, json)
-        print result
+        print(result)
         return result
 
 
     def default_ext_logger(msg):
-        print 'default_ext_logger(msg="{0}")'.format(msg)
+        print('default_ext_logger(msg="{0}")'.format(msg))
 
 
     def default_ext_event_logger(*args, **kwargs):
-        print 'default_ext_event_logger(*args, **kwargs)'
-        print 'args:'
+        print('default_ext_event_logger(*args, **kwargs)')
+        print('args:')
         for arg in args:
-            print arg
-        print 'kwargs:'
+            print(arg)
+        print('kwargs:')
         for k in kwargs:
             print('"{0}"="{1}"'.format(k, kwargs[k]))
 
@@ -137,10 +150,10 @@ if __name__ == '__main__':
     done = False
     while not done:
         now = datetime.datetime.now()
-        print 'Test loop iteration starting at {0}'.format(now)
+        print('Test loop iteration starting at {0}'.format(now))
         imds_logger.log_imds_data_if_right_time()
         if now >= start_time + datetime.timedelta(minutes=2):
             done = True
         else:
-            print 'Sleeping 10 seconds'
+            print('Sleeping 10 seconds')
             time.sleep(10)

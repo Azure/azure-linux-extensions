@@ -17,6 +17,8 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import print_function
+
 # A provider is responsible for taking a particular syntax of configuration instructions, as found in the JSON config
 # blob, and using it to enable collection of data as specified in those instructions.
 
@@ -212,7 +214,7 @@ def AddMetric(counter_spec):
     try:
         metric = BuiltinMetric(counter_spec)
     except ProvUtil.ParseException as ex:
-        print "Couldn't create metric: ", ex
+        print("Couldn't create metric: ", ex)
         return None
 
     # (class, instanceId, sampleRate) -> [ metric ]

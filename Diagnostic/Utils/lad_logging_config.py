@@ -23,6 +23,14 @@ from Utils.lad_exceptions import LadLoggingConfigException
 import Utils.mdsd_xml_templates as mxt
 from Utils.omsagent_util import get_syslog_ng_src_name
 
+# Python 2/3 compatibility
+try:
+    # Python 2
+    dict_items = lambda d: d.iteritems()
+except AttributeError:
+    # Python 3
+    dict_items = lambda d: d.items()
+
 
 syslog_src_name = 'mdsd.syslog'
 
@@ -137,7 +145,7 @@ class LadLoggingConfig:
                 self._rsyslog_config = \
                     '\n'.join('{0}.{1}  @127.0.0.1:%SYSLOG_PORT%'.format(syslog_name_to_rsyslog_name(fac),
                                                                          syslog_name_to_rsyslog_name(sev))
-                              for fac, sev in self._fac_sev_map.iteritems()) + '\n'
+                              for fac, sev in dict_items(self._fac_sev_map)) + '\n'
         return self._rsyslog_config
 
     def get_syslog_ng_config(self):
@@ -159,7 +167,7 @@ class LadLoggingConfig:
                               'destination(d_LAD_oms); }};'.format(get_syslog_ng_src_name(),
                                                                    syslog_name_to_rsyslog_name(fac),
                                                                    syslog_name_to_rsyslog_name(sev))
-                              for fac, sev in self._fac_sev_map.iteritems()) + '\n'
+                              for fac, sev in dict_items(self._fac_sev_map)) + '\n'
         return self._syslog_ng_config
 
 

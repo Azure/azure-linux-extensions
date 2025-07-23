@@ -16,8 +16,17 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import print_function
+
 import datetime
-import exceptions
+# Python 2/3 compatibility for exceptions module
+try:
+    import exceptions
+except ImportError:
+    # Python 3 doesn't have the exceptions module
+    import builtins as exceptions
+    # In Python 3, LookupError is a built-in
+    exceptions.LookupError = LookupError
 import os.path
 import platform
 import signal
@@ -34,6 +43,10 @@ import json
 # Actually waagent import can succeed even on a Linux machine without waagent installed,
 # by setting PYTHONPATH env var to the azure-linux-extensions/Common/WALinuxAgent-2.0.16,
 # but let's just keep this try-except here on them for any potential local imports that may throw.
+
+# Add parent directory to path for imports
+# sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+
 try:
     # waagent, ext handler
     from Utils.WAAgentUtil import waagent
