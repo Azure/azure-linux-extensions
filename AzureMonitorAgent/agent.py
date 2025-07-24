@@ -574,6 +574,8 @@ def uninstall():
 
     uninstall_azureotelcollector()
 
+    remove_host_configs()
+
     # remove the logrotate config
     if os.path.exists(AMAExtensionLogRotateFilePath):   
         try:
