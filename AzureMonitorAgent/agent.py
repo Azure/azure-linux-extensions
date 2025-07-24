@@ -42,9 +42,7 @@ import contextlib
 import ama_tst.modules.install.supported_distros as supported_distros
 from collections import OrderedDict
 from hashlib import sha256
-from shutil import copyfile
-from shutil import copytree
-from shutil import rmtree
+from shutil import copyfile, rmtree
 
 from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
@@ -117,8 +115,8 @@ if sys.version_info < (2,7):
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
-BundleFileNameDeb = 'azuremonitoragent.deb'
-BundleFileNameRpm = 'azuremonitoragent.rpm'
+BundleFileNameDeb = 'azuremonitoragent_1.35.9-1053_x86_64.deb'
+BundleFileNameRpm = 'azuremonitoragent-1.35.8-1020.x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -133,7 +131,7 @@ PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/pr
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
 AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
-WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
+
 SupportedArch = set(['x86_64', 'aarch64'])
 
 # Error codes
@@ -170,7 +168,11 @@ def main():
         if re.match('^([-/]*)(disable)', option):
             operation = 'Disable'
         elif re.match('^([-/]*)(uninstall)', option):
-            operation = 'Uninstall'
+            # Check for clean uninstall flag
+            if len(sys.argv) > 2 and sys.argv[2] == '--clean':
+                operation = 'UninstallClean'
+            else:
+                operation = 'Uninstall'
         elif re.match('^([-/]*)(install)', option):
             operation = 'Install'
         elif re.match('^([-/]*)(enable)', option):
@@ -194,7 +196,7 @@ def main():
     message = '{0} succeeded'.format(operation)
 
     # Avoid entering broken state where manual purge actions are necessary in low disk space scenario
-    destructive_operations = ['Disable', 'Uninstall']
+    destructive_operations = ['Disable', 'Uninstall', 'UninstallClean']
     if operation not in destructive_operations:
         exit_code = check_disk_space_availability()
         if exit_code != 0:
@@ -547,9 +549,27 @@ def install():
 
 def uninstall():
     """
-    Uninstall the Azure Monitor Linux Agent.
-    This is a somewhat soft uninstall. It is not a purge.
+    Uninstall the Azure Monitor Linux Agent for updates.
+    This preserves configuration files under /etc/opt.
     Note: uninstall operation times out from WAAgent at 5 minutes
+    """
+    return _uninstall_internal(preserve_configs=True)
+
+def uninstall_clean():
+    """
+    Completely uninstall the Azure Monitor Linux Agent.
+    This removes all files including configuration.
+    Note: uninstall operation times out from WAAgent at 5 minutes
+    """
+    return _uninstall_internal(preserve_configs=False)
+
+def _uninstall_internal(preserve_configs=True):
+    """
+    Internal uninstall method that handles both clean and update uninstalls.
+    
+    Args:
+        preserve_configs (bool): If True, preserve config files under /etc/opt (for updates).
+                                If False, remove everything (for clean uninstall).
     """
 
     exit_if_vm_not_supported('Uninstall')
@@ -561,20 +581,30 @@ def uninstall():
         hutil_log_info("Azure Monitor Agent is not installed, nothing to uninstall.")
         return 0, "Azure Monitor Agent is not installed, nothing to uninstall."
 
+    # For clean uninstall, gather the file list BEFORE running the uninstall command
+    # This ensures we have the complete list even after the package manager removes its database
+    package_files_for_cleanup = []
+    if not preserve_configs:
+        hutil_log_info("Gathering package file list for clean uninstall before removing package")
+        package_files_for_cleanup = _get_package_files_for_cleanup()
+
     AMAUninstallCommand = ""
     if PackageManager == "dpkg":
-        AMAUninstallCommand = "dpkg -P azuremonitoragent"
+        # For Debian: remove vs purge
+        if preserve_configs:
+            AMAUninstallCommand = "dpkg -r azuremonitoragent"  # Remove but keep configs
+        else:
+            AMAUninstallCommand = "dpkg -P azuremonitoragent"  # Purge everything
     elif PackageManager == "rpm":
         AMAUninstallCommand = "rpm -e azuremonitoragent"
     else:
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
-    hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
+    
+    hutil_log_info('Running command "{0}" (preserve_configs={1})'.format(AMAUninstallCommand, preserve_configs))
 
     remove_localsyslog_configs()
 
     uninstall_azureotelcollector()
-
-    remove_host_configs()
 
     # remove the logrotate config
     if os.path.exists(AMAExtensionLogRotateFilePath):   
@@ -623,11 +653,149 @@ def uninstall():
             hutil_log_info("Uninstall command executed successfully, package is no longer installed.")
             output = "Azure Monitor Agent package uninstalled successfully"
             exit_code = 0
+
+        # For clean uninstall, remove all files installed by the package
+        if not preserve_configs:
+            hutil_log_info("Performing clean uninstall - removing all package files")
+            _remove_package_files_from_list(package_files_for_cleanup)
+
     except Exception as ex:
         exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
                 'Stacktrace: {1}'.format(ex, traceback.format_exc())
     return exit_code, output
+
+def _get_package_files_for_cleanup():
+    """
+    Get the list of files and directories installed by the azuremonitoragent package
+    that should be removed during clean uninstall.
+    This must be called BEFORE the package is uninstalled to ensure the package
+    manager still has the file list available.
+    
+    Returns:
+        list: List of file/directory paths that contain "azuremonitoragent"
+    """
+    try:
+        # Get list of files installed by the package
+        if PackageManager == "dpkg":
+            # For Debian-based systems
+            cmd = "dpkg -L azuremonitoragent"
+        elif PackageManager == "rpm":
+            # For RPM-based systems
+            cmd = "rpm -ql azuremonitoragent"
+        else:
+            hutil_log_info("Unknown package manager, cannot list package files")
+            return []
+
+        exit_code, output = run_command_and_log(cmd, check_error=False)
+        
+        if exit_code != 0 or not output:
+            hutil_log_info("Could not get package file list for cleanup")
+            return []
+
+        # Parse the file list
+        files = [line.strip() for line in output.strip().split('\n') if line.strip()]
+        
+        # Filter to only include paths that contain "azuremonitoragent" in the path
+        # This ensures we only remove azuremonitoragent-specific files/directories
+        # and not shared parent directories like /opt, /opt/microsoft, etc.
+        azuremonitoragent_files = []
+        for file_path in files:
+            # Only include files/directories that have "azuremonitoragent" in their path
+            if "azuremonitoragent" in file_path:
+                azuremonitoragent_files.append(file_path)
+            else:
+                hutil_log_info("Skipping non-azuremonitoragent path: {0}".format(file_path))
+        
+        hutil_log_info("Found {0} azuremonitoragent files/directories for cleanup".format(len(azuremonitoragent_files)))
+        return azuremonitoragent_files
+        
+    except Exception as ex:
+        hutil_log_info("Error gathering package files for cleanup: {0}".format(ex))
+        return []
+
+def _remove_package_files_from_list(package_files):
+    """
+    Remove all files and directories from the provided list that were installed 
+    by the azuremonitoragent package. This function works with a pre-gathered 
+    list of files, allowing it to work even after the package has been uninstalled.
+    
+    Args:
+        package_files (list): List of file/directory paths to remove
+    """
+    try:
+        if not package_files:
+            hutil_log_info("No package files provided for removal")
+            return
+            
+        hutil_log_info("Removing {0} azuremonitoragent files/directories from pre-gathered list".format(len(package_files)))
+        
+        # Separate files and directories
+        files_to_remove = []
+        dirs_to_remove = []
+        
+        for file_path in package_files:
+            if os.path.isfile(file_path):
+                files_to_remove.append(file_path)
+            elif os.path.isdir(file_path):
+                dirs_to_remove.append(file_path)
+            # Skip if path doesn't exist (already removed)
+        
+        # Remove files first
+        files_removed = 0
+        for file_path in files_to_remove:
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    files_removed += 1
+            except Exception as ex:
+                hutil_log_info("Failed to remove file {0}: {1}".format(file_path, ex))
+        
+        hutil_log_info("Removed {0} files from package".format(files_removed))
+        
+        # Remove directories (in reverse order to handle nested directories)
+        # Sort by depth (deepest first) to avoid removing parent before child
+        dirs_to_remove.sort(key=lambda x: x.count('/'), reverse=True)
+        
+        dirs_removed = 0
+        for dir_path in dirs_to_remove:
+            try:
+                # Check if the directory exists and is a directory before attempting to remove
+                if os.path.exists(dir_path) and os.path.isdir(dir_path):
+                    try:
+                        shutil.rmtree(dir_path)
+                        dirs_removed += 1
+                        hutil_log_info("Removed directory: {0}".format(dir_path))
+                    except OSError as ex:
+                        # If rmtree fails, try rmdir for empty directories
+                        try:
+                            os.rmdir(dir_path)
+                            dirs_removed += 1
+                            hutil_log_info("Removed empty directory: {0}".format(dir_path))
+                        except OSError:
+                            hutil_log_info("Could not remove directory {0}: {1}".format(dir_path, ex))
+            except Exception as ex:
+                hutil_log_info("Failed to remove directory {0}: {1}".format(dir_path, ex))
+        
+        hutil_log_info("Removed {0} directories from package".format(dirs_removed))
+        
+        # # cleanup of logs files under /var/?
+        # additional_cleanup_dirs = [
+        #     "/var/opt/microsoft/azuremonitoragent", #?
+        #     "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent" #?
+        # ]
+        
+        # for cleanup_dir in additional_cleanup_dirs:
+        #     if os.path.exists(cleanup_dir):
+        #         try:
+        #             shutil.rmtree(cleanup_dir)
+        #             hutil_log_info("Removed additional directory: {0}".format(cleanup_dir))
+        #         except Exception as ex:
+        #             hutil_log_info("Failed to remove additional directory {0}: {1}".format(cleanup_dir, ex))
+        
+        
+    except Exception as ex:
+        hutil_log_info("Error during file removal from list: {0}".format(ex))
 
 def enable():
     """
@@ -2021,6 +2189,7 @@ def transformconfig():
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
               'Uninstall' : uninstall,
+              'UninstallClean' : uninstall_clean,
               'Install' : install,
               'Enable' : enable,
               'Update' : update,
@@ -2046,17 +2215,9 @@ def parse_context(operation):
 
             # As per VM extension team, we have to manage rotation for our extension.log
             # for now, this is our extension code, but to be moved to HUtil library.
-            if os.path.exists(WAGuestAgentLogRotateFilePath):      
-                if os.path.exists(AMAExtensionLogRotateFilePath):
-                    try:
-                        os.remove(AMAExtensionLogRotateFilePath)
-                    except Exception as ex:
-                        output = 'Logrotate removal failed with error: {0}\nStacktrace: {1}'.format(ex, traceback.format_exc())
-                        hutil_log_info(output)
-            else:
-                if not os.path.exists(AMAExtensionLogRotateFilePath):      
-                    logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
-                    copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
+            if not os.path.exists(AMAExtensionLogRotateFilePath):      
+                logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
+                copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
             
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
@@ -2366,7 +2527,7 @@ def is_feature_enabled(feature):
     feature_support_matrix = {
         'useDynamicSSL'             : ['all'],
         'enableCMV2'                : ['all'],
-        'enableAzureOTelCollector'  : ['all']
+        'enableAzureOTelCollector'  : ['eastus2euap', 'northcentralus']
     }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
