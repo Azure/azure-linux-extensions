@@ -42,7 +42,7 @@ import contextlib
 import ama_tst.modules.install.supported_distros as supported_distros
 from collections import OrderedDict
 from hashlib import sha256
-from shutil import copyfile, rmtree
+from shutil import copyfile, rmtree, copytree
 
 from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
@@ -172,11 +172,7 @@ def main():
         if re.match('^([-/]*)(disable)', option):
             operation = 'Disable'
         elif re.match('^([-/]*)(uninstall)', option):
-            # Check for clean uninstall flag
-            if len(sys.argv) > 2 and sys.argv[2] == '--clean':
-                operation = 'UninstallClean'
-            else:
-                operation = 'Uninstall'
+            operation = 'Uninstall'
         elif re.match('^([-/]*)(install)', option):
             operation = 'Install'
         elif re.match('^([-/]*)(enable)', option):
@@ -200,7 +196,7 @@ def main():
     message = '{0} succeeded'.format(operation)
 
     # Avoid entering broken state where manual purge actions are necessary in low disk space scenario
-    destructive_operations = ['Disable', 'Uninstall', 'UninstallClean']
+    destructive_operations = ['Disable', 'Uninstall']
     if operation not in destructive_operations:
         exit_code = check_disk_space_availability()
         if exit_code != 0:
@@ -294,7 +290,7 @@ def cache_configuration_files():
     try:
         # Create cache directory if it doesn't exist
         if os.path.exists(AMAConfigCacheDirectory):
-            shutil.rmtree(AMAConfigCacheDirectory)
+            rmtree(AMAConfigCacheDirectory)
         os.makedirs(AMAConfigCacheDirectory)
         
         cached_something = False
@@ -303,7 +299,7 @@ def cache_configuration_files():
         etc_config_source_dir = '/etc/opt/microsoft/azuremonitoragent'
         if os.path.exists(etc_config_source_dir):
             cache_etc_config_dir = os.path.join(AMAConfigCacheDirectory, 'etc_azuremonitoragent')
-            shutil.copytree(etc_config_source_dir, cache_etc_config_dir)
+            copytree(etc_config_source_dir, cache_etc_config_dir)
             hutil_log_info("Cached configuration directory: {0}".format(etc_config_source_dir))
             cached_something = True
         else:
@@ -313,7 +309,7 @@ def cache_configuration_files():
         opt_source_dir = '/opt/microsoft/azuremonitoragent'
         if os.path.exists(opt_source_dir):
             cache_opt_dir = os.path.join(AMAConfigCacheDirectory, 'opt_azuremonitoragent')
-            shutil.copytree(opt_source_dir, cache_opt_dir)
+            copytree(opt_source_dir, cache_opt_dir)
             hutil_log_info("Cached runtime directory: {0}".format(opt_source_dir))
             cached_something = True
         else:
@@ -328,7 +324,7 @@ def cache_configuration_files():
         for file_path in additional_files:
             if os.path.exists(file_path):
                 dest_path = os.path.join(AMAConfigCacheDirectory, os.path.basename(file_path))
-                shutil.copy2(file_path, dest_path)
+                copy2(file_path, dest_path)
                 hutil_log_info("Cached config file: {0}".format(file_path))
                 cached_something = True
         
@@ -365,10 +361,10 @@ def restore_configuration_files():
             
             # Remove existing config dir if present
             if os.path.exists(etc_config_dest_dir):
-                shutil.rmtree(etc_config_dest_dir)
+                rmtree(etc_config_dest_dir)
             
             # Restore from cache
-            shutil.copytree(cache_etc_config_dir, etc_config_dest_dir)
+            copytree(cache_etc_config_dir, etc_config_dest_dir)
             hutil_log_info("Restored configuration directory: {0}".format(etc_config_dest_dir))
             restored_something = True
         
@@ -382,10 +378,10 @@ def restore_configuration_files():
             
             # Remove existing runtime dir if present
             if os.path.exists(opt_dest_dir):
-                shutil.rmtree(opt_dest_dir)
+                rmtree(opt_dest_dir)
             
             # Restore from cache
-            shutil.copytree(cache_opt_dir, opt_dest_dir)
+            copytree(cache_opt_dir, opt_dest_dir)
             hutil_log_info("Restored runtime directory: {0}".format(opt_dest_dir))
             restored_something = True
         
@@ -408,7 +404,7 @@ def restore_configuration_files():
                 # Ensure parent directory exists
                 os.makedirs(os.path.dirname(dest_path), exist_ok=True)
                     
-                shutil.copy2(cache_file, dest_path)
+                copy2(cache_file, dest_path)
                 hutil_log_info("Restored config file: {0}".format(dest_path))
                 restored_something = True
         
@@ -429,7 +425,7 @@ def cleanup_configuration_cache():
     """
     try:
         if os.path.exists(AMAConfigCacheDirectory):
-            shutil.rmtree(AMAConfigCacheDirectory)
+            rmtree(AMAConfigCacheDirectory)
             hutil_log_info("Cleaned up configuration cache")
     except Exception as ex:
         hutil_log_info("Failed to clean up configuration cache: {0}".format(ex))
@@ -505,9 +501,9 @@ def copy_mdsd_fluentbit_binaries():
 
     if sys.version_info >= (3, 8):
         # dirs_exist_ok parameter was added in Python 3.8
-        shutil.copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir, dirs_exist_ok=True)
+        copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir, dirs_exist_ok=True)
     else:
-        shutil.copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir)
+        copytree("/opt/microsoft/azuremonitoragent/lib", lib_dir)
     
     canUseSharedmdsd, _ = run_command_and_log('ldd ' + mdsd_bin_local_path + ' | grep "not found"')
     canUseSharedmdsdmgr, _ = run_command_and_log('ldd ' + mdsdmgr_bin_local_path + ' | grep "not found"')
@@ -918,7 +914,7 @@ def _remove_package_files_from_list(package_files):
                 # Check if the directory exists and is a directory before attempting to remove
                 if os.path.exists(dir_path) and os.path.isdir(dir_path):
                     try:
-                        shutil.rmtree(dir_path)
+                        rmtree(dir_path)
                         dirs_removed += 1
                         hutil_log_info("Removed directory: {0}".format(dir_path))
                     except OSError as ex:
@@ -959,7 +955,7 @@ def _remove_package_files_from_list(package_files):
         for cleanup_dir in additional_cleanup_dirs:
             if os.path.exists(cleanup_dir):
                 try:
-                    shutil.rmtree(cleanup_dir)
+                    rmtree(cleanup_dir)
                     additional_dirs_removed += 1
                     hutil_log_info("Removed additional Azure Monitor directory: {0}".format(cleanup_dir))
                 except Exception as ex:
@@ -1407,7 +1403,7 @@ def update():
     """
     Update the current installation of AzureMonitorLinuxAgent.
     Cache configuration files before the update process begins.
-    The actual update workflow (disable -> uninstall -> install -> enable) is handled by the Azure extension framework.
+    The actual update workflow is (disable -> update -> uninstall -> install -> enable)
     """
     
     hutil_log_info("Starting Azure Monitor Agent update - caching configuration files")
@@ -2709,7 +2705,7 @@ def is_feature_enabled(feature):
     feature_support_matrix = {
         'useDynamicSSL'             : ['all'],
         'enableCMV2'                : ['all'],
-        'enableAzureOTelCollector'  : ['eastus2euap', 'northcentralus']
+        'enableAzureOTelCollector'  : ['all']
     }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
