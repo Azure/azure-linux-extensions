@@ -42,7 +42,7 @@ import contextlib
 import ama_tst.modules.install.supported_distros as supported_distros
 from collections import OrderedDict
 from hashlib import sha256
-from shutil import copyfile, rmtree, copytree
+from shutil import copyfile, rmtree, copytree, copy2
 
 from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
@@ -315,6 +315,21 @@ def cache_configuration_files():
         else:
             hutil_log_info("No /opt runtime directory found to cache")
         
+        # Cache log directories
+        log_dirs_to_cache = [
+            '/var/opt/microsoft/azuremonitoragent/log',
+            '/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent'
+        ]
+        
+        for log_dir in log_dirs_to_cache:
+            if os.path.exists(log_dir):
+                cache_log_dir = os.path.join(AMAConfigCacheDirectory, os.path.basename(log_dir))
+                copytree(log_dir, cache_log_dir)
+                hutil_log_info("Cached log directory: {0}".format(log_dir))
+                cached_something = True
+            else:
+                hutil_log_info("No log directory found to cache: {0}".format(log_dir))
+        
         # Cache other important config files
         additional_files = [
             '/etc/default/azuremonitoragent',
@@ -384,6 +399,27 @@ def restore_configuration_files():
             copytree(cache_opt_dir, opt_dest_dir)
             hutil_log_info("Restored runtime directory: {0}".format(opt_dest_dir))
             restored_something = True
+        
+        # Restore log directories
+        log_dirs_to_restore = [
+            ('log', '/var/opt/microsoft/azuremonitoragent/log'),
+            ('Microsoft.Azure.Monitor.AzureMonitorLinuxAgent', '/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent')
+        ]
+        
+        for cache_dir_name, dest_path in log_dirs_to_restore:
+            cache_log_dir = os.path.join(AMAConfigCacheDirectory, cache_dir_name)
+            if os.path.exists(cache_log_dir):
+                # Ensure parent directory exists
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                
+                # Remove existing log dir if present
+                if os.path.exists(dest_path):
+                    rmtree(dest_path)
+                
+                # Restore from cache
+                copytree(cache_log_dir, dest_path)
+                hutil_log_info("Restored log directory: {0}".format(dest_path))
+                restored_something = True
         
         # Restore additional config files
         additional_files = [
@@ -942,13 +978,13 @@ def _remove_package_files_from_list(package_files):
             additional_cleanup_dirs = [
                 "/opt/microsoft/azuremonitoragent",           # Main installation directory
                 "/var/opt/microsoft/azuremonitoragent",       # Runtime data directory  
-                "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent"  # Extension logs
+                # "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent"  # Extension logs
             ]
         # For dpkg systems, the purge command is more thorough, but we still clean up runtime dirs
         elif PackageManager == "dpkg":
             additional_cleanup_dirs = [
                 "/var/opt/microsoft/azuremonitoragent",       # Runtime data directory  
-                "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent"  # Extension logs
+                # "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent"  # Extension logs
             ]
         
         additional_dirs_removed = 0
@@ -2393,9 +2429,17 @@ def parse_context(operation):
 
             # As per VM extension team, we have to manage rotation for our extension.log
             # for now, this is our extension code, but to be moved to HUtil library.
-            if not os.path.exists(AMAExtensionLogRotateFilePath):      
-                logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
-                copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
+            if os.path.exists(WAGuestAgentLogRotateFilePath):      
+                if os.path.exists(AMAExtensionLogRotateFilePath):
+                    try:
+                        os.remove(AMAExtensionLogRotateFilePath)
+                    except Exception as ex:
+                        output = 'Logrotate removal failed with error: {0}\nStacktrace: {1}'.format(ex, traceback.format_exc())
+                        hutil_log_info(output)
+            else:
+                if not os.path.exists(AMAExtensionLogRotateFilePath):      
+                    logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
+                    copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
             
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
