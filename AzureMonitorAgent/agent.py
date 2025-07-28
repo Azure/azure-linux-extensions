@@ -317,8 +317,7 @@ def cache_configuration_files():
         
         # Cache log directories
         log_dirs_to_cache = [
-            '/var/opt/microsoft/azuremonitoragent/log',
-            '/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent'
+            '/var/opt/microsoft/azuremonitoragent/log'
         ]
         
         for log_dir in log_dirs_to_cache:
@@ -403,7 +402,6 @@ def restore_configuration_files():
         # Restore log directories
         log_dirs_to_restore = [
             ('log', '/var/opt/microsoft/azuremonitoragent/log'),
-            ('Microsoft.Azure.Monitor.AzureMonitorLinuxAgent', '/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent')
         ]
         
         for cache_dir_name, dest_path in log_dirs_to_restore:
@@ -966,29 +964,21 @@ def _remove_package_files_from_list(package_files):
         
         hutil_log_info("Removed {0} directories from package".format(dirs_removed))
         
+        # Additional cleanup of Azure Monitor log directories
+        log_dirs = []
+        
+        # Cleanup log files and directories
+        log_dirs = [
+            "/var/opt/microsoft/azuremonitoragent",
+            "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/events",
+        ]
+
         # Additional cleanup of Azure Monitor directories that may contain runtime files
-        # This is especially important for RPM-based systems where 'rpm -e' doesn't remove
-        # directories as thoroughly as dpkg's purge option
-        # These directories should be completely removed during uninstall even if they 
-        # contain files not originally part of the package (logs, runtime data, etc.)
-        additional_cleanup_dirs = []
-        
-        # For RPM systems, we need more aggressive cleanup since rpm -e leaves more behind
         if PackageManager == "rpm":
-            additional_cleanup_dirs = [
-                "/opt/microsoft/azuremonitoragent",           # Main installation directory
-                "/var/opt/microsoft/azuremonitoragent",       # Runtime data directory  
-                # "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent"  # Extension logs
-            ]
-        # For dpkg systems, the purge command is more thorough, but we still clean up runtime dirs
-        elif PackageManager == "dpkg":
-            additional_cleanup_dirs = [
-                "/var/opt/microsoft/azuremonitoragent",       # Runtime data directory  
-                # "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent"  # Extension logs
-            ]
-        
+            log_dirs.append("/opt/microsoft/azuremonitoragent")
+
         additional_dirs_removed = 0
-        for cleanup_dir in additional_cleanup_dirs:
+        for cleanup_dir in log_dirs:
             if os.path.exists(cleanup_dir):
                 try:
                     rmtree(cleanup_dir)
