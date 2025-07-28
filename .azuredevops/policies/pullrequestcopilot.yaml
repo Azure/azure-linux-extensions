@@ -1,0 +1,84 @@
+# metadata 
+name: Azure Linux Extensions PullRequest Copilot Configuration
+description: Pull Request Copilot configuration for Azure Disk Encryption and other Linux extensions.
+
+# filters
+resource: repository
+
+# primitive configuration
+configuration:
+  pullRequestCopilotPrimitive:
+    enabled: true
+    branches:                     # Enable on key branches for ADE development
+    - ade-singlepass-dev         # Current development branch
+    - ade-singlepass-master      # Main ADE single-pass branch
+    - master                     # Main repository branch
+    - ade-dualpass-dev          # Dual-pass development branch
+    maxReviewCommentsAllowed: 5   # Allow more comments for complex encryption code
+    additionalInstructionForReview:  # Specific instructions for ADE code review
+    - Focus on cryptographic security practices and key management
+    - Review LUKS encryption implementation for correctness
+    - Ensure proper error handling for disk encryption operations
+    - Validate CVM/Confidential VM security features
+    - Check for proper cleanup of temporary encryption files
+    severityThreshold: 0.8          # Higher threshold for security-critical code
+    focusAreas:                     # Focus on security and reliability for encryption code
+    - security
+    - reliability
+    - performance
+    - '!refactoring'               # Exclude refactoring-focused reviews to prioritize security analysis
+
+    onPullRequestCreate:
+
+    - prompt: 'copilot: review'   # Auto-review on pull request create 
+      autoResolve: false          # Keep security comments open by default
+      exclude:                    # Content and path filters to be excluded for reviewing by bot
+        pathFilters:              # ADE-specific exclusions
+        - '*.ini'
+        - '*.yml'
+        - '*.json'
+        - '*.yaml'
+        - '*.bicep'
+        - '*.csproj'
+        - '*.sln'
+        - '*.xml'
+        - '*.resx'
+        - '*.proj'
+        - '*.png'
+        - '*.vsdx'
+        - '*.pbix'
+        - '*.pdf'
+        - '*.pfx'
+        - '*.bin'
+        - '*.jpeg'
+        - '*.zip'
+        - '*.vhd'
+        - 'Test-*.ps1'             # Exclude PowerShell test scripts
+        - 'VMEncryption/test/*'    # Exclude unit test files
+        - 'VMEncryption/six/*'     # Exclude third-party libraries
+        - 'VMEncryption/transitions/*'  # Exclude state machine library
+        - 'Common/psutil/*'        # Exclude psutil library
+        - 'Common/WALinuxAgent-*/*' # Exclude WALinuxAgent dependencies
+        contentFilters:            # Exclude auto-generated or binary content
+        - '(?i)auto-generated file'
+        - '(?i)binary file'
+        - '(?i)test data'
+        
+    - prompt: 'copilot: summary'   # Auto PR description updated w/ AI summary 
+      autoResolve: true           # AI description generated comment as closed by default
+      exclude:                    # Exclude same patterns for summary
+        pathFilters: 
+        - '*.ini'
+        - '*.yml'
+        - '*.json'
+        - '*.yaml'
+        - '*.png'
+        - '*.pdf'
+        - '*.zip'
+        - 'VMEncryption/test/*'
+        - 'Test-*.ps1'
+      prependAISummary: true      # Put AI summary at top for encryption changes
+
+#   - prompt: 'copilot: generateworkitem'    # On every PR create to create a work item
+#     workItemMappings:                       # Configure if work item tracking is needed
+#     - areaPath: Azure\Linux\Extensions\ADE  # Area path for ADE work items
