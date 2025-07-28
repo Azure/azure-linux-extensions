@@ -324,8 +324,6 @@ class redhatPatching(AbstractPatching):
         # Change config so that dracut will force add the dm_crypt kernel module
         self.append_contents_to_file('\nadd_drivers+=" dm_crypt "\n',
                                       '/etc/dracut.conf.d/ade.conf')
-        # Change config so that dracut will force add the cryptsetup binary
-        self.append_contents_to_file('\ninstall_items+=" /usr/sbin/cryptsetup "\n', '/etc/dracut.conf.d/ade.conf')
 
         # Add the new kernel param
         additional_params = ["rd.luks.ade.partuuid={0}".format(root_partuuid),
