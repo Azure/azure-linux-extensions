@@ -115,8 +115,8 @@ if sys.version_info < (2,7):
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
-BundleFileNameDeb = 'azuremonitoragent_1.35.9-1053_x86_64.deb'
-BundleFileNameRpm = 'azuremonitoragent-1.35.8-1020.x86_64.rpm'
+BundleFileNameDeb = 'azuremonitoragent.deb'
+BundleFileNameRpm = 'azuremonitoragent.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -131,10 +131,10 @@ PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/pr
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
 AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
+WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent'
 
 # Configuration cache for updates
 AMAConfigCacheDirectory = '/var/cache/azuremonitoragent-config-cache'
-WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -768,8 +768,7 @@ def uninstall():
 
     AMAUninstallCommand = ""
     if PackageManager == "dpkg":
-        # Always use purge for complete removal
-        AMAUninstallCommand = "dpkg -P azuremonitoragent"  # Purge everything
+        AMAUninstallCommand = "dpkg -P azuremonitoragent"
     elif PackageManager == "rpm":
         AMAUninstallCommand = "rpm -e azuremonitoragent"
     else:
