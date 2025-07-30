@@ -42,19 +42,19 @@ class azurelinuxPatching(redhatPatching):
         # Check each package individually
         packages_to_install = []
         for package in packages:
-            self.logger.log(f"Checking if {package} is already installed.")
-            check_command = f"rpm -q {package}"
+            self.logger.log("Checking if {0} is already installed.".format(package))
+            check_command = "rpm -q {0}".format(package)
             # rpm -q returns 0 (success) when package is installed
             if self.command_executor.Execute(check_command) != 0:
-                self.logger.log(f"{package} not installed, marking for installation.")
+                self.logger.log("{0} not installed, marking for installation.".format(package))
                 packages_to_install.append(package)
             else:
-                self.logger.log(f"{package} is already installed.")
+                self.logger.log("{0} is already installed.".format(package))
         
         if packages_to_install:
             package_list = " ".join(packages_to_install)
-            install_command = f"tdnf install -y {package_list}"
-            self.logger.log(f"Running command: {install_command} with a timeout of 100 seconds.")
+            install_command = "tdnf install -y {0}".format(package_list)
+            self.logger.log("Running command: {0} with a timeout of 100 seconds.".format(install_command))
             
             # Execute the install command with a timeout
             return_code = self.command_executor.Execute(install_command, timeout=100)
@@ -65,7 +65,7 @@ class azurelinuxPatching(redhatPatching):
                 self.logger.log(msg, level='error')
                 raise Exception(msg)
             
-            self.logger.log(f"Installation command completed with return code: {return_code}")
+            self.logger.log("Installation command completed with return code: {0}".format(return_code))
             return return_code
         else:
             self.logger.log("All required packages are already installed.")
@@ -93,31 +93,31 @@ class azurelinuxPatching(redhatPatching):
             packages = [pkg for pkg in packages if pkg not in ['psmisc', 'uuid', 'at', 'patch', 'procps-ng']]
         
         package_list = " ".join(packages)
-        self.logger.log(f"Final package list for installation: {package_list}")
+        self.logger.log("Final package list for installation: {0}".format(package_list))
         
         # Check each package individually to handle partial installations
         packages_to_install = []
         for package in packages:
-            self.logger.log(f"Checking if {package} is already installed.")
-            check_command = f"rpm -q {package}"
+            self.logger.log("Checking if {0} is already installed.".format(package))
+            check_command = "rpm -q {0}".format(package)
             # rpm -q returns 0 (success) when package is installed
             if self.command_executor.Execute(check_command) != 0:
-                self.logger.log(f"{package} not installed, marking for installation.")
+                self.logger.log("{0} not installed, marking for installation.".format(package))
                 packages_to_install.append(package)
             else:
-                self.logger.log(f"{package} is already installed.")
+                self.logger.log("{0} is already installed.".format(package))
         
         if packages_to_install:
             packages_to_install_str = " ".join(packages_to_install)
-            self.logger.log(f"Packages to install: {packages_to_install_str}")
+            self.logger.log("Packages to install: {0}".format(packages_to_install_str))
             
-            install_command = f"tdnf install -y {packages_to_install_str}"
-            self.logger.log(f"Running command: {install_command}")
+            install_command = "tdnf install -y {0}".format(packages_to_install_str)
+            self.logger.log("Running command: {0}".format(install_command))
             
             # Execute the installation command
             return_code = self.command_executor.Execute(install_command)
             
-            self.logger.log(f"Installation of packages completed with return code: {return_code}")
+            self.logger.log("Installation of packages completed with return code: {0}".format(return_code))
         else:
             self.logger.log("All required packages are already installed.")
         
