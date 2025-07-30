@@ -469,7 +469,7 @@ def install():
 
             full_msg = "{0} {1} {2}".format(error_msg, troubleshooting, manual_fix)
             hutil_log_info(full_msg)
-            return 1, full_msg
+            # return 1, full_msg
 
     # If the package is not already installed, proceed with installation otherwise skip since it is the same package version
     if not same_package_installed:
