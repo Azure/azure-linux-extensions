@@ -8,7 +8,7 @@ from Common import DeviceItem
 from Common import CommonVariables
 from CommandExecutor import CommandExecutor
 
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 from .test_utils import mock_dir_structure, MockDistroPatcher
 try:
     import unittest.mock as mock  # python 3+

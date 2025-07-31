@@ -2,7 +2,7 @@ import unittest
 import EncryptionSettingsUtil
 import Common
 from io import StringIO
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 try:
     import unittest.mock as mock # python 3+ 
 except ImportError:

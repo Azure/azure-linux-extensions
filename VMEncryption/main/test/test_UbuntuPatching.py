@@ -5,7 +5,7 @@ from patch.UbuntuPatching import UbuntuPatching
 from DiskUtil import DiskUtil
 from Common import CommonVariables
 from CommandExecutor import CommandExecutor
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 try:
     builtins_open = "builtins.open"
     import unittest.mock as mock # python3+

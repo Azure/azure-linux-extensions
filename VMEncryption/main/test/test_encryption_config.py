@@ -22,7 +22,7 @@ import unittest
 
 from EncryptionConfig import EncryptionConfig
 from EncryptionEnvironment import EncryptionEnvironment
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 
 class Test_EncryptionConfig(unittest.TestCase):
     def setUp(self):

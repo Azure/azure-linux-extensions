@@ -22,7 +22,7 @@ import unittest
 import Common
 import EncryptionEnvironment
 import json
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 
 try:
     import unittest.mock as mock # python 3+ 
