@@ -16,6 +16,7 @@ supported_dists_x86_64 = {'redhat' : ['7', '8', '9'], # Rhel
 }
 
 supported_dists_aarch64 = {'red hat' : ['8'], # Rhel
+                    'redhat' : ['8'], # Rhel
                     'ubuntu' : ['18.04', '20.04', '22.04', '24.04'], # Ubuntu
                     'alma' : ['8'], # Alma
                     'centos' : ['7'], # CentOS
