@@ -116,7 +116,7 @@ if sys.version_info < (2,7):
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
 BundleFileNameDeb = 'azuremonitoragent.deb'
-BundleFileNameRpm = 'azuremonitoragent.rpm'
+BundleFileNameRpm = 'azuremonitoragent-1.36.1-1078.x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -315,9 +315,10 @@ def cache_configuration_files():
         else:
             hutil_log_info("No /opt runtime directory found to cache")
         
-        # Cache log directories
+        # Cache log and tenant directories
         log_dirs_to_cache = [
-            '/var/opt/microsoft/azuremonitoragent/log'
+            '/var/opt/microsoft/azuremonitoragent/log',
+            '/etc/opt/microsoft/azuremonitoragent/tenants'
         ]
         
         for log_dir in log_dirs_to_cache:
@@ -332,7 +333,7 @@ def cache_configuration_files():
         # Cache other important config files
         additional_files = [
             '/etc/default/azuremonitoragent',
-            AMAExtensionLogRotateFilePath
+            AMAExtensionLogRotateFilePath,
         ]
         
         for file_path in additional_files:
@@ -402,6 +403,7 @@ def restore_configuration_files():
         # Restore log directories
         log_dirs_to_restore = [
             ('log', '/var/opt/microsoft/azuremonitoragent/log'),
+            ('tenants', '/etc/opt/microsoft/azuremonitoragent/tenants')  # Restore tenants directory
         ]
         
         for cache_dir_name, dest_path in log_dirs_to_restore:
@@ -416,7 +418,7 @@ def restore_configuration_files():
                 
                 # Restore from cache
                 copytree(cache_log_dir, dest_path)
-                hutil_log_info("Restored log directory: {0}".format(dest_path))
+                hutil_log_info("Restored {0} directory: {1}".format(cache_dir_name, dest_path))
                 restored_something = True
         
         # Restore additional config files
