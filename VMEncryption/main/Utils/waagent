@@ -1343,6 +1343,19 @@ class marinerDistro(redhatDistro):
         super(marinerDistro, self).__init__()
 
 ############################################################
+#   azurelinuxDistro
+############################################################    
+
+class azurelinuxDistro(redhatDistro):
+    """
+    Azurelinux Distro concrete class
+    Put AzureLinux specific behavior here...
+    """
+
+    def __init__(self):
+        super(azurelinuxDistro, self).__init__()
+
+############################################################
 #   asianuxDistro
 ############################################################    
 

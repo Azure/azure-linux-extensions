@@ -339,9 +339,9 @@ class redhatPatching(AbstractPatching):
             #Add the plain os disk base to the "LVM Reject list" and add osencrypt device to the "Accept list"
             self.append_contents_to_file('\ndevices { filter = ["a|osencrypt|", "r|' + root_partuuid + '|"] }\n', '/etc/lvm/lvm.conf')
             # Force dracut to include LVM and Crypt modules
-            self.append_contents_to_file('\nadd_dracutmodules+=" crypt lvm"\n',
+            self.append_contents_to_file('\nadd_dracutmodules+=" crypt lvm "\n',
                                           '/etc/dracut.conf.d/ade.conf')
         else:
-            self.append_contents_to_file('\nadd_dracutmodules+=" crypt"\n',
+            self.append_contents_to_file('\nadd_dracutmodules+=" crypt "\n',
                                           '/etc/dracut.conf.d/ade.conf')
             self.add_kernelopts(["root=/dev/mapper/osencrypt"])
