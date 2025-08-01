@@ -3,7 +3,7 @@ import unittest
 from Common import CryptItem
 from EncryptionEnvironment import EncryptionEnvironment
 from CryptMountConfigUtil import CryptMountConfigUtil
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 from .test_utils import MockDistroPatcher
 
 try:

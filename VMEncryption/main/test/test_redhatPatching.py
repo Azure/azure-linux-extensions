@@ -5,7 +5,7 @@ from patch.redhatPatching import redhatPatching
 from DiskUtil import DiskUtil
 from Common import CommonVariables
 from CommandExecutor import CommandExecutor
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 from CommandExecutor import ProcessCommunicator
 try:
     builtins_open = "builtins.open"

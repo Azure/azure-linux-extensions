@@ -1,0 +1,4 @@
+# Virtual environments
+main/vmencryption-test-env/
+**/venv/
+**/*-test-env/

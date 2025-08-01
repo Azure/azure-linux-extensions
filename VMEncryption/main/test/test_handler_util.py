@@ -20,7 +20,7 @@
 
 import unittest
 import os
-from . import console_logger
+import console_logger
 import glob
 import Common
 from tempfile import mkstemp

@@ -25,7 +25,7 @@ from ResourceDiskUtil import ResourceDiskUtil
 from DiskUtil import DiskUtil
 from CryptMountConfigUtil import CryptMountConfigUtil
 from Common import CommonVariables
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 try:
     import unittest.mock as mock  # python3+
 except ImportError:

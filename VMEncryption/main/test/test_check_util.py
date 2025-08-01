@@ -5,7 +5,7 @@ from check_util import CheckUtil
 from IMDSUtil import IMDSStoredResults
 from Common import CommonVariables
 from io import StringIO
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 from .test_utils import MockDistroPatcher
 try:
     builtins_open = "builtins.open"

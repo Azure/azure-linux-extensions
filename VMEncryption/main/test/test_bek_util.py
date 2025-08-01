@@ -8,7 +8,7 @@ from BekUtil import BekUtil
 from AbstractBekUtilImpl import BekMissingException,AbstractBekUtilImpl
 from DiskUtil import DiskUtil
 from Common import CommonVariables
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 
 class Test_Bek_Util(unittest.TestCase):
     def setUp(self):
