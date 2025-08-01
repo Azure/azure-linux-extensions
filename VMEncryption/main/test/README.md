@@ -75,7 +75,7 @@ except ImportError:
     import mock  # Python 2.7 compatibility
 
 from YourModule import YourClass
-from .console_logger import ConsoleLogger
+from console_logger import ConsoleLogger
 
 class Test_YourClass(unittest.TestCase):
     def setUp(self):
