@@ -455,12 +455,6 @@ def install():
                 same_package_installed = True
         else:
             hutil_log_error("A different version of azuremonitoragent package is already installed. Attempting to uninstall it before installing the new version.")
-            exit_code, output = uninstall_azure_monitor_agent(installed_versions)
-
-            hutil_log_info("Uninstall exit code: {0}, output: {1}".format(exit_code, output))
-
-            if (exit_code != 0):
-                hutil_log_error("Force uninstall failed with error: {0}".format(output))
 
     # If the package is not already installed, proceed with installation otherwise skip since it is the same package version
     if not same_package_installed:
