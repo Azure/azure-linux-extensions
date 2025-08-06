@@ -615,13 +615,13 @@ def uninstall_azure_monitor_agent(installed_versions):
     # possibly check for AMA package then return      
     # check if the uninstall was successful
     if PackageManager == "dpkg":
-        exit_code, _ = run_command_and_log("dpkg-query -W -f='${Package}_${Version}\n' 'azuremonitoragent*' 2>/dev/null", check_error=False)
+        exit_code, remaining_packages = run_command_and_log("dpkg-query -W -f='${Package}_${Version}\n' 'azuremonitoragent*' 2>/dev/null", check_error=False)
     elif PackageManager == "rpm":
-        exit_code, _ = run_command_and_log("rpm -q azuremonitoragent", check_error=False)
+        exit_code, remaining_packages = run_command_and_log("rpm -q azuremonitoragent", check_error=False)
 
     if exit_code == 0:
         # Since the previous uninstall failed we are going down the route of uninstall without dep and pre/post
-        hutil_log_info("Forcing uninstall due to something missing")
+        hutil_log_info("Forcing uninstall due to something missing.\n Remaining packages: {0}".format(remaining_packages))
         AMAUninstallCommandForce = ""
         if PackageManager == "dpkg":
             # we can remove the post and pre scripts first then purge
@@ -630,13 +630,24 @@ def uninstall_azure_monitor_agent(installed_versions):
                                             retry_check = retry_if_dpkg_or_rpm_locked,
                                             final_check = final_check_if_dpkg_or_rpm_locked)
             AMAUninstallCommandForce = "dpkg --force-all -P azuremonitoragent"
-        elif PackageManager == "rpm":
-            AMAUninstallCommandForce = "rpm -e --noscripts --nodeps azuremonitoragent"
-
-        hutil_log_info('Running command "{0}"'.format(AMAUninstallCommandForce))
-        exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
+            hutil_log_info('Running command "{0}"'.format(AMAUninstallCommandForce))
+            exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
                                             retry_check = retry_if_dpkg_or_rpm_locked,
                                             final_check = final_check_if_dpkg_or_rpm_locked)
+        elif PackageManager == "rpm":
+            AMAUninstallCommandForce = "rpm -e --noscripts --nodeps {0}"
+            # At the moment this is just a fix for RPM as we have not seen any instances of this needing to be done for dpkg
+            for package in remaining_packages.split('\n'):
+                # Clean the package name and create uninstall command
+                package = package.strip()
+                if not package:
+                    continue
+                AMAUninstallCommandForce = AMAUninstallCommandForce.format(package)
+
+            hutil_log_info('Running command "{0}"'.format(AMAUninstallCommandForce))
+            exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
+                                                retry_check = retry_if_dpkg_or_rpm_locked,
+                                                final_check = final_check_if_dpkg_or_rpm_locked)
 
         hutil_log_info("Finished force uninstall with exit code {0} and output: {1}".format(exit_code, output))
         return exit_code, output
