@@ -667,23 +667,22 @@ def uninstall_azure_monitor_agent():
                 exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
                                                     retry_check = retry_if_dpkg_or_rpm_locked,
                                                     final_check = final_check_if_dpkg_or_rpm_locked)
-            
-                # Last verification to ensure all packages are uninstalled
-                exit_code, remaining_packages = get_installed_package_version()
-                if exit_code == 0:
-                    output = "Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages)
-                    hutil_log_info("Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages))
-                    return 1, output
-                else:
-                    hutil_log_info("Uninstall command removed all packages successfully after using --noscripts --nodeps.")
-                    return 0, "Uninstall command removed all packages successfully after using --noscripts --nodeps."
 
         hutil_log_info("Finished uninstall_azure_monitor_agent() for {0} with exit code {1} and output: {2}".format(PackageManager, exit_code, output))
-        return exit_code, output
+
+        # Check if packages are still installed
+        exit_code, remaining_packages = get_installed_package_version()
+        if exit_code == 0:
+            output = "Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages)
+            hutil_log_info("Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages))
+            return 1, output
+        else:
+            hutil_log_info("Uninstall command removed all packages successfully after using ____.")
+            return 0, "Azure Monitor Agent packages uninstalled successfully after using performing ___ "
     # Since there was no indication of AMA, we assume it was uninstalled successfully
     else:
-        hutil_log_info("Azure Monitor Agent packages uninstalled successfully")
-        return 0, "Azure Monitor Agent packages uninstalled successfully"
+        hutil_log_info("Azure Monitor Agent is not installed, nothing to uninstall.")
+        return 0, "Azure Monitor Agent is not installed, nothing to uninstall."
 def enable():
     """
     Start the Azure Monitor Linux Agent Service
