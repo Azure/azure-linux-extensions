@@ -624,6 +624,7 @@ def uninstall_azure_monitor_agent():
     # Check if azuremonitoragent is still installed, exit code will be non-zero if it is not.
     exit_code, remaining_packages = get_installed_package_version()
 
+    commands_used = []
     if exit_code == 0:
         # Since the previous uninstall failed we are going down the route of uninstall without dep and pre/post
         hutil_log_info("Forcing uninstall due to something missing.\n Remaining packages: {0}".format(remaining_packages))
@@ -639,6 +640,7 @@ def uninstall_azure_monitor_agent():
             exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
                                             retry_check = retry_if_dpkg_or_rpm_locked,
                                             final_check = final_check_if_dpkg_or_rpm_locked)
+            commands_used.extend([RemoveScriptsCommand, AMAUninstallCommandForce])
         elif PackageManager == "rpm":
             # First try to mass uninstall AMA by using the --allmatches flag for rpm
             AMAUninstallCommand = "rpm -e --allmatches azuremonitoragent"
@@ -647,6 +649,7 @@ def uninstall_azure_monitor_agent():
                                                 retry_check = retry_if_dpkg_or_rpm_locked,
                                                 final_check = final_check_if_dpkg_or_rpm_locked)
 
+            commands_used.append(AMAUninstallCommand)
             # Requery to see what is left after the mass uninstall
             exit_code, remaining_packages = get_installed_package_version()
 
@@ -662,8 +665,9 @@ def uninstall_azure_monitor_agent():
                     if not package:
                         continue
                     AMAUninstallCommandForce = AMAUninstallCommandForce.format(package)
-
-                hutil_log_info('Running command "{0}"'.format(AMAUninstallCommandForce))
+                    commands_used.append(AMAUninstallCommandForce)
+                    hutil_log_info('Running command "{0}"'.format(AMAUninstallCommandForce))
+                
                 exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
                                                     retry_check = retry_if_dpkg_or_rpm_locked,
                                                     final_check = final_check_if_dpkg_or_rpm_locked)
@@ -677,12 +681,12 @@ def uninstall_azure_monitor_agent():
             hutil_log_info("Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages))
             return 1, output
         else:
-            hutil_log_info("Uninstall command removed all packages successfully after using ____.")
-            return 0, "Azure Monitor Agent packages uninstalled successfully after using performing ___ "
-    # Since there was no indication of AMA, we assume it was uninstalled successfully
+            hutil_log_info("Uninstall command removed all packages successfully after using: {0}".format(", ".join(commands_used)))
+            return 0, "Azure Monitor Agent packages uninstalled successfully after using: {0}".format(", ".join(commands_used))
+    # Since there was no indication of AMA, we can assume it was uninstalled successfully
     else:
-        hutil_log_info("Azure Monitor Agent is not installed, nothing to uninstall.")
-        return 0, "Azure Monitor Agent is not installed, nothing to uninstall."
+        hutil_log_info("Azure Monitor Agent has been uninstalled.")
+        return 0, "Azure Monitor Agent has been uninstalled."
 def enable():
     """
     Start the Azure Monitor Linux Agent Service
