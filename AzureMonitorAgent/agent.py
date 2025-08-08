@@ -117,8 +117,8 @@ if sys.version_info < (2,7):
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
-BundleFileNameDeb = 'azuremonitoragent.deb'
-BundleFileNameRpm = 'azuremonitoragent.rpm'
+BundleFileNameDeb = 'azuremonitoragent_1.35.9-1053_x86_64.deb'
+BundleFileNameRpm = 'azuremonitoragent-1.36.1-1078.x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -364,51 +364,35 @@ def copy_mdsd_fluentbit_binaries():
 
     rmtree(os.getcwd() + "/lib")    
 
-def get_installed_package_version(package_name):
+def get_installed_package_version():
     """
-    Get the installed version of a package, including architecture.
+    Gets a list of installed version of the Azure Monitor Agent package.
     In the case of dpkg, we need to rsplit() the architecture part, see below for why.
     Examples of version_string:
-      - RPM: azuremonitoragent-1.33.4-build.main.872.x86_64.rpm -> 1.33.4-build.main.000.x86_64
-      - DEB: azuremonitoragent_1.35.4-971_x86_64.deb -> 1.35.4-000
-    Returns: (is_installed, version_string)
+      - RPM: azuremonitoragent-1.33.4-build.main.872.x86_64.rpm -> 1.33.4-build.main.872.x86_64
+      - DEB: azuremonitoragent_1.35.4-971_x86_64.deb -> 1.35.4-971_x86_64
+    Returns: (is_installed, version_list)
     """
     if PackageManager == "dpkg":
-        # We need Architecture to match BundleFileNameDeb
-        cmd = "dpkg-query -W -f='${{Version}}.${{Architecture}}' {0} 2>/dev/null".format(package_name)
+        cmd = "dpkg-query -W -f='${Package}_${Version}\n' 'azuremonitoragent*' 2>/dev/null"
     elif PackageManager == "rpm":
-        cmd = "rpm -q --qf '%{{VERSION}}-%{{RELEASE}}.%{{ARCH}}' {0} 2>/dev/null".format(package_name)
+        cmd = "rpm -q azuremonitoragent"
     else:
-        return False, "Could not determine package manager"
+        return 1, "Could not determine package manager"
 
     exit_code, output = run_command_and_log(cmd, check_error=False)
 
     if exit_code != 0 or not output:
-        return False, "Package not found"
+        return 1, "Package not found"
 
-    version_string = output.strip()
+    version_list = output.strip().split('\n')
+    return 0, version_list
 
-    if PackageManager == "dpkg":
-        # For dpkg, the version string is in the format: 1.33.4-build.main.872.amd64
-        # We want to return just the version part: 1.33.4-build.main.872
-        version_string = version_string.rsplit('.', 1)[0]
-    return True, version_string
-
-def get_bundle_version():
-    """
-    Extract version number from bundle filename. (i.e. 1.3***...<build #>)
-    Examples:
-      - RPM: azuremonitoragent-1.33.4-build.main.000.x86_64.rpm -> 1.33.4-build.main.000.x86_64
-      - DEB: azuremonitoragent_1.35.4-971_x86_64.deb -> 1.35.4-000
-    """
-    if PackageManager == "dpkg":
-        # Match between first underscore and next underscore (version)
-        match = re.search(r'azuremonitoragent_([^_]+)_', BundleFileNameDeb)
-    else:  # rpm
-        # Match between first dash and last dot before arch (version)
-        match = re.search(r'azuremonitoragent-([^-]+(?:-[^-]+)*)\.', BundleFileNameRpm)
-    if match:
-        return match.group(1)
+def get_current_bundle_file():
+    if PackageManager == 'dpkg':
+        return BundleFileNameDeb.rsplit('.deb', 1)[0]  # Remove .deb extension
+    elif PackageManager == 'rpm':
+        return BundleFileNameRpm.rsplit('.rpm', 1)[0]  # Remove .rpm extension
     return ""
 
 def install():
@@ -447,29 +431,38 @@ def install():
     same_package_installed = False
 
     # Check if the package is already installed with the correct version
-    is_installed, installed_version = get_installed_package_version("azuremonitoragent")
-    bundle_version = get_bundle_version()
+    exit_code, installed_versions = get_installed_package_version()
 
     # Check if the package is already installed, if so determine if it is the same as the bundle or not
-    if is_installed:
-        hutil_log_info("Found installed azuremonitoragent version: {0}".format(installed_version))
-        hutil_log_info("Bundle version: {0}".format(bundle_version))
+    if exit_code == 0:
+        hutil_log_info("Found installed azuremonitoragent version(s): {0}".format(installed_versions))
+        current_bundle = get_current_bundle_file()
+        hutil_log_info("Current bundle file: {0}".format(current_bundle))
 
-        if installed_version == bundle_version:
-            hutil_log_info("This version of azuremonitoragent package is already installed. Skipping package install.")
-            same_package_installed = True
+        # Check if already have this version of AMA installed, if so, no-op for install of AMA
+        if len(installed_versions) == 1:
+            package_name = installed_versions[0]
+            if PackageManager == 'dpkg':
+                architecture = ''
+                if platform.machine() == 'x86_64':
+                    architecture = '_x86_64'
+                elif platform.machine() == 'aarch64':
+                    architecture = '_aarch64'
+                # need to change the ending from amd64 to x86_64 and arm64 to aarch64
+                package_name = package_name + architecture
+            if current_bundle == package_name:
+                hutil_log_info("This version of azuremonitoragent package is already installed. Skipping package install.")
+                same_package_installed = True
         else:
-            error_msg = "A different version of azuremonitoragent package is already installed."
-            troubleshooting = "Try deleting the VM extension via the portal or CLI using 'az vm extension delete -n AzureMonitorLinuxAgent -g <resource group name> -n <VM name>'."
+            hutil_log_error("Multiple versions of azuremonitoragent package found: {0}\n This is undefined behavior, we recommend running the following:".format(installed_versions))
 
-            if PackageManager == "dpkg":
-                manual_fix = "If that does not work you may need to repair manually by running 'rm /var/lib/dpkg/info/azuremonitoragent.*' followed by 'dpkg --force-all -P azuremonitoragent'"
-            else:  # rpm
-                manual_fix = "If that does not work you may need to repair manually by running 'rpm -e --noscripts --nodeps azuremonitoragent'"
-
-            full_msg = "{0} {1} {2}".format(error_msg, troubleshooting, manual_fix)
-            hutil_log_info(full_msg)
-            # return 1, full_msg
+            if PackageManager == 'dpkg':
+                hutil_log_error("Run the following command first:\n dpkg --purge azuremonitoragent. If this does not work try the following with caution:\n"
+                "'rm /var/lib/dpkg/info/azuremonitoragent.*' followed by 'dpkg --force-all -P azuremonitoragent'")
+            else:
+                hutil_log_error("Run the following command first: ")
+                hutil_log_error("'rpm -q azuremonitoragent' and for each version run: rpm -e azuremonitoragent-(version)-(bundle_number).(architecture), or rpm -e --deleteall azuremonitoragent\n An example of the command is as follows: rpm -e {0}".format(installed_versions[0]))
+                hutil_log_error("If the following does not work please try the following: rpm -e --noscripts --nodeps azuremonitoragent-(version)-(bundle_number).(architecture). I.e. rpm -e --noscripts --nodeps {0}".format(installed_versions[0]))
 
     # If the package is not already installed, proceed with installation otherwise skip since it is the same package version
     if not same_package_installed:
@@ -556,19 +549,48 @@ def uninstall():
     find_package_manager("Uninstall")
 
     # Before we uninstall, we need to ensure AMA is installed to begin with
-    is_installed, _ = get_installed_package_version("azuremonitoragent")
-    if not is_installed:
+    exit_code, installed_versions = get_installed_package_version()
+    if exit_code != 0:
         hutil_log_info("Azure Monitor Agent is not installed, nothing to uninstall.")
         return 0, "Azure Monitor Agent is not installed, nothing to uninstall."
 
-    AMAUninstallCommand = ""
-    if PackageManager == "dpkg":
-        AMAUninstallCommand = "dpkg -P azuremonitoragent"
-    elif PackageManager == "rpm":
-        AMAUninstallCommand = "rpm -e azuremonitoragent"
-    else:
+    if PackageManager != "dpkg" and PackageManager != "rpm":
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg" )
-    hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
+        # return 1, "Unsupported operating system: {0}".format(PackageManager)
+
+    # Attempt to uninstall each specific
+
+     # Try a specific package uninstall for rpm
+    if PackageManager == "rpm":
+        purge_cmd_template = "rpm -e {0}"    
+        # Process each package
+        for package_name in installed_versions:
+            if not package_name.strip():
+                continue
+            
+            package_name = package_name.strip()
+
+            # Clean the package name and create uninstall command
+            uninstall_command = purge_cmd_template.format(package_name)
+
+            hutil_log_info("Removing package: {0} by running {1}".format(package_name, uninstall_command))
+
+            # Execute uninstall command with retries
+            exit_code, output = run_command_with_retries_output(
+                uninstall_command, 
+                retries=4,
+                retry_check=retry_if_dpkg_or_rpm_locked,
+                final_check=final_check_if_dpkg_or_rpm_locked
+            )
+    elif PackageManager == "dpkg":
+        AMAUninstallCommand = "dpkg -P azuremonitoragent"
+        hutil_log_info("Removing package: azuremonitoragent by running {0}".format(AMAUninstallCommand))
+        exit_code, output = run_command_with_retries_output(
+            AMAUninstallCommand, 
+            retries=4,
+            retry_check=retry_if_dpkg_or_rpm_locked,
+            final_check=final_check_if_dpkg_or_rpm_locked
+        )
 
     remove_localsyslog_configs()
 
@@ -585,48 +607,86 @@ def uninstall():
 
     # Retry, since uninstall can fail due to concurrent package operations
     try:
-        is_still_installed = False
-        exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
-                                            retry_check = retry_if_dpkg_or_rpm_locked,
-                                            final_check = final_check_if_dpkg_or_rpm_locked)
-
-        # check if the uninstall was successful
-        if PackageManager == "dpkg":
-            exit_code, _ = run_command_and_log("dpkg-query -W -f='${Status}' azuremonitoragent 2>/dev/null", check_error=False)
-            is_still_installed = (exit_code == 0)
-        elif PackageManager == "rpm":
-            exit_code, _ = run_command_and_log("rpm -q azuremonitoragent", check_error=False)
-            is_still_installed = (exit_code == 0)
-
-        # If there is still a package leftover
-        if is_still_installed:
-            AMAUninstallCommandForce = ""
-            # do a force uninstall since the package is still installed
-            if PackageManager == "dpkg":
-                # we can remove the post and pre scripts first then purge
-                RemoveScriptsCommand = "rm /var/lib/dpkg/info/azuremonitoragent.*"
-                run_command_with_retries_output(RemoveScriptsCommand, retries = 4,
-                                                retry_check = retry_if_dpkg_or_rpm_locked,
-                                                final_check = final_check_if_dpkg_or_rpm_locked)
-                AMAUninstallCommandForce = "dpkg --force-all -P azuremonitoragent"
-            elif PackageManager == "rpm":
-                AMAUninstallCommandForce = "rpm -e --noscripts --nodeps azuremonitoragent"
-
-            hutil_log_info("Forcing uninstall due to something missing")
-            exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
-                                                retry_check = retry_if_dpkg_or_rpm_locked,
-                                                final_check = final_check_if_dpkg_or_rpm_locked)
-        else:
-            # If the package is not installed our exit code is non-zero so we need to "reset" it to 0
-            hutil_log_info("Uninstall command executed successfully, package is no longer installed.")
-            output = "Azure Monitor Agent package uninstalled successfully"
-            exit_code = 0
+        exit_code, output = uninstall_azure_monitor_agent()
     except Exception as ex:
         exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
                 'Stacktrace: {1}'.format(ex, traceback.format_exc())
     return exit_code, output
 
+def uninstall_azure_monitor_agent():
+    """
+    Uninstall the Azure Monitor Linux Agent package with the possibility of multiple existing packages.
+    (Just for rpm) This function will attempt to uninstall each package in the installed_versions list.
+    If it still persists, a force uninstall is done.
+    Returns: (exit_code, output_message)
+    """
+    # Check if azuremonitoragent is still installed, exit code will be non-zero if it is not.
+    exit_code, remaining_packages = get_installed_package_version()
+
+    commands_used = []
+    if exit_code == 0:
+        # Since the previous uninstall failed we are going down the route of uninstall without dep and pre/post
+        hutil_log_info("Forcing uninstall due to something missing.\n Remaining packages: {0}".format(remaining_packages))
+        AMAUninstallCommandForce = ""
+        if PackageManager == "dpkg":
+            # we can remove the post and pre scripts first then purge
+            RemoveScriptsCommand = "rm /var/lib/dpkg/info/azuremonitoragent.*"
+            run_command_with_retries_output(RemoveScriptsCommand, retries = 4,
+                                            retry_check = retry_if_dpkg_or_rpm_locked,
+                                            final_check = final_check_if_dpkg_or_rpm_locked)
+            AMAUninstallCommandForce = "dpkg --force-all -P azuremonitoragent"
+            hutil_log_info('Running command "{0}"'.format(AMAUninstallCommandForce))
+            exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
+                                            retry_check = retry_if_dpkg_or_rpm_locked,
+                                            final_check = final_check_if_dpkg_or_rpm_locked)
+            commands_used.extend([RemoveScriptsCommand, AMAUninstallCommandForce])
+        elif PackageManager == "rpm":
+            # First try to mass uninstall AMA by using the --allmatches flag for rpm
+            AMAUninstallCommand = "rpm -e --allmatches azuremonitoragent"
+            hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
+            exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
+                                                retry_check = retry_if_dpkg_or_rpm_locked,
+                                                final_check = final_check_if_dpkg_or_rpm_locked)
+
+            commands_used.append(AMAUninstallCommand)
+            # Requery to see what is left after the mass uninstall
+            exit_code, remaining_packages = get_installed_package_version()
+
+            # If the above command fails, we will try to force uninstall each package
+            # This is a workaround for the case where the package is not removed properly
+            if exit_code == 0:
+                hutil_log_info("Failed to uninstall azuremonitoragent with --allmatches, trying to force uninstall each package individually.")
+                AMAUninstallCommandForce = "rpm -e --noscripts --nodeps {0}"
+                # At the moment this is just a fix for RPM as we have not seen any instances of this needing to be done for dpkg
+                for package in remaining_packages:
+                    # Clean the package name and create uninstall command
+                    package = package.strip()
+                    if not package:
+                        continue
+                    AMAUninstallCommandForce = AMAUninstallCommandForce.format(package)
+                    commands_used.append(AMAUninstallCommandForce)
+                    hutil_log_info('Running command "{0}"'.format(AMAUninstallCommandForce))
+                
+                exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
+                                                    retry_check = retry_if_dpkg_or_rpm_locked,
+                                                    final_check = final_check_if_dpkg_or_rpm_locked)
+
+        hutil_log_info("Finished uninstall_azure_monitor_agent() for {0} with exit code {1} and output: {2}".format(PackageManager, exit_code, output))
+
+        # Check if packages are still installed
+        exit_code, remaining_packages = get_installed_package_version()
+        if exit_code == 0:
+            output = "Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages)
+            hutil_log_info("Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages))
+            return 1, output
+        else:
+            hutil_log_info("Uninstall command removed all packages successfully after using: {0}".format(", ".join(commands_used)))
+            return 0, "Azure Monitor Agent packages uninstalled successfully after using: {0}".format(", ".join(commands_used))
+    # Since there was no indication of AMA, we can assume it was uninstalled successfully
+    else:
+        hutil_log_info("Azure Monitor Agent has been uninstalled.")
+        return 0, "Azure Monitor Agent has been uninstalled."
 def enable():
     """
     Start the Azure Monitor Linux Agent Service
