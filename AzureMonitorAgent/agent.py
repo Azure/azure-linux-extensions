@@ -560,7 +560,7 @@ def uninstall():
 
     # Attempt to uninstall each specific
 
-     # Try a specific package uninstall for rpm
+    # Try a specific package uninstall for rpm
     if PackageManager == "rpm":
         purge_cmd_template = "rpm -e {0}"    
         # Process each package
@@ -627,7 +627,7 @@ def uninstall_azure_monitor_agent():
     commands_used = []
     if exit_code == 0:
         # Since the previous uninstall failed we are going down the route of uninstall without dep and pre/post
-        hutil_log_info("Forcing uninstall due to something missing.\n Remaining packages: {0}".format(remaining_packages))
+        hutil_log_info("Initial uninstall command did not remove all packages. Remaining packages: {0}".format(remaining_packages))
         AMAUninstallCommandForce = ""
         if PackageManager == "dpkg":
             # we can remove the post and pre scripts first then purge
@@ -643,6 +643,7 @@ def uninstall_azure_monitor_agent():
             commands_used.extend([RemoveScriptsCommand, AMAUninstallCommandForce])
         elif PackageManager == "rpm":
             # First try to mass uninstall AMA by using the --allmatches flag for rpm
+            # This is a more robust version of uninstall() since it uses the --allmatches flag
             AMAUninstallCommand = "rpm -e --allmatches azuremonitoragent"
             hutil_log_info('Running command "{0}"'.format(AMAUninstallCommand))
             exit_code, output = run_command_with_retries_output(AMAUninstallCommand, retries = 4,
@@ -650,15 +651,15 @@ def uninstall_azure_monitor_agent():
                                                 final_check = final_check_if_dpkg_or_rpm_locked)
 
             commands_used.append(AMAUninstallCommand)
-            # Requery to see what is left after the mass uninstall
+            # Query to see what is left after using the --allmatches uninstall
             exit_code, remaining_packages = get_installed_package_version()
 
-            # If the above command fails, we will try to force uninstall each package
-            # This is a workaround for the case where the package is not removed properly
+            # If the above command fails, we will try to force uninstall each package by using the --noscripts and --nodeps flags
             if exit_code == 0:
                 hutil_log_info("Failed to uninstall azuremonitoragent with --allmatches, trying to force uninstall each package individually.")
+                # --noscripts and --nodeps flags are used to avoid running any pre/post scripts and skip dependencies test
+                # https://jfearn.fedorapeople.org/en-US/RPM/4/html/RPM_Guide/ch03s03s03.html
                 AMAUninstallCommandForce = "rpm -e --noscripts --nodeps {0}"
-                # At the moment this is just a fix for RPM as we have not seen any instances of this needing to be done for dpkg
                 for package in remaining_packages:
                     # Clean the package name and create uninstall command
                     package = package.strip()
