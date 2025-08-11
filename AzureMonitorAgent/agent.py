@@ -441,7 +441,7 @@ def install():
             hutil_log_info("Current bundle file: {0}".format(current_bundle))
             package_name = installed_versions[0]
 
-            # This is to make sure dpkg's packave name is in the same format as the BundileFileNameDeb
+            # This is to make sure dpkg's package name is in the same format as the BundileFileNameDeb
             if PackageManager == 'dpkg':
                 architecture = ''
                 if platform.machine() == 'x86_64':
