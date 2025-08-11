@@ -466,7 +466,7 @@ def install():
 
     # If the same bundle of Azure Monitor Agent package is not already installed, proceed with installation
     if not same_package_installed:
-        hutil_log_info("Installing Azure Monitor Agent package since same bundle is not installed.")
+        hutil_log_info("Installing Azure Monitor Agent package.")
         package_directory = os.path.join(os.getcwd(), PackagesDirectory)
         bundle_path = os.path.join(package_directory, BundleFileName)
         os.chmod(bundle_path, 100)
