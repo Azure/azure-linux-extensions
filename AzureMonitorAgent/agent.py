@@ -464,9 +464,9 @@ def install():
                 hutil_log_error("'rpm -q azuremonitoragent' and for each version run: rpm -e azuremonitoragent-(version)-(bundle_number).(architecture), or rpm -e --deleteall azuremonitoragent\n An example of the command is as follows: rpm -e {0}".format(installed_versions[0]))
                 hutil_log_error("If the following does not work please try the following: rpm -e --noscripts --nodeps azuremonitoragent-(version)-(bundle_number).(architecture). I.e. rpm -e --noscripts --nodeps {0}".format(installed_versions[0]))
 
-    # If the package is not already installed, proceed with installation otherwise skip since it is the same package version
+    # If the same bundle of Azure Monitor Agent package is not already installed, proceed with installation
     if not same_package_installed:
-        hutil_log_info("No previous package found, installing Azure Monitor Agent package.")
+        hutil_log_info("Installing Azure Monitor Agent package since same bundle is not installed.")
         package_directory = os.path.join(os.getcwd(), PackagesDirectory)
         bundle_path = os.path.join(package_directory, BundleFileName)
         os.chmod(bundle_path, 100)
