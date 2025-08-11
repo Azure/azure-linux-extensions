@@ -366,24 +366,23 @@ def copy_mdsd_fluentbit_binaries():
 
 def get_installed_package_version():
     """
-    Gets a list of installed version of the Azure Monitor Agent package.
-    In the case of dpkg, we need to rsplit() the architecture part, see below for why.
-    Examples of output based on PackageManager:
-      - RPM: azuremonitoragent-1.33.4-build.main.872.x86_64.rpm -> 1.33.4-build.main.872.x86_64
-      - DPKG: azuremonitoragent_1.35.4-971_x86_64.deb -> 1.35.4-971_x86_64
+    Returns if Azure Monitor Agent is installed and a list of installed version of the Azure Monitor Agent package.
     Returns: (is_installed, version_list)
     """
     if PackageManager == "dpkg":
+        # In the case of dpkg, we specfiy only Package and Version as architecture is written as amd64/arm64 instead of x86_64/aarch64.
         cmd = "dpkg-query -W -f='${Package}_${Version}\n' 'azuremonitoragent*' 2>/dev/null"
     elif PackageManager == "rpm":
         cmd = "rpm -q azuremonitoragent"
     else:
-        return False, "Could not determine package manager"
+        hutil_log_error("Could not determine package manager.")
+        return False, []
 
     exit_code, output = run_command_and_log(cmd, check_error=False)
 
     if exit_code != 0 or not output:
-        return False, "Azure Monitor Agent package not found"
+        hutil_log_info("Azure Monitor Agent package not found after running {0}.".format(cmd))
+        return False, []
 
     version_list = output.strip().split('\n')
     return True, version_list
@@ -678,11 +677,11 @@ def force_uninstall_azure_monitor_agent():
         # Check if packages are still installed
         is_still_installed, remaining_packages = get_installed_package_version()
         if is_still_installed:
-            output = "Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages)
-            hutil_log_info("Uninstall command did not remove all packages, remaining packages: {0}".format(remaining_packages))
+            output = "Force uninstall did not remove all packages, remaining packages: {0}".format(remaining_packages)
+            hutil_log_info("Force uninstall did not remove all packages, remaining packages: {0}".format(remaining_packages))
             return 1, output
         else:
-            hutil_log_info("Uninstall command removed all packages successfully after using: {0}".format(", ".join(commands_used)))
+            hutil_log_info("Force uninstall removed all packages successfully after using: {0}".format(", ".join(commands_used)))
             return 0, "Azure Monitor Agent packages uninstalled successfully after using: {0}".format(", ".join(commands_used))
     # Since there was no indication of AMA, we can assume it was uninstalled successfully
     else:
