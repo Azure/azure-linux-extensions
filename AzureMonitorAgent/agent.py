@@ -117,8 +117,8 @@ if sys.version_info < (2,7):
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
-BundleFileNameDeb = 'azuremonitoragent_1.35.9-1053_x86_64.deb'
-BundleFileNameRpm = 'azuremonitoragent-1.36.1-1078.x86_64.rpm'
+BundleFileNameDeb = 'azuremonitoragent.deb'
+BundleFileNameRpm = 'azuremonitoragent.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -441,7 +441,7 @@ def install():
             hutil_log_info("Current bundle file: {0}".format(current_bundle))
             package_name = installed_versions[0]
 
-            # This is to make sure dpkg's package name is in the same format as the BundileFileNameDeb
+            # This is to make sure dpkg's package name is in the same format as the BundleFileNameDeb
             if PackageManager == 'dpkg':
                 architecture = ''
                 if platform.machine() == 'x86_64':
@@ -673,8 +673,7 @@ def force_uninstall_azure_monitor_agent():
                     
                     hutil_log_info("Force uninstall command {0} returned exit code {1} and output: {2}".format(AMAUninstallCommandForce, exit_code, output))
 
-            hutil_log_info("Finished force_uninstall_azure_monitor_agent() for {0} with exit code {1} and output: {2}".format(PackageManager, exit_code, output))
-
+        hutil_log_info("Finished force_uninstall_azure_monitor_agent() for {0} with exit code {1} and output: {2}".format(PackageManager, exit_code, output))
         # Check if packages are still installed
         is_still_installed, remaining_packages = get_installed_package_version()
         if is_still_installed:
