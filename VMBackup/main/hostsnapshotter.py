@@ -76,6 +76,10 @@ class HostSnapshotter(object):
                         temp_dict[CommonVariables.key] = flag
                         temp_dict[CommonVariables.value] = paras.wellKnownSettingFlags[flag]
                         settings.append(temp_dict)
+                if(paras.isVMADEEnabled == True):
+                    settings.append({CommonVariables.key:CommonVariables.isOsDiskADEEncrypted, CommonVariables.value:self.isOsDiskADEEncrypted})
+                    settings.append({CommonVariables.key:CommonVariables.areDataDisksADEEncrypted, CommonVariables.value:self.areDataDisksADEEncrypted})
+                    meta_data.append({CommonVariables.key:CommonVariables.encryptionDetails, CommonVariables.value:self.encryptionDetails})
                 hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, settings, paras.snapshotTaskToken, meta_data)
                 body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
