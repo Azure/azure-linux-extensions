@@ -133,7 +133,7 @@ PreviewFeaturesDirectory = '/etc/opt/microsoft/azuremonitoragent/config-cache/pr
 ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
 AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
-
+WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
 SupportedArch = set(['x86_64', 'aarch64'])
 
 # Error codes
@@ -469,7 +469,7 @@ def install():
 
             full_msg = "{0} {1} {2}".format(error_msg, troubleshooting, manual_fix)
             hutil_log_info(full_msg)
-            return 1, full_msg
+            # return 1, full_msg
 
     # If the package is not already installed, proceed with installation otherwise skip since it is the same package version
     if not same_package_installed:
@@ -2044,9 +2044,17 @@ def parse_context(operation):
 
             # As per VM extension team, we have to manage rotation for our extension.log
             # for now, this is our extension code, but to be moved to HUtil library.
-            if not os.path.exists(AMAExtensionLogRotateFilePath):      
-                logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
-                copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
+            if os.path.exists(WAGuestAgentLogRotateFilePath):      
+                if os.path.exists(AMAExtensionLogRotateFilePath):
+                    try:
+                        os.remove(AMAExtensionLogRotateFilePath)
+                    except Exception as ex:
+                        output = 'Logrotate removal failed with error: {0}\nStacktrace: {1}'.format(ex, traceback.format_exc())
+                        hutil_log_info(output)
+            else:
+                if not os.path.exists(AMAExtensionLogRotateFilePath):      
+                    logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
+                    copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
             
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
@@ -2356,7 +2364,7 @@ def is_feature_enabled(feature):
     feature_support_matrix = {
         'useDynamicSSL'             : ['all'],
         'enableCMV2'                : ['all'],
-        'enableAzureOTelCollector'  : ['eastus2euap', 'northcentralus']
+        'enableAzureOTelCollector'  : ['all']
     }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature

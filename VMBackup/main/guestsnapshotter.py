@@ -69,7 +69,7 @@ class GuestSnapshotter(object):
         self.configfile='/etc/azure/vmbackup.conf'
         self.hutil = hutil
 
-    def snapshot(self, sasuri, sasuri_index, settings, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger):
+    def snapshot(self, sasuri, sasuri_index, settings, meta_data, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger, disk_encryption_details = None):
         temp_logger=''
         error_logger=''
         snapshot_error = SnapshotError()
@@ -94,9 +94,13 @@ class GuestSnapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
+                temp_logger = temp_logger + str(headers)
+                if(disk_encryption_details is not None and 
+                   len(disk_encryption_details) >= 2 and disk_encryption_details[0] and disk_encryption_details[1]):
+                    headers[disk_encryption_details[0]] = disk_encryption_details[1]
+                    self.logger.log("appending disk_encryption_details as part of headers while taking a snapshot")
                 if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
                     self.logger.log("Not passing the TTL header via Guest path though it is enabled")
-                temp_logger = temp_logger + str(headers)
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 temp_logger = temp_logger + str(datetime.datetime.utcnow()) + ' start calling the snapshot rest api. '
@@ -127,7 +131,7 @@ class GuestSnapshotter(object):
         snapshot_result_error.put(snapshot_error)
         snapshot_info_indexer_queue.put(snapshot_info_indexer)
 
-    def snapshot_seq(self, sasuri, sasuri_index, settings, meta_data):
+    def snapshot_seq(self, sasuri, sasuri_index, settings, meta_data, disk_encryption_metadata = None):
         result = None
         snapshot_error = SnapshotError()
         snapshot_info_indexer = SnapshotInfoIndexerObj(sasuri_index, False, None, None)
@@ -150,9 +154,12 @@ class GuestSnapshotter(object):
                         key = meta['Key']
                         value = meta['Value']
                         headers["x-ms-meta-" + key] = value
+                if(disk_encryption_metadata is not None and len(disk_encryption_metadata) >= 2 and
+                  disk_encryption_metadata[0] and disk_encryption_metadata[1]):
+                    headers[disk_encryption_metadata[0]] = disk_encryption_metadata[1]
+                    self.logger.log("appending disk_encryption_details as part of headers while taking a snapshot")
                 if(CommonVariables.isSnapshotTtlEnabled in settings and settings[CommonVariables.isSnapshotTtlEnabled]):
                     self.logger.log("Not passing the TTL header via Guest path though it is enabled")
-                self.logger.log(str(headers))
                 http_util = HttpUtil(self.logger)
                 sasuri_obj = urlparser.urlparse(sasuri + '&comp=snapshot')
                 self.logger.log("start calling the snapshot rest api")
@@ -208,7 +215,10 @@ class GuestSnapshotter(object):
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
                     try:
-                        mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.wellKnownSettingFlags, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
+                        if(paras.isVMADEEnabled and len(paras.disk_encryption_details) > blob_index):
+                            mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.wellKnownSettingFlags, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger, paras.disk_encryption_details[blob_index])))
+                        else:
+                            mp_jobs.append(mp.Process(target=self.snapshot,args=(blob, blob_index, paras.wellKnownSettingFlags, paras.backup_metadata, snapshot_result_error, snapshot_info_indexer_queue, global_logger, global_error_logger)))
                     except Exception as e:
                         self.logger.log("multiprocess queue creation failed")
                         all_snapshots_failed = True
@@ -297,7 +307,10 @@ class GuestSnapshotter(object):
                     blobUri = blob.split("?")[0]
                     self.logger.log("index: " + str(blob_index) + " blobUri: " + str(blobUri))
                     blob_snapshot_info_array.append(HostSnapshotObjects.BlobSnapshotInfo(False, blobUri, None, 500))
-                    snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.wellKnownSettingFlags, paras.backup_metadata)
+                    if(paras.isVMADEEnabled == True and len(paras.disk_encryption_details) > blob_index):
+                        snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.wellKnownSettingFlags, paras.backup_metadata, paras.disk_encryption_details[blob_index])
+                    else:
+                        snapshotError, snapshot_info_indexer = self.snapshot_seq(blob, blob_index, paras.wellKnownSettingFlags, paras.backup_metadata)
                     if(snapshotError.errorcode != CommonVariables.success):
                         snapshot_result.errors.append(snapshotError)
                     # update blob_snapshot_info_array element properties from snapshot_info_indexer object
