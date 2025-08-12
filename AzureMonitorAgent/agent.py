@@ -649,6 +649,7 @@ def force_uninstall_azure_monitor_agent():
                                                 retry_check = retry_if_dpkg_or_rpm_locked,
                                                 final_check = final_check_if_dpkg_or_rpm_locked)
 
+            hutil_log_info("Force uninstall command {0} returned exit code {1} and output: {2}".format(AMAUninstallCommandForce, exit_code, output))
             commands_used.append(AMAUninstallCommand)
             # Query to see what is left after using the --allmatches uninstall
             is_still_installed, remaining_packages = get_installed_package_version()
@@ -672,8 +673,6 @@ def force_uninstall_azure_monitor_agent():
                                                         final_check = final_check_if_dpkg_or_rpm_locked)
                     
                     hutil_log_info("Force uninstall command {0} returned exit code {1} and output: {2}".format(AMAUninstallCommandForce, exit_code, output))
-
-        hutil_log_info("Finished force_uninstall_azure_monitor_agent() for {0} with exit code {1} and output: {2}".format(PackageManager, exit_code, output))
         # Check if packages are still installed
         is_still_installed, remaining_packages = get_installed_package_version()
         if is_still_installed:
