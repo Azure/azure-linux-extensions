@@ -117,8 +117,8 @@ if sys.version_info < (2,7):
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
-BundleFileNameDeb = 'azuremonitoragent.deb'
-BundleFileNameRpm = 'azuremonitoragent.rpm'
+BundleFileNameDeb = 'azuremonitoragent_1.35.9-1053_x86_64.deb'
+BundleFileNameRpm = 'azuremonitoragent-1.36.1-1078.x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -658,21 +658,22 @@ def force_uninstall_azure_monitor_agent():
                 hutil_log_info("Failed to uninstall azuremonitoragent with --allmatches, trying to force uninstall each package individually.")
                 # --noscripts and --nodeps flags are used to avoid running any pre/post scripts and skip dependencies test
                 # https://jfearn.fedorapeople.org/en-US/RPM/4/html/RPM_Guide/ch03s03s03.html
-                AMAUninstallCommandForce = "rpm -e --noscripts --nodeps {0}"
                 for package in remaining_packages:
                     # Clean the package name and create uninstall command
                     package = package.strip()
                     if not package:
                         continue
-                    AMAUninstallCommandForce = AMAUninstallCommandForce.format(package)
+                    AMAUninstallCommandForce = "rpm -e --noscripts --nodeps {0}".format(package)
                     commands_used.append(AMAUninstallCommandForce)
                     hutil_log_info('Running command "{0}"'.format(AMAUninstallCommandForce))
                 
-                exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
-                                                    retry_check = retry_if_dpkg_or_rpm_locked,
-                                                    final_check = final_check_if_dpkg_or_rpm_locked)
+                    exit_code, output = run_command_with_retries_output(AMAUninstallCommandForce, retries = 4,
+                                                        retry_check = retry_if_dpkg_or_rpm_locked,
+                                                        final_check = final_check_if_dpkg_or_rpm_locked)
+                    
+                    hutil_log_info("Force uninstall command {0} returned exit code {1} and output: {2}".format(AMAUninstallCommandForce, exit_code, output))
 
-        hutil_log_info("Finished force_uninstall_azure_monitor_agent() for {0} with exit code {1} and output: {2}".format(PackageManager, exit_code, output))
+            hutil_log_info("Finished force_uninstall_azure_monitor_agent() for {0} with exit code {1} and output: {2}".format(PackageManager, exit_code, output))
 
         # Check if packages are still installed
         is_still_installed, remaining_packages = get_installed_package_version()
