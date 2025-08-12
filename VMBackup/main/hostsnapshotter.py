@@ -45,6 +45,9 @@ class HostSnapshotter(object):
         self.configfile='/etc/azure/vmbackup.conf'
         self.snapshoturi = 'http://' + hostIp + '/metadata/recsvc/snapshot/dosnapshot?api-version=2017-12-01'
         self.presnapshoturi = 'http://' + hostIp + '/metadata/recsvc/snapshot/presnapshot?api-version=2017-12-01'
+        self.isOsDiskADEEncrypted = False
+        self.areDataDisksADEEncrypted = False
+        self.encryptionDetails = {}
 
     def snapshotall(self, paras, freezer, g_fsfreeze_on, taskId):
         result = None
@@ -124,7 +127,7 @@ class HostSnapshotter(object):
             all_failed = True
         return blob_snapshot_info_array, all_failed, is_inconsistent, unable_to_sleep
 
-    def pre_snapshot(self, paras, taskId):
+    def pre_snapshot(self, paras, taskId, fetch_disk_details = False):
         statusCode = 555
         if(self.presnapshoturi is None):
             self.logger.log("Failed to do the snapshot because presnapshoturi is none",False,'Error')
@@ -138,7 +141,10 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
-                hostPreSnapshotRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken)
+                if(fetch_disk_details == True):
+                    hostPreSnapshotRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken, paras.isVMADEEnabled)
+                else:
+                    hostPreSnapshotRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken)
                 body_content = json.dumps(hostPreSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
                 self.logger.log('Host Request body : ' + str(body_content))
@@ -146,13 +152,40 @@ class HostSnapshotter(object):
                 self.logger.log("start calling the presnapshot rest api")
                 # initiate http call for blob-snapshot and get http response
                 result, httpResp, errMsg,responseBody = http_util.HttpCallGetResponse('POST', presnapshoturi_obj, body_content, headers = headers, responseBodyRequired = True, isHostCall = True)
-                self.logger.log("presnapshot responseBody: " + responseBody)
+                if responseBody:
+                    try:
+                        response_json = json.loads(responseBody)
+                        if "bhsVersion" in response_json:
+                            self.logger.log("PreSnapshotResponse: bhsVersion: " + str(response_json["bhsVersion"]))
+                        if "nodeId" in response_json:
+                            self.logger.log("PreSnapshotResponse: nodeId: " + str(response_json["nodeId"]))
+                        if "responseTime" in response_json:
+                            self.logger.log("PreSnapshotResponse: responseTime: " + str(response_json["responseTime"]))
+                        if "result" in response_json:
+                            self.logger.log("PreSnapshotResponse: result: " + str(response_json["result"]))
+                    except Exception as e:
+                        self.logger.log("PreSnapshotResponse: Failed to parse responseBody: " + str(e))
+                
                 if(httpResp != None):
                     statusCode = httpResp.status
                     self.logger.log("PreSnapshot: Status Code: " + str(statusCode))
                     if(int(statusCode) == 200 or int(statusCode) == 201) and (responseBody == None or responseBody == "") :
                         self.logger.log("PreSnapshot:responseBody is empty but http status code is success")
                         statusCode = 557
+                    elif(responseBody != None):
+                        if (paras.isVMADEEnabled == True):
+                            response = json.loads(responseBody)
+                            self.isOsDiskADEEncrypted = response.get(CommonVariables.isOsDiskADEEncrypted)
+                            self.areDataDisksADEEncrypted = response.get(CommonVariables.areDataDisksADEEncrypted)
+                            self.encryptionDetails = response.get(CommonVariables.encryptionDetails)
+                            self.logger.log("PreSnapshotResponse: isOsDiskADEEncrypted: "+ str(self.isOsDiskADEEncrypted))
+                            self.logger.log("PreSnapshotResponse: areDataDisksADEEncrypted: "+ str(self.areDataDisksADEEncrypted))
+                            if self.encryptionDetails is not None:
+                                self.logger.log("PreSnapshotResponse: encryptionDetails: "+ str(len(self.encryptionDetails)))
+                            else:
+                                self.logger.log("PreSnapshotResponse: EncryptionDetails are null")
+                        else:
+                            self.logger.log("VM is not ADE Enabled")
                     elif(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):
                         self.logger.log("BHS is not runnning on host machine")
                         statusCode = 556
