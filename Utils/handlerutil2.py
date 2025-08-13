@@ -69,6 +69,7 @@ DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 MANIFEST_XML = "manifest.xml"
 
+ENV_CONFIG_SEQUENCE_NUMBER = "ConfigSequenceNumber"
 
 class HandlerContext:
     def __init__(self, name):
@@ -131,20 +132,30 @@ class HandlerUtility:
         seq_no = -1
         cur_seq_no = -1
         freshest_time = None
-        for subdir, dirs, files in os.walk(config_folder):
-            for file in files:
-                try:
-                    cur_seq_no = int(os.path.basename(file).split('.')[0])
-                    if (freshest_time == None):
-                        freshest_time = os.path.getmtime(join(config_folder, file))
-                        seq_no = cur_seq_no
-                    else:
-                        current_file_m_time = os.path.getmtime(join(config_folder, file))
-                        if (current_file_m_time > freshest_time):
-                            freshest_time = current_file_m_time
-                            seq_no = cur_seq_no
-                except ValueError:
-                    continue
+
+        # First read the sequence number from the environment variable
+        seq_no_from_env = os.getenv(ENV_CONFIG_SEQUENCE_NUMBER)
+        if (seq_no_from_env is not None):
+            seq_no = int(seq_no_from_env)
+        else:
+            # Otherwise look for the most recent sequence number from the files
+            self.log("Searching for sequence number in config folder: " + config_folder)
+            for subdir, dirs, file_names in os.walk(config_folder):
+                for file_name in file_names:
+                    try:
+                        file_basename = os.path.basename(file_name)
+                        if "." in file_basename:
+                            cur_seq_no = int(file_basename.split('.')[0])
+                            if (freshest_time is None):
+                                freshest_time = os.path.getmtime(join(config_folder, file_name))
+                                seq_no = cur_seq_no
+                            else:
+                                current_file_m_time = os.path.getmtime(join(config_folder, file_name))
+                                if (current_file_m_time > freshest_time):
+                                    freshest_time = current_file_m_time
+                                    seq_no = cur_seq_no
+                    except ValueError:
+                        continue
         return seq_no
 
     def log(self, message):
