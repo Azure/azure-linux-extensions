@@ -370,7 +370,7 @@ def get_installed_package_version():
     Returns: (is_installed, version_list)
     """
     if PackageManager == "dpkg":
-        # In the case of dpkg, we specfiy only Package and Version as architecture is written as amd64/arm64 instead of x86_64/aarch64.
+        # In the case of dpkg, we specify only Package and Version as architecture is written as amd64/arm64 instead of x86_64/aarch64.
         cmd = "dpkg-query -W -f='${Package}_${Version}\n' 'azuremonitoragent*' 2>/dev/null"
     elif PackageManager == "rpm":
         cmd = "rpm -q azuremonitoragent"
@@ -1251,7 +1251,7 @@ def install_azureotelcollector():
     """
     This method will install the azureotelcollector package and start a systemd file watcher service that watches for configuration file changes.
     MetricsExtension is responsible for writing the configuration file.
-    Only if configuration is present, otelcollector process will start to run, the watcher service is responsible to monitor the configurartion file.
+    Only if configuration is present, otelcollector process will start to run, the watcher service is responsible to monitor the configuration file.
     """
     if is_feature_enabled("enableAzureOTelCollector") and is_systemd():
         find_package_manager("Install")
