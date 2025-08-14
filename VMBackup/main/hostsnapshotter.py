@@ -77,7 +77,7 @@ class HostSnapshotter(object):
                         temp_dict[CommonVariables.key] = flag
                         temp_dict[CommonVariables.value] = paras.wellKnownSettingFlags[flag]
                         settings.append(temp_dict)
-                if(paras.isVMADEEnabled == True):
+                if(paras.isVMADEEnabled == True and paras.encryptionDetails):
                     settings.append({CommonVariables.key:CommonVariables.isOsDiskADEEncrypted, CommonVariables.value:paras.isOsDiskADEEncrypted})
                     settings.append({CommonVariables.key:CommonVariables.areDataDisksADEEncrypted, CommonVariables.value:paras.areDataDisksADEEncrypted})
                     meta_data.append({CommonVariables.key:CommonVariables.encryptionDetails, CommonVariables.value:paras.encryptionDetails})
@@ -141,7 +141,12 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
-                if(fetch_disk_details == True):
+                # if the vm is ade enabled and if the encryptiondetails are not yet populated, then we need to fetch the disk details
+                # or when the fetch_disk_details flag is set to true
+                if(fetch_disk_details == True or (paras.isVMADEEnabled == True and not paras.encryptionDetails)):
+                    if(fetch_disk_details != True):
+                        self.logger.log("Fetching disk details as the VM is ADE enabled and encryptionDetails are not yet populated")
+                        fetch_disk_details = True
                     preSnapshotSettings = []
                     temp_dict = {}
                     temp_dict[CommonVariables.key] = CommonVariables.isVMADEEnabled
