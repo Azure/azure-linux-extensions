@@ -861,6 +861,18 @@ class HandlerUtility:
         else:
             txt = str(txt)
         return txt
+    
+    def redact_sensitive_encryption_details(self, request_body):
+        try:
+            meta_list = getattr(request_body, "snapshotMetadata", None)
+            for meta in meta_list:
+                if meta.get("Key") == "EncryptionDetails":
+                    # Redact the entire value of EncryptionDetails
+                    meta["Value"] = "REDACTED"
+            return request_body
+        except Exception as e:
+            self.log("Error while redacting: {0}".format(str(e)), 'Error')
+            return request_body
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
