@@ -296,29 +296,30 @@ def cache_configuration_files():
         cached_something = False
         
         # Cache configuration directory from /etc/opt/microsoft/azuremonitoragent/
-        etc_config_source_dir = '/etc/opt/microsoft/azuremonitoragent'
-        if os.path.exists(etc_config_source_dir):
-            cache_etc_config_dir = os.path.join(AMAConfigCacheDirectory, 'etc_azuremonitoragent')
-            copytree(etc_config_source_dir, cache_etc_config_dir)
-            hutil_log_info("Cached configuration directory: {0}".format(etc_config_source_dir))
-            cached_something = True
-        else:
-            hutil_log_info("No /etc configuration directory found to cache")
+        # etc_config_source_dir = '/etc/opt/microsoft/azuremonitoragent'
+        # if os.path.exists(etc_config_source_dir):
+        #     cache_etc_config_dir = os.path.join(AMAConfigCacheDirectory, 'etc_azuremonitoragent')
+        #     copytree(etc_config_source_dir, cache_etc_config_dir)
+        #     hutil_log_info("Cached configuration directory: {0}".format(etc_config_source_dir))
+        #     cached_something = True
+        # else:
+        #     hutil_log_info("No /etc configuration directory found to cache")
         
         # Cache runtime binaries and files from /opt/microsoft/azuremonitoragent/
-        opt_source_dir = '/opt/microsoft/azuremonitoragent'
-        if os.path.exists(opt_source_dir):
-            cache_opt_dir = os.path.join(AMAConfigCacheDirectory, 'opt_azuremonitoragent')
-            copytree(opt_source_dir, cache_opt_dir)
-            hutil_log_info("Cached runtime directory: {0}".format(opt_source_dir))
-            cached_something = True
-        else:
-            hutil_log_info("No /opt runtime directory found to cache")
+        # opt_source_dir = '/opt/microsoft/azuremonitoragent'
+        # if os.path.exists(opt_source_dir):
+        #     cache_opt_dir = os.path.join(AMAConfigCacheDirectory, 'opt_azuremonitoragent')
+        #     copytree(opt_source_dir, cache_opt_dir)
+        #     hutil_log_info("Cached runtime directory: {0}".format(opt_source_dir))
+        #     cached_something = True
+        # else:
+        #     hutil_log_info("No /opt runtime directory found to cache")
         
         # Cache log and tenant directories
         log_dirs_to_cache = [
-            '/var/opt/microsoft/azuremonitoragent/log',
-            '/etc/opt/microsoft/azuremonitoragent/tenants'
+            # '/var/opt/microsoft/azuremonitoragent/log',
+            '/etc/opt/microsoft/azuremonitoragent/tenants',
+            # '/var/opt/microsoft/azuremonitoragent/events',
         ]
         
         for log_dir in log_dirs_to_cache:
@@ -403,7 +404,8 @@ def restore_configuration_files():
         # Restore log directories
         log_dirs_to_restore = [
             ('log', '/var/opt/microsoft/azuremonitoragent/log'),
-            ('tenants', '/etc/opt/microsoft/azuremonitoragent/tenants')  # Restore tenants directory
+            ('tenants', '/etc/opt/microsoft/azuremonitoragent/tenants'),  # Restore tenants directory
+            ('events', '/var/opt/microsoft/azuremonitoragent/events'),  # Restore events directory
         ]
         
         for cache_dir_name, dest_path in log_dirs_to_restore:
@@ -916,7 +918,8 @@ def _get_package_files_for_cleanup():
     manager still has the file list available.
     
     Returns:
-        list: List of file/directory paths that contain "azuremonitoragent"
+        tuple: (files_list, directories_to_add) where files_list contains package files
+               and directories_to_add contains directories that need explicit cleanup
     """
     try:
         # Get list of files installed by the package
@@ -939,19 +942,26 @@ def _get_package_files_for_cleanup():
         # Parse the file list
         files = [line.strip() for line in output.strip().split('\n') if line.strip()]
         
-        # Filter to only include paths that contain "azuremonitor" in the path
-        # This ensures we only remove azuremonitor-related files/directories
-        # and not shared parent directories like /opt, /opt/microsoft, etc.
+        # Collect all azuremonitor-related paths
         azuremonitoragent_files = []
+        directory_paths_found = set()
+        
         for file_path in files:
             # Only include files/directories that have "azuremonitor" in their path
             # This covers both "azuremonitoragent" and "azuremonitor-*" service files
             if "azuremonitor" in file_path:
                 azuremonitoragent_files.append(file_path)
+                
+                # For RPM, we need to track parent directories since RPM doesn't list them
+                if PackageManager == "rpm":
+                    # Extract parent directories that contain azuremonitor
+                    parent_dir = os.path.dirname(file_path)
+                    while parent_dir and parent_dir != "/" and "azuremonitor" in parent_dir:
+                        directory_paths_found.add(parent_dir)
+                        parent_dir = os.path.dirname(parent_dir)
             else:
                 hutil_log_info("Skipping non-azuremonitor path: {0}".format(file_path))
         
-        hutil_log_info("Found {0} azuremonitor files/directories for cleanup".format(len(azuremonitoragent_files)))
         return azuremonitoragent_files
         
     except Exception as ex:
@@ -995,8 +1005,6 @@ def _remove_package_files_from_list(package_files):
             except Exception as ex:
                 hutil_log_info("Failed to remove file {0}: {1}".format(file_path, ex))
         
-        hutil_log_info("Removed {0} files from package".format(files_removed))
-        
         # Remove directories (in reverse order to handle nested directories)
         # Sort by depth (deepest first) to avoid removing parent before child
         dirs_to_remove.sort(key=lambda x: x.count('/'), reverse=True)
@@ -1028,11 +1036,11 @@ def _remove_package_files_from_list(package_files):
         
         # Cleanup log files and directories
         log_dirs = [
-            "/var/opt/microsoft/azuremonitoragent",
-            "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/events",
+            # "/var/opt/microsoft/azuremonitoragent",
+            "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/events", # not sure if this should be removed
         ]
 
-        # Additional cleanup of Azure Monitor directories that may contain runtime files
+        # Additional cleanup of /opt/microsoft/azuremonitoragent directory for rpm because some files are not removed
         if PackageManager == "rpm":
             log_dirs.append("/opt/microsoft/azuremonitoragent")
 
@@ -1496,7 +1504,7 @@ def update():
     # Cache configuration files before any other operations
     if not cache_configuration_files():
         hutil_log_error("Failed to cache configuration files during update")
-        return 1, "Failed to cache configuration files during update"
+        return 0, "Failed to cache configuration files during update"
     
     hutil_log_info("Configuration files cached successfully for update")
     return 0, "Update succeeded"
