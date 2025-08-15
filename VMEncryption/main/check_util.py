@@ -298,6 +298,9 @@ class CheckUtil(object):
         try:
             executor = CommandExecutor(self.logger)
             executor.Execute("modprobe vfat", True)
+            # Seems modprobe can return success without successfully lodaing vfat.
+            # Adding one more check to ensure vfat is loaded
+            executor.Execute("lsmod vfat", True)
         except:
             raise RuntimeError('Incompatible system, prerequisite vfat module was not found.')
 
