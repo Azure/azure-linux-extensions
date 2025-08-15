@@ -848,7 +848,9 @@ def setup_me(is_lad, managed_identity="sai", HUtilObj=None, is_local_control_cha
             # Removing it as permissions might not match, and ME will create this with the right permissions
             remove_file("/var/run/azuremonitoragent/mdm_influxdb.socket")
             # Create user/group for metrics-extension.service if it is requested
-            ensure_user_and_group(user, group, True)
+            ensure_user_and_group(user, group, create_if_missing=True)
+            # For ARC, add user to himds group if it exists
+            ensure_user_and_group(user, "himds", create_if_missing=False)
             # Append group permissions for folder containing influxDB socket file, so the user can create them - in this case ME
             setup_user_and_group_access("/var/run/azuremonitoragent/", user)
             # In CMv2 with user and group specified, create directory for MetricsExtension config caching
