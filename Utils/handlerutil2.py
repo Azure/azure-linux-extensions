@@ -379,7 +379,11 @@ class HandlerUtility:
 
     def get_protected_settings(self):
         if (self._context._config != None):
-            return self.get_handler_settings().get('protectedSettings')
+            protectedSettings = self.get_handler_settings().get('protectedSettings')
+            if (isinstance(protectedSettings, dict)):
+                return protectedSettings
+            else:
+                self.error("Protected settings is not of type dictionary")
         return None
 
     def get_public_settings(self):
