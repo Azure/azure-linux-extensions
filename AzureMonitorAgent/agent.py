@@ -115,7 +115,7 @@ if sys.version_info < (2,7):
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
-BundleFileNameDeb = 'azuremonitoragent.deb'
+BundleFileNameDeb = 'azuremonitoragent_1.35.9-1053_x86_64.deb'
 BundleFileNameRpm = 'azuremonitoragent-1.36.1-1078.x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
@@ -278,195 +278,6 @@ def check_kill_process(pstring):
         fields = line.split()
         pid = fields[0]
         os.kill(int(pid), signal.SIGKILL)
-
-def cache_configuration_files():
-    """
-    Cache configuration files and binaries during update to preserve them during uninstall/re-install cycle.
-    This includes:
-    - Configuration files from /etc/opt/microsoft/azuremonitoragent/
-    - Runtime binaries and files from /opt/microsoft/azuremonitoragent/
-    - Other important config files
-    """
-    try:
-        # Create cache directory if it doesn't exist
-        if os.path.exists(AMAConfigCacheDirectory):
-            rmtree(AMAConfigCacheDirectory)
-        os.makedirs(AMAConfigCacheDirectory)
-        
-        cached_something = False
-        
-        # Cache configuration directory from /etc/opt/microsoft/azuremonitoragent/
-        # etc_config_source_dir = '/etc/opt/microsoft/azuremonitoragent'
-        # if os.path.exists(etc_config_source_dir):
-        #     cache_etc_config_dir = os.path.join(AMAConfigCacheDirectory, 'etc_azuremonitoragent')
-        #     copytree(etc_config_source_dir, cache_etc_config_dir)
-        #     hutil_log_info("Cached configuration directory: {0}".format(etc_config_source_dir))
-        #     cached_something = True
-        # else:
-        #     hutil_log_info("No /etc configuration directory found to cache")
-        
-        # Cache runtime binaries and files from /opt/microsoft/azuremonitoragent/
-        # opt_source_dir = '/opt/microsoft/azuremonitoragent'
-        # if os.path.exists(opt_source_dir):
-        #     cache_opt_dir = os.path.join(AMAConfigCacheDirectory, 'opt_azuremonitoragent')
-        #     copytree(opt_source_dir, cache_opt_dir)
-        #     hutil_log_info("Cached runtime directory: {0}".format(opt_source_dir))
-        #     cached_something = True
-        # else:
-        #     hutil_log_info("No /opt runtime directory found to cache")
-        
-        # Cache log and tenant directories
-        log_dirs_to_cache = [
-            # '/var/opt/microsoft/azuremonitoragent/log',
-            '/etc/opt/microsoft/azuremonitoragent/tenants',
-            # '/var/opt/microsoft/azuremonitoragent/events',
-        ]
-        
-        for log_dir in log_dirs_to_cache:
-            if os.path.exists(log_dir):
-                cache_log_dir = os.path.join(AMAConfigCacheDirectory, os.path.basename(log_dir))
-                copytree(log_dir, cache_log_dir)
-                hutil_log_info("Cached log directory: {0}".format(log_dir))
-                cached_something = True
-            else:
-                hutil_log_info("No log directory found to cache: {0}".format(log_dir))
-        
-        # Cache other important config files
-        additional_files = [
-            '/etc/default/azuremonitoragent',
-            AMAExtensionLogRotateFilePath,
-        ]
-        
-        for file_path in additional_files:
-            if os.path.exists(file_path):
-                dest_path = os.path.join(AMAConfigCacheDirectory, os.path.basename(file_path))
-                copy2(file_path, dest_path)
-                hutil_log_info("Cached config file: {0}".format(file_path))
-                cached_something = True
-        
-        if not cached_something:
-            hutil_log_info("No Azure Monitor Agent files found to cache - may be a clean install")
-        else:
-            hutil_log_info("Successfully cached Azure Monitor Agent files to {0}".format(AMAConfigCacheDirectory))
-        
-        return True
-        
-    except Exception as ex:
-        hutil_log_error("Failed to cache configuration files: {0}".format(ex))
-        return False
-
-def restore_configuration_files():
-    """
-    Restore configuration files and binaries from cache after package installation.
-    Returns True if files were restored, False if no cache found or error occurred.
-    """
-    try:
-        if not os.path.exists(AMAConfigCacheDirectory):
-            hutil_log_info("No configuration cache found - this is a clean install")
-            return False
-        
-        restored_something = False
-        
-        # Restore main configuration directory to /etc/opt/microsoft/azuremonitoragent/
-        cache_etc_config_dir = os.path.join(AMAConfigCacheDirectory, 'etc_azuremonitoragent')
-        etc_config_dest_dir = '/etc/opt/microsoft/azuremonitoragent'
-        
-        if os.path.exists(cache_etc_config_dir):
-            # Ensure parent directory exists
-            os.makedirs(os.path.dirname(etc_config_dest_dir), exist_ok=True)
-            
-            # Remove existing config dir if present
-            if os.path.exists(etc_config_dest_dir):
-                rmtree(etc_config_dest_dir)
-            
-            # Restore from cache
-            copytree(cache_etc_config_dir, etc_config_dest_dir)
-            hutil_log_info("Restored configuration directory: {0}".format(etc_config_dest_dir))
-            restored_something = True
-        
-        # Restore runtime binaries and files to /opt/microsoft/azuremonitoragent/
-        cache_opt_dir = os.path.join(AMAConfigCacheDirectory, 'opt_azuremonitoragent')
-        opt_dest_dir = '/opt/microsoft/azuremonitoragent'
-        
-        if os.path.exists(cache_opt_dir):
-            # Ensure parent directory exists
-            os.makedirs(os.path.dirname(opt_dest_dir), exist_ok=True)
-            
-            # Remove existing runtime dir if present
-            if os.path.exists(opt_dest_dir):
-                rmtree(opt_dest_dir)
-            
-            # Restore from cache
-            copytree(cache_opt_dir, opt_dest_dir)
-            hutil_log_info("Restored runtime directory: {0}".format(opt_dest_dir))
-            restored_something = True
-        
-        # Restore log directories
-        log_dirs_to_restore = [
-            ('log', '/var/opt/microsoft/azuremonitoragent/log'),
-            ('tenants', '/etc/opt/microsoft/azuremonitoragent/tenants'),  # Restore tenants directory
-            ('events', '/var/opt/microsoft/azuremonitoragent/events'),  # Restore events directory
-        ]
-        
-        for cache_dir_name, dest_path in log_dirs_to_restore:
-            cache_log_dir = os.path.join(AMAConfigCacheDirectory, cache_dir_name)
-            if os.path.exists(cache_log_dir):
-                # Ensure parent directory exists
-                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                
-                # Remove existing log dir if present
-                if os.path.exists(dest_path):
-                    rmtree(dest_path)
-                
-                # Restore from cache
-                copytree(cache_log_dir, dest_path)
-                hutil_log_info("Restored {0} directory: {1}".format(cache_dir_name, dest_path))
-                restored_something = True
-        
-        # Restore additional config files
-        additional_files = [
-            'azuremonitoragent',  # /etc/default/azuremonitoragent
-            'azuremonitoragentextension'  # logrotate file
-        ]
-        
-        for file_name in additional_files:
-            cache_file = os.path.join(AMAConfigCacheDirectory, file_name)
-            if os.path.exists(cache_file):
-                if file_name == 'azuremonitoragent':
-                    dest_path = '/etc/default/azuremonitoragent'
-                elif file_name == 'azuremonitoragentextension':
-                    dest_path = AMAExtensionLogRotateFilePath
-                else:
-                    continue
-                
-                # Ensure parent directory exists
-                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                    
-                copy2(cache_file, dest_path)
-                hutil_log_info("Restored config file: {0}".format(dest_path))
-                restored_something = True
-        
-        if restored_something:
-            hutil_log_info("Successfully restored Azure Monitor Agent files from cache")
-        else:
-            hutil_log_info("No cached files found to restore")
-            
-        return restored_something
-        
-    except Exception as ex:
-        hutil_log_error("Failed to restore configuration files: {0}".format(ex))
-        return False
-
-def cleanup_configuration_cache():
-    """
-    Clean up the configuration cache directory.
-    """
-    try:
-        if os.path.exists(AMAConfigCacheDirectory):
-            rmtree(AMAConfigCacheDirectory)
-            hutil_log_info("Cleaned up configuration cache")
-    except Exception as ex:
-        hutil_log_info("Failed to clean up configuration cache: {0}".format(ex))
 
 def compare_and_copy_bin(src, dest):
     # Check if previous file exist at the location, compare the two binaries,
@@ -727,22 +538,12 @@ def install():
         except:
             log_and_exit("install", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitoragent.service.d for suse 12,15" )
 
-    # Check for cached configuration files from previous installation (during updates)
-    # and restore them if they exist
-    config_restored = restore_configuration_files()
-    if config_restored:
-        hutil_log_info("Restored configuration files from cache - this was an update")
-        # Clean up the cache after successful restoration
-        cleanup_configuration_cache()
-    else:
-        hutil_log_info("No configuration cache found - this is a fresh installation")
-
     return 0, "Azure Monitor Agent package installed successfully"
 
 def uninstall():
     """
     Uninstall the Azure Monitor Linux Agent.
-    If a configuration cache exists (indicating an update sequence), preserve it.
+    If a configuration cache exists (indicating an update sequence), preserve log directories.
     Otherwise, perform complete cleanup including cache removal.
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
@@ -815,20 +616,9 @@ def uninstall():
     # Retry, since uninstall can fail due to concurrent package operations
     try:
         exit_code, output = force_uninstall_azure_monitor_agent()
- 
-        # Since we are doing a complete uninstall, remove all files installed by the package
+
+        # Remove all files installed by the package that were listed
         _remove_package_files_from_list(package_files_for_cleanup)
-            
-        # Check if we're in an update sequence by looking for existing cache
-        # If cache exists, this is likely part of an update (update -> uninstall -> install)
-        # If no cache exists, this is a complete uninstall
-        cache_exists = os.path.exists(AMAConfigCacheDirectory)
-        
-        if cache_exists:
-            hutil_log_info("Configuration cache detected - preserving for update sequence (not cleaning cache)")
-        else:
-            hutil_log_info("No configuration cache found - performing complete cleanup")
-            cleanup_configuration_cache()  # This will be a no-op if cache doesn't exist, but be explicit
 
     except Exception as ex:
         exit_code = GenericErrorCode
@@ -1033,14 +823,22 @@ def _remove_package_files_from_list(package_files):
         
         # Additional cleanup of Azure Monitor log directories
         log_dirs = []
-        
-        # Cleanup log files and directories
-        log_dirs = [
-            # "/var/opt/microsoft/azuremonitoragent",
-            "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/events", # not sure if this should be removed
-        ]
 
-        # Additional cleanup of /opt/microsoft/azuremonitoragent directory for rpm because some files are not removed
+        # Check if we're in an update sequence by looking for existing cache
+        # If cache exists, this is likely part of an update (update -> uninstall -> install)
+        # If no cache exists, this is a complete uninstall
+        cache_exists = os.path.exists(AMAConfigCacheDirectory)
+        
+        # We are going to remove these directories only if we are not in an update sequence (cache does not exist)
+        if not cache_exists:
+            hutil_log_info("Cache not detected, cleaning up Azure Monitor log directory for uninstall.")
+            # Cleanup log files and directories
+            log_dirs = [
+                "/var/opt/microsoft/azuremonitoragent",
+                "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/events", # not sure if this should be removed since this is only configured for LAD situation
+            ]
+
+        # Additional cleanup of /opt/microsoft/azuremonitoragent directory for rpm because 
         if PackageManager == "rpm":
             log_dirs.append("/opt/microsoft/azuremonitoragent")
 
@@ -1498,15 +1296,11 @@ def update():
     Cache configuration files before the update process begins.
     The actual update workflow is (disable -> update -> uninstall -> install -> enable)
     """
-    
-    hutil_log_info("Starting Azure Monitor Agent update - caching configuration files")
-    
-    # Cache configuration files before any other operations
-    if not cache_configuration_files():
-        hutil_log_error("Failed to cache configuration files during update")
-        return 0, "Failed to cache configuration files during update"
-    
-    hutil_log_info("Configuration files cached successfully for update")
+
+    if os.path.exists(AMAConfigCacheDirectory):
+            rmtree(AMAConfigCacheDirectory)
+    os.makedirs(AMAConfigCacheDirectory)
+
     return 0, "Update succeeded"
 
 def restart_launcher():
