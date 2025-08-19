@@ -543,8 +543,7 @@ def install():
 def uninstall():
     """
     Uninstall the Azure Monitor Linux Agent.
-    If a configuration cache exists (indicating an update sequence), preserve log directories.
-    Otherwise, perform complete cleanup including cache removal.
+    Whether it is a purge of all files or preserve of log files depends on the uninstall context file.
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
 
@@ -1280,6 +1279,11 @@ def update():
 def _get_uninstall_context():
     """
     Determine the context of this uninstall operation
+
+    Returns the context as a string:
+        'complete' - if this is a clean uninstall
+        'update' - if this is an update operation
+    Also returns as 'complete' if it fails
     """
 
     try:
@@ -1289,7 +1293,7 @@ def _get_uninstall_context():
                 hutil_log_info("Found uninstall context: {0}".format(context))
                 return context
     except Exception as ex:
-        hutil_log_info("Failed to read uninstall context: {0}".format(ex))
+        hutil_log_info("Failed to read uninstall context: {0}".format(ex)) # rewrite this as an error log?
     
     return 'complete'
 
@@ -1305,8 +1309,7 @@ def _cleanup_uninstall_context():
         if os.path.exists(AMA_STATE_DIR) and not os.listdir(AMA_STATE_DIR):
             os.rmdir(AMA_STATE_DIR)
     except Exception as ex:
-        hutil_log_info("Failed to cleanup uninstall context: {0}".format(ex))
-
+        hutil_log_info("Failed to cleanup uninstall context: {0}".format(ex)) # rewrite this as an error log?
 
 def restart_launcher():
     # start agent launcher
