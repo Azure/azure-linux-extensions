@@ -1269,7 +1269,7 @@ def update():
         os.makedirs(AMA_STATE_DIR, exist_ok=True)
         with open(AMA_UNINSTALL_CONTEXT_FILE, 'w') as f:
             f.write('update\n')
-            f.write(str(int(time.time())))  # Timestamp for debugging
+            f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) # Timestamp for debugging
         hutil_log_info("Marked uninstall context as 'update'")
     except Exception as ex:
         hutil_log_error("Failed to set uninstall context: {0}".format(ex))
@@ -1283,7 +1283,7 @@ def _get_uninstall_context():
     Returns the context as a string:
         'complete' - if this is a clean uninstall
         'update' - if this is an update operation
-    Also returns as 'complete' if it fails
+    Also returns as 'complete' if it fails to read the context file.
     """
 
     try:
