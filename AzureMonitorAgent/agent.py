@@ -112,6 +112,9 @@ if sys.version_info < (2,7):
     subprocess.check_output = check_output
     subprocess.CalledProcessError = CalledProcessError
 
+AMA_STATE_DIR = '/var/lib/azuremonitoragent'
+AMA_UNINSTALL_CONTEXT_FILE = os.path.join(AMA_STATE_DIR, 'uninstall-context')
+
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
@@ -132,9 +135,6 @@ ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
 AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
 WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
-
-# Configuration cache for updates
-AMAConfigCacheDirectory = '/var/cache/azuremonitoragent-config-cache'
 
 SupportedArch = set(['x86_64', 'aarch64'])
 
@@ -559,6 +559,10 @@ def uninstall():
     if PackageManager != "dpkg" and PackageManager != "rpm":
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg." )
 
+    # Determine uninstall context
+    uninstall_context = _get_uninstall_context()
+    hutil_log_info("Uninstall context: {0}".format(uninstall_context))
+
     # For clean uninstall, gather the file list BEFORE running the uninstall command
     # This ensures we have the complete list even after the package manager removes its database
     package_files_for_cleanup = []
@@ -618,7 +622,10 @@ def uninstall():
         exit_code, output = force_uninstall_azure_monitor_agent()
 
         # Remove all files installed by the package that were listed
-        _remove_package_files_from_list(package_files_for_cleanup)
+        _remove_package_files_from_list(package_files_for_cleanup, uninstall_context)
+
+        # Clean up context marker (always do this)
+        _cleanup_uninstall_context()
 
     except Exception as ex:
         exit_code = GenericErrorCode
@@ -758,7 +765,7 @@ def _get_package_files_for_cleanup():
         hutil_log_info("Error gathering package files for cleanup: {0}".format(ex))
         return []
 
-def _remove_package_files_from_list(package_files):
+def _remove_package_files_from_list(package_files, uninstall_context='complete'):
     """
     Remove all files and directories from the provided list that were installed 
     by the azuremonitoragent package. This function works with a pre-gathered 
@@ -774,87 +781,48 @@ def _remove_package_files_from_list(package_files):
             
         hutil_log_info("Removing {0} azuremonitor files/directories from pre-gathered list".format(len(package_files)))
         
-        # Separate files and directories
-        files_to_remove = []
-        dirs_to_remove = []
-        
-        for file_path in package_files:
-            if os.path.isfile(file_path):
-                files_to_remove.append(file_path)
-            elif os.path.isdir(file_path):
-                dirs_to_remove.append(file_path)
-            # Skip if path doesn't exist (already removed)
-        
-        # Remove files first
-        files_removed = 0
-        for file_path in files_to_remove:
+        # Use rmtree for everything - it handles both files and directories
+        items_removed = 0
+        for item_path in package_files:
             try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    files_removed += 1
+                if os.path.exists(item_path):
+                    if os.path.isdir(item_path):
+                        rmtree(item_path)
+                        hutil_log_info("Removed directory: {0}".format(item_path))
+                    else:
+                        os.remove(item_path)
+                        hutil_log_info("Removed file: {0}".format(item_path))
+                    items_removed += 1
             except Exception as ex:
-                hutil_log_info("Failed to remove file {0}: {1}".format(file_path, ex))
+                hutil_log_info("Failed to remove {0}: {1}".format(item_path, ex))
         
-        # Remove directories (in reverse order to handle nested directories)
-        # Sort by depth (deepest first) to avoid removing parent before child
-        dirs_to_remove.sort(key=lambda x: x.count('/'), reverse=True)
+        hutil_log_info("Removed {0} items from package".format(items_removed))
         
-        dirs_removed = 0
-        for dir_path in dirs_to_remove:
-            try:
-                # Check if the directory exists and is a directory before attempting to remove
-                if os.path.exists(dir_path) and os.path.isdir(dir_path):
-                    try:
-                        rmtree(dir_path)
-                        dirs_removed += 1
-                        hutil_log_info("Removed directory: {0}".format(dir_path))
-                    except OSError as ex:
-                        # If rmtree fails, try rmdir for empty directories
-                        try:
-                            os.rmdir(dir_path)
-                            dirs_removed += 1
-                            hutil_log_info("Removed empty directory: {0}".format(dir_path))
-                        except OSError:
-                            hutil_log_info("Could not remove directory {0}: {1}".format(dir_path, ex))
-            except Exception as ex:
-                hutil_log_info("Failed to remove directory {0}: {1}".format(dir_path, ex))
+        # With rpm /opt/microsoft/azuremonitoragent sometimes remains so adding it to be explicitly removed
+        additional_cleanup_dirs = [
+            "/opt/microsoft/azuremonitoragent"
+        ]
         
-        hutil_log_info("Removed {0} directories from package".format(dirs_removed))
-        
-        # Additional cleanup of Azure Monitor log directories
-        log_dirs = []
-
-        # Check if we're in an update sequence by looking for existing cache
-        # If cache exists, this is likely part of an update (update -> uninstall -> install)
-        # If no cache exists, this is a complete uninstall
-        cache_exists = os.path.exists(AMAConfigCacheDirectory)
-        
-        # We are going to remove these directories only if we are not in an update sequence (cache does not exist)
-        if not cache_exists:
-            hutil_log_info("Cache not detected, cleaning up Azure Monitor log directory for uninstall.")
-            # Cleanup log files and directories
-            log_dirs = [
+        # Context-aware additional cleanup for other directories
+        if uninstall_context == 'complete':
+            hutil_log_info("Complete uninstall context - removing everything")
+            additional_cleanup_dirs.extend([
                 "/var/opt/microsoft/azuremonitoragent",
-                "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/events", # not sure if this should be removed since this is only configured for LAD situation
-            ]
-
-        # Additional cleanup of /opt/microsoft/azuremonitoragent directory for rpm because 
-        if PackageManager == "rpm":
-            log_dirs.append("/opt/microsoft/azuremonitoragent")
+                "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/events", # not sure about this as it only occurs during LAD setup
+            ])
 
         additional_dirs_removed = 0
-        for cleanup_dir in log_dirs:
+        for cleanup_dir in additional_cleanup_dirs:
             if os.path.exists(cleanup_dir):
                 try:
                     rmtree(cleanup_dir)
                     additional_dirs_removed += 1
-                    hutil_log_info("Removed additional Azure Monitor directory: {0}".format(cleanup_dir))
+                    hutil_log_info("Removed Azure Monitor directory: {0}".format(cleanup_dir))
                 except Exception as ex:
-                    hutil_log_info("Failed to remove additional directory {0}: {1}".format(cleanup_dir, ex))
+                    hutil_log_info("Failed to remove directory {0}: {1}".format(cleanup_dir, ex))
         
         if additional_dirs_removed > 0:
             hutil_log_info("Removed {0} additional Azure Monitor directories".format(additional_dirs_removed))
-        
         
     except Exception as ex:
         hutil_log_info("Error during file removal from list: {0}".format(ex))
@@ -1292,16 +1260,53 @@ def disable():
 
 def update():
     """
-    Update the current installation of AzureMonitorLinuxAgent.
-    Cache configuration files before the update process begins.
-    The actual update workflow is (disable -> update -> uninstall -> install -> enable)
+    This function is called when the extension is updated.
+    It marks the uninstall context to indicate that the next run should be treated as an update rather than a clean install.
     """
 
-    if os.path.exists(AMAConfigCacheDirectory):
-            rmtree(AMAConfigCacheDirectory)
-    os.makedirs(AMAConfigCacheDirectory)
+    hutil_log_info("Update operation called for Azure Monitor Agent")
+
+    try:
+        os.makedirs(AMA_STATE_DIR, exist_ok=True)
+        with open(AMA_UNINSTALL_CONTEXT_FILE, 'w') as f:
+            f.write('update\n')
+            f.write(str(int(time.time())))  # Timestamp for debugging
+        hutil_log_info("Marked uninstall context as 'update'")
+    except Exception as ex:
+        hutil_log_error("Failed to set uninstall context: {0}".format(ex))
 
     return 0, "Update succeeded"
+
+def _get_uninstall_context():
+    """
+    Determine the context of this uninstall operation
+    """
+
+    try:
+        if os.path.exists(AMA_UNINSTALL_CONTEXT_FILE):
+            with open(AMA_UNINSTALL_CONTEXT_FILE, 'r') as f:
+                context = f.read().strip().split('\n')[0]
+                hutil_log_info("Found uninstall context: {0}".format(context))
+                return context
+    except Exception as ex:
+        hutil_log_info("Failed to read uninstall context: {0}".format(ex))
+    
+    return 'complete'
+
+def _cleanup_uninstall_context():
+    """
+    Clean up uninstall context marker
+    """
+
+    try:
+        if os.path.exists(AMA_UNINSTALL_CONTEXT_FILE):
+            os.remove(AMA_UNINSTALL_CONTEXT_FILE)
+        # Also clean up state directory if empty
+        if os.path.exists(AMA_STATE_DIR) and not os.listdir(AMA_STATE_DIR):
+            os.rmdir(AMA_STATE_DIR)
+    except Exception as ex:
+        hutil_log_info("Failed to cleanup uninstall context: {0}".format(ex))
+
 
 def restart_launcher():
     # start agent launcher
