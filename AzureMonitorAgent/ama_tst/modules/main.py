@@ -11,6 +11,7 @@ from general_health.general_health  import check_general_health
 from high_cpu_mem.high_cpu_mem      import check_high_cpu_memory
 from syslog_tst.syslog                  import check_syslog
 from custom_logs.custom_logs        import check_custom_logs
+from metrics_troubleshooter.metrics_troubleshooter import run_metrics_troubleshooter
 
 # check to make sure the user is running as root
 def check_sudo():
@@ -30,7 +31,7 @@ def check_all(interactive):
         return checked_install
     else:
         all_success = checked_install
-    
+
     print("================================================================================")
     # 2: Connection
     checked_connection = check_connection(interactive)
@@ -46,7 +47,7 @@ def check_all(interactive):
         return checked_general_health
     else:
         all_success = checked_general_health
-        
+
     print("================================================================================")
     # 4: High CPU/Memory Usage
     checked_highcpumem = check_high_cpu_memory(interactive)
@@ -62,7 +63,7 @@ def check_all(interactive):
         return checked_syslog
     else:
         all_success = checked_syslog
-    
+
     print("================================================================================")
     # 6: Custom logs
     checked_custom_logs = check_custom_logs(interactive)
@@ -70,6 +71,15 @@ def check_all(interactive):
         return checked_custom_logs
     else:
         all_success = checked_custom_logs
+
+    print("================================================================================")
+    # 7: Metrics not flowing
+    check_data_collected = run_metrics_troubleshooter(interactive)
+    if (is_error(check_data_collected)):
+        return check_data_collected
+    else:
+        all_success = check_data_collected
+
     return all_success
 
 def collect_logs():
@@ -158,6 +168,7 @@ def run_troubleshooter():
               "4: Agent consuming high CPU/memory. \n"\
               "5: Syslog not flowing. \n"\
               "6: Custom logs not flowing. \n"\
+              "7: Metrics not flowing.\n"\
               "================================================================================\n"\
               "A: Run through all scenarios.\n"\
               "L: Collect the logs for AMA.\n"\
@@ -170,11 +181,12 @@ def run_troubleshooter():
             '4': check_high_cpu_memory,
             '5': check_syslog,
             '6': check_custom_logs,
+            '7': run_metrics_troubleshooter,
             'A': check_all
         }
     
         issue = get_input("Please select an option",\
-                        (lambda x : x.lower() in ['1','2','3','4','5','6','q','quit','l','a']),\
+                        (lambda x : x.lower() in ['1','2','3','4','5','6','7','q','quit','l','a']),\
                         "Please enter an integer corresponding with your issue (1-6) to\n"\
                         "continue, 'A' to run through all scenarios, 'L' to run the log collector, or 'Q' to quit.")
         # quit troubleshooter
@@ -214,7 +226,7 @@ def run_troubleshooter():
         print_results(success)
 
         # if user ran single scenario, ask if they want to run again
-        if (issue in ['1', '2', '3', '4', '5', '6']):
+        if (issue in ['1', '2', '3', '4', '5', '6', '7']):
             run_again = get_input("Do you want to run another scenario? (y/n)",\
                                   (lambda x : x.lower() in ['y','yes','n','no']),\
                                   "Please type either 'y'/'yes' or 'n'/'no' to proceed.")
