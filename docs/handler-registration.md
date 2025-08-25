@@ -40,7 +40,6 @@ registration-scripts/
     └── sample-extension-1.0.xml
 ```
 
-<a name="package-and-upload-your-extension"/>
 ## Package and upload your extension
 
 You can package your extension into a zip file using the following command.
@@ -58,7 +57,6 @@ You should upload your extension to a downloadable storage, for e.g. [Azure Blob
 bin/blob/upload.sh ~/azure-linux-extensions/build/SampleExtension-1.0.0.0.zip
 ```
 
-<a name="register-your-extension"/>
 ## Register your extension
 
 ### Prepare your subscription for registration
