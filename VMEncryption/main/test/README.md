@@ -2,19 +2,6 @@
 
 Unit tests for the Azure Linux VM Encryption Extension. Tests ensure cross-platform compatibility (Python 2.7/3.x) across multiple Linux distributions.
 
-## Quick Start
-
-```bash
-# Navigate to main directory
-cd "c:/path/to/VMEncryption/main"
-
-# Run all tests
-py -m unittest discover test/ -v
-
-# Run specific test
-py -m unittest test.test_azurelinuxPatching -v
-```
-
 ## Setup
 
 Create and activate a virtual environment, then install dependencies:
@@ -31,6 +18,20 @@ source vmencryption-test-env/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 ```
+
+## Quick Start
+
+```bash
+# Navigate to main directory
+cd "c:/path/to/VMEncryption/main"
+
+# Run all tests
+py -m unittest discover test/ -v
+
+# Run specific test
+py -m unittest test.test_azurelinuxPatching -v
+```
+
 
 ## Test Structure
 
