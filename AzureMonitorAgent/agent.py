@@ -2714,22 +2714,37 @@ def get_settings():
                                             '{0}.prv'.format(
                                                       settings_thumbprint))
             decoded_settings = base64.standard_b64decode(encoded_settings)
-            decrypt_cmd = 'openssl smime -inform DER -decrypt -recip {0} ' \
-                          '-inkey {1}'.format(encoded_cert_path,
-                                              encoded_key_path)
 
-            try:
-                session = subprocess.Popen([decrypt_cmd], shell = True,
-                                           stdin = subprocess.PIPE,
-                                           stderr = subprocess.STDOUT,
-                                           stdout = subprocess.PIPE)
-                output = session.communicate(decoded_settings)
-            except OSError:
-                pass
-            protected_settings_str = output[0]
+
+             # FIPS 140-3: use 'openssl cms' (supports AES256 & DES_EDE3_CBC) with fallback to legacy 'openssl smime'
+            cms_cmd = 'openssl cms -inform DER -decrypt -recip {0} -inkey {1}'.format(encoded_cert_path, encoded_key_path)
+            smime_cmd = 'openssl smime -inform DER -decrypt -recip {0} -inkey {1}'.format(encoded_cert_path, encoded_key_path)
+
+            protected_settings_str = None
+            for decrypt_cmd in [cms_cmd, smime_cmd]:
+                try:
+                    session = subprocess.Popen([decrypt_cmd], shell=True,
+                                               stdin=subprocess.PIPE,
+                                               stderr=subprocess.STDOUT,
+                                               stdout=subprocess.PIPE)
+                    output = session.communicate(decoded_settings)
+                    # success only if return code is 0 and we have output
+                    if session.returncode == 0 and output[0]:
+                        protected_settings_str = output[0]
+                        if decrypt_cmd == cms_cmd:
+                            hutil_log_info('Decrypted protectedSettings using openssl cms.')
+                        else:
+                            hutil_log_info('Decrypted protectedSettings using openssl smime fallback.')
+                        break
+                    else:
+                        hutil_log_info('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, session.returncode))
+                except OSError:
+                    # Try next method
+                    pass
 
             if protected_settings_str is None:
                 log_and_exit('Enable', GenericErrorCode, 'Failed decrypting protectedSettings')
+
             protected_settings = ''
             try:
                 protected_settings = json.loads(protected_settings_str)
