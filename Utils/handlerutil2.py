@@ -136,8 +136,11 @@ class HandlerUtility:
         # First read the sequence number from the environment variable
         seq_no_from_env = os.getenv(ENV_CONFIG_SEQUENCE_NUMBER)
         if (seq_no_from_env is not None):
-            seq_no = int(seq_no_from_env)
-        else:
+            try:
+                seq_no = int(seq_no_from_env)
+            except ValueError:
+                self.error("Unable to convert sequence number to int:" + seq_no_from_env)
+        if seq_no == -1:
             # Otherwise look for the most recent sequence number from the files
             self.log("Searching for sequence number in config folder: " + config_folder)
             for subdir, dirs, file_names in os.walk(config_folder):
