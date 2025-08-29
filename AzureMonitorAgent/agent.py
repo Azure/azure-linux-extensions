@@ -2739,12 +2739,10 @@ def get_settings():
                     else:
                         hutil_log_info('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, session.returncode))
                 except OSError:
-                    # Try next method
                     pass
 
             if protected_settings_str is None:
                 log_and_exit('Enable', GenericErrorCode, 'Failed decrypting protectedSettings')
-
             protected_settings = ''
             try:
                 protected_settings = json.loads(protected_settings_str)
