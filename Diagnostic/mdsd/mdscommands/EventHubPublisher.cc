@@ -206,6 +206,10 @@ EventHubPublisher::PublishAsync(
     {
         MdsCmdLogError("Error: EH async publish to " + m_eventHubUrl + " failed: " + ex.what());
     }
+    catch(...)
+    {
+        MdsCmdLogError("Error: EH async publish to " + m_eventHubUrl + " failed with unknown exception");
+    }
 
     m_resetHttpClient = true;
     return pplx::task_from_result(false);
@@ -219,11 +223,17 @@ EventHubPublisher::HandleServerResponseAsync(
     try {
         return HandleServerResponse(responseTask.get(), true);
     }
-    catch(const std::exception & e)
+    catch(const std::exception & ex)
     {
         MdsCmdLogError("Error: EH async publish to " + m_eventHubUrl +
-            " failed with http response: " + e.what());
+            " failed with http response: " + ex.what());
     }
+    catch(...)
+    {
+        MdsCmdLogError("Error: EH async publish to " + m_eventHubUrl +
+            " failed with unknown http response exception");
+    }
+
     m_resetHttpClient = true;
     return false;
 }
