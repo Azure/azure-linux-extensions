@@ -208,7 +208,7 @@ EventHubPublisher::PublishAsync(
     }
     catch(...)
     {
-        MdsCmdLogError("Error: EH async publish to " + m_eventHubUrl + " failed with unknown exception");
+        MdsCmdLogError("Error: EH async publish to " + m_eventHubUrl + " failed with unknown exception.");
     }
 
     m_resetHttpClient = true;
@@ -231,7 +231,7 @@ EventHubPublisher::HandleServerResponseAsync(
     catch(...)
     {
         MdsCmdLogError("Error: EH async publish to " + m_eventHubUrl +
-            " failed with unknown http response exception");
+            " failed with unknown exception in response.");
     }
 
     m_resetHttpClient = true;
