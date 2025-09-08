@@ -69,13 +69,14 @@ class SnapshotInfoObj:
         return dict(isSuccessful = self.isSuccessful, snapshotUri = self.snapshotUri, errorMessage = self.errorMessage, blobUri = self.blobUri, directDriveSnapshotIdentifier = self.directDriveSnapshotIdentifier)
 
 class DirectDriveSnapshotIdentifier:
-    def __init__(self, creationTime, id, token):
+    def __init__(self, creationTime, id, token, instantAccessDurationMinutes = None):
         self.creationTime = creationTime
         self.id = id
         self.token = token
+        self.instantAccessDurationMinutes = instantAccessDurationMinutes # This is populated for DD disk with Instant Access snapshot
 
     def convertToDictionary(self):
-        return dict(creationTime = self.creationTime, id = self.id, token = self.token)
+        return dict(creationTime = self.creationTime, id = self.id, token = self.token, instantAccessDurationMinutes = self.instantAccessDurationMinutes)
 
 class CreationTime:
     def __init__(self, DateTime, OffsetMinutes):
