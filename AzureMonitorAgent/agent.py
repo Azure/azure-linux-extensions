@@ -1243,7 +1243,12 @@ def azureotelcollector_is_active():
     Checks if `azureotelcollector` is installed to run as a systemd service.
     """
     if is_systemd():
-        return 0 == os.system('systemctl is-active --quiet azureotelcollector-watcher.path')
+        try:
+            rc = subprocess.call(["systemctl", "is-active", "--quiet", "azureotelcollector-watcher.path"])
+            return rc == 0
+        except OSError:
+            return False
+
     return False
 
 
@@ -1562,11 +1567,14 @@ def metrics_watcher(hutil_error, hutil_log):
 
     while True:
         try:
+            if is_feature_enabled("enableAzureOTelCollector") and not azureotelcollector_is_active():
+                install_azureotelcollector()
+
             if not me_handler.is_running(is_lad=False):
                 me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
 
                 try:
-                    if is_feature_enabled("enableAzureOTelCollector") and azureotelcollector_is_active():
+                    if is_feature_enabled("enableAzureOTelCollector"):
                         if os.path.exists(me_service_template_path):
                             os.remove(me_service_template_path)
                         copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
