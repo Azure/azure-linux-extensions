@@ -503,9 +503,6 @@ def install():
     # Needs to be revisited for aarch64
     copy_kqlextension_binaries()
 
-    # Install azureotelcollector
-    install_azureotelcollector()
-
     # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
         # Check if they have libssl.so.1.1 since AMA is built against this version
