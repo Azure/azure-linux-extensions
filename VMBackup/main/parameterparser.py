@@ -39,7 +39,7 @@ class ParameterParser(object):
         self.disk_encryption_details = []
         self.isOsDiskADEEncrypted = False
         self.areDataDisksADEEncrypted = False
-        self.encryptionDetails = {}
+        self.diskEncryptionSettings = {}
         self.wellKnownSettingFlags = {CommonVariables.isSnapshotTtlEnabled: False, CommonVariables.useMccfToFetchDsasForAllDisks: False,
                                       CommonVariables.useMccfForLad: False, CommonVariables.enableSnapshotExtensionPolling: False, CommonVariables.isVmmdBlobIncluded : False}
         settingKeysMapping= {}
