@@ -1261,6 +1261,8 @@ def update():
     """
     This function is called when the extension is updated.
     It marks the uninstall context to indicate that the next run should be treated as an update rather than a clean install.
+
+    Always returns 0
     """
 
     hutil_log_info("Update operation called for Azure Monitor Agent")
