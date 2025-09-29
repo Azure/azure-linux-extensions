@@ -119,10 +119,10 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         Helper for test_oms_rsyslog().
         :param cfg: SyslogMdsdConfig object containing syslog config
         """
-        print '=== Actual oms rsyslog config output ==='
+        print('=== Actual oms rsyslog config output ===')
         oms_rsyslog_config = cfg.get_rsyslog_config()
-        print oms_rsyslog_config
-        print '========================================'
+        print(oms_rsyslog_config)
+        print('=========================================')
         lines = oms_rsyslog_config.strip().split('\n')
         # Item (line) count should match
         self.assertEqual(len(cfg._fac_sev_map), len(lines))
@@ -130,16 +130,16 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
         for l in lines:
             self.assertRegexpMatches(l, r"\w+\.\w+\s+@127\.0\.0\.1:%SYSLOG_PORT%")
         # For each facility-severity, there should be corresponding line.
-        for fac, sev in cfg._fac_sev_map.iteritems():
+        for fac, sev in cfg._fac_sev_map.items():
             index = oms_rsyslog_config.find('{0}.{1}'.format(syslog_name_to_rsyslog_name(fac),
                                                              syslog_name_to_rsyslog_name(sev)))
             self.assertGreaterEqual(index, 0)
-        print "*** Actual output verified ***\n"
+        print("*** Actual output verified ***\n")
 
-        print '=== Actual oms syslog-ng config output ==='
+        print('=== Actual oms syslog-ng config output ===')
         oms_syslog_ng_config = cfg.get_syslog_ng_config()
-        print oms_syslog_ng_config
-        print '=========================================='
+        print(oms_syslog_ng_config)
+        print('==========================================')
         lines = oms_syslog_ng_config.strip().split('\n')
         # Item (line) count should match
         self.assertGreaterEqual(len(lines), len(cfg._fac_sev_map))
@@ -149,34 +149,34 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                                         r'filter\(f_LAD_oms_ml_\w+\); destination\(d_LAD_oms\); \}}'
                                         .format(get_syslog_ng_src_name()))
         # For each facility-severity, there should be corresponding line.
-        for fac, sev in cfg._fac_sev_map.iteritems():
+        for fac, sev in cfg._fac_sev_map.items():
             index = oms_syslog_ng_config.find('log {{ source({0}); filter(f_LAD_oms_f_{1}); filter(f_LAD_oms_ml_{2}); '
                                               'destination(d_LAD_oms); }}'.format(get_syslog_ng_src_name(),
                                                                                   syslog_name_to_rsyslog_name(fac),
                                                                                   syslog_name_to_rsyslog_name(sev)))
             self.assertGreaterEqual(index, 0)
-        print "*** Actual output verified ***\n"
+        print("*** Actual output verified ***\n")
 
-        print '=== Actual oms syslog mdsd XML output ==='
+        print('=== Actual oms syslog mdsd XML output ===')
         xml = cfg.get_mdsd_syslog_config()
-        print xml
-        print '========================================='
+        print(xml)
+        print('=========================================')
         root = self.assertXmlDocument(xml)
         self.assertXpathsOnlyOne(root, expected_xpaths)
-        print "*** Actual output verified ***\n"
+        print("*** Actual output verified ***\n")
 
     def test_oms_filelog_mdsd_config(self):
         """
         Test whether mdsd XML config for LAD fileLog settings is correctly generated.
         """
-        print '=== Actual oms filelog mdsd XML config output ==='
+        print('=== Actual oms filelog mdsd XML config output ===')
         xml = self.cfg_filelog.get_mdsd_filelog_config()
-        print xml
-        print '================================================='
+        print(xml)
+        print('=================================================')
         root = self.assertXmlDocument(xml)
 
         self.assertXpathsOnlyOne(root, self.oms_filelog_expected_xpaths)
-        print "*** Actual output verified ***\n"
+        print("*** Actual output verified ***\n")
 
         # Other configs should be all ''
         self.assertFalse(self.cfg_syslog.get_mdsd_filelog_config())
@@ -184,9 +184,9 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
 
     def __helper_test_oms_fluentd_config(self, header_text, expected, actual):
         header = "=== Actual output of {0} ===".format(header_text)
-        print header
-        print actual
-        print '=' * len(header)
+        print(header)
+        print(actual)
+        print('=') * len(header)
         # TODO BADBAD exact string matching...
         self.assertEqual(expected, actual)
         pass
@@ -295,15 +295,15 @@ class LadLoggingConfigTest(unittest.TestCase, XmlTestMixin):
                           ]
         dst_xml_tree = ET.ElementTree(ET.fromstring(entire_xml_cfg_tmpl))
         map(lambda x: copy_source_mdsdevent_eh_url_elems(dst_xml_tree, x), xml_string_srcs)
-        print '=== mdsd config XML after combining syslog/filelogs XML configs ==='
+        print('=== mdsd config XML after combining syslog/filelogs XML configs ===')
         xml = ET.tostring(dst_xml_tree.getroot())
-        print xml
-        print '==================================================================='
+        print(xml)
+        print('===================================================================')
         # Verify using xmlunittests
         root = self.assertXmlDocument(xml)
         self.assertXpathsOnlyOne(root, self.oms_syslog_expected_xpaths)
         self.assertXpathsOnlyOne(root, self.oms_filelog_expected_xpaths)
-        print "*** Actual output verified ***\n"
+        print("*** Actual output verified ***\n")
 
 
 if __name__ == '__main__':

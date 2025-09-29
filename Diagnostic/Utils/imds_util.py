@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Azure Linux extension
 #
@@ -18,9 +18,21 @@
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import datetime
-import urllib2
 import time
 import traceback
+
+# Python 2/3 compatibility for urllib
+try:
+    # Python 3
+    import urllib.request
+    import urllib.error
+    urlopen = urllib.request.urlopen
+    Request = urllib.request.Request
+except ImportError:
+    # Python 2
+    import urllib2
+    urlopen = urllib2.urlopen
+    Request = urllib2.Request
 
 
 def get_imds_data(node, json=True):
@@ -38,8 +50,8 @@ def get_imds_data(node, json=True):
     imds_url = 'http://169.254.169.254{0}{1}{2}'.format(
         separator, node, '?format=json&api-version=latest_internal' if json else '')
     imds_headers = {'Metadata': 'True'}
-    req = urllib2.Request(url=imds_url, headers=imds_headers)
-    resp = urllib2.urlopen(req)
+    req = Request(url=imds_url, headers=imds_headers)
+    resp = urlopen(req)
     data = resp.read()
     data_str = data.decode('utf-8')
     return data_str
@@ -112,20 +124,20 @@ if __name__ == '__main__':
 
     def fake_get_imds_data(node, json=True):
         result = 'fake_get_imds_data(node="{0}", json="{1}")'.format(node, json)
-        print result
+        print(result)
         return result
 
 
     def default_ext_logger(msg):
-        print 'default_ext_logger(msg="{0}")'.format(msg)
+        print('default_ext_logger(msg="{0}")'.format(msg))
 
 
     def default_ext_event_logger(*args, **kwargs):
-        print 'default_ext_event_logger(*args, **kwargs)'
-        print 'args:'
+        print('default_ext_event_logger(*args, **kwargs)')
+        print('args:')
         for arg in args:
-            print arg
-        print 'kwargs:'
+            print(arg)
+        print('kwargs:')
         for k in kwargs:
             print('"{0}"="{1}"'.format(k, kwargs[k]))
 
@@ -137,10 +149,10 @@ if __name__ == '__main__':
     done = False
     while not done:
         now = datetime.datetime.now()
-        print 'Test loop iteration starting at {0}'.format(now)
+        print('Test loop iteration starting at {0}'.format(now))
         imds_logger.log_imds_data_if_right_time()
         if now >= start_time + datetime.timedelta(minutes=2):
             done = True
         else:
-            print 'Sleeping 10 seconds'
+            print('Sleeping 10 seconds')
             time.sleep(10)

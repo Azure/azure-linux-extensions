@@ -90,12 +90,12 @@ class LadExtSettingsTest(unittest.TestCase):
 }
 """
         actual_json = json.loads(self._lad_settings.redacted_handler_settings())
-        print json.dumps(actual_json, sort_keys=True, indent=2)
+        print(json.dumps(actual_json, sort_keys=True, indent=2))
         self.assertEqual(json.dumps(json.loads(expected), sort_keys=True),
                          json.dumps(actual_json, sort_keys=True))
         # Validate that the original wasn't modified (that is, redaction should be on a deep copy)
-        print "===== Original handler setting (shouldn't be redacted, must be different from the deep copy) ====="
-        print json.dumps(self._lad_settings.get_handler_settings(), sort_keys=True, indent=2)
+        print("===== Original handler setting (shouldn't be redacted, must be different from the deep copy) =====")
+        print(json.dumps(self._lad_settings.get_handler_settings(), sort_keys=True, indent=2))
         self.assertNotEqual(json.dumps(self._lad_settings.get_handler_settings(), sort_keys=True),
                             json.dumps(actual_json, sort_keys=True))
 

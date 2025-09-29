@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Azure Linux extension
 #
@@ -17,7 +17,6 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import datetime
-import exceptions
 import os.path
 import platform
 import signal
@@ -58,9 +57,9 @@ try:
 
 
 except Exception as e:
-    print 'A local import (e.g., waagent) failed. Exception: {0}\n' \
-          'Stacktrace: {1}'.format(e, traceback.format_exc())
-    print "Can't proceed. Exiting with a special exit code 119."
+    print('A local import (e.g., waagent) failed. Exception: {0}\n' \
+          'Stacktrace: {1}'.format(e, traceback.format_exc()))
+    print("Can't proceed. Exiting with a special exit code 119.")
     sys.exit(119)  # This is the only thing we can do, as all logging depends on waagent/hutil.
 
 
@@ -119,7 +118,7 @@ def init_distro_specific_actions():
         hutil.log("os version: {0}:{1}".format(name.lower(), version))
         g_dist_config = DistroSpecific.get_distro_actions(name.lower(), version, hutil.log)
         RunGetOutput = g_dist_config.log_run_get_output
-    except exceptions.LookupError as ex:
+    except LookupError as ex:
         hutil.error("os version: {0}:{1} not supported".format(dist[0], dist[1]))
         # TODO Exit immediately if distro is unknown. This is currently done in main().
         g_dist_config = None
@@ -186,7 +185,7 @@ def setup_dependencies_and_mdsd(configurator):
     # Set up omsagent
     omsagent_setup_exit_code, omsagent_setup_output = oms.setup_omsagent(configurator, RunGetOutput,
                                                                          hutil.log, hutil.error)
-    if omsagent_setup_exit_code is not 0:
+    if omsagent_setup_exit_code != 0:
         return 3, omsagent_setup_output
 
     # Install lad-mdsd pkg (/usr/local/lad/bin/mdsd). Must be done after omsagent install because of dependencies
@@ -417,7 +416,7 @@ def main(command):
             if g_dist_config.use_systemd():
                 install_lad_as_systemd_service()
                 RunGetOutput('systemctl enable mdsd-lde')
-                mdsd_lde_active = RunGetOutput('systemctl status mdsd-lde')[0] is 0
+                mdsd_lde_active = RunGetOutput('systemctl status mdsd-lde')[0] == 0
                 if not mdsd_lde_active or hutil.is_current_config_seq_greater_inused():
                     RunGetOutput('systemctl restart mdsd-lde')
             else:
@@ -432,7 +431,7 @@ def main(command):
             # If the -daemon detects a problem, e.g. bad configuration, it will overwrite this status with a more
             # informative one. If it succeeds, all is well.
 
-        elif g_ext_op_type is "Daemon":
+        elif g_ext_op_type == "Daemon":
             configurator = create_core_components_configs()
             if configurator:
                 start_mdsd(configurator)
@@ -453,7 +452,7 @@ def start_daemon():
     raise an exception (often OSError)
     :return: None
     """
-    args = ['python2', g_diagnostic_py_filepath, "-daemon"]
+    args = ['python3', g_diagnostic_py_filepath, "-daemon"]
     log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
     hutil.log('start daemon ' + str(args))
     subprocess.Popen(args, stdout=log, stderr=log)
@@ -509,7 +508,7 @@ def start_mdsd(configurator):
     config_validate_cmd = '{0}{1}{2} -v -c {3} -r {4}'.format(added_env_str, ' ' if added_env_str else '',
                                                        g_mdsd_bin_path, xml_file, g_ext_dir)
     config_validate_cmd_status, config_validate_cmd_msg = RunGetOutput(config_validate_cmd)
-    if config_validate_cmd_status is not 0:
+    if config_validate_cmd_status != 0:
         # Invalid config. Log error and report success.
         g_lad_log_helper.log_and_report_invalid_mdsd_cfg(g_ext_op_type,
                                                          config_validate_cmd_msg, read_file_to_string(xml_file))
@@ -518,7 +517,7 @@ def start_mdsd(configurator):
     # Start OMI if it's not running.
     # This shouldn't happen, but this measure is put in place just in case (e.g., Ubuntu 16.04 systemd).
     # Don't check if starting succeeded, as it'll be done in the loop below anyway.
-    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running", should_log=False)[0] is 1
+    omi_running = RunGetOutput("/opt/omi/bin/service_control is-running", should_log=False)[0] == 1
     if not omi_running:
         hutil.log("OMI is not running. Restarting it.")
         RunGetOutput("/opt/omi/bin/service_control restart")
@@ -823,7 +822,7 @@ def restart_omi_if_crashed(omi_installed, mdsd):
     should_restart_omi = False
     if omi_installed:
         cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
-        should_restart_omi = cmd_exit_status is not 0
+        should_restart_omi = cmd_exit_status != 0
         if should_restart_omi:
             hutil.error("OMI noop query failed. Output: " + cmd_output + ". OMI crash suspected. "
                         "Restarting OMI and sending SIGHUP to mdsd after 5 seconds.")
@@ -834,7 +833,7 @@ def restart_omi_if_crashed(omi_installed, mdsd):
             # Query OMI once again to make sure restart fixed the issue.
             # If not, attempt to re-install OMI as last resort.
             cmd_exit_status, cmd_output = RunGetOutput(cmd=omicli_noop_query_cmd, should_log=False)
-            should_reinstall_omi = cmd_exit_status is not 0
+            should_reinstall_omi = cmd_exit_status != 0
             if should_reinstall_omi:
                 hutil.error("OMI noop query failed even after OMI was restarted. Attempting to re-install the components.")
                 configurator = create_core_components_configs()
@@ -851,7 +850,7 @@ def restart_omi_if_crashed(omi_installed, mdsd):
     # so it's still better to signal anyway.
     should_signal_mdsd = should_restart_omi or omi_reinstalled
     if should_signal_mdsd:
-        omi_up_and_running = RunGetOutput(omicli_noop_query_cmd)[0] is 0
+        omi_up_and_running = RunGetOutput(omicli_noop_query_cmd)[0] == 0
         if omi_up_and_running:
             mdsd.send_signal(signal.SIGHUP)
             hutil.log("SIGHUP sent to mdsd")
@@ -892,7 +891,7 @@ if __name__ == '__main__':
                 # Trick to print backtrace in case we execute './diagnostic.py -xxx yyy' from a terminal for testing.
                 # By just adding one more cmdline arg with any content, the above if condition becomes false,\
                 # thus allowing us to run code here, printing the exception message with the stack trace.
-                print msg
+                print(msg)
             # Need to exit with an error code, so that this situation can be detected by waagent and also
             # reported to customer through agent/extension status blob.
             hutil.do_exit(42, wala_event_type, 'Error', '42', msg)  # What's 42? Ask Abhi.

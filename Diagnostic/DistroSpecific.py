@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Azure Linux extension
 # Distribution-specific actions
@@ -18,7 +18,6 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import exceptions
 import time
 import subprocess
 import re
@@ -360,4 +359,4 @@ def get_distro_actions(name, version, logger):
             return DistroMap[name_and_major_version](logger)
         if name in DistroMap:
             return DistroMap[name](logger)
-    raise exceptions.LookupError('{0} is not a supported distro'.format(name_and_version))
+    raise LookupError('{0} is not a supported distro'.format(name_and_version))

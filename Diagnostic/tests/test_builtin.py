@@ -165,7 +165,7 @@ class TestMakeXML(unittest.TestCase):
         doc = ET.ElementTree(ET.fromstring(self.base_xml))
         BProvider.UpdateXML(doc)
         # xml_string = ET.tostring(doc.getroot())
-        # print xml_string
+        # print(x)ml_string
 
 
 class Lad2_3CompatiblePortalPublicSettingsGenerator(unittest.TestCase):
@@ -244,7 +244,7 @@ class Lad2_3CompatiblePortalPublicSettingsGenerator(unittest.TestCase):
         units_and_names = self.extract_perf_counter_units_and_names_from_metrics_def_sample()
 
         for class_name in BProvider._builtIns:
-            for lad_counter_name, scx_counter_name in BProvider._builtIns[class_name].iteritems():
+            for lad_counter_name, scx_counter_name in BProvider._builtIns[class_name].items():
                 perf_counter_cfg = dict(each_perf_counter_cfg_template)
                 perf_counter_cfg['class'] = class_name
                 perf_counter_cfg['counter'] = lad_counter_name
@@ -270,7 +270,7 @@ class Lad2_3CompatiblePortalPublicSettingsGenerator(unittest.TestCase):
                 perf_counter_cfg_list.append(perf_counter_cfg)
 
         actual = json.dumps(pub_settings, sort_keys=True, indent=2)
-        print actual
+        print(actual)
         # Uncomment the following 2 lines when generating expected JSON file (of course after validating the actual)
         #with open('lad_2_3_compatible_portal_pub_settings.json', 'w') as f:
         #    f.write(actual)

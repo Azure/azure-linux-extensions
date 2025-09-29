@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Azure Linux extension
 #
@@ -20,6 +20,15 @@ import binascii
 
 from Utils.WAAgentUtil import waagent
 from Utils.lad_exceptions import LadLoggingConfigException
+
+# Python 2/3 compatibility
+import sys
+if sys.version_info[0] == 2:
+    # Python 2
+    string_types = basestring
+else:
+    # Python 3
+    string_types = str
 
 
 def get_extension_operation_type(command):
@@ -209,7 +218,7 @@ def encrypt_secret_with_cert(run_command, logger, cert_path, secret):
     cmd = "echo -n '{0}' | openssl smime -aes256 -encrypt -outform DER -out {1} {2}"
     cmd_to_run = cmd.format(secret, f.name, cert_path)
     ret_status, ret_msg = run_command(cmd_to_run, should_log=False)
-    if ret_status is not 0:
+    if ret_status != 0:
         logger("Encrypting storage secret failed with the following message: " + ret_msg)
         return None
     encrypted_secret = f.read()
@@ -248,7 +257,7 @@ def get_mdsd_proxy_config(waagent_setting, ext_settings, logger):
         proxy_config = ext_settings.read_protected_config(proxy_setting_name)  # Protected setting has next priority
     if not proxy_config:
         proxy_config = ext_settings.read_public_config(proxy_setting_name)
-    if not isinstance(proxy_config, basestring):
+    if not isinstance(proxy_config, string_types):
         logger('Error: mdsdHttpProxy config is not a string. Ignored.')
     else:
         proxy_config = proxy_config.strip()
