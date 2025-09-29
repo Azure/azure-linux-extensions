@@ -18,11 +18,11 @@ def LogError(msg):
     global totalErrors
     totalErrors = totalErrors + 1
     msg2 = "%s: Error: %s" % (sys.argv[0], msg)
-    print msg2
+    print(msg2)
 
 
 def LogInfo(msg):
-    print msg
+    print(msg)
 
 
 def ParseCmdLine():

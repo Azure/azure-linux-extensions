@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Azure Linux extension
 #
@@ -405,7 +405,7 @@ def setup_omsagent(configurator, run_command, logger_log, logger_error):
     if need_fresh_install_omi:
         # Check if OMI is configured to listen to any non-zero port and reconfigure if so.
         omi_listens_to_nonzero_port = run_command(r"grep '^\s*httpsport\s*=' /etc/opt/omi/conf/omiserver.conf "
-                                                  r"| grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] is 0
+                                                  r"| grep -v '^\s*httpsport\s*=\s*0\s*$'")[0] == 0
         if omi_listens_to_nonzero_port:
             run_command("/opt/omi/bin/omiconfigeditor httpsport -s 0 < /etc/opt/omi/conf/omiserver.conf "
                         "> /etc/opt/omi/conf/omiserver.conf_temp")

@@ -48,10 +48,9 @@ def decrypt_protected_settings(handlerSettings):
 
 def print_content_with_header(header_text, content):
     header = '>>>>> ' + header_text + ' >>>>>'
-    print header
-    print content
-    print '<' * len(header)
-    print
+    print(header)
+    print(content)
+    print('<' * len(header))
 
 
 def mock_fetch_uuid():
@@ -67,11 +66,11 @@ def mock_encrypt_secret(cert, secret):
 
 
 def mock_log_info(msg):
-    print 'LOG:', msg
+    print('LOG:', msg)
 
 
 def mock_log_error(msg):
-    print 'ERROR:', msg
+    print('ERROR:', msg)
 
 
 def load_test_config(filename):
@@ -294,7 +293,7 @@ class LadConfigAllTest(unittest.TestCase, XmlTestMixin):
         configurator = load_test_config(test_lad_settings_logging_json_file)
         configurator._sink_configs.insert_from_config(test_sinks_config)
         configurator._update_metric_collection_settings(test_config)
-        print ET.tostring(configurator._mdsd_config_xml_tree.getroot())
+        print(ET.tostring(configurator._mdsd_config_xml_tree.getroot()))
 
 if __name__ == '__main__':
     unittest.main()

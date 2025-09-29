@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Azure Linux extension
 #
@@ -212,7 +212,7 @@ def AddMetric(counter_spec):
     try:
         metric = BuiltinMetric(counter_spec)
     except ProvUtil.ParseException as ex:
-        print "Couldn't create metric: ", ex
+        print("Couldn't create metric: ", ex)
         return None
 
     # (class, instanceId, sampleRate) -> [ metric ]

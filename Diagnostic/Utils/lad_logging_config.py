@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Azure Linux extension
 #
@@ -137,7 +137,7 @@ class LadLoggingConfig:
                 self._rsyslog_config = \
                     '\n'.join('{0}.{1}  @127.0.0.1:%SYSLOG_PORT%'.format(syslog_name_to_rsyslog_name(fac),
                                                                          syslog_name_to_rsyslog_name(sev))
-                              for fac, sev in self._fac_sev_map.iteritems()) + '\n'
+                              for fac, sev in self._fac_sev_map.items()) + '\n'
         return self._rsyslog_config
 
     def get_syslog_ng_config(self):
@@ -159,7 +159,7 @@ class LadLoggingConfig:
                               'destination(d_LAD_oms); }};'.format(get_syslog_ng_src_name(),
                                                                    syslog_name_to_rsyslog_name(fac),
                                                                    syslog_name_to_rsyslog_name(sev))
-                              for fac, sev in self._fac_sev_map.iteritems()) + '\n'
+                              for fac, sev in self._fac_sev_map.items()) + '\n'
         return self._syslog_ng_config
 
 
