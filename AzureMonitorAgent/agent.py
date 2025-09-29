@@ -118,8 +118,8 @@ AMA_UNINSTALL_CONTEXT_FILE = os.path.join(AMA_STATE_DIR, 'uninstall-context')
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
-BundleFileNameDeb = 'azuremonitoragent_1.35.9-1053_x86_64.deb'
-BundleFileNameRpm = 'azuremonitoragent-1.36.1-1078.x86_64.rpm'
+BundleFileNameDeb = 'azuremonitoragent.deb'
+BundleFileNameRpm = 'azuremonitoragent.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
