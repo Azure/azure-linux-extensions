@@ -807,7 +807,6 @@ def _remove_package_files_from_list(package_files, uninstall_context='complete')
             hutil_log_info("Complete uninstall context - removing everything")
             additional_cleanup_dirs.extend([
                 "/var/opt/microsoft/azuremonitoragent",
-                "/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent/events", # not sure about this as it only occurs during LAD setup
             ])
 
         additional_dirs_removed = 0
@@ -1268,7 +1267,8 @@ def update():
     hutil_log_info("Update operation called for Azure Monitor Agent")
 
     try:
-        os.makedirs(AMA_STATE_DIR, exist_ok=True)
+        if not os.path.exists(AMA_STATE_DIR):
+            os.makedirs(AMA_STATE_DIR)
         with open(AMA_UNINSTALL_CONTEXT_FILE, 'w') as f:
             f.write('update\n')
             f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) # Timestamp for debugging
@@ -1294,9 +1294,11 @@ def _get_uninstall_context():
                 context = f.read().strip().split('\n')[0]
                 hutil_log_info("Found uninstall context: {0}".format(context))
                 return context
+        else:
+            hutil_log_info("Uninstall context file does not exist, defaulting to 'complete'")
     except Exception as ex:
-        hutil_log_info("Failed to read uninstall context: {0}".format(ex)) # rewrite this as an error log?
-    
+        hutil_log_error("Failed to read uninstall context file: {0}".format(ex))
+
     return 'complete'
 
 def _cleanup_uninstall_context():
@@ -1307,11 +1309,20 @@ def _cleanup_uninstall_context():
     try:
         if os.path.exists(AMA_UNINSTALL_CONTEXT_FILE):
             os.remove(AMA_UNINSTALL_CONTEXT_FILE)
+            hutil_log_info("Removed uninstall context file")
+        else:
+            hutil_log_info("Uninstall context file does not exist, nothing to remove")
+        
         # Also clean up state directory if empty
         if os.path.exists(AMA_STATE_DIR) and not os.listdir(AMA_STATE_DIR):
             os.rmdir(AMA_STATE_DIR)
+            hutil_log_info("Removed empty state directory")
+        elif os.path.exists(AMA_STATE_DIR):
+            hutil_log_info("State directory exists but is not empty, leaving it")
+        else:
+            hutil_log_info("State directory does not exist, nothing to remove")
     except Exception as ex:
-        hutil_log_info("Failed to cleanup uninstall context: {0}".format(ex)) # rewrite this as an error log?
+        hutil_log_error("Failed to cleanup uninstall context: {0}".format(ex))
 
 def restart_launcher():
     # start agent launcher
