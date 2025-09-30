@@ -135,7 +135,6 @@ ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
 AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
 WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
-
 SupportedArch = set(['x86_64', 'aarch64'])
 
 # Error codes
