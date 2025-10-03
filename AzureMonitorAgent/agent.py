@@ -554,12 +554,9 @@ def uninstall():
     if not is_installed:
         hutil_log_info("Azure Monitor Agent is not installed, nothing to uninstall.")
         return 0, "Azure Monitor Agent is not installed, nothing to uninstall."
+   
     if PackageManager != "dpkg" and PackageManager != "rpm":
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg." )
-
-    # Determine uninstall context
-    uninstall_context = _get_uninstall_context()
-    hutil_log_info("Uninstall context: {0}".format(uninstall_context))
 
     # For clean uninstall, gather the file list BEFORE running the uninstall command
     # This ensures we have the complete list even after the package manager removes its database
@@ -620,7 +617,7 @@ def uninstall():
         exit_code, output = force_uninstall_azure_monitor_agent()
 
         # Remove all files installed by the package that were listed
-        _remove_package_files_from_list(package_files_for_cleanup, uninstall_context)
+        _remove_package_files_from_list(package_files_for_cleanup)
 
         # Clean up context marker (always do this)
         _cleanup_uninstall_context()
@@ -754,7 +751,7 @@ def _get_package_files_for_cleanup():
         hutil_log_info("Error gathering package files for cleanup: {0}".format(ex))
         return []
 
-def _remove_package_files_from_list(package_files, uninstall_context='complete'):
+def _remove_package_files_from_list(package_files):
     """
     Remove all files and directories from the provided list that were installed 
     by the azuremonitoragent package. This function works with a pre-gathered 
@@ -773,6 +770,10 @@ def _remove_package_files_from_list(package_files, uninstall_context='complete')
         
         # Add directories that need explicit cleanup regardless of package manager behavior
         cleanup_paths.add("/opt/microsoft/azuremonitoragent")
+
+        # Determine uninstall context based on if the context file exists
+        uninstall_context = _get_uninstall_context()
+        hutil_log_info("Uninstall context: {0}".format(uninstall_context))
         
         if uninstall_context == 'complete':
             hutil_log_info("Complete uninstall context - removing everything")
