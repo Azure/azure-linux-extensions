@@ -112,7 +112,7 @@ if sys.version_info < (2,7):
     subprocess.check_output = check_output
     subprocess.CalledProcessError = CalledProcessError
 
-AMA_STATE_DIR = '/var/lib/azuremonitoragent'
+AMA_STATE_DIR = '/var/opt/microsoft'
 AMA_UNINSTALL_CONTEXT_FILE = os.path.join(AMA_STATE_DIR, 'uninstall-context')
 
 # Global Variables
@@ -739,21 +739,12 @@ def _get_package_files_for_cleanup():
         
         # Collect all azuremonitor-related paths
         azuremonitoragent_files = []
-        directory_paths_found = set()
         
         for file_path in files:
             # Only include files/directories that have "azuremonitor" in their path
             # This covers both "azuremonitoragent" and "azuremonitor-*" service files
             if "azuremonitor" in file_path:
                 azuremonitoragent_files.append(file_path)
-                
-                # For RPM, we need to track parent directories since RPM doesn't list them
-                if PackageManager == "rpm":
-                    # Extract parent directories that contain azuremonitor
-                    parent_dir = os.path.dirname(file_path)
-                    while parent_dir and parent_dir != "/" and "azuremonitor" in parent_dir:
-                        directory_paths_found.add(parent_dir)
-                        parent_dir = os.path.dirname(parent_dir)
             else:
                 hutil_log_info("Skipping non-azuremonitor path: {0}".format(file_path))
         
@@ -777,11 +768,23 @@ def _remove_package_files_from_list(package_files, uninstall_context='complete')
             hutil_log_info("No package files provided for removal")
             return
             
-        hutil_log_info("Removing {0} azuremonitor files/directories from pre-gathered list".format(len(package_files)))
+        # Build consolidated list of paths to clean up
+        cleanup_paths = set(package_files) if package_files else set()
         
-        # Use rmtree for everything - it handles both files and directories
+        # Add directories that need explicit cleanup regardless of package manager behavior
+        cleanup_paths.add("/opt/microsoft/azuremonitoragent")
+        
+        if uninstall_context == 'complete':
+            hutil_log_info("Complete uninstall context - removing everything")
+            cleanup_paths.add("/var/opt/microsoft/azuremonitoragent")
+
+        # Sort paths by depth (deepest first) to avoid removing parent before children
+        sorted_paths = sorted(cleanup_paths, key=lambda x: x.count('/'), reverse=True)
+        
+        hutil_log_info("Removing {0} azuremonitor paths".format(len(sorted_paths)))
+        
         items_removed = 0
-        for item_path in package_files:
+        for item_path in sorted_paths:
             try:
                 if os.path.exists(item_path):
                     if os.path.isdir(item_path):
@@ -794,32 +797,7 @@ def _remove_package_files_from_list(package_files, uninstall_context='complete')
             except Exception as ex:
                 hutil_log_info("Failed to remove {0}: {1}".format(item_path, ex))
         
-        hutil_log_info("Removed {0} items from package".format(items_removed))
-        
-        # With rpm /opt/microsoft/azuremonitoragent sometimes remains so adding it to be explicitly removed
-        additional_cleanup_dirs = [
-            "/opt/microsoft/azuremonitoragent"
-        ]
-        
-        # Context-aware additional cleanup for other directories
-        if uninstall_context == 'complete':
-            hutil_log_info("Complete uninstall context - removing everything")
-            additional_cleanup_dirs.extend([
-                "/var/opt/microsoft/azuremonitoragent",
-            ])
-
-        additional_dirs_removed = 0
-        for cleanup_dir in additional_cleanup_dirs:
-            if os.path.exists(cleanup_dir):
-                try:
-                    rmtree(cleanup_dir)
-                    additional_dirs_removed += 1
-                    hutil_log_info("Removed Azure Monitor directory: {0}".format(cleanup_dir))
-                except Exception as ex:
-                    hutil_log_info("Failed to remove directory {0}: {1}".format(cleanup_dir, ex))
-        
-        if additional_dirs_removed > 0:
-            hutil_log_info("Removed {0} additional Azure Monitor directories".format(additional_dirs_removed))
+        hutil_log_info("Removed {0} items total".format(items_removed))
         
     except Exception as ex:
         hutil_log_info("Error during file removal from list: {0}".format(ex))
