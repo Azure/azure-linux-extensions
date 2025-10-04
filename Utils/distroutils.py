@@ -295,8 +295,8 @@ class FreeBSDDistro(GenericDistro):
 
 
     # noinspection PyMethodOverriding
-    def chpasswd(self, user, password):
-        return ext_utils.run_send_stdin(['pw', 'usermod', 'user', '-h', '0'], password, log_cmd=False)
+    def change_password(self, user, password):
+        return ext_utils.run_send_stdin(['pw', 'usermod', user, '-h', '0'], password.encode('utf-8'), log_cmd=False)
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
@@ -315,7 +315,7 @@ class FreeBSDDistro(GenericDistro):
                 uidmin = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
         except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
-            pass
+
         if uidmin is None:
             uidmin = 100
         if userentry is not None and userentry[2] < uidmin:
