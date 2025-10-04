@@ -68,7 +68,7 @@ class CommonVariables:
     isVMADEEnabled = 'isVMADEEnabled'
     isOsDiskADEEncrypted = 'isOsDiskADEEncrypted'
     areDataDisksADEEncrypted = 'areDataDisksADEEncrypted'
-    encryptionDetails = 'EncryptionDetails'
+    diskEncryptionSettings = 'DiskEncryptionSettings'
     isAnyWADiskIncluded = 'isAnyWADiskIncluded'
     isAnyDirectDriveDiskIncluded = 'isAnyDirectDriveDiskIncluded'
     diskEncryptionKey = "x-ms-meta-DiskEncryptionSettings"

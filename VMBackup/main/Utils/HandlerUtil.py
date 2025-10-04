@@ -866,8 +866,8 @@ class HandlerUtility:
         try:
             meta_list = getattr(request_body, "snapshotMetadata", None)
             for meta in meta_list:
-                if meta.get("Key") == "EncryptionDetails":
-                    # Redact the entire value of EncryptionDetails
+                if meta.get("Key") == "DiskEncryptionSettings":
+                    # Redact the entire value of DiskEncryptionSettings
                     meta["Value"] = "REDACTED"
             return request_body
         except Exception as e:
