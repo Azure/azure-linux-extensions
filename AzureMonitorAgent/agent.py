@@ -704,8 +704,8 @@ def force_uninstall_azure_monitor_agent():
       
 def _get_package_files_for_cleanup():
     """
-    Get the list of files and directories installed by the azuremonitoragent package
-    that should be removed during clean uninstall.
+    Get the list of files and directories installed by the provided
+    azuremonitoragent spec that should be removed during uninstall.
     This must be called BEFORE the package is uninstalled to ensure the package
     manager still has the file list available.
     
@@ -748,14 +748,15 @@ def _get_package_files_for_cleanup():
         return azuremonitoragent_files
         
     except Exception as ex:
-        hutil_log_info("Error gathering package files for cleanup: {0}".format(ex))
+        hutil_log_error("Error gathering package files for cleanup: {0}\n Is Azure Monitor Agent Installed?".format(ex))
         return []
 
 def _remove_package_files_from_list(package_files):
     """
     Remove all files and directories from the provided list that were installed 
-    by the azuremonitoragent package. This function works with a pre-gathered 
-    list of files, allowing it to work even after the package has been uninstalled.
+    by the provided azuremonitoragent spec. This function works with a pre-gathered 
+    list of files from _get_package_files_for_cleanup(), allowing it to work even 
+    after the package has been uninstalled.
     
     Args:
         package_files (list): List of file/directory paths to remove
@@ -801,7 +802,7 @@ def _remove_package_files_from_list(package_files):
         hutil_log_info("Removed {0} items total".format(items_removed))
         
     except Exception as ex:
-        hutil_log_info("Error during file removal from list: {0}".format(ex))
+        hutil_log_error("Error during file removal from list: {0}\n Were these files removed already?".format(ex))
 
 def enable():
     """
@@ -1252,7 +1253,7 @@ def update():
             f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) # Timestamp for debugging
         hutil_log_info("Marked uninstall context as 'update'")
     except Exception as ex:
-        hutil_log_error("Failed to set uninstall context: {0}".format(ex))
+        hutil_log_error("Failed to set uninstall context: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes /var/opt/microsoft/azuremonitoragent/.".format(ex))
 
     return 0, "Update succeeded"
 
@@ -1275,7 +1276,7 @@ def _get_uninstall_context():
         else:
             hutil_log_info("Uninstall context file does not exist, defaulting to 'complete'")
     except Exception as ex:
-        hutil_log_error("Failed to read uninstall context file: {0}".format(ex))
+        hutil_log_error("Failed to read uninstall context file: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes /var/opt/microsoft/azuremonitoragent/..".format(ex))
 
     return 'complete'
 
@@ -1300,7 +1301,7 @@ def _cleanup_uninstall_context():
         else:
             hutil_log_info("State directory does not exist, nothing to remove")
     except Exception as ex:
-        hutil_log_error("Failed to cleanup uninstall context: {0}".format(ex))
+        hutil_log_error("Failed to cleanup uninstall context: {0}\n This may result in unintended behavior as described.\nIf the marker file exists and cannot be removed, uninstall will continue to keep the /var/opt/microsoft/azuremonitoragent/ path, leading users to have to remove it manually.".format(ex))
 
 def restart_launcher():
     # start agent launcher
