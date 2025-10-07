@@ -112,14 +112,11 @@ if sys.version_info < (2,7):
     subprocess.check_output = check_output
     subprocess.CalledProcessError = CalledProcessError
 
-AMA_STATE_DIR = '/var/opt/microsoft'
-AMA_UNINSTALL_CONTEXT_FILE = os.path.join(AMA_STATE_DIR, 'uninstall-context')
-
 # Global Variables
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
 BundleFileNameDeb = 'azuremonitoragent.deb'
-BundleFileNameRpm = 'azuremonitoragent.rpm'
+BundleFileNameRpm = 'azuremonitoragent-1.37.0-1135.x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -135,6 +132,7 @@ ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
 AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
 WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
+AmaUninstallContextFile = '/var/opt/microsoft/uninstall-context'
 SupportedArch = set(['x86_64', 'aarch64'])
 
 # Error codes
@@ -1246,9 +1244,10 @@ def update():
     hutil_log_info("Update operation called for Azure Monitor Agent")
 
     try:
-        if not os.path.exists(AMA_STATE_DIR):
-            os.makedirs(AMA_STATE_DIR)
-        with open(AMA_UNINSTALL_CONTEXT_FILE, 'w') as f:
+        state_dir = os.path.dirname(AmaUninstallContextFile)
+        if not os.path.exists(state_dir):
+            os.makedirs(state_dir)
+        with open(AmaUninstallContextFile, 'w') as f:
             f.write('update\n')
             f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) # Timestamp for debugging
         hutil_log_info("Marked uninstall context as 'update'")
@@ -1268,8 +1267,8 @@ def _get_uninstall_context():
     """
 
     try:
-        if os.path.exists(AMA_UNINSTALL_CONTEXT_FILE):
-            with open(AMA_UNINSTALL_CONTEXT_FILE, 'r') as f:
+        if os.path.exists(AmaUninstallContextFile):
+            with open(AmaUninstallContextFile, 'r') as f:
                 context = f.read().strip().split('\n')[0]
                 hutil_log_info("Found uninstall context: {0}".format(context))
                 return context
@@ -1286,20 +1285,11 @@ def _cleanup_uninstall_context():
     """
 
     try:
-        if os.path.exists(AMA_UNINSTALL_CONTEXT_FILE):
-            os.remove(AMA_UNINSTALL_CONTEXT_FILE)
+        if os.path.exists(AmaUninstallContextFile):
+            os.remove(AmaUninstallContextFile)
             hutil_log_info("Removed uninstall context file")
         else:
             hutil_log_info("Uninstall context file does not exist, nothing to remove")
-        
-        # Also clean up state directory if empty
-        if os.path.exists(AMA_STATE_DIR) and not os.listdir(AMA_STATE_DIR):
-            os.rmdir(AMA_STATE_DIR)
-            hutil_log_info("Removed empty state directory")
-        elif os.path.exists(AMA_STATE_DIR):
-            hutil_log_info("State directory exists but is not empty, leaving it")
-        else:
-            hutil_log_info("State directory does not exist, nothing to remove")
     except Exception as ex:
         hutil_log_error("Failed to cleanup uninstall context: {0}\n This may result in unintended behavior as described.\nIf the marker file exists and cannot be removed, uninstall will continue to keep the /var/opt/microsoft/azuremonitoragent/ path, leading users to have to remove it manually.".format(ex))
 
