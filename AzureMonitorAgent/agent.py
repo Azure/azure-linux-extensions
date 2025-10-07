@@ -133,6 +133,7 @@ AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-c
 AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
 WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
 AmaUninstallContextFile = '/var/opt/microsoft/uninstall-context'
+AmaDataPath = '/var/opt/microsoft/azuremonitoragent/'
 SupportedArch = set(['x86_64', 'aarch64'])
 
 # Error codes
@@ -767,8 +768,9 @@ def _remove_package_files_from_list(package_files):
         # Build consolidated list of paths to clean up
         cleanup_paths = set(package_files) if package_files else set()
         
-        # Add directories that need explicit cleanup regardless of package manager behavior
-        cleanup_paths.add("/opt/microsoft/azuremonitoragent")
+        # Add directories that need explicit cleanup since on rpm systems 
+        # the initial list for this path does not remove the directories and files
+        cleanup_paths.add("/opt/microsoft/azuremonitoragent/")
 
         # Determine uninstall context based on if the context file exists
         uninstall_context = _get_uninstall_context()
@@ -776,7 +778,7 @@ def _remove_package_files_from_list(package_files):
         
         if uninstall_context == 'complete':
             hutil_log_info("Complete uninstall context - removing everything")
-            cleanup_paths.add("/var/opt/microsoft/azuremonitoragent")
+            cleanup_paths.add(AmaDataPath)
 
         # Sort paths by depth (deepest first) to avoid removing parent before children
         sorted_paths = sorted(cleanup_paths, key=lambda x: x.count('/'), reverse=True)
@@ -1252,7 +1254,7 @@ def update():
             f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) # Timestamp for debugging
         hutil_log_info("Marked uninstall context as 'update'")
     except Exception as ex:
-        hutil_log_error("Failed to set uninstall context: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes /var/opt/microsoft/azuremonitoragent/.".format(ex))
+        hutil_log_error("Failed to set uninstall context: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes {1}.".format(ex, AmaDataPath))
 
     return 0, "Update succeeded"
 
@@ -1275,7 +1277,7 @@ def _get_uninstall_context():
         else:
             hutil_log_info("Uninstall context file does not exist, defaulting to 'complete'")
     except Exception as ex:
-        hutil_log_error("Failed to read uninstall context file: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes /var/opt/microsoft/azuremonitoragent/.".format(ex))
+        hutil_log_error("Failed to read uninstall context file: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes {1}.".format(ex, AmaDataPath))
 
     return 'complete'
 
@@ -1291,7 +1293,7 @@ def _cleanup_uninstall_context():
         else:
             hutil_log_info("Uninstall context file does not exist, nothing to remove")
     except Exception as ex:
-        hutil_log_error("Failed to cleanup uninstall context: {0}\n This may result in unintended behavior as described.\nIf the marker file exists and cannot be removed, uninstall will continue to keep the /var/opt/microsoft/azuremonitoragent/ path, leading users to have to remove it manually.".format(ex))
+        hutil_log_error("Failed to cleanup uninstall context: {0}\n This may result in unintended behavior as described.\nIf the marker file exists and cannot be removed, uninstall will continue to keep the {1} path, leading users to have to remove it manually.".format(ex, AmaDataPath))
 
 def restart_launcher():
     # start agent launcher
