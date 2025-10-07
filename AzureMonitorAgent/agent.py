@@ -1276,7 +1276,7 @@ def _get_uninstall_context():
         else:
             hutil_log_info("Uninstall context file does not exist, defaulting to 'complete'")
     except Exception as ex:
-        hutil_log_error("Failed to read uninstall context file: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes /var/opt/microsoft/azuremonitoragent/..".format(ex))
+        hutil_log_error("Failed to read uninstall context file: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes /var/opt/microsoft/azuremonitoragent/.".format(ex))
 
     return 'complete'
 
