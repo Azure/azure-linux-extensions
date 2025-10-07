@@ -116,7 +116,7 @@ if sys.version_info < (2,7):
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
 BundleFileNameDeb = 'azuremonitoragent.deb'
-BundleFileNameRpm = 'azuremonitoragent-1.37.0-1135.x86_64.rpm'
+BundleFileNameRpm = 'azuremonitoragent.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
