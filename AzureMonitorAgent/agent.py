@@ -116,7 +116,7 @@ if sys.version_info < (2,7):
 PackagesDirectory = 'packages'
 # The BundleFileName values will be replaced by actual values in the release pipeline. See apply_version.sh.
 BundleFileNameDeb = 'azuremonitoragent.deb'
-BundleFileNameRpm = 'azuremonitoragent.rpm'
+BundleFileNameRpm = 'azuremonitoragent-1.37.0-1135.x86_64.rpm'
 BundleFileName = ''
 TelegrafBinName = 'telegraf'
 InitialRetrySleepSeconds = 30
@@ -553,6 +553,72 @@ def uninstall():
 
     if PackageManager != "dpkg" and PackageManager != "rpm":
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg." )
+
+    # Stop all running processes FIRST to prevent I/O errors during file removal
+    hutil_log_info("Stopping all Azure Monitor Agent processes before uninstall")
+    try:
+        # Check and stop watcher processes only if they are running
+        if is_metrics_process_running():
+            hutil_log_info("Metrics watcher is running, stopping it")
+            stop_metrics_process()
+        else:
+            hutil_log_info("Metrics watcher is not running")
+            
+        if is_syslogconfig_process_running():
+            hutil_log_info("Syslog config watcher is running, stopping it")
+            stop_syslogconfig_process()
+        else:
+            hutil_log_info("Syslog config watcher is not running")
+            
+        if is_transformconfig_process_running():
+            hutil_log_info("Transform config watcher is running, stopping it")
+            stop_transformconfig_process()
+        else:
+            hutil_log_info("Transform config watcher is not running")
+
+        # Additional aggressive cleanup: kill any remaining AMA agent.py processes
+        # This catches any processes that might not have PID files or weren't detected above
+        hutil_log_info("Performing aggressive cleanup of any remaining AMA processes")
+        run_command_and_log("pkill -f 'agent.py.*-metrics' || true", check_error=False)
+        run_command_and_log("pkill -f 'agent.py.*-syslogconfig' || true", check_error=False)
+        run_command_and_log("pkill -f 'agent.py.*-transformconfig' || true", check_error=False)
+        
+        # Give processes time to terminate gracefully
+        time.sleep(2)
+
+        # Stop amacoreagent and agent launcher only if they are running
+        if is_systemd():
+            if 0 == os.system('systemctl is-active --quiet azuremonitor-agentlauncher'):
+                hutil_log_info("Azure Monitor Agent Launcher is running, stopping it")
+                run_command_and_log(get_service_command("azuremonitor-agentlauncher", "stop", "disable"), check_error=False)
+            else:
+                hutil_log_info("Azure Monitor Agent Launcher is not running")
+                
+            if 0 == os.system('systemctl is-active --quiet azuremonitor-coreagent'):
+                hutil_log_info("Azure Monitor Core Agent is running, stopping it")
+                run_command_and_log(get_service_command("azuremonitor-coreagent", "stop", "disable"), check_error=False)
+            else:
+                hutil_log_info("Azure Monitor Core Agent is not running")
+
+        # Stop and disable all AMA systemd services only if they are running
+        for service in ["azuremonitoragent", "azuremonitoragentmgr"]:
+            if 0 == os.system('systemctl is-active --quiet {0}'.format(service)):
+                hutil_log_info("{0} service is running, stopping it".format(service))
+                run_command_and_log(get_service_command(service, "stop", "disable"), check_error=False)
+            else:
+                hutil_log_info("{0} service is not running".format(service))
+
+        # Stop KQL extension if not on aarch64 and only if it's running
+        if platform.machine() != 'aarch64':
+            if 0 == os.system('systemctl is-active --quiet azuremonitor-kqlextension'):
+                hutil_log_info("Azure Monitor KQL Extension is running, stopping it")
+                run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"), check_error=False)
+            else:
+                hutil_log_info("Azure Monitor KQL Extension is not running")
+        
+        hutil_log_info("Successfully attempted to stop all Azure Monitor Agent processes")
+    except Exception as ex:
+        hutil_log_info("Error stopping processes during uninstall: {0}".format(ex))
 
     # For clean uninstall, gather the file list BEFORE running the uninstall command
     # This ensures we have the complete list even after the package manager removes its database
