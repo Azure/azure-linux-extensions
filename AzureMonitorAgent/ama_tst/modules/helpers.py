@@ -19,6 +19,13 @@ try:
 except NameError:
     FileNotFoundError = IOError
 
+# backwards compatible JSONDecodeError for Python 2 vs 3
+try:
+    json.JSONDecodeError
+except AttributeError:
+    # Python 2 doesn't have json.JSONDecodeError, use ValueError instead
+    json.JSONDecodeError = ValueError
+
 # backwards compatible devnull variable for Python 3.3 vs earlier
 try:
     DEVNULL = subprocess.DEVNULL
@@ -220,6 +227,9 @@ def run_cmd_output(cmd):
 
 
 def find_dcr_workspace():
+    """
+    Parse DCR configuration files to find workspace IDs and regions.
+    """
     global general_info
     
     if 'DCR_WORKSPACE_ID' in general_info and 'DCR_REGION' in general_info:
@@ -227,12 +237,35 @@ def find_dcr_workspace():
     dcr_workspace = set()
     dcr_region = set()
     me_region = set()
+    agent_settings = {}
     general_info['URL_SUFFIX'] = '.com'
     try:
         for file in os.listdir(CONFIG_DIR):
             file_path = CONFIG_DIR + "/" + file
             with open(file_path) as f:
                 result = json.load(f)
+                
+                # Check if this is an AgentSettings DCR - parse its settings
+                if result['kind'] == 'AgentSettings':
+                    if 'settings' in result:
+                        settings_str = result['settings']
+                        try:
+                            # The settings field is a JSON string, so parse it
+                            if isinstance(settings_str, str):
+                                settings_list = json.loads(settings_str)
+                            else:
+                                settings_list = settings_str
+                            
+                            # Process each setting
+                            for setting in settings_list:
+                                name = setting['name']
+                                value = setting['value']
+                                if name:
+                                    agent_settings[name] = value
+                        except (json.JSONDecodeError, TypeError) as e:
+                            # If parsing fails, skip this AgentSettings DCR
+                            print("Error parsing settings key in AgentSettings DCR")
+                    continue
                 channels = result['channels']
                 for channel in channels:
                     if channel['protocol'] == 'ods':
@@ -260,9 +293,13 @@ def find_dcr_workspace():
     general_info['DCR_WORKSPACE_ID'] = dcr_workspace
     general_info['DCR_REGION'] = dcr_region
     general_info['ME_REGION'] = me_region
+    general_info['AGENT_SETTINGS'] = agent_settings
     return (dcr_workspace, dcr_region, None)
 
 def find_dce():
+    """
+    Parse DCR configuration files to find Data Collection Endpoints (DCE).
+    """
     global general_info
     
     dce = set()
@@ -271,6 +308,9 @@ def find_dce():
             file_path = CONFIG_DIR + "/" + file
             with open(file_path) as f:
                 result = json.load(f)
+                # Check if this is an AgentSettings DCR, if so skip it
+                if result['kind'] == 'AgentSettings':
+                    continue
                 channels = result['channels']
                 for channel in channels:
                     if channel['protocol'] == 'gig':
