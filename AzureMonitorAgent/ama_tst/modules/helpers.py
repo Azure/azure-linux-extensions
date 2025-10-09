@@ -220,6 +220,9 @@ def run_cmd_output(cmd):
 
 
 def find_dcr_workspace():
+    """
+    Parse DCR configuration files to find workspace IDs and regions.
+    """
     global general_info
     
     if 'DCR_WORKSPACE_ID' in general_info and 'DCR_REGION' in general_info:
@@ -233,6 +236,9 @@ def find_dcr_workspace():
             file_path = CONFIG_DIR + "/" + file
             with open(file_path) as f:
                 result = json.load(f)
+                # Check if this DCR has channels, if not we can skip this file since it could be AgentSettings
+                if 'channels' not in result:
+                    continue
                 channels = result['channels']
                 for channel in channels:
                     if channel['protocol'] == 'ods':
@@ -263,6 +269,9 @@ def find_dcr_workspace():
     return (dcr_workspace, dcr_region, None)
 
 def find_dce():
+    """
+    Parse DCR configuration files to find Data Collection Endpoints (DCE).
+    """
     global general_info
     
     dce = set()
@@ -271,6 +280,9 @@ def find_dce():
             file_path = CONFIG_DIR + "/" + file
             with open(file_path) as f:
                 result = json.load(f)
+                # Check if this DCR has channels, if not we can skip this file since it could be AgentSettings
+                if 'channels' not in result:
+                    continue
                 channels = result['channels']
                 for channel in channels:
                     if channel['protocol'] == 'gig':
