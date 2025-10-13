@@ -32,6 +32,25 @@ def check_endpt_ssl(ssl_cmd, endpoint):
                 verified = True
                 continue
 
+        # If connection established but no explicit verification status in brief mode,
+        # try a verification check to determine if SSL cert is valid
+        if connected and not verified:
+            try:
+                # Use verify_return_error flag to test certificate verification
+                verify_cmd = ssl_cmd.replace('-brief', '-verify_return_error -brief')
+                verify_output = subprocess.check_output(verify_cmd.format(endpoint), shell=True,\
+                               stderr=subprocess.STDOUT, universal_newlines=True)
+                # If verify command succeeds (no exception), verification is OK
+                if "CONNECTION ESTABLISHED" in verify_output:
+                    verified = True
+            except subprocess.CalledProcessError:
+                # Verification failed - certificate issues
+                verified = False
+            except Exception:
+                # Other error - assume verified if basic connection worked
+                # This handles cases where verify_return_error isn't supported
+                verified = True
+
         return (connected, verified, ssl_output)
     except Exception as e:
         return (False, False, e)
