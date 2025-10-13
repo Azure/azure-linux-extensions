@@ -35,9 +35,12 @@ except:
 general_info = dict()
 
 def geninfo_lookup(key):
+    print("trying to find {0}".format(key))
     try:
         val = general_info[key]
+        print('val found: {0}'.format(val))
     except KeyError:
+        print('error with key {0}'.format(key))
         return None
     return val
 
@@ -246,7 +249,7 @@ def find_dcr_workspace():
                 result = json.load(f)
                 
                 # Check if this is an AgentSettings DCR - parse its settings
-                if result['kind'] == 'AgentSettings':
+                if 'kind' in result and result['kind'] == 'AgentSettings' and 'channels' not in result:
                     if 'settings' in result:
                         settings_str = result['settings']
                         try:
@@ -288,13 +291,12 @@ def find_dcr_workspace():
                         region = endpoint_url.split('https://')[1].split('.monitoring')[0]
                         me_region.add(region)
     except Exception as e:
-        return (None, None, e)
+        return (None, None, None, e)
 
     general_info['DCR_WORKSPACE_ID'] = dcr_workspace
     general_info['DCR_REGION'] = dcr_region
     general_info['ME_REGION'] = me_region
-    general_info['AGENT_SETTINGS'] = agent_settings
-    return (dcr_workspace, dcr_region, None)
+    return (dcr_workspace, dcr_region, agent_settings, None)
 
 def find_dce():
     """
@@ -309,7 +311,7 @@ def find_dce():
             with open(file_path) as f:
                 result = json.load(f)
                 # Check if this is an AgentSettings DCR, if so skip it
-                if result['kind'] == 'AgentSettings':
+                if 'kind' in result and result['kind'] == 'AgentSettings' and 'channels' not in result:
                     continue
                 channels = result['channels']
                 for channel in channels:
