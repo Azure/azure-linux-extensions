@@ -35,12 +35,9 @@ except:
 general_info = dict()
 
 def geninfo_lookup(key):
-    print("trying to find {0}".format(key))
     try:
         val = general_info[key]
-        print('val found: {0}'.format(val))
     except KeyError:
-        print('error with key {0}'.format(key))
         return None
     return val
 
