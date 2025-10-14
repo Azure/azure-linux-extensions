@@ -1,4 +1,5 @@
 import subprocess
+import traceback
 
 from error_codes import *
 from errors      import error_info
@@ -12,6 +13,25 @@ REGION_HANDLER_URL = "{0}.handler.control.monitor.azure.com"
 ODS_URL = "{0}.ods.opinsights.azure.com"
 ME_URL = "management.azure.com"
 ME_REGION_URL = "{0}.monitoring.azure.com"
+
+
+def _log_ssl_error(context, exception, show_traceback=True):
+    """Helper function to log SSL errors cleanly"""
+    print("{0}:".format(context))
+    print("  Type: {0}".format(type(exception).__name__))
+    print("  Message: {0}".format(str(exception)))
+    
+    # For CalledProcessError, show command details
+    if isinstance(exception, subprocess.CalledProcessError):
+        print("  Command: {0}".format(getattr(exception, 'cmd', 'Unknown')))
+        print("  Return code: {0}".format(getattr(exception, 'returncode', 'Unknown')))
+        if hasattr(exception, 'output') and exception.output:
+            print("  Output: {0}".format(exception.output.strip()))
+    
+    # Show traceback if requested
+    if show_traceback:
+        print("  Traceback:")
+        print(traceback.format_exc())
 
 
 def check_endpt_ssl(ssl_cmd, endpoint):
@@ -43,17 +63,20 @@ def check_endpt_ssl(ssl_cmd, endpoint):
                 # If verify command succeeds (no exception), verification is OK
                 if "CONNECTION ESTABLISHED" in verify_output:
                     verified = True
-            except subprocess.CalledProcessError:
+            except subprocess.CalledProcessError as e:
                 # Verification failed - certificate issues
+                _log_ssl_error("SSL verification failed", e, show_traceback=False)
                 verified = False
-            except Exception:
+            except Exception as e:
                 # Other error - assume verified if basic connection worked
                 # This handles cases where verify_return_error isn't supported
-                verified = True
+                _log_ssl_error("SSL verification exception", e, show_traceback=True)
+                verified = False
 
         return (connected, verified, ssl_output)
     except Exception as e:
-        return (False, False, e)
+        _log_ssl_error("SSL connection failed", e, show_traceback=True)
+        return (False, False, str(e))
 
 
 def check_internet_connect():
