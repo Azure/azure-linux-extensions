@@ -2511,7 +2511,7 @@ def find_vm_distro(operation):
         log_and_exit(operation, IndeterminateOperatingSystem, error_msg)
     
     # Normalize distribution names
-    if vm_dist == 'rhel':
+    if vm_dist == 'rhel' or vm_dist == 'red hat':
         vm_dist = 'redhat'
     elif vm_dist == 'ol':
         vm_dist = 'oracle'
