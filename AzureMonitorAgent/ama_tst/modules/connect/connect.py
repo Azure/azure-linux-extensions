@@ -29,7 +29,7 @@ def check_parameters():
     return NO_ERROR
    
 def check_workspace():
-    wkspc_id, wkspc_region, e = find_dcr_workspace()
+    wkspc_id, wkspc_region, agent_settings, e = find_dcr_workspace()
     if e != None:
         error_info.append((e,))
         return ERR_NO_DCR 

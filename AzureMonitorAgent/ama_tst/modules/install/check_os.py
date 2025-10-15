@@ -1,8 +1,9 @@
+from __future__ import absolute_import
 import platform
 from error_codes import *
 from errors      import error_info
 from helpers     import find_vm_bits, find_vm_distro
-import install.supported_distros as supported_distros
+from . import supported_distros
 
     
 def format_alternate_versions(supported_dist, versions):
