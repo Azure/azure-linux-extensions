@@ -290,12 +290,14 @@ def create_outfile(output_dirpath, logs_date, pkg_manager):
         outfile.write("--------------------------------------------------------------------------------\n")
 
         # connection to endpoints
-        wkspc_id, wkspc_region, e = helpers.find_dcr_workspace()
+        wkspc_id, wkspc_region, agent_settings, e = helpers.find_dcr_workspace()
         if e == None:
             outfile.write("Workspace ID: {0}\n".format(str(wkspc_id)))
             outfile.write("Workspace region: {0}\n".format(str(wkspc_region)))
             outfile.write("--------------------------------------------------------------------------------\n")
-               
+            if agent_settings != {}:
+                outfile.write("AgentSettinsgs file found: {0}\n".format(str(agent_settings)))
+
         # AMA package info (dpkg/rpm)
         if (pkg_manager == "dpkg"):
             outfile.write("Output of command: {0}\n".format(DPKG_CMD))
