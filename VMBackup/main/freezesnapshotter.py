@@ -229,7 +229,7 @@ class FreezeSnapshotter(object):
                         blob_snapshot_info.snapshotUri = None
                         creationTimeStr = '\\/Date(' + blob_snapshot_info.ddSnapshotIdentifier.creationTime + ')\\/'
                         creationTimeObj = Status.CreationTime(creationTimeStr, 0)
-                        ddSnapshotIdentifierInfo = Status.DirectDriveSnapshotIdentifier(creationTimeObj, blob_snapshot_info.ddSnapshotIdentifier.id, blob_snapshot_info.ddSnapshotIdentifier.token)
+                        ddSnapshotIdentifierInfo = Status.DirectDriveSnapshotIdentifier(creationTimeObj, blob_snapshot_info.ddSnapshotIdentifier.id, blob_snapshot_info.ddSnapshotIdentifier.token, blob_snapshot_info.ddSnapshotIdentifier.instantAccessDurationMinutes)
                         self.logger.log("DDSnapshotIdentifier Information to CRP- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime.DateTime, ddSnapshotIdentifierInfo.id))
                     else:
                         self.logger.log("No DD Snapshot Identifier Found. Hence directDriveSnapshotIdentifier will be Null")
