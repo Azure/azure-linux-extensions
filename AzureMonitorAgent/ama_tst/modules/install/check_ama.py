@@ -199,7 +199,7 @@ def check_ama(interactive):
     if newer_ama_version is None:
         if e is None:
             # No error and no newer version found - current version is up to date
-            print("✓ AMA version is up to date (latest version)")
+            print("AMA version is up to date (latest version)")
             return NO_ERROR
         else:
             # There was an error fetching the latest version

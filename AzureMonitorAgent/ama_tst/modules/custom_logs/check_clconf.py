@@ -11,7 +11,11 @@ def check_customlog_input():
     if (cl_input == None or len(cl_input) == 0):
         error_info.append(("No custom logs file path",))
         return ERR_CL_INPUT
+    # cl_input is a list, not a dictionary - iterate over the paths directly
     for path in cl_input:
+        # Skip malformed entries that don't look like valid file paths
+        if not path or not path.startswith('/'):
+            continue
         try: 
             check_path = run_cmd_output('ls {0}'.format(path)).strip()
             if check_path.endswith('No such file or directory'):
@@ -42,11 +46,20 @@ def check_customlog_conf():
                     cl_log_file = cl_line.strip().split('log_file')[1]
                     general_info['CL_LOG'] =  cl_log_file
                     
-                if (cl_line.strip().startswith('Path')):
-                    cl_input_path = cl_line.strip().split('Path')[1].strip()
-                    general_info['CL_INPUT'].append(cl_input_path)
+                # Only match exact "Path" lines (not "Path_Key" or other variants)
+                if (cl_line.strip().startswith('Path ') or cl_line.strip().startswith('Path\t')):
+                    # Extract the path value after the whitespace
+                    parts = cl_line.strip().split(None, 1)  # Split on any whitespace, max 1 split
+                    if len(parts) > 1:
+                        cl_input_path = parts[1].strip()
+                        # Only add valid file paths (should start with /)
+                        if cl_input_path.startswith('/'):
+                            general_info['CL_INPUT'].append(cl_input_path)
+
     except Exception as e:
         error_info.append((e,))
         return ERR_CL_CONF
-    
+
+    print('cl_input value: {0}'.format(general_info['CL_INPUT']))
+
     return NO_ERROR

@@ -2,7 +2,7 @@
 
 COMMAND="./modules/main.py"
 PYTHON=""
-TST_VERSION="1.4"  # update when changes are made to TST
+TST_VERSION="1.6"  # update when changes are made to TST
 ARG="$@"
 
 display_help() {

@@ -58,6 +58,7 @@ import base64
 import json
 import time
 import re
+import subprocess
 # imp was deprecated in python 3.12
 if sys.version_info >= (3, 12):
     import importlib
@@ -171,8 +172,8 @@ class HandlerUtility:
 
     @staticmethod
     def redact_protected_settings(content):
-        redacted_tmp = re.sub('"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
-        redacted = re.sub('"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
+        redacted_tmp = re.sub(r'"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
+        redacted = re.sub(r'"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
         return redacted
 
     def _parse_config(self, ctxt):
@@ -195,16 +196,37 @@ class HandlerUtility:
                 cert = waagent.LibDir + '/' + thumb + '.crt'
                 pkey = waagent.LibDir + '/' + thumb + '.prv'
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
-                openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}"
-                cleartxt = waagent.RunSendStdin(openSSLcmd.format(cert, pkey), unencodedSettings)[1]
-                if cleartxt is None:
-                    self.error("OpenSSL decode error using  thumbprint " + thumb)
-                    self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
+
+                # FIPS 140-3: use 'openssl cms' (supports AES256 & DES_EDE3_CBC) with fallback to legacy 'openssl smime'
+                cms_cmd = 'openssl cms -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
+                smime_cmd = 'openssl smime -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
+
+                protected_settings_str = None
+                for decrypt_cmd in [cms_cmd, smime_cmd]:
+                    try:
+                        session = subprocess.Popen([decrypt_cmd], shell=True,
+                                                stdin=subprocess.PIPE,
+                                                stderr=subprocess.STDOUT,
+                                                stdout=subprocess.PIPE)
+                        output = session.communicate(unencodedSettings)
+                        # success only if return code is 0 and we have output
+                        if session.returncode == 0 and output[0]:
+                            protected_settings_str = output[0]
+                            if decrypt_cmd == cms_cmd:
+                                self.log('Decrypted protectedSettings using openssl cms.')
+                            else:
+                                self.log('Decrypted protectedSettings using openssl smime fallback.')
+                            break
+                        else:
+                            self.log('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, session.returncode))
+                    except OSError:
+                        pass
+
                 jctxt = ''
                 try:
-                    jctxt = json.loads(cleartxt)
+                    jctxt = json.loads(protected_settings_str)
                 except:
-                    self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(cleartxt))
+                    self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(protected_settings_str))
                 handlerSettings['protectedSettings']=jctxt
                 self.log('Config decoded correctly.')
         return config

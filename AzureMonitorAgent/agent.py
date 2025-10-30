@@ -42,9 +42,7 @@ import contextlib
 import ama_tst.modules.install.supported_distros as supported_distros
 from collections import OrderedDict
 from hashlib import sha256
-from shutil import copyfile
-from shutil import copytree
-from shutil import rmtree
+from shutil import copyfile, rmtree, copytree, copy2
 
 from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
@@ -134,6 +132,8 @@ ArcSettingsFile = '/var/opt/azcmagent/localconfig.json'
 AMAAstTransformConfigMarkerPath = '/etc/opt/microsoft/azuremonitoragent/config-cache/agenttransform.marker'
 AMAExtensionLogRotateFilePath = '/etc/logrotate.d/azuremonitoragentextension'
 WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
+AmaUninstallContextFile = '/var/opt/microsoft/uninstall-context'
+AmaDataPath = '/var/opt/microsoft/azuremonitoragent/'
 SupportedArch = set(['x86_64', 'aarch64'])
 
 # Error codes
@@ -238,7 +238,7 @@ def check_disk_space_availability():
     Check if there is the required space on the machine.
     """
     try:
-        if get_free_space_mb("/var") < 500 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500 :
+        if get_free_space_mb("/var") < 700 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500 :
             # 52 is the exit code for missing dependency i.e. disk space
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             return MissingDependency
@@ -503,9 +503,6 @@ def install():
     # Needs to be revisited for aarch64
     copy_kqlextension_binaries()
 
-    # Install azureotelcollector
-    install_azureotelcollector()
-
     # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
         # Check if they have libssl.so.1.1 since AMA is built against this version
@@ -541,7 +538,7 @@ def install():
 def uninstall():
     """
     Uninstall the Azure Monitor Linux Agent.
-    This is a somewhat soft uninstall. It is not a purge.
+    Whether it is a purge of all files or preserve of log files depends on the uninstall context file.
     Note: uninstall operation times out from WAAgent at 5 minutes
     """
 
@@ -557,6 +554,13 @@ def uninstall():
     if PackageManager != "dpkg" and PackageManager != "rpm":
         log_and_exit("Uninstall", UnsupportedOperatingSystem, "The OS has neither rpm nor dpkg." )
 
+    # For clean uninstall, gather the file list BEFORE running the uninstall command
+    # This ensures we have the complete list even after the package manager removes its database
+    package_files_for_cleanup = []
+
+    hutil_log_info("Gathering package file list for clean uninstall before removing package")
+    package_files_for_cleanup = _get_package_files_for_cleanup()
+        
     # Attempt to uninstall each specific
 
     # Try a specific package uninstall for rpm
@@ -607,6 +611,13 @@ def uninstall():
     # Retry, since uninstall can fail due to concurrent package operations
     try:
         exit_code, output = force_uninstall_azure_monitor_agent()
+
+        # Remove all files installed by the package that were listed
+        _remove_package_files_from_list(package_files_for_cleanup)
+
+        # Clean up context marker (always do this)
+        _cleanup_uninstall_context()
+
     except Exception as ex:
         exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
@@ -686,6 +697,110 @@ def force_uninstall_azure_monitor_agent():
     else:
         hutil_log_info("Azure Monitor Agent has been uninstalled.")
         return 0, "Azure Monitor Agent has been uninstalled."
+      
+def _get_package_files_for_cleanup():
+    """
+    Get the list of files and directories installed by the provided
+    azuremonitoragent spec that should be removed during uninstall.
+    This must be called BEFORE the package is uninstalled to ensure the package
+    manager still has the file list available.
+    
+    Returns:
+        tuple: (files_list, directories_to_add) where files_list contains package files
+               and directories_to_add contains directories that need explicit cleanup
+    """
+    try:
+        # Get list of files installed by the package
+        if PackageManager == "dpkg":
+            # For Debian-based systems
+            cmd = "dpkg -L azuremonitoragent"
+        elif PackageManager == "rpm":
+            # For RPM-based systems
+            cmd = "rpm -ql azuremonitoragent"
+        else:
+            hutil_log_info("Unknown package manager, cannot list package files")
+            return []
+
+        exit_code, output = run_command_and_log(cmd, check_error=False)
+        
+        if exit_code != 0 or not output:
+            hutil_log_info("Could not get package file list for cleanup")
+            return []
+
+        # Parse the file list
+        files = [line.strip() for line in output.strip().split('\n') if line.strip()]
+        
+        # Collect all azuremonitor-related paths
+        azuremonitoragent_files = []
+        
+        for file_path in files:
+            # Only include files/directories that have "azuremonitor" in their path
+            # This covers both "azuremonitoragent" and "azuremonitor-*" service files
+            if "azuremonitor" in file_path:
+                azuremonitoragent_files.append(file_path)
+            else:
+                hutil_log_info("Skipping non-azuremonitor path: {0}".format(file_path))
+        
+        return azuremonitoragent_files
+        
+    except Exception as ex:
+        hutil_log_error("Error gathering package files for cleanup: {0}\n Is Azure Monitor Agent Installed?".format(ex))
+        return []
+
+def _remove_package_files_from_list(package_files):
+    """
+    Remove all files and directories from the provided list that were installed 
+    by the provided azuremonitoragent spec. This function works with a pre-gathered 
+    list of files from _get_package_files_for_cleanup(), allowing it to work even 
+    after the package has been uninstalled.
+    
+    Args:
+        package_files (list): List of file/directory paths to remove
+    """
+    try:
+        if not package_files:
+            hutil_log_info("No package files provided for removal")
+            return
+            
+        # Build consolidated list of paths to clean up
+        cleanup_paths = set(package_files) if package_files else set()
+        
+        # Add directories that need explicit cleanup since on rpm systems 
+        # the initial list for this path does not remove the directories and files
+        cleanup_paths.add("/opt/microsoft/azuremonitoragent/")
+
+        # Determine uninstall context based on if the context file exists
+        uninstall_context = _get_uninstall_context()
+        hutil_log_info("Uninstall context: {0}".format(uninstall_context))
+        
+        if uninstall_context == 'complete':
+            hutil_log_info("Complete uninstall context - removing everything")
+            cleanup_paths.add(AmaDataPath)
+
+        # Sort paths by depth (deepest first) to avoid removing parent before children
+        sorted_paths = sorted(cleanup_paths, key=lambda x: x.count('/'), reverse=True)
+        
+        hutil_log_info("Removing {0} azuremonitor paths".format(len(sorted_paths)))
+        
+        items_removed = 0
+        for item_path in sorted_paths:
+            try:
+                if os.path.exists(item_path):
+                    if os.path.isdir(item_path):
+                        rmtree(item_path)
+                        hutil_log_info("Removed directory: {0}".format(item_path))
+                    else:
+                        os.remove(item_path)
+                        hutil_log_info("Removed file: {0}".format(item_path))
+                    items_removed += 1
+            except Exception as ex:
+                hutil_log_info("Failed to remove {0}: {1}".format(item_path, ex))
+        
+        hutil_log_info("Removed {0} items total".format(items_removed))
+        
+    except Exception as ex:
+        hutil_log_error("Error during file removal from list: {0}\n Were these files removed already?".format(ex))
+
 def enable():
     """
     Start the Azure Monitor Linux Agent Service
@@ -1119,12 +1234,63 @@ def disable():
 
 def update():
     """
-    Update the current installation of AzureMonitorLinuxAgent
-    No logic to install the agent as agent -> install() will be called
-    with update because upgradeMode = "UpgradeWithInstall" set in HandlerManifest
+    This function is called when the extension is updated.
+    It marks the uninstall context to indicate that the next run should be treated as an update rather than a clean install.
+
+    Always returns 0
     """
 
-    return 0, ""
+    hutil_log_info("Update operation called for Azure Monitor Agent")
+
+    try:
+        state_dir = os.path.dirname(AmaUninstallContextFile)
+        if not os.path.exists(state_dir):
+            os.makedirs(state_dir)
+        with open(AmaUninstallContextFile, 'w') as f:
+            f.write('update\n')
+            f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) # Timestamp for debugging
+        hutil_log_info("Marked uninstall context as 'update'")
+    except Exception as ex:
+        hutil_log_error("Failed to set uninstall context: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes {1}.".format(ex, AmaDataPath))
+
+    return 0, "Update succeeded"
+
+def _get_uninstall_context():
+    """
+    Determine the context of this uninstall operation
+
+    Returns the context as a string:
+        'complete' - if this is a clean uninstall
+        'update' - if this is an update operation
+    Also returns as 'complete' if it fails to read the context file.
+    """
+
+    try:
+        if os.path.exists(AmaUninstallContextFile):
+            with open(AmaUninstallContextFile, 'r') as f:
+                context = f.read().strip().split('\n')[0]
+                hutil_log_info("Found uninstall context: {0}".format(context))
+                return context
+        else:
+            hutil_log_info("Uninstall context file does not exist, defaulting to 'complete'")
+    except Exception as ex:
+        hutil_log_error("Failed to read uninstall context file: {0}\n The uninstall operation will not behave as expected with the uninstall context file missing, defaulting to an uninstall that removes {1}.".format(ex, AmaDataPath))
+
+    return 'complete'
+
+def _cleanup_uninstall_context():
+    """
+    Clean up uninstall context marker
+    """
+
+    try:
+        if os.path.exists(AmaUninstallContextFile):
+            os.remove(AmaUninstallContextFile)
+            hutil_log_info("Removed uninstall context file")
+        else:
+            hutil_log_info("Uninstall context file does not exist, nothing to remove")
+    except Exception as ex:
+        hutil_log_error("Failed to cleanup uninstall context: {0}\n This may result in unintended behavior as described.\nIf the marker file exists and cannot be removed, uninstall will continue to keep the {1} path, leading users to have to remove it manually.".format(ex, AmaDataPath))
 
 def restart_launcher():
     # start agent launcher
@@ -1243,7 +1409,12 @@ def azureotelcollector_is_active():
     Checks if `azureotelcollector` is installed to run as a systemd service.
     """
     if is_systemd():
-        return 0 == os.system('systemctl is-active --quiet azureotelcollector-watcher.path')
+        try:
+            rc = subprocess.call(["systemctl", "is-active", "--quiet", "azureotelcollector-watcher.path"])
+            return rc == 0
+        except OSError:
+            return False
+
     return False
 
 
@@ -1562,11 +1733,14 @@ def metrics_watcher(hutil_error, hutil_log):
 
     while True:
         try:
+            if is_feature_enabled("enableAzureOTelCollector") and not azureotelcollector_is_active():
+                install_azureotelcollector()
+
             if not me_handler.is_running(is_lad=False):
                 me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
 
                 try:
-                    if is_feature_enabled("enableAzureOTelCollector") and azureotelcollector_is_active():
+                    if is_feature_enabled("enableAzureOTelCollector"):
                         if os.path.exists(me_service_template_path):
                             os.remove(me_service_template_path)
                         copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
@@ -1628,10 +1802,10 @@ def metrics_watcher(hutil_error, hutil_log):
                         if sedisabled != 0:                        
                             check_semanage, _ = run_command_and_log("which semanage",log_cmd=False, log_output=False)
                             if check_semanage == 0:
-                                fluentPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False, log_output=False)
+                                fluentPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e ' + fluent_port,log_cmd=False, log_output=False)
                                 if fluentPortEnabled != 0:                    
                                     # also check SELinux config paths for Oracle/RH
-                                    fluentPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e http_port_t | grep ' + fluent_port,log_cmd=False, log_output=False)
+                                    fluentPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e ' + fluent_port,log_cmd=False, log_output=False)
                                     if fluentPortEnabled != 0:                    
                                         # allow the fluent port in SELinux
                                         run_command_and_log('semanage port -a -t http_port_t -p tcp ' + fluent_port,log_cmd=False, log_output=False)
@@ -1911,10 +2085,10 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
         else:            
             check_semanage, _ = run_command_and_log("which semanage",log_cmd=False, log_output=False)
             if check_semanage == 0 and syslog_port != '':
-                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False, log_output=False)
+                syslogPortEnabled, _ = run_command_and_log('grep -Rnw /var/lib/selinux -e ' + syslog_port,log_cmd=False, log_output=False)
                 if syslogPortEnabled != 0:                    
                     # also check SELinux config paths for Oracle/RH
-                    syslogPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e syslogd_port_t | grep ' + syslog_port,log_cmd=False, log_output=False)
+                    syslogPortEnabled, _ = run_command_and_log('grep -Rnw /etc/selinux -e ' + syslog_port,log_cmd=False, log_output=False)
                     if syslogPortEnabled != 0:                    
                         # allow the syslog port in SELinux
                         run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False, log_output=False)
@@ -2337,7 +2511,7 @@ def find_vm_distro(operation):
         log_and_exit(operation, IndeterminateOperatingSystem, error_msg)
     
     # Normalize distribution names
-    if vm_dist == 'rhel':
+    if vm_dist == 'rhel' or vm_dist == 'red hat':
         vm_dist = 'redhat'
     elif vm_dist == 'ol':
         vm_dist = 'oracle'
@@ -2714,19 +2888,32 @@ def get_settings():
                                             '{0}.prv'.format(
                                                       settings_thumbprint))
             decoded_settings = base64.standard_b64decode(encoded_settings)
-            decrypt_cmd = 'openssl smime -inform DER -decrypt -recip {0} ' \
-                          '-inkey {1}'.format(encoded_cert_path,
-                                              encoded_key_path)
 
-            try:
-                session = subprocess.Popen([decrypt_cmd], shell = True,
-                                           stdin = subprocess.PIPE,
-                                           stderr = subprocess.STDOUT,
-                                           stdout = subprocess.PIPE)
-                output = session.communicate(decoded_settings)
-            except OSError:
-                pass
-            protected_settings_str = output[0]
+
+             # FIPS 140-3: use 'openssl cms' (supports AES256 & DES_EDE3_CBC) with fallback to legacy 'openssl smime'
+            cms_cmd = 'openssl cms -inform DER -decrypt -recip {0} -inkey {1}'.format(encoded_cert_path, encoded_key_path)
+            smime_cmd = 'openssl smime -inform DER -decrypt -recip {0} -inkey {1}'.format(encoded_cert_path, encoded_key_path)
+
+            protected_settings_str = None
+            for decrypt_cmd in [cms_cmd, smime_cmd]:
+                try:
+                    session = subprocess.Popen([decrypt_cmd], shell=True,
+                                               stdin=subprocess.PIPE,
+                                               stderr=subprocess.STDOUT,
+                                               stdout=subprocess.PIPE)
+                    output = session.communicate(decoded_settings)
+                    # success only if return code is 0 and we have output
+                    if session.returncode == 0 and output[0]:
+                        protected_settings_str = output[0]
+                        if decrypt_cmd == cms_cmd:
+                            hutil_log_info('Decrypted protectedSettings using openssl cms.')
+                        else:
+                            hutil_log_info('Decrypted protectedSettings using openssl smime fallback.')
+                        break
+                    else:
+                        hutil_log_info('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, session.returncode))
+                except OSError:
+                    pass
 
             if protected_settings_str is None:
                 log_and_exit('Enable', GenericErrorCode, 'Failed decrypting protectedSettings')
