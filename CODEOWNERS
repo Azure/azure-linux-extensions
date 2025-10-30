@@ -35,10 +35,10 @@
 /VMAccess/ @D1v38om83r @nkuchta @Azure/azure-agent-extensions
 
 # VMBackup Extension
-/VMBackup/ @ppusuluri-ms @prchingh @vityagi @mearvind
+/VMBackup/ @vityagi @mearvind @arisettisanjana @deveshjagwani
 
 # VMEncryption Extension
-/VMEncryption/ @vimish @ejarvi @vermashi
+/VMEncryption/ @vimish @ejarvi
 
 # WALinuxAgent
 /Common/ @D1v38om83r @nkuchta @Azure/walinuxagent @Azure/azure-agent-extensions

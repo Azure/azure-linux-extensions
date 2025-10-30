@@ -238,7 +238,7 @@ def check_disk_space_availability():
     Check if there is the required space on the machine.
     """
     try:
-        if get_free_space_mb("/var") < 500 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500 :
+        if get_free_space_mb("/var") < 700 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500 :
             # 52 is the exit code for missing dependency i.e. disk space
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
             return MissingDependency
@@ -2511,7 +2511,7 @@ def find_vm_distro(operation):
         log_and_exit(operation, IndeterminateOperatingSystem, error_msg)
     
     # Normalize distribution names
-    if vm_dist == 'rhel':
+    if vm_dist == 'rhel' or vm_dist == 'red hat':
         vm_dist = 'redhat'
     elif vm_dist == 'ol':
         vm_dist = 'oracle'

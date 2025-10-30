@@ -24,63 +24,65 @@ def check_sudo():
         return True
 
 def check_all(interactive):
-    all_success = NO_ERROR
-    # 1: Install
-    checked_install = check_installation(interactive)
-    if (is_error(checked_install)):
-        return checked_install
-    else:
-        all_success = checked_install
-
+    """
+    Run all troubleshooter checks, continuing even if errors occur.
+    Collects all results and reports the most severe issue at the end.
+    """
+    checks = [
+        ("Installation", check_installation),
+        ("Connection", check_connection),
+        ("General Health", check_general_health),
+        ("High CPU/Memory Usage", check_high_cpu_memory),
+        ("Syslog", check_syslog),
+        ("Custom logs", check_custom_logs),
+        ("Metrics", run_metrics_troubleshooter),
+    ]
+    
+    results = []
+    overall_status = NO_ERROR
+    
+    for i, (check_name, check_func) in enumerate(checks, 1):
+        print("================================================================================")
+        print("Running check {0}/7: {1}...".format(i, check_name))
+        
+        try:
+            result = check_func(interactive)
+            results.append((check_name, result))
+            
+            # Track the most severe error (higher error codes are more severe)
+            if is_error(result) and result > overall_status:
+                overall_status = result
+            elif not is_error(result) and result > overall_status and overall_status == NO_ERROR:
+                overall_status = result
+                
+            # Print immediate result for this check
+            if is_error(result):
+                print("[ERROR] {0}: ERROR (code {1})".format(check_name, result))
+            elif result != NO_ERROR:
+                print("[WARN]  {0}: WARNING (code {1})".format(check_name, result))
+            else:
+                print("[OK]    {0}: OK".format(check_name))
+                
+        except Exception as e:
+            print("[EXCEPTION] {0}: EXCEPTION - {1}".format(check_name, str(e)))
+            results.append((check_name, "EXCEPTION: {0}".format(str(e))))
+            overall_status = ERR_FOUND  # Set a generic error code
+    
+    # Summary of all results
+    print("\n================================================================================")
+    print("SUMMARY OF ALL CHECKS:")
     print("================================================================================")
-    # 2: Connection
-    checked_connection = check_connection(interactive)
-    if (is_error(checked_connection)):
-        return checked_connection
-    else:
-        all_success = checked_connection
-
-    print("================================================================================")
-    # 3: General Health
-    checked_general_health = check_general_health(interactive)
-    if (is_error(checked_general_health)):
-        return checked_general_health
-    else:
-        all_success = checked_general_health
-
-    print("================================================================================")
-    # 4: High CPU/Memory Usage
-    checked_highcpumem = check_high_cpu_memory(interactive)
-    if (is_error(checked_highcpumem)):
-        return checked_highcpumem
-    else:
-        all_success = checked_highcpumem
-
-    print("================================================================================")
-    # 5: Syslog
-    checked_syslog = check_syslog(interactive)
-    if (is_error(checked_syslog)):
-        return checked_syslog
-    else:
-        all_success = checked_syslog
-
-    print("================================================================================")
-    # 6: Custom logs
-    checked_custom_logs = check_custom_logs(interactive)
-    if (is_error(checked_custom_logs)):
-        return checked_custom_logs
-    else:
-        all_success = checked_custom_logs
-
-    print("================================================================================")
-    # 7: Metrics not flowing
-    check_data_collected = run_metrics_troubleshooter(interactive)
-    if (is_error(check_data_collected)):
-        return check_data_collected
-    else:
-        all_success = check_data_collected
-
-    return all_success
+    for check_name, result in results:
+        if isinstance(result, str) and result.startswith("EXCEPTION"):
+            print("[EXCEPTION] {0}: {1}".format(check_name, result))
+        elif is_error(result):
+            print("[ERROR] {0}: ERROR (code {1})".format(check_name, result))
+        elif result != NO_ERROR:
+            print("[WARN]  {0}: WARNING (code {1})".format(check_name, result))
+        else:
+            print("[OK]    {0}: OK".format(check_name))
+    
+    return overall_status
 
 def collect_logs():
     # get output directory for logs
