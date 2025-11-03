@@ -298,7 +298,6 @@ class HandlerUtility:
                     self.error('JSON exception decoding ' + cleartxt)
                 handlerSettings['protectedSettings'] = jctxt
                 self.log('Config decoded correctly.')
-
                 # cleaning/removing the temp files created
                 try:
                     if os.path.isfile(f.name):
