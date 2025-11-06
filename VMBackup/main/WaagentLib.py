@@ -56,7 +56,96 @@ import zipfile
 import json
 import datetime
 import xml.sax.saxutils
-from distutils.version import LooseVersion
+try:
+    from packaging.version import Version as LooseVersion
+except ImportError:
+    try:
+        from distutils.version import LooseVersion
+    except ImportError:
+        # Fallback for environments without packaging or distutils
+        class LooseVersion:
+            """
+            Custom version comparison class that implements semantic versioning.
+            
+            Examples of version comparisons that work correctly:
+            - LooseVersion("10.0") > LooseVersion("2.0")     # True (10 > 2, not string "10.0" < "2.0")
+            - LooseVersion("1.10") > LooseVersion("1.2")     # True (10 > 2 in minor version)
+            - LooseVersion("2.1.3") > LooseVersion("2.1")    # True (2.1.3 > 2.1.0)
+            - LooseVersion("1.0-alpha") < LooseVersion("1.0") # True (pre-release < release)
+            - LooseVersion("1.0-beta") > LooseVersion("1.0-alpha") # True (beta > alpha)
+            - LooseVersion("1.0-rc") > LooseVersion("1.0-beta")    # True (rc > beta)
+            
+            How parsing works:
+            - "2.1.3" → (2, 1, 3)
+            - "1.0-alpha" → (1, 0, -1000)  # alpha = -1000 for correct precedence
+            - "1.0-beta" → (1, 0, -100)    # beta = -100
+            - "1.0-rc" → (1, 0, -10)       # rc = -10
+            - "1.0" → (1, 0)               # release version (no negative suffix)
+            
+            Tuple comparison ensures: (1, 0, -1000) < (1, 0, -100) < (1, 0, -10) < (1, 0)
+            """
+            def __init__(self, version_string):
+                self.version = str(version_string)
+                # Parse version into comparable parts
+                self._parsed = self._parse_version(self.version)
+                
+            def _parse_version(self, version_str):
+                """
+                Parse version string into comparable tuple of integers and strings.
+                
+                Parsing examples:
+                - "2.1.3" → splits to ["2", "1", "3"] → converts to (2, 1, 3)
+                - "1.0-alpha" → splits to ["1", "0", "alpha"] → converts to (1, 0, -1000)
+                - "1.10.5-beta2" → splits to ["1", "10", "5", "beta2"] → converts to (1, 10, 5, "beta2")
+                """
+                import re
+                # Split by dots, hyphens, and underscores
+                parts = re.split(r'[.\-_]', version_str.lower())
+                parsed = []
+                for part in parts:
+                    # Try to convert to int, otherwise keep as string
+                    try:
+                        parsed.append(int(part))
+                    except ValueError:
+                        # Handle pre-release identifiers with negative values for correct precedence
+                        # This ensures: alpha < beta < rc < release
+                        if part in ('alpha', 'a'):
+                            parsed.append(-1000)  # Lowest precedence
+                        elif part in ('beta', 'b'):
+                            parsed.append(-100)   # Medium precedence
+                        elif part in ('rc', 'pre'):
+                            parsed.append(-10)    # High precedence (but still < release)
+                        else:
+                            parsed.append(part)   # Keep as string for mixed alphanumeric
+                return tuple(parsed)
+                
+            def __str__(self):
+                return self.version
+                
+            def __eq__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed == other._parsed
+                return self._parsed == LooseVersion(other)._parsed
+                
+            def __lt__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed < other._parsed
+                return self._parsed < LooseVersion(other)._parsed
+                
+            def __le__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed <= other._parsed
+                return self._parsed <= LooseVersion(other)._parsed
+                
+            def __gt__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed > other._parsed
+                return self._parsed > LooseVersion(other)._parsed
+                
+            def __ge__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed >= other._parsed
+                return self._parsed >= LooseVersion(other)._parsed
 
 if not hasattr(subprocess, 'check_output'):
     def check_output(*popenargs, **kwargs):

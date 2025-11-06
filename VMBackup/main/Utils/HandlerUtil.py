@@ -655,9 +655,18 @@ class HandlerUtility:
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
+        # Convert TopLevelStatus object to JSON array string
+        # Before: stat_rept is TopLevelStatus object with timestampUTC="e2794170-c93d-4178-a8da-9bc7fd91ecc0"
+        # After: stat_rept = '[{"version":"1.0","timestampUTC":"e2794170-c93d-4178-a8da-9bc7fd91ecc0","status":{"name":"VMSnapshotLinux",...}}]'
         stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
-        stat_rept = stat_rept.replace('\\\/', '\/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
+        # Replace placeholder GUID with actual Microsoft JSON date format first
+        # Before: "timestampUTC":"e2794170-c93d-4178-a8da-9bc7fd91ecc0"
+        # After: "timestampUTC":"\/Date(time_span)\/"
         stat_rept = stat_rept.replace(date_place_holder,date_string)
+        # Now remove JSON-escaped forward slashes to get clean date format for C# DateTimeOffset
+        # Before: "timestampUTC":"\/Date(time_span)\/"
+        # After: "timestampUTC":"/Date(time_span)/"
+        stat_rept = stat_rept.replace(r'\/', '/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
 
         # Add Status as sub-status for Status to be written on Status-File
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
