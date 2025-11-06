@@ -23,7 +23,16 @@
 # http://msdn.microsoft.com/en-us/library/cc227259%28PROT.13%29.aspx
 #
 
-import crypt
+# TODO: Many classes, methods, and imports in this file might not be needed by VM Backup Extension
+# and should be removed to reduce file size and eliminate unnecessary dependencies.
+# Future cleanup should analyze actual VMBackup usage and remove unused code.
+
+# Note: crypt module deprecated in Python 3.13+, but gen_password_hash() is not used by VMBackup
+try:
+    import crypt
+except ImportError:
+    # Python 3.13+ removed crypt module, but VMBackup doesn't use password functions
+    crypt = None
 import random
 import base64
 
@@ -463,6 +472,8 @@ class AbstractDistro(object):
             return "Failed to set password for {0}: {1}".format(username, output)
 
     def gen_password_hash(self, password, crypt_id, salt_len):
+        if crypt is None:
+            raise ImportError("crypt module not available (Python 3.13+). This function is not used by VMBackup.")
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
