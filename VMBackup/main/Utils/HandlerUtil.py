@@ -81,6 +81,13 @@ import datetime
 import Utils.Status
 from Utils.EventLoggerUtil import EventLogger
 from Utils.LogHelper import LoggingLevel, LoggingConstants, FileHelpers
+
+# Handle the deprecation of platform.dist() in Python 3.8+
+try:
+    import distro
+    HAS_DISTRO = True
+except ImportError:
+    HAS_DISTRO = False
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -552,28 +559,74 @@ class HandlerUtility:
             if 'NS-BSD' in platform.system():
                 release = re.sub('\\-.*$', '', str(platform.release()))
                 return "NS-BSD", release
-            if 'linux_distribution' in dir(platform):
-                distinfo = list(platform.linux_distribution(full_distribution_name=0))
-                # remove trailing whitespace in distro name
-                if(distinfo[0] == ''):
-                    osfile= open("/etc/os-release", "r")
+            
+            # Try modern approach first (Python 3.8+ compatible)
+            if HAS_DISTRO:
+                try:
+                    distro_name = distro.name()
+                    distro_version = distro.version()
+                    if distro_name and distro_version:
+                        return distro_name + "-" + distro_version, platform.release()
+                except Exception as e:
+                    self.log('Warning: distro package failed with error: %s' % str(e))
+            
+            # Fallback to linux_distribution (deprecated in Python 3.5, removed in Python 3.8)
+            if hasattr(platform, 'linux_distribution'):
+                try:
+                    distinfo = list(platform.linux_distribution(full_distribution_name=0))
+                    # remove trailing whitespace in distro name
+                    if(distinfo[0] == ''):
+                        osfile= open("/etc/os-release", "r")
+                        for line in osfile:
+                            lists=str(line).split("=")
+                            if(lists[0]== "NAME"):
+                                distroname = lists[1].split("\"")
+                            if(lists[0]=="VERSION"):
+                                distroversion = lists[1].split("\"")
+                        osfile.close()
+                        return distroname[1]+"-"+distroversion[1],platform.release()
+                    distinfo[0] = distinfo[0].strip()
+                    return  distinfo[0]+"-"+distinfo[1],platform.release()
+                except Exception as e:
+                    self.log('Warning: platform.linux_distribution failed with error: %s' % str(e))
+            
+            # Fallback to platform.dist() (deprecated in Python 3.5, removed in Python 3.8+)
+            if hasattr(platform, 'dist'):
+                try:
+                    distinfo = platform.dist()
+                    return  distinfo[0]+"-"+distinfo[1],platform.release()
+                except Exception as e:
+                    self.log('Warning: platform.dist failed with error: %s' % str(e))
+            
+            # Final fallback: try to parse /etc/os-release manually
+            try:
+                distroname = None
+                distroversion = None
+                with open("/etc/os-release", "r") as osfile:
                     for line in osfile:
-                        lists=str(line).split("=")
-                        if(lists[0]== "NAME"):
-                            distroname = lists[1].split("\"")
-                        if(lists[0]=="VERSION"):
-                            distroversion = lists[1].split("\"")
-                    osfile.close()
-                    return distroname[1]+"-"+distroversion[1],platform.release()
-                distinfo[0] = distinfo[0].strip()
-                return  distinfo[0]+"-"+distinfo[1],platform.release()
-            else:
-                distinfo = platform.dist()
-                return  distinfo[0]+"-"+distinfo[1],platform.release()
+                        lists = str(line.strip()).split("=", 1)
+                        if len(lists) >= 2:
+                            key = lists[0].strip()
+                            value = lists[1].strip().strip('"')
+                            if key == "NAME":
+                                distroname = value
+                            elif key == "VERSION" or key == "VERSION_ID":
+                                distroversion = value
+                
+                if distroname and distroversion:
+                    return distroname + "-" + distroversion, platform.release()
+                elif distroname:
+                    return distroname + "-Unknown", platform.release()
+            except Exception as e:
+                self.log('Warning: Failed to parse /etc/os-release with error: %s' % str(e))
+            
+            # If all else fails, return unknown
+            return "Unknown", "Unknown"
+            
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
-            return "Unkonwn","Unkonwn"
+            return "Unknown","Unknown"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
         sub_status_obj = Utils.Status.SubstatusObj(code,name,status,formattedmessage)
