@@ -135,6 +135,8 @@ WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
 AmaUninstallContextFile = '/var/opt/microsoft/uninstall-context'
 AmaDataPath = '/var/opt/microsoft/azuremonitoragent/'
 SupportedArch = set(['x86_64', 'aarch64'])
+MDSDFluentPort = 0
+MDSDSyslogPort = 0
 
 # Error codes
 GenericErrorCode = 1
@@ -1424,7 +1426,7 @@ def install_azureotelcollector():
     MetricsExtension is responsible for writing the configuration file.
     Only if configuration is present, otelcollector process will start to run, the watcher service is responsible to monitor the configuration file.
     """
-    if is_feature_enabled("enableAzureOTelCollector") and is_systemd():
+    if is_systemd():
         find_package_manager("Install")
         azureotelcollector_install_command = get_otelcollector_installation_command()
         hutil_log_info('Running command "{0}"'.format(azureotelcollector_install_command))
@@ -1733,7 +1735,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
     while True:
         try:
-            if is_feature_enabled("enableAzureOTelCollector") and not azureotelcollector_is_active():
+            if not azureotelcollector_is_active():
                 install_azureotelcollector()
 
             if not me_handler.is_running(is_lad=False):
@@ -1777,7 +1779,7 @@ def metrics_watcher(hutil_error, hutil_log):
                 fluent_port = f.read()
                 f.close()
             
-            if fluent_port != '' and os.path.isfile(FluentCfgPath):
+            if fluent_port != '' and os.path.isfile(FluentCfgPath) and fluent_port != MDSDFluentPort:
                 portSetting = "    Port                       "  + fluent_port + "\n"
                 defaultPortSetting = 'Port'
                 portUpdated = True                
@@ -1795,6 +1797,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 print(line, end='')
                     os.chmod(FluentCfgPath, stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                    MDSDFluentPort = fluent_port
 
                     # add SELinux rules if needed
                     if os.path.exists('/etc/selinux/config') and fluent_port != '':
@@ -2072,6 +2075,9 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
         f.close()
         
     useSyslogTcp = False
+
+    if syslog_port == MDSDSyslogPort:
+        return
     
     # always use syslog tcp port, unless 
     # - the distro is Red Hat based and doesn't have semanage
@@ -2093,7 +2099,9 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
                         # allow the syslog port in SELinux
                         run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False, log_output=False)
                 useSyslogTcp = True   
-        
+
+    MDSDSyslogPort = syslog_port
+    
     # 1P tenants use omuxsock, so keep using that for customers using 1P
     if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
