@@ -3057,17 +3057,9 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
             exit_code = e.returncode
             output = e.output
 
-    try:
-        unicode_type = unicode # Python 2
-    except NameError:
-        unicode_type = str # Python 3
-
-    if all(ord(c) < 128 for c in output) or isinstance(output, unicode_type):
-        output = output.encode('utf-8')
-
-    # On python 3, encode returns a byte object, so we must decode back to a string
-    if sys.version_info >= (3,) and type(output) == bytes:
-        output = output.decode('utf-8', 'ignore')
+    # On python 3, check_output returns a binary object
+    if not isinstance(output, str):
+        output = output.decode('utf-8', 'ignore')   
 
     return exit_code, output.strip()
 
