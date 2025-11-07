@@ -68,6 +68,7 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
+                headers['UserAgent'] = 'VMSnapshot'
                 settings = []
                 if (paras.includeLunList != None and paras.includeLunList.count != 0):
                     diskIds = paras.includeLunList
@@ -141,6 +142,7 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
+                headers['UserAgent'] = 'VMSnapshot'
                 # if the vm is ade enabled and if the diskEncryptionSettings are not yet populated, then we need to fetch the disk details
                 # or when the fetch_disk_details flag is set to true
                 if(fetch_disk_details == True or (paras.isVMADEEnabled == True and not paras.diskEncryptionSettings)):
