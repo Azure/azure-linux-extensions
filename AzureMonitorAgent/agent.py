@@ -3056,10 +3056,14 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
             output = e.output
-
-    # On python 3, check_output returns a binary object
-    if not isinstance(output, str):
-        output = output.decode('utf-8', 'ignore')   
+    
+    # Python 2: encode unicode -> UTF-8 bytes (str). Python 3: decode bytes -> str.
+    try:  # Python 2
+        if isinstance(output, unicode):  # type: ignore  # noqa: F821
+            output = output.encode('utf-8', 'ignore')
+    except NameError:  # Python 3
+        if isinstance(output, (bytes, bytearray)):
+            output = bytes(output).decode('utf-8', 'ignore')
 
     return exit_code, output.strip()
 
