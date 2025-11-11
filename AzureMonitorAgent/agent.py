@@ -3056,18 +3056,14 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
             output = e.output
-
-    try:
-        unicode_type = unicode # Python 2
-    except NameError:
-        unicode_type = str # Python 3
-
-    if all(ord(c) < 128 for c in output) or isinstance(output, unicode_type):
-        output = output.encode('utf-8')
-
-    # On python 3, encode returns a byte object, so we must decode back to a string
-    if sys.version_info >= (3,) and type(output) == bytes:
-        output = output.decode('utf-8', 'ignore')
+    
+    # Python 2: encode unicode -> UTF-8 bytes (str). Python 3: decode bytes -> str.
+    try:  # Python 2
+        if isinstance(output, unicode):  # type: ignore  # noqa: F821
+            output = output.encode('utf-8', 'ignore')
+    except NameError:  # Python 3
+        if isinstance(output, (bytes, bytearray)):
+            output = bytes(output).decode('utf-8', 'ignore')
 
     return exit_code, output.strip()
 
