@@ -204,8 +204,9 @@ class HandlerUtility:
                 protected_settings_str = ''
                 for decrypt_cmd in [cms_cmd, smime_cmd]:
                     try:
+                        # waagent.RunSendStdin returns a tuple (return code, stdout)
                         output = waagent.RunSendStdin(decrypt_cmd, unencodedSettings)
-                        if output[0] == 0 and output[1]:
+                        if output and output[0] == 0 and output[1]:
                             protected_settings_str = output[1]
                             if decrypt_cmd == cms_cmd:
                                 self.log('Decrypted protectedSettings using openssl cms.')
@@ -213,7 +214,8 @@ class HandlerUtility:
                                 self.log('Decrypted protectedSettings using openssl smime fallback.')
                             break
                         else:
-                            self.log('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, output[0]))
+                            rc = output[0] if output else 'N/A'
+                            self.log('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, rc))
                     except OSError:
                         pass
 
