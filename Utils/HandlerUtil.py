@@ -201,7 +201,7 @@ class HandlerUtility:
                 cms_cmd = 'openssl cms -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
                 smime_cmd = 'openssl smime -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
 
-                protected_settings_str = None
+                protected_settings_str = ''
                 for decrypt_cmd in [cms_cmd, smime_cmd]:
                     try:
                         # waagent.RunSendStdin returns a tuple (return code, stdout)
