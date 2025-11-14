@@ -30,7 +30,6 @@ import Utils.extensionutils as ext_utils
 import Utils.distroutils as dist_utils
 import Utils.constants as constants
 import Utils.ovfutils as ovf_utils
-import VMAccess.errorclarification as error_code
 
 # Define global variables
 ExtensionShortName = 'VMAccess'
@@ -40,7 +39,6 @@ BeginSSHTag = '---- BEGIN SSH2 PUBLIC KEY ----'
 OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
 SshdConfigBackupPath = '/var/cache/vmaccess/backup'
-ErrorClarificationName = "ErrorClarification"
 
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
@@ -135,10 +133,8 @@ def install():
 
 
 def enable():
-    errorstatus = error_code.ErrorCode.SYSTEM_ERROR
     hutil = handler_util.HandlerUtility()
     hutil.do_parse_context('Enable')
-
     try:
         hutil.exit_if_enabled(remove_protected_settings=True)  # If no new seqNum received, exit.
 
@@ -169,33 +165,19 @@ def enable():
 
         if remove_user:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="remove-user")
-            errorstatus, errormsg = _remove_user_account(remove_user, hutil)
-            if errorstatus is not None:
-                raise Exception(errormsg)
+            _remove_user_account(remove_user, hutil)
 
-        output = _set_user_account_pub_key(protect_settings, hutil)
+        _set_user_account_pub_key(protect_settings, hutil)
 
-        if output is not None:
-                errorstatus, errormsg = output[0], output[1]
-                hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(errormsg), errorstatus.value)
-        
         if _is_sshd_config_modified(protect_settings):
             MyDistro.restart_ssh_service()
 
-        errorstatus = check_and_repair_disk(hutil)
-        if errorstatus is not None:
-            if errorstatus == error_code.ErrorCode.CHECK_REPAIR_DISK_ERROR:
-                hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.', errorstatus.value)
-            if errorstatus == error_code.ErrorCode.CHECK_DISK_ERROR:
-                hutil.do_exit(1, 'Enable', 'error', '0', 'Check disk failed.', errorstatus.value)
-            if errorstatus == error_code.ErrorCode.REPAIR_DISK_ERROR:
-                hutil.do_exit(1, 'Enable', 'error', '0', 'Repair disk failed.', errorstatus.value)
-            
+        check_and_repair_disk(hutil)
         hutil.do_exit(0, 'Enable', 'success', '0', 'Enable succeeded.')
     except Exception as e:
         hutil.error(("Failed to enable the extension with error: {0}, "
                      "stack trace: {1}").format(str(e), traceback.format_exc()))
-        hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(str(e)),errorstatus.value)
+        hutil.do_exit(1, 'Enable', 'error', '0', "Enable failed: {0}".format(str(e)))
 
 
 def _forcibly_reset_chap(hutil):
@@ -239,13 +221,12 @@ def _remove_user_account(user_name, hutil):
                                       op=constants.WALAEventOperation.Enable,
                                       is_success=False,
                                       message="(02102)Failed to remove user.")
-        return error_code.ErrorCode.SYSTEM_ERROR, "Failed to remove user {0}".format(e)
+        raise Exception("Failed to remove user {0}".format(e))
 
     ext_utils.add_extension_event(name=hutil.get_name(),
                                   op=constants.WALAEventOperation.Enable,
                                   is_success=True,
                                   message="Successfully removed user")
-    return None, "Successfully removed user {0}".format(user_name)
 
 
 def _set_user_account_pub_key(protect_settings, hutil):
@@ -263,7 +244,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     # user name must be provided if set ssh key or password
     if not protect_settings or 'username' not in protect_settings:
-        return None
+        return
 
     user_name = protect_settings['username']
     user_pass = protect_settings.get('password')
@@ -274,7 +255,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
 
     no_convert = False
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
-        return error_code.ErrorCode.USER_PASSWORD_ERROR, "No password or ssh_key is specified."
+        raise Exception("No password or ssh_key is specified.")
 
     if user_pass is not None and len(user_pass) == 0:
         user_pass = None
@@ -292,7 +273,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                       op=constants.WALAEventOperation.Enable,
                                       is_success=False,
                                       message="(02101)" + err_msg)
-        return error_code.ErrorCode.SYSTEM_ERROR, err_msg + " with " + error_string
+        raise Exception(err_msg + " with " + error_string)
     hutil.log("Succeeded in creating the account or setting the password.")
 
     # Allow password authentication if user_pass is provided
@@ -366,7 +347,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
                                           op=constants.WALAEventOperation.Enable,
                                           is_success=False,
                                           message="(02100)Failed to reset ssh key.")
-            return error_code.ErrorCode.SYSTEM_ERROR, e
+            raise e
 
 
 def _get_other_sudoers(user_name):
@@ -578,29 +559,33 @@ def check_and_repair_disk(hutil):
             err_msg = ("check_disk and repair_disk was both specified."
                        "Only one of them can be specified")
             hutil.error(err_msg)
-            return error_code.ErrorCode.CHECK_REPAIR_DISK_ERROR
+            hutil.do_exit(1, 'Enable', 'error', '0', 'Enable failed.')
 
         if check_disk:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="check_disk")
             outretcode = _fsck_check(hutil)
+            hutil.log("Successfully checked disk")
             return outretcode
 
         if repair_disk:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="repair_disk")
             outdata = _fsck_repair(hutil, disk_name)
+            hutil.log("Repaired and remounted disk")
             return outdata
 
 
 def _fsck_check(hutil):
-    retcode = ext_utils.run(['fsck', '-As', '-y'])
-    if retcode > 0:
-        hutil.log(str(retcode))
-        hutil.error("Failed to run disk check with error: {0}, {1}".format("Disk check was not successful", traceback.format_exc()))
-        return error_code.ErrorCode.CHECK_DISK_ERROR
-    else:
-        hutil.log("Successfully checked disk")
-        return None
-
+    try:
+        retcode = ext_utils.run(['fsck', '-As', '-y'])
+        if retcode > 0:
+            hutil.log(retcode)
+            raise Exception("Disk check was not successful")
+        else:
+            return retcode
+    except Exception as e:
+        hutil.error("Failed to run disk check with error: {0}, {1}".format(
+            str(e), traceback.format_exc()))
+        hutil.do_exit(1, 'Check', 'error', '0', 'Check failed.')
 
 
 def _fsck_repair(hutil, disk_name):
@@ -616,13 +601,13 @@ def _fsck_repair(hutil, disk_name):
             if retcode == 0:
                 retcode, output = ext_utils.run_command_get_output(["mount"])
                 hutil.log(output)
-                hutil.log("Repaired and remounted disk")
                 return output
         else:
             raise Exception("Failed to mount disks")
     except Exception as e:
         hutil.error("{0}, {1}".format(str(e), traceback.format_exc()))
-        return error_code.ErrorCode.REPAIR_DISK_ERROR
+        hutil.do_exit(1, 'Repair', 'error', '0', 'Repair failed.')
+
 
 if __name__ == '__main__':
     main()

@@ -68,7 +68,6 @@ from os.path import join
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 MANIFEST_XML = "manifest.xml"
-from VMAccess.vmaccess import ErrorClarificationName
 
 ENV_CONFIG_SEQUENCE_NUMBER = "ConfigSequenceNumber"
 
@@ -330,9 +329,7 @@ class HandlerUtility:
     def _set_most_recent_seq(self, seq):
         ext_utils.set_file_contents('mrseq', str(seq))
 
-    def do_status_report(self, operation, status, status_code, message, error_code=None, substatus=None):
-        if error_code is not None:
-            message = "{0} (error code: {1})".format(message, error_code)
+    def do_status_report(self, operation, status, status_code, message):
         self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
         tstamp = time.strftime(DateTimeFormat, time.gmtime())
         stat = [{
@@ -349,8 +346,6 @@ class HandlerUtility:
                 }
             }
         }]
-        if substatus is not None:
-            stat[0]["substatus"] = substatus
         stat_rept = json.dumps(stat)
         if self._context._status_file:
             tmp = "%s.tmp" % (self._context._status_file)
@@ -364,15 +359,9 @@ class HandlerUtility:
         if ext_utils.set_file_contents(heartbeat_file, health_report) is None:
             self.error('Unable to wite heartbeat info to ' + heartbeat_file)
 
-    def do_exit(self, exit_code, operation, status, code, message, error_code=None):
+    def do_exit(self, exit_code, operation, status, code, message):
         try:
-            substatus = None
-            if error_code is not None:
-                substatus = [{
-                    "Name": ErrorClarificationName,
-                    "Code": error_code
-                }]
-            self.do_status_report(operation, status, code, message,error_code, substatus)
+            self.do_status_report(operation, status, code, message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
         sys.exit(exit_code)
