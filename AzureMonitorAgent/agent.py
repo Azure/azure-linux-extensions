@@ -1712,7 +1712,7 @@ def metrics_watcher(hutil_error, hutil_log):
     """
     Watcher thread to monitor metric configuration changes and to take action on them
     """
-
+    global MDSDFluentPort
     # Check every 30 seconds
     sleepTime =  30
 
@@ -2062,7 +2062,8 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     """
     Install local syslog configuration files if not present and restart syslog
     """
-
+    global MDSDSyslogPort
+    
     # don't deploy any configuration if no control plane is configured
     if not uses_gcs and not uses_mcs:
         return
@@ -2100,7 +2101,8 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
                         run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False, log_output=False)
                 useSyslogTcp = True   
 
-    MDSDSyslogPort = syslog_port
+    if syslog_port != '':
+        MDSDSyslogPort = syslog_port
     
     # 1P tenants use omuxsock, so keep using that for customers using 1P
     if useSyslogTcp == True and syslog_port != '':
