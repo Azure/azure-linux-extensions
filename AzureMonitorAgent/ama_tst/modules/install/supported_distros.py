@@ -2,7 +2,7 @@ supported_dists_x86_64 = {'redhat' : ['7', '8', '9', '10'], # Rhel
                        'centos' : ['7', '8'], # CentOS
                        'oracle' : ['7', '8', '9'], # Oracle
                        'ol' : ['7', '8', '9'], # Oracle Linux
-                       'debian' : ['9', '10', '11', '12'], # Debian
+                       'debian' : ['9', '10', '11', '12', '13'], # Debian
                        'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04'], # Ubuntu
                        'suse' : ['12', '15'], 'sles' : ['12', '15'], # SLES
                        'mariner' : ['2'], # Mariner
