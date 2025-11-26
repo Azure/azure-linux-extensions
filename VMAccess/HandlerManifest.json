@@ -8,7 +8,8 @@
       "uninstallCommand": "extension_shim.sh -c ./vmaccess.py -u",
       "updateCommand": "extension_shim.sh -c ./vmaccess.py -p",
       "rebootAfterInstall": false,
-      "reportHeartbeat": false
+      "reportHeartbeat": false,
+      "continueOnUpdateFailure": true
     }
   }
 ]
