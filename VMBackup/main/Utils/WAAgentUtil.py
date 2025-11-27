@@ -18,9 +18,21 @@
 # limitations under the License.
 
 try:
-    import imp as imp
+    # For Python 3.5 and later, use importlib
+    import importlib.util
+    has_importlib_util = True
 except ImportError:
-    import importlib as imp
+    has_importlib_util = False
+
+try:
+    import imp as imp
+    has_imp = True
+except ImportError:
+    has_imp = False
+    
+if not has_importlib_util and not has_imp:
+    raise ImportError("Neither importlib.util nor imp module is available")
+
 import os
 import os.path
 
@@ -58,18 +70,16 @@ try:
        # Search for the old agent path if the new one is not found
        agentPath = searchWAAgentOld()
     if agentPath:
-        try:
+        if has_importlib_util:
             # For Python 3.5 and later, use importlib
-            import importlib.util
             spec = importlib.util.spec_from_file_location('waagent', agentPath)
             waagent = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(waagent)       
-        except ImportError:
+        elif has_imp:
             # For Python 3.4 and earlier, use imp module
-            import imp
             waagent = imp.load_source('waagent', agentPath)
-        except Exception:
-            raise Exception("Can't load waagent.")
+        else:
+            raise Exception("No suitable import mechanism available.")
     else:
         raise Exception("Can't load new or old waagent. Agent path not found.")
 except Exception as e:
