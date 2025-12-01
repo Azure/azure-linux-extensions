@@ -2,11 +2,11 @@
   {
     "version": 1.0,
     "handlerManifest": {
-      "disableCommand": "extension_shim.sh -c ./vmaccess.py -d",
+      "disableCommand": "extension_noop.sh",
       "enableCommand": "extension_shim.sh -c ./vmaccess.py  -e",
-      "installCommand": "extension_shim.sh -c ./vmaccess.py  -i",
-      "uninstallCommand": "extension_shim.sh -c ./vmaccess.py -u",
-      "updateCommand": "extension_shim.sh -c ./vmaccess.py -p",
+      "installCommand": "extension_noop.sh",
+      "uninstallCommand": "extension_noop.sh",
+      "updateCommand": "extension_noop.sh",
       "rebootAfterInstall": false,
       "reportHeartbeat": false,
       "continueOnUpdateFailure": true

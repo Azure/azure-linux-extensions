@@ -271,27 +271,16 @@ class HandlerUtility:
         self.log('sequence number is ' + self._context._seq_no)
         self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
         self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
-
-        # For operations such as uninstall, no .settings file corresponding to the sequence number will exist
-        # In those cases, the sequence number will always be 0
+        self.log("setting file path is" + self._context._settings_file)
         ctxt = None
-        if os.path.isfile(self._context._settings_file):
-            self.log("settings file exists at " + self._context._settings_file)
-            ctxt = ext_utils.get_file_contents(self._context._settings_file)
-            if ctxt == None:
-                error_msg = 'Unable to read ' + self._context._settings_file + '. '
-                self.error(error_msg)
-                return None
-            self.log("JSON config: " + HandlerUtility.redact_protected_settings(ctxt))
-            self._context._config = self._parse_config(ctxt)
-        else:
-            if self._context._seq_no == "0":
-                self.log("settings file does not exist, but seqNo is 0. Not loading settings")
-            else:
-                 error_msg = 'Settings file at ' + self._context._settings_file + ' does not exist. '
-                 self.error(error_msg)
-                 return None
+        ctxt = ext_utils.get_file_contents(self._context._settings_file)
+        if ctxt == None:
+            error_msg = 'Unable to read ' + self._context._settings_file + '. '
+            self.error(error_msg)
+            return None
 
+        self.log("JSON config: " + HandlerUtility.redact_protected_settings(ctxt))
+        self._context._config = self._parse_config(ctxt)
         return self._context
 
     def _change_log_file(self):
