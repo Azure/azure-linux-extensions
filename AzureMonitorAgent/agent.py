@@ -501,9 +501,9 @@ def install():
 
     set_metrics_binaries()
 
-    # Copy KqlExtension binaries
+    # Copy AstExtension binaries
     # Needs to be revisited for aarch64
-    copy_kqlextension_binaries()
+    copy_astextension_binaries()
 
     # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
@@ -956,9 +956,9 @@ def enable():
 
     if platform.machine() != 'aarch64':
         if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-            # start/enable kql extension only in 3P mode and non aarch64
-            kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
-            output += kql_output # do not block if kql start fails
+            # start/enable ast extension only in 3P mode and non aarch64
+            ast_output_start_code, ast_output = run_command_and_log(get_service_command("azuremonitor-astextension", *operations))
+            output += ast_output # do not block if ast start fails
             # start transformation config watcher process
             start_transformconfig_process()
 
@@ -1225,12 +1225,12 @@ def disable():
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
 
     if platform.machine() != 'aarch64':
-        # stop kql extensionso that is not started after system reboot. Do not block if it fails.
-        kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-        if kql_exit_code != 0:
-            status_command = get_service_command("azuremonitor-kqlextension", "status")
-            kql_exit_code, kql_status_output = run_command_and_log(status_command)
-            hutil_log_info(kql_status_output)
+        # stop ast extensionso that is not started after system reboot. Do not block if it fails.
+        ast_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-astextension", "stop", "disable"))
+        if ast_exit_code != 0:
+            status_command = get_service_command("azuremonitor-astextension", "status")
+            ast_exit_code, ast_status_output = run_command_and_log(status_command)
+            hutil_log_info(ast_status_output)
 
     return exit_code, output
 
@@ -1300,11 +1300,11 @@ def restart_launcher():
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
-def restart_kqlextension():
+def restart_astextension():
     # start agent transformation extension process
-    hutil_log_info('Handler initiating agent transformation extension (KqlExtension) restart and enable')
+    hutil_log_info('Handler initiating agent transformation extension (AstExtension) restart and enable')
     if is_systemd():
-        exit_code, output = run_command_and_log('systemctl restart azuremonitor-kqlextension && systemctl enable azuremonitor-kqlextension')
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-astextension && systemctl enable azuremonitor-astextension')
 
 def set_proxy(address, username, password):
     """
@@ -2045,7 +2045,7 @@ def transformconfig_watcher(hutil_error, hutil_log):
                     crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
                     if (crc != last_crc):
-                        restart_kqlextension()
+                        restart_astextension()
                         last_crc = crc
                 f.close()
 
@@ -2652,20 +2652,20 @@ def get_ssl_cert_info(operation):
 
     log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
 
-def copy_kqlextension_binaries():
-    kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
-    kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
-    kqlextension_runtimesbin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
-    if os.path.exists(kqlextension_runtimesbin):
+def copy_astextension_binaries():
+    astextension_bin_local_path = os.getcwd() + "/AstExtensionBin/"
+    astextension_bin = "/opt/microsoft/azuremonitoragent/bin/astextension/"
+    astextension_runtimesbin = "/opt/microsoft/azuremonitoragent/bin/astextension/runtimes/"
+    if os.path.exists(astextension_runtimesbin):
         # only for versions of AMA with .NET runtimes
-        rmtree(kqlextension_runtimesbin)
-    # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
-    for f in os.listdir(kqlextension_bin):
-        if f != 'KqlExtension' and f != 'appsettings.json':
-            os.remove(os.path.join(kqlextension_bin, f))
+        rmtree(astextension_runtimesbin)
+    # only for versions with Ast .net cleanup .NET files as it is causing issues with AOT runtime
+    for f in os.listdir(astextension_bin):
+        if f != 'AstExtension' and f != 'appsettings.json':
+            os.remove(os.path.join(astextension_bin, f))
 
-    for f in os.listdir(kqlextension_bin_local_path):
-        compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
+    for f in os.listdir(astextension_bin_local_path):
+        compare_and_copy_bin(astextension_bin_local_path + f, astextension_bin + f)
 
 
 def is_arc_installed():
