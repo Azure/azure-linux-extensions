@@ -111,25 +111,11 @@ def main():
 
     try:
         for a in sys.argv[1:]:
-            if re.match("^([-/]*)(disable)", a):
-                disable()
-            elif re.match("^([-/]*)(uninstall)", a):
-                uninstall()
-            elif re.match("^([-/]*)(install)", a):
-                install()
-            elif re.match("^([-/]*)(enable)", a):
+            if re.match("^([-/]*)(enable)", a):
                 enable()
-            elif re.match("^([-/]*)(update)", a):
-                update()
     except Exception as e:
         err_msg = "Failed with error: {0}, {1}".format(e, traceback.format_exc())
         logger.error(err_msg)
-
-
-def install():
-    hutil = handler_util.HandlerUtility()
-    hutil.do_parse_context('Install')
-    hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
 
 
 def enable():
@@ -189,24 +175,6 @@ def _forcibly_reset_chap(hutil):
 def _is_sshd_config_modified(protected_settings):
     result = protected_settings.get('reset_ssh') or protected_settings.get('restore_backup_ssh') or protected_settings.get('password')
     return result is not None
-
-
-def uninstall():
-    hutil = handler_util.HandlerUtility()
-    hutil.do_parse_context('Uninstall')
-    hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall succeeded')
-
-
-def disable():
-    hutil = handler_util.HandlerUtility()
-    hutil.do_parse_context('Disable')
-    hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
-
-
-def update():
-    hutil = handler_util.HandlerUtility()
-    hutil.do_parse_context('Update')
-    hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
 
 def _remove_user_account(user_name, hutil):
