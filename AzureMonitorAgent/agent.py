@@ -1776,7 +1776,7 @@ def metrics_watcher(hutil_error, hutil_log):
             fluent_port = ''
             if os.path.isfile(AMAFluentPortFilePath):
                 f = open(AMAFluentPortFilePath, "r")
-                fluent_port = f.read()
+                fluent_port = validate_port_number(f.read(), "fluent")
                 f.close()
             
             if fluent_port != '' and os.path.isfile(FluentCfgPath) and fluent_port != MDSDFluentPort:
@@ -2072,7 +2072,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     syslog_port = ''
     if os.path.isfile(AMASyslogPortFilePath):
         f = open(AMASyslogPortFilePath, "r")
-        syslog_port = f.read()
+        syslog_port = validate_port_number(f.read(), "syslog")
         f.close()
         
     useSyslogTcp = False
@@ -3153,6 +3153,31 @@ def log_and_exit(operation, exit_code = GenericErrorCode, message = ''):
     else:
         update_status_file(operation, str(exit_code), exit_status, message)
         sys.exit(exit_code)
+
+
+def validate_port_number(port_value, port_name):
+    """
+    Validates that a port value is a valid integer within the range 1-65535.
+
+    Args:
+        port_value: The port value to validate (string)
+        port_name: The name of the port for error messages (e.g., "fluent", "syslog")
+
+    Returns:
+        The validated port number as a string, or empty string if invalid
+    """
+    if not port_value:
+        return ''
+
+    try:
+        port_int = int(port_value.strip())
+        if port_int < 1 or port_int > 65535:
+            hutil_log_error('Invalid {0} port number: {1}. Must be between 1-65535.'.format(port_name, port_int))
+            return ''
+        return str(port_int)
+    except ValueError:
+        hutil_log_error('Invalid {0} port value: {1}. Must be an integer.'.format(port_name, port_value))
+        return ''
 
 
 # Exceptions
