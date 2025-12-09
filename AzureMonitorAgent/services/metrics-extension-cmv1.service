@@ -5,11 +5,6 @@ After=network.target
 [Service]
 ExecStart=%ME_BIN% -TokenSource MSI -Input influxdb_local -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -DataDirectory %ME_DATA_DIRECTORY% -LocalControlChannel -MonitoringAccount %ME_MONITORING_ACCOUNT% -LogLevel Error
 ExecReload=/bin/kill -HUP $MAINPID
-Restart=on-failure
-RestartSec=60
-StartLimitInterval=600
-StartLimitBurst=5
-RestartForceExitStatus=SIGPIPE
 KillMode=control-group
 
 [Install]
