@@ -409,11 +409,11 @@ def install():
     set_os_arch('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
-    # Check if Debian 12 VMs have rsyslog package (required for AMA 1.31+)
-    if (vm_dist.startswith('debian')) and vm_ver.startswith('12'):
+    # Check if Debian 12 and 13 VMs have rsyslog package (required for AMA 1.31+)
+    if (vm_dist.startswith('debian')) and ((vm_ver.startswith('12') or vm_ver.startswith('13')) or int(vm_ver.split('.')[0]) >= 12):
         check_rsyslog, _ = run_command_and_log("dpkg -s rsyslog")
         if check_rsyslog != 0:
-            hutil_log_info("'rsyslog' package missing from Debian 12 machine, installing to allow AMA to run.")
+            hutil_log_info("'rsyslog' package missing from Debian {0} machine, installing to allow AMA to run.".format(vm_ver))
             rsyslog_exit_code, rsyslog_output = run_command_and_log("DEBIAN_FRONTEND=noninteractive apt-get update && \
                                                                     DEBIAN_FRONTEND=noninteractive apt-get install -y rsyslog")
             if rsyslog_exit_code != 0:
