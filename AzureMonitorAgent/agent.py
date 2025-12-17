@@ -957,7 +957,7 @@ def enable():
     if platform.machine() != 'aarch64':
         if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
             # start/enable ast extension only in 3P mode and non aarch64
-            ast_output_start_code, ast_output = run_command_and_log(get_service_command("azuremonitor-astextension", *operations))
+            _, ast_output = run_command_and_log(get_service_command("azuremonitor-astextension", *operations))
             output += ast_output # do not block if ast start fails
             # start transformation config watcher process
             start_transformconfig_process()
@@ -1228,8 +1228,9 @@ def disable():
         # stop ast extensionso that is not started after system reboot. Do not block if it fails.
         ast_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-astextension", "stop", "disable"))
         if ast_exit_code != 0:
+            hutil_log_info(disable_output)
             status_command = get_service_command("azuremonitor-astextension", "status")
-            ast_exit_code, ast_status_output = run_command_and_log(status_command)
+            _, ast_status_output = run_command_and_log(status_command)
             hutil_log_info(ast_status_output)
 
     return exit_code, output
