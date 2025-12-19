@@ -68,6 +68,7 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
+                headers['UserAgent'] = 'VMSnapshot'
                 settings = []
                 if (paras.includeLunList != None and paras.includeLunList.count != 0):
                     diskIds = paras.includeLunList
@@ -77,10 +78,10 @@ class HostSnapshotter(object):
                         temp_dict[CommonVariables.key] = flag
                         temp_dict[CommonVariables.value] = paras.wellKnownSettingFlags[flag]
                         settings.append(temp_dict)
-                if(paras.isVMADEEnabled == True and paras.encryptionDetails):
+                if(paras.isVMADEEnabled == True and paras.diskEncryptionSettings):
                     settings.append({CommonVariables.key:CommonVariables.isOsDiskADEEncrypted, CommonVariables.value:paras.isOsDiskADEEncrypted})
                     settings.append({CommonVariables.key:CommonVariables.areDataDisksADEEncrypted, CommonVariables.value:paras.areDataDisksADEEncrypted})
-                    meta_data.append({CommonVariables.key:CommonVariables.encryptionDetails, CommonVariables.value:paras.encryptionDetails})
+                    meta_data.append({CommonVariables.key:CommonVariables.diskEncryptionSettings, CommonVariables.value:paras.diskEncryptionSettings})
                 hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, settings, paras.snapshotTaskToken, meta_data, paras.instantAccessDurationMinutes)
                 body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 redactedRequestBodyObj = self.hutil.redact_sensitive_encryption_details(hostDoSnapshotRequestBodyObj)
@@ -141,11 +142,12 @@ class HostSnapshotter(object):
                 headers = {}
                 headers['Backup'] = 'true'
                 headers['Content-type'] = 'application/json'
-                # if the vm is ade enabled and if the encryptiondetails are not yet populated, then we need to fetch the disk details
+                headers['UserAgent'] = 'VMSnapshot'
+                # if the vm is ade enabled and if the diskEncryptionSettings are not yet populated, then we need to fetch the disk details
                 # or when the fetch_disk_details flag is set to true
-                if(fetch_disk_details == True or (paras.isVMADEEnabled == True and not paras.encryptionDetails)):
+                if(fetch_disk_details == True or (paras.isVMADEEnabled == True and not paras.diskEncryptionSettings)):
                     if(fetch_disk_details != True):
-                        self.logger.log("Fetching disk details as the VM is ADE enabled and encryptionDetails are not yet populated")
+                        self.logger.log("Fetching disk details as the VM is ADE enabled and diskEncryptionSettings are not yet populated")
                         fetch_disk_details = True
                     preSnapshotSettings = []
                     temp_dict = {}
@@ -187,13 +189,13 @@ class HostSnapshotter(object):
                             response = json.loads(responseBody)
                             paras.isOsDiskADEEncrypted = response.get(CommonVariables.isOsDiskADEEncrypted)
                             paras.areDataDisksADEEncrypted = response.get(CommonVariables.areDataDisksADEEncrypted)
-                            paras.encryptionDetails = response.get(CommonVariables.encryptionDetails)
+                            paras.diskEncryptionSettings = response.get(CommonVariables.diskEncryptionSettings)
                             self.logger.log("PreSnapshotResponse: isOsDiskADEEncrypted: "+ str(paras.isOsDiskADEEncrypted))
                             self.logger.log("PreSnapshotResponse: areDataDisksADEEncrypted: "+ str(paras.areDataDisksADEEncrypted))
-                            if paras.encryptionDetails is not None:
-                                self.logger.log("PreSnapshotResponse: encryptionDetails: "+ str(len(paras.encryptionDetails)))
+                            if paras.diskEncryptionSettings is not None:
+                                self.logger.log("PreSnapshotResponse: DiskEncryptionSettings: "+ str(len(paras.diskEncryptionSettings)))
                             else:
-                                self.logger.log("PreSnapshotResponse: EncryptionDetails are null")
+                                self.logger.log("PreSnapshotResponse: DiskEncryptionSettings are null")
                         else:
                             self.logger.log("PreSnapshotResponse: VM is either not ADE Enabled or disk details were not requested")
                     elif(httpResp.status == 500 and not responseBody.startswith("{ \"error\"")):

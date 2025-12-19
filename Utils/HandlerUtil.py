@@ -58,6 +58,7 @@ import base64
 import json
 import time
 import re
+import subprocess
 # imp was deprecated in python 3.12
 if sys.version_info >= (3, 12):
     import importlib
@@ -195,16 +196,34 @@ class HandlerUtility:
                 cert = waagent.LibDir + '/' + thumb + '.crt'
                 pkey = waagent.LibDir + '/' + thumb + '.prv'
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
-                openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}"
-                cleartxt = waagent.RunSendStdin(openSSLcmd.format(cert, pkey), unencodedSettings)[1]
-                if cleartxt is None:
-                    self.error("OpenSSL decode error using  thumbprint " + thumb)
-                    self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
+
+                # FIPS 140-3: use 'openssl cms' (supports AES256 & DES_EDE3_CBC) with fallback to legacy 'openssl smime'
+                cms_cmd = 'openssl cms -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
+                smime_cmd = 'openssl smime -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
+
+                protected_settings_str = ''
+                for decrypt_cmd in [cms_cmd, smime_cmd]:
+                    try:
+                        # waagent.RunSendStdin returns a tuple (return code, stdout)
+                        output = waagent.RunSendStdin(decrypt_cmd, unencodedSettings)
+                        if output and output[0] == 0 and output[1]:
+                            protected_settings_str = output[1]
+                            if decrypt_cmd == cms_cmd:
+                                self.log('Decrypted protectedSettings using openssl cms.')
+                            else:
+                                self.log('Decrypted protectedSettings using openssl smime fallback.')
+                            break
+                        else:
+                            rc = output[0] if output else 'N/A'
+                            self.log('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, rc))
+                    except OSError:
+                        pass
+
                 jctxt = ''
                 try:
-                    jctxt = json.loads(cleartxt)
+                    jctxt = json.loads(protected_settings_str)
                 except:
-                    self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(cleartxt))
+                    self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(protected_settings_str))
                 handlerSettings['protectedSettings']=jctxt
                 self.log('Config decoded correctly.')
         return config

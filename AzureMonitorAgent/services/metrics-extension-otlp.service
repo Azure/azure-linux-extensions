@@ -8,8 +8,6 @@ Environment="OTLP_GRPC_PORT=4317"
 EnvironmentFile=-/etc/metrics-extension.d/options.conf
 ExecStart=%ME_BIN% -TokenSource AMCS -ManagedIdentity %ME_MANAGED_IDENTITY% -Input influxdb_local,otlp_grpc -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -LogLevel Info -Logger Console -OperationEnvironment AMA-Linux/AMA_VERSION
 ExecReload=/bin/kill -HUP $MAINPID
-Restart=on-failure
-RestartForceExitStatus=SIGPIPE
 KillMode=control-group
 
 [Install]
