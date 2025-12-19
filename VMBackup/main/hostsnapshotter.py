@@ -152,9 +152,9 @@ class HostSnapshotter(object):
                     temp_dict[CommonVariables.key] = CommonVariables.isVMADEEnabled
                     temp_dict[CommonVariables.value] = paras.isVMADEEnabled
                     preSnapshotSettings.append(temp_dict)
-                    hostPreSnapshotRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken, preSnapshotSettings, paras.instantAccessDurationMinutes)
+                    hostPreSnapshotRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken, preSnapshotSettings)
                 else:
-                    hostPreSnapshotRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken, instantAccessDurationMinutes = paras.instantAccessDurationMinutes)
+                    hostPreSnapshotRequestBodyObj = HostSnapshotObjects.HostPreSnapshotRequestBody(taskId, paras.snapshotTaskToken)
                 body_content = json.dumps(hostPreSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 self.logger.log('Headers : ' + str(headers))
                 self.logger.log('Host Request body : ' + str(body_content))
