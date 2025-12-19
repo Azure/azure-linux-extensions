@@ -13,15 +13,14 @@ class HostDoSnapshotRequestBody:
         return dict(taskId = self.taskId, diskIds = self.diskIds, settings = self.settings, snapshotTaskToken = self.snapshotTaskToken, snapshotMetadata = self.snapshotMetadata, instantAccessDurationMinutes = self.instantAccessDurationMinutes)
 
 class HostPreSnapshotRequestBody:
-    def __init__(self, taskId, snapshotTaskToken, preSnapshotSettings = None, instantAccessDurationMinutes = None):
+    def __init__(self, taskId, snapshotTaskToken, preSnapshotSettings = None):
         self.taskId = taskId
         self.snapshotTaskToken = snapshotTaskToken
         if (preSnapshotSettings != None):
             self.preSnapshotSettings = preSnapshotSettings
-        self.instantAccessDurationMinutes = instantAccessDurationMinutes
 
     def convertToDictionary(self):
-        result = dict(taskId=self.taskId, snapshotTaskToken=self.snapshotTaskToken, instantAccessDurationMinutes = self.instantAccessDurationMinutes)
+        result = dict(taskId=self.taskId, snapshotTaskToken=self.snapshotTaskToken)
         if hasattr(self, 'preSnapshotSettings'):
             result['preSnapshotSettings'] = self.preSnapshotSettings
         return result

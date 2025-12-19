@@ -81,7 +81,7 @@ class HostSnapshotter(object):
                     settings.append({CommonVariables.key:CommonVariables.isOsDiskADEEncrypted, CommonVariables.value:paras.isOsDiskADEEncrypted})
                     settings.append({CommonVariables.key:CommonVariables.areDataDisksADEEncrypted, CommonVariables.value:paras.areDataDisksADEEncrypted})
                     meta_data.append({CommonVariables.key:CommonVariables.encryptionDetails, CommonVariables.value:paras.encryptionDetails})
-                hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, settings, paras.snapshotTaskToken, meta_data)
+                hostDoSnapshotRequestBodyObj = HostSnapshotObjects.HostDoSnapshotRequestBody(taskId, diskIds, settings, paras.snapshotTaskToken, meta_data, paras.instantAccessDurationMinutes)
                 body_content = json.dumps(hostDoSnapshotRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
                 redactedRequestBodyObj = self.hutil.redact_sensitive_encryption_details(hostDoSnapshotRequestBodyObj)
                 redacted_body_content = json.dumps(redactedRequestBodyObj, cls = HandlerUtil.ComplexEncoder)
@@ -119,7 +119,7 @@ class HostSnapshotter(object):
                 else:
                     # HttpCall failed
                     HandlerUtil.HandlerUtility.add_to_telemetery_data(CommonVariables.hostStatusCodeDoSnapshot, str(555))
-                    self.logger.log("presnapshot Hitting wrong WireServer IP")
+                    self.logger.log("dosnapshot Hitting wrong WireServer IP")
         except Exception as e:
             errorMsg = "Failed to do the snapshot in host with error: %s, stack trace: %s" % (str(e), traceback.format_exc())
             self.logger.log(errorMsg, False, 'Error')
@@ -231,9 +231,14 @@ class HostSnapshotter(object):
                         self.logger.log("Converting the creationTime string received in UTC format to UTC Ticks")
                         delta = creationTimeObj - epochTime
                         timestamp = self.get_total_seconds(delta)
-                        creationTimeUTCTicks = str(int(timestamp * 1000)) 
-                        ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeUTCTicks , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'])
-                        self.logger.log("ddSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id))
+                        creationTimeUTCTicks = str(int(timestamp * 1000))
+                        instantAccessDurationMinutes = None
+                        if 'instantAccessDurationMinutes' in snapshot_info['ddSnapshotIdentifier']:
+                            instantAccessDurationMinutes = snapshot_info['ddSnapshotIdentifier']['instantAccessDurationMinutes']
+                        ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeUTCTicks , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'], instantAccessDurationMinutes)
+                        self.logger.log("ddSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}, token : {2}, instantAccessDurationMinutes : {3}".format(
+                                        ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token,
+                                        ddSnapshotIdentifierInfo.instantAccessDurationMinutes if ddSnapshotIdentifierInfo.instantAccessDurationMinutes is not None else 'Not Set'))
                     else:
                         self.logger.log("ddSnapshotIdentifier absent/None in Host Response")
 
