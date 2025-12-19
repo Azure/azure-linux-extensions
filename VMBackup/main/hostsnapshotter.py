@@ -236,7 +236,9 @@ class HostSnapshotter(object):
                         if 'instantAccessDurationMinutes' in snapshot_info['ddSnapshotIdentifier']:
                             instantAccessDurationMinutes = snapshot_info['ddSnapshotIdentifier']['instantAccessDurationMinutes']
                         ddSnapshotIdentifierInfo = HostSnapshotObjects.DDSnapshotIdentifier(creationTimeUTCTicks , snapshot_info['ddSnapshotIdentifier']['id'], snapshot_info['ddSnapshotIdentifier']['token'], instantAccessDurationMinutes)
-                        self.logger.log("ddSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}".format(ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id))
+                        self.logger.log("ddSnapshotIdentifier Information from Host- creationTime : {0}, id : {1}, token : {2}, instantAccessDurationMinutes : {3}".format(
+                                        ddSnapshotIdentifierInfo.creationTime, ddSnapshotIdentifierInfo.id, ddSnapshotIdentifierInfo.token,
+                                        ddSnapshotIdentifierInfo.instantAccessDurationMinutes if ddSnapshotIdentifierInfo.instantAccessDurationMinutes is not None else 'Not Set'))
                     else:
                         self.logger.log("ddSnapshotIdentifier absent/None in Host Response")
 
