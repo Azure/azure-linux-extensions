@@ -48,6 +48,7 @@ class ParameterParser(object):
         settingKeysMapping[CommonVariables.useMccfForLad.lower()] = CommonVariables.useMccfForLad
         settingKeysMapping[CommonVariables.enableSnapshotExtensionPolling.lower()] = CommonVariables.enableSnapshotExtensionPolling
         self.includeLunList = []    #To be shared with HP
+        self.instantAccessDurationMinutes = None
 
         """
         get the public configuration
@@ -140,3 +141,12 @@ class ParameterParser(object):
                 backup_logger.log(errorMsg, True)
                         
         backup_logger.log("settings to be sent " + str(self.wellKnownSettingFlags), True)
+
+        try:
+            if(self.includedDisks != None):
+                if(CommonVariables.instantAccessDurationMinutes in self.includedDisks.keys() and self.includedDisks[CommonVariables.instantAccessDurationMinutes] != None):
+                    self.instantAccessDurationMinutes = self.includedDisks[CommonVariables.instantAccessDurationMinutes]
+                    backup_logger.log("InstantAccessDurationMinutes = " + str(self.instantAccessDurationMinutes), True)
+        except Exception as e:
+            errorMsg = "Exception occurred while extracting instantAccessDurationMinutes, Exception: %s" % (str(e))
+            backup_logger.log(errorMsg, True)
