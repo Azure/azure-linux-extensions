@@ -10,7 +10,10 @@ class HostDoSnapshotRequestBody:
         self.instantAccessDurationMinutes = instantAccessDurationMinutes
 
     def convertToDictionary(self):
-        return dict(taskId = self.taskId, diskIds = self.diskIds, settings = self.settings, snapshotTaskToken = self.snapshotTaskToken, snapshotMetadata = self.snapshotMetadata, instantAccessDurationMinutes = self.instantAccessDurationMinutes)
+        result = dict(taskId = self.taskId, diskIds = self.diskIds, settings = self.settings, snapshotTaskToken = self.snapshotTaskToken, snapshotMetadata = self.snapshotMetadata)
+        if self.instantAccessDurationMinutes is not None:
+            result['instantAccessDurationMinutes'] = self.instantAccessDurationMinutes
+        return result
 
 class HostPreSnapshotRequestBody:
     def __init__(self, taskId, snapshotTaskToken, preSnapshotSettings = None):
