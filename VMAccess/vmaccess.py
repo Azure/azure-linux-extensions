@@ -265,7 +265,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
         if cert_txt.strip().lower().startswith("ssh-rsa") or cert_txt.strip().lower().startswith("ssh-ed25519"):
             no_convert = True
         try:
-            pub_path = os.path.join('/home/', user_name, '.ssh',
+            pub_path = os.path.join('$HOME', user_name, '.ssh',
                                     'authorized_keys')
             ovf_env.UserName = user_name
             if no_convert:
