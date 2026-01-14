@@ -1873,7 +1873,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data,
-                                "unix:///run/azuremonitoragent/mdm_influxdb.socket",
+                                "unix:///run/azuremetricsext/mdm_influxdb.socket",
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
