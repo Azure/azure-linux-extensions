@@ -850,14 +850,14 @@ def setup_me(is_lad, managed_identity="sai", HUtilObj=None, is_local_control_cha
         me_monitoring_account = ""
         if user and group:
             # Remove any previous user setup for MetricsExtension if it exists
-            remove_user(user)
+            remove_user(user, HUtilObj=HUtilObj)
             # Create user/group for metrics-extension.service if it is requested
-            ensure_user_and_group(user, group, create_if_missing=True)
+            ensure_user_and_group(user, group, create_if_missing=True, HUtilObj=HUtilObj)
             # For ARC, add user to himds group if it exists
-            ensure_user_and_group(user, "himds", create_if_missing=False)
+            ensure_user_and_group(user, "himds", create_if_missing=False, HUtilObj=HUtilObj)
             # In CMv2 with user and group specified, create directory for MetricsExtension config caching
             me_config_dir = "/var/run/azuremetricsext"
-            create_empty_data_directory(me_config_dir, user, group)
+            create_empty_data_directory(me_config_dir, user, group, HUtilObj=HUtilObj)
     else:
         # query imds to get the required information
         az_resource_id, subscription_id, location, az_environment, data = get_imds_values(is_lad)
@@ -958,26 +958,37 @@ def setup_me(is_lad, managed_identity="sai", HUtilObj=None, is_local_control_cha
     return True
 
 
-def remove_user(user):
+def remove_user(user, HUtilObj=None):
     """
     Removes existing user.
     Note: This is important as the older MetricsExtension might have created the user which needs to be removed.
     This mechanism can be removed in the future, if the user and group are maintained from MetricsExtension package.
+    :param user: linux user
+    :param HUtilObj: utility object for logging
     """
     try:
         pwd.getpwnam(user)
-        try:
-            process = subprocess.Popen(['userdel', "-r", user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out, err = process.communicate()
-            if process.returncode != 0:
-                print('Failed to delete user {0}. stderr: {1}'.format(user, err))
-        except Exception as e:
-            print('Error while deleting user {0}: {1}'.format(user, e))
     except KeyError:
-        print('User {0} does not exist.'.format(user))
+        if HUtilObj:
+            HUtilObj.log('User {0} does not exist.'.format(user))
+        return
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking user {0}: {1}'.format(user, e))
+        return
+
+    try:
+        process = subprocess.Popen(['userdel', "-r", user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        if process.returncode != 0:
+            if HUtilObj:
+                HUtilObj.log('Failed to delete user {0}. stderr: {1}'.format(user, err))
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while deleting user {0}: {1}'.format(user, e))
 
 
-def ensure_user_and_group(user, group, create_if_missing=False):
+def ensure_user_and_group(user, group, create_if_missing=False, HUtilObj=None):
     """
     Ensures if the user and group exists, optionally creating them if it does not exist.
     Group is checked, user is checked and then user is added to the group.
@@ -985,31 +996,42 @@ def ensure_user_and_group(user, group, create_if_missing=False):
     :param user: linux user
     :param group: linux group
     :param create_if_missing: boolean if true, create the requested user and group, where user belongs to the group
+    :param HUtilObj: utility object for logging
     """
     # Check/Create group if missing
     try:
         grp.getgrnam(group)
-        print('Group {0} exists.'.format(group))
+        if HUtilObj:
+            HUtilObj.log('Group {0} exists.'.format(group))
     except KeyError:
         if create_if_missing:
             try:
                 process = subprocess.Popen(['groupadd', group], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 out, err = process.communicate()
                 if process.returncode != 0:
-                    print('Failed to create group {0}. stderr: {1}'.format(group, err))
+                    if HUtilObj:
+                        HUtilObj.log('Failed to create group {0}. stderr: {1}'.format(group, err))
                     return False
-                print('Group {0} created.'.format(group))
+                if HUtilObj:
+                    HUtilObj.log('Group {0} created.'.format(group))
             except Exception as e:
-                print('Error while creating group {0}: {1}'.format(group, e))
+                if HUtilObj:
+                    HUtilObj.log('Error while creating group {0}: {1}'.format(group, e))
                 return False
         else:
-            print('Group {0} does not exist.'.format(group))
+            if HUtilObj:
+                HUtilObj.log('Group {0} does not exist.'.format(group))
             return False
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking group {0}: {1}'.format(group, e))
+        return False
 
     # Check/Create user if missing
     try:
         pwd.getpwnam(user)
-        print('User {0} exists.'.format(user))
+        if HUtilObj:
+            HUtilObj.log('User {0} exists.'.format(user))
     except KeyError:
         if create_if_missing:
             try:
@@ -1018,47 +1040,45 @@ def ensure_user_and_group(user, group, create_if_missing=False):
                 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 out, err = process.communicate()
                 if process.returncode != 0:
-                    print('Failed to create user {0}. stderr: {1}'.format(user, err))
+                    if HUtilObj:
+                        HUtilObj.log('Failed to create user {0}. stderr: {1}'.format(user, err))
                     return False
-                print('User {0} created.'.format(user))
+                if HUtilObj:
+                    HUtilObj.log('User {0} created.'.format(user))
             except Exception as e:
-                print('Error while creating user {0}: {1}'.format(user, e))
+                if HUtilObj:
+                    HUtilObj.log('Error while creating user {0}: {1}'.format(user, e))
                 return False
         else:
-            print('User {0} does not exist.'.format(user))
+            if HUtilObj:
+                HUtilObj.log('User {0} does not exist.'.format(user))
             return False
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking user {0}: {1}'.format(user, e))
+        return False
 
     # Add user to group
     try:
         process = subprocess.Popen(['usermod', '-aG', group, user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
         if process.returncode != 0:
-            print('Failed to add user {0} to group {1}. stderr: {2}'.format(user, group, err))
+            if HUtilObj:
+                HUtilObj.log('Failed to add user {0} to group {1}. stderr: {2}'.format(user, group, err))
             return False
-        print('User {0} added to group {1}.'.format(user, group))
+        if HUtilObj:
+            HUtilObj.log('User {0} added to group {1}.'.format(user, group))
     except Exception as e:
-        print('Error while adding user {0} to group {1}: {2}'.format(user, group, e))
+        if HUtilObj:
+            HUtilObj.log('Error while adding user {0} to group {1}: {2}'.format(user, group, e))
         return False
 
-    print('User {0} added to group {1} (or already a member).'.format(user, group))
+    if HUtilObj:
+        HUtilObj.log('User {0} added to group {1} (or already a member).'.format(user, group))
     return True
 
 
-
-def remove_file(file_path):
-    """
-    Removes existing file.
-    Note: This is important as the older MetricsExtension might have created the socket file with root permissions.
-    This mechanism can be removed in the future, if the socket file is renamed.
-    """
-    try:
-        os.remove(file_path)
-        print('File {0} has been removed.'.format(file_path))
-    except Exception as e:
-        print('Error while deleting file {0}: {1}.'.format(file_path, e))
-
-
-def create_empty_data_directory(me_config_dir, user=None, group=None, mode=0o755):
+def create_empty_data_directory(me_config_dir, user=None, group=None, mode=0o755, HUtilObj=None):
     '''
     Creates an empty data directory where MetricsExtension can store cached configurations.
     For CMv1, MetricsExtension requires mdsd to provide all configurations on disk.
@@ -1078,6 +1098,8 @@ def create_empty_data_directory(me_config_dir, user=None, group=None, mode=0o755
             # Set the ownership
             os.chown(me_config_dir, uid, gid)
 
-        print('Directory {0} created with ownership {1}:{2}.'.format(me_config_dir, user, group))
+        if HUtilObj:
+            HUtilObj.log('Directory {0} created with ownership {1}:{2}.'.format(me_config_dir, user, group))
     except Exception as e:
-        print('Failed to create directory: {0}'.format(e))
+        if HUtilObj:
+            HUtilObj.log('Failed to create directory: {0}'.format(e))
