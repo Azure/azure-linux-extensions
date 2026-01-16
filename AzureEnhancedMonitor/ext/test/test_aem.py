@@ -104,9 +104,9 @@ class TestAEM(unittest.TestCase):
         privateConfig = json.loads(TestPrivateConfig)
         config = aem.EnhancedMonitorConfig(publicConfig, privateConfig)
         self.assertNotEquals(None, config)
-        self.assertEquals(".table.core.windows.net", 
+        self.assertEqual(".table.core.windows.net", 
                           config.getStorageHostBase('asdf'))
-        self.assertEquals(".table.core.windows.net", 
+        self.assertEqual(".table.core.windows.net", 
                           config.getLADHostBase())
         return config
 
@@ -120,7 +120,7 @@ class TestAEM(unittest.TestCase):
         name = "Cloud Provider"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("Microsoft Azure", counter.value)
+        self.assertEqual("Microsoft Azure", counter.value)
         
         name = "Virtualization Solution Version"
         counter = next((c for c in counters if c.name == name))
@@ -135,27 +135,27 @@ class TestAEM(unittest.TestCase):
         name = "Instance Type"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("Small (A1)", counter.value)
+        self.assertEqual("Small (A1)", counter.value)
 
         name = "Data Sources"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("wad", counter.value)
+        self.assertEqual("wad", counter.value)
 
         name = "Data Provider Version"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("2.0.0", counter.value)
+        self.assertEqual("2.0.0", counter.value)
 
         name = "Memory Over-Provisioning"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("no", counter.value)
+        self.assertEqual("no", counter.value)
 
         name = "CPU Over-Provisioning"
         counter = next((c for c in counters if c.name == name))
         self.assertNotEquals(None, counter)
-        self.assertEquals("no", counter.value)
+        self.assertEqual("no", counter.value)
 
     def test_cpuinfo(self):
         cpuinfo = aem.CPUInfo.getCPUInfo()
@@ -163,18 +163,18 @@ class TestAEM(unittest.TestCase):
         self.assertNotEquals(0, cpuinfo.getNumOfCoresPerCPU())
         self.assertNotEquals(0, cpuinfo.getNumOfCores())
         self.assertNotEquals(None, cpuinfo.getProcessorType())
-        self.assertEquals(float, type(cpuinfo.getFrequency()))
-        self.assertEquals(bool, type(cpuinfo.isHyperThreadingOn()))
+        self.assertEqual(float, type(cpuinfo.getFrequency()))
+        self.assertEqual(bool, type(cpuinfo.isHyperThreadingOn()))
         percent = cpuinfo.getCPUPercent()
-        self.assertEquals(float, type(percent))
+        self.assertEqual(float, type(percent))
         self.assertTrue(percent >= 0 and percent <= 100)
 
     def test_meminfo(self):
         meminfo = aem.MemoryInfo()
         self.assertNotEquals(None, meminfo.getMemSize())
-        self.assertEquals(long, type(meminfo.getMemSize()))
+        self.assertEqual(long, type(meminfo.getMemSize()))
         percent = meminfo.getMemPercent()
-        self.assertEquals(float, type(percent))
+        self.assertEqual(float, type(percent))
         self.assertTrue(percent >= 0 and percent <= 100)
 
     def test_networkinfo(self):
@@ -201,7 +201,7 @@ class TestAEM(unittest.TestCase):
         #No hardware change
         lastChange = hwChangeInfo.getLastHardwareChange()
         hwChangeInfo = aem.HardwareChangeInfo(netinfo)
-        self.assertEquals(lastChange, hwChangeInfo.getLastHardwareChange())
+        self.assertEqual(lastChange, hwChangeInfo.getLastHardwareChange())
 
         #Create mock hardware
         waagent.SetFileContents(testHwInfoFile, ("0\nma-ca-sa-ds-02"))
@@ -307,9 +307,9 @@ class TestAEM(unittest.TestCase):
     def test_get_storage_key_range(self):
         startKey, endKey = aem.getStorageTableKeyRange()
         self.assertNotEquals(None, startKey)
-        self.assertEquals(13, len(startKey))
+        self.assertEqual(13, len(startKey))
         self.assertNotEquals(None, endKey)
-        self.assertEquals(13, len(endKey))
+        self.assertEqual(13, len(endKey))
 
     def test_storage_datasource(self):
         aem.getStorageMetrics = mock_getStorageMetrics
@@ -356,7 +356,7 @@ class TestAEM(unittest.TestCase):
         writer.write(counters, eventFile = testEventFile)
         with open(testEventFile) as F:
             content = F.read()
-            self.assertEquals(str(counters[0]), content)
+            self.assertEqual(str(counters[0]), content)
 
         testEventFile = "/dev/console"
         print("==============================")
@@ -366,13 +366,13 @@ class TestAEM(unittest.TestCase):
 
     def test_easyHash(self):
         hashVal = aem.easyHash('a')
-        self.assertEquals(97, hashVal)
+        self.assertEqual(97, hashVal)
         hashVal = aem.easyHash('ab')
-        self.assertEquals(87, hashVal)
+        self.assertEqual(87, hashVal)
         hashVal = aem.easyHash(("ciextension-SUSELinuxEnterpriseServer11SP3"
                                 "___role1___"
                                 "ciextension-SUSELinuxEnterpriseServer11SP3"))
-        self.assertEquals(5, hashVal)
+        self.assertEqual(5, hashVal)
     
     def test_get_ad_key_range(self):
         startKey, endKey = aem.getAzureDiagnosticKeyRange()
@@ -384,14 +384,14 @@ class TestAEM(unittest.TestCase):
         epoch = datetime.datetime.utcfromtimestamp(0)
         unixTimestamp = (int((date - epoch).total_seconds()))
         mdsTimestamp = aem.getMDSTimestamp(unixTimestamp)
-        self.assertEquals(635578412400000000, mdsTimestamp)
+        self.assertEqual(635578412400000000, mdsTimestamp)
     
     def test_get_storage_timestamp(self):
         date = datetime.datetime(2015, 1, 26, 3, 54)
         epoch = datetime.datetime.utcfromtimestamp(0)
         unixTimestamp = (int((date - epoch).total_seconds()))
         storageTimestamp = aem.getStorageTimestamp(unixTimestamp)
-        self.assertEquals("20150126T0354", storageTimestamp)
+        self.assertEqual("20150126T0354", storageTimestamp)
 
 def mock_getStorageMetrics(*args, **kwargs):
         with open(os.path.join(env.test_dir, "storage_metrics")) as F:
