@@ -3,7 +3,7 @@ Description=Metrics Extension service for Linux Agent metrics sourcing
 After=network.target
 
 [Service]
-ExecStart=%ME_BIN% -TokenSource MSI -Input influxdb_local -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -DataDirectory %ME_DATA_DIRECTORY% -LocalControlChannel -MonitoringAccount %ME_MONITORING_ACCOUNT% -LogLevel Error
+ExecStart=%ME_BIN% -TokenSource MSI -Input influxdb_local -InfluxDbSocketPath %ME_INFLUX_SOCKET_FILE_PATH% -DataDirectory %ME_DATA_DIRECTORY% -LocalControlChannel -MonitoringAccount %ME_MONITORING_ACCOUNT% -LogLevel Error
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=control-group
 
