@@ -212,6 +212,67 @@ class HandlerUtility:
     def fetch_log_message(self):
         return self.log_message
 
+    def _decrypt_protected_settings(self, encrypted_file, cert_path, pkey_path):
+        """
+        Decrypt protected settings with FIPS 140-3 AES256 support and defensive fallback.
+        
+        For FIPS 140-3 compliance, CRP is upgrading encryption to AES256. Opted-in VMs receive
+        protected settings encrypted with AES256, while other VMs continue using DES_EDE3_CBC.
+        
+        The 'cms' command supports both AES256 and DES_EDE3_CBC encryption, while 'smime' only
+        supports DES_EDE3_CBC. We try 'cms' first and fallback to 'smime' for compatibility.
+        
+        Args:
+            encrypted_file: Path to temporary file containing encrypted settings
+            cert_path: Path to certificate file (.crt)
+            pkey_path: Path to private key file (.prv)
+            
+        Returns:
+            Decrypted cleartext string
+        """
+        cleartxt = None
+        
+        # Determine base64 decode command based on platform
+        if 'NS-BSD' in platform.system():
+            # base64 tool is not available with NSBSD, use openssl
+            base64_cmd = self.patching.openssl_path + " base64 -d -A -in " + encrypted_file
+        else:
+            base64_cmd = self.patching.base64_path + " -d " + encrypted_file
+        
+        # Try OpenSSL CMS command first (supports both AES256 and DES_EDE3_CBC)
+        try:
+            cms_cmd = base64_cmd + " | " + self.patching.openssl_path + " cms -inform DER -decrypt -recip " + cert_path + " -inkey " + pkey_path
+            self.log("Attempting decryption using OpenSSL CMS command (supports AES256 and DES_EDE3_CBC)")
+            result = waagent.RunGetOutput(cms_cmd)
+            if result[0] == 0 and result[1]:  # Success (return code 0) and non-empty output
+                cleartxt = result[1]
+                self.log("Successfully decrypted protected settings using CMS command")
+                return cleartxt
+            else:
+                self.log("CMS decryption failed with return code: " + str(result[0]) + ", attempting fallback to SMIME")
+        except Exception as e:
+            self.log("CMS decryption failed with exception: " + str(e) + ", attempting fallback to SMIME")
+        
+        # Fallback to OpenSSL SMIME command (supports DES_EDE3_CBC only)
+        try:
+            smime_cmd = base64_cmd + " | " + self.patching.openssl_path + " smime -inform DER -decrypt -recip " + cert_path + " -inkey " + pkey_path
+            self.log("Attempting decryption using OpenSSL SMIME command (fallback - supports DES_EDE3_CBC only)")
+            result = waagent.RunGetOutput(smime_cmd)
+            if result[0] == 0 and result[1]:  # Success (return code 0) and non-empty output
+                cleartxt = result[1]
+                self.log("Successfully decrypted protected settings using SMIME command (fallback)")
+                return cleartxt
+            else:
+                self.error("SMIME decryption also failed with return code: " + str(result[0]))
+        except Exception as e:
+            self.error("SMIME decryption failed with exception: " + str(e))
+        
+        # If both methods fail, raise an error
+        if not cleartxt:
+            self.error("Failed to decrypt protected settings using both CMS and SMIME commands")
+            
+        return cleartxt
+
     def _parse_config(self, ctxt):
         config = None
         try:
@@ -234,11 +295,9 @@ class HandlerUtility:
                 f.close()
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
-                if 'NS-BSD' in platform.system():
-                    # base64 tool is not available with NSBSD, use openssl
-                    cleartxt = waagent.RunGetOutput(self.patching.openssl_path + " base64 -d -A -in " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
-                else:
-                    cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                # Decrypt protected settings with FIPS 140-3 AES256 support and defensive fallback
+                # Try cms command first (supports both AES256 and DES_EDE3_CBC), fallback to smime if needed
+                cleartxt = self._decrypt_protected_settings(f.name, cert, pkey)
                 jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
