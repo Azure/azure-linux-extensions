@@ -19,6 +19,8 @@
 import sys
 import json
 import os
+import pwd
+import grp
 from telegraf_utils.telegraf_name_map import name_map
 import subprocess
 import signal
@@ -600,6 +602,114 @@ def remove_telegraf_service(is_lad):
     return True, "Successfully removed {0} service".format(telegraf_service_name)
 
 
+def ensure_telegraf_user():
+    """
+    Ensures the telegraf user and group exist, creating them if necessary.
+    This is similar to how syslog user is created in the azuremonitoragent postinst script.
+    The telegraf user is a system user with no home directory and nologin shell.
+    Returns True if successful, False otherwise.
+    """
+    user = "telegraf"
+    group = "telegraf"
+    
+    # Check/Create group if missing
+    try:
+        grp.getgrnam(group)
+    except KeyError:
+        try:
+            process = subprocess.Popen(
+                ['groupadd', '--system', group],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            out, err = process.communicate()
+            if process.returncode != 0:
+                print('Failed to create group {0}. stderr: {1}'.format(group, err))
+                return False
+        except Exception as e:
+            print('Error while creating group {0}: {1}'.format(group, e))
+            return False
+
+    # Check/Create user if missing
+    try:
+        pwd.getpwnam(user)
+    except KeyError:
+        try:
+            # Find nologin shell path (varies by distro)
+            nologin_path = '/usr/sbin/nologin'
+            if not os.path.exists(nologin_path):
+                nologin_path = '/sbin/nologin'
+            if not os.path.exists(nologin_path):
+                nologin_path = '/bin/false'
+            
+            process = subprocess.Popen([
+                'useradd', '-M', '--shell', nologin_path,
+                '--gid', group, '--system', user
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = process.communicate()
+            if process.returncode != 0:
+                print('Failed to create user {0}. stderr: {1}'.format(user, err))
+                return False
+        except Exception as e:
+            print('Error while creating user {0}: {1}'.format(user, e))
+            return False
+
+    return True
+
+
+def setup_telegraf_user_permissions(telegraf_d_conf_dir, telegraf_agent_conf):
+    """
+    Set up permissions so the telegraf user can read config files and write to mdsd socket.
+    :param telegraf_d_conf_dir: path to telegraf .d conf subdirectory
+    :param telegraf_agent_conf: path to telegraf .conf file
+    """
+    user = "telegraf"
+    group = "telegraf"
+    
+    try:
+        uid = pwd.getpwnam(user).pw_uid
+        gid = grp.getgrnam(group).gr_gid
+    except KeyError as e:
+        print('Failed to get uid/gid for telegraf user: {0}'.format(e))
+        return False
+    
+    # Set ownership of telegraf config directory and files
+    # telegraf_conf_dir is e.g., /var/lib/waagent/.../config/telegraf_configs/
+    telegraf_conf_dir = os.path.dirname(telegraf_agent_conf)
+    
+    try:
+        # The parent directories (config/, extension folder) are owned by root.
+        # We need to ensure they are world-traversable (o+x) so telegraf can reach its config.
+        # We go up from telegraf_configs/ to config/ to the extension folder.
+        parent_dir = os.path.dirname(telegraf_conf_dir)  # config/
+        grandparent_dir = os.path.dirname(parent_dir)     # extension folder
+        
+        for dir_path in [grandparent_dir, parent_dir]:
+            if os.path.isdir(dir_path):
+                # Add world-execute (traverse) permission, keep existing permissions
+                current_mode = os.stat(dir_path).st_mode
+                new_mode = current_mode | 0o001  # Add o+x
+                os.chmod(dir_path, new_mode)
+        
+        # Change ownership of the telegraf config directory and its contents
+        os.chown(telegraf_conf_dir, uid, gid)
+        for root, dirs, files in os.walk(telegraf_conf_dir):
+            for d in dirs:
+                os.chown(os.path.join(root, d), uid, gid)
+            for f in files:
+                os.chown(os.path.join(root, f), uid, gid)
+        
+        # Note: mdsd sockets in /var/run/azuremonitoragent/ are world-writable (srw-rw-rw-)
+        # so telegraf does not need any special group membership to write to them.
+        # We intentionally do NOT add telegraf to the syslog group to maintain
+        # privilege separation - telegraf should not be able to write to config-cache.
+        
+    except Exception as e:
+        print('Error setting up telegraf permissions: {0}'.format(e))
+        return False
+    
+    return True
+
+
 def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_agent_conf, HUtilObj=None):
     """
     Add the metrics-sourcer service if the VM is using systemd
@@ -616,6 +726,22 @@ def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_a
 
     if not os.path.isfile(telegraf_agent_conf):
         raise Exception("Telegraf agent config does not exist. Failed to setup telegraf service.")
+
+    # Create dedicated telegraf user for running the service with minimal privileges
+    if not ensure_telegraf_user():
+        message = "Warning: Failed to create telegraf user. Service may run as root."
+        if HUtilObj is not None:
+            HUtilObj.log(message)
+        else:
+            print('Warning: {0}'.format(message))
+    else:
+        # Set up permissions for the telegraf user to access config and sockets
+        if not setup_telegraf_user_permissions(telegraf_d_conf_dir, telegraf_agent_conf):
+            message = "Warning: Failed to set up telegraf user permissions."
+            if HUtilObj is not None:
+                HUtilObj.log(message)
+            else:
+                print('Warning: {0}'.format(message))
 
     if os.path.isfile(telegraf_service_template_path):
 
