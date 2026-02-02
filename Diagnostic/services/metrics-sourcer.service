@@ -4,6 +4,8 @@ Description=Custom Modified Telegraf service for Linux Agent metrics sourcing
 After=network.target
 
 [Service]
+User=telegraf
+Group=telegraf
 ExecStart=%TELEGRAF_BIN% --config %TELEGRAF_AGENT_CONFIG% --config-directory %TELEGRAF_CONFIG_DIR%
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
