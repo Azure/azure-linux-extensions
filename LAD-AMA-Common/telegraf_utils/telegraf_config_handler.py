@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 #
 # Azure Linux extension
