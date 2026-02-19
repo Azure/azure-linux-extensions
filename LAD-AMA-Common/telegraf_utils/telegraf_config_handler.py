@@ -725,7 +725,7 @@ def setup_telegraf_service(is_lad, telegraf_bin, telegraf_d_conf_dir, telegraf_a
     if not os.path.isfile(telegraf_agent_conf):
         raise Exception("Telegraf agent config does not exist. Failed to setup telegraf service.")
 
-    # Create dedicated telegraf user for running the service with minimal privileges
+    # Create dedicated telegraf user for running the service
     if not ensure_telegraf_user():
         message = "Warning: Failed to create telegraf user. Service may run as root."
         if HUtilObj is not None:
