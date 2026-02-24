@@ -448,7 +448,7 @@ class AbstractDistro(object):
         if sys.version_info < (3,11):
             return crypt.crypt(password, salt)
         else:
-            hashed_password = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+            hashed_password = hashlib.pbkdf2_hmac('sha512', password.encode('utf-8'), salt, 100000)
             return hashed_password.hex()
 
     def load_ata_piix(self):
