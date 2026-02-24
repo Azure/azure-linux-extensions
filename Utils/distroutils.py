@@ -3,7 +3,8 @@ import pwd
 import random
 if sys.version_info < (3,11):
     import crypt
-import hashlib
+else:
+    import hashlib
 import string
 import platform
 import re
