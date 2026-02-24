@@ -22,8 +22,8 @@
 
 if sys.version_info < (3,11):
     import crypt
-
-import hashlib
+else:
+    import hashlib
 import random
 import array
 import base64
