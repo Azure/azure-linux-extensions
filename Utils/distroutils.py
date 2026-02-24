@@ -158,7 +158,7 @@ class GenericDistro(object):
         if sys.version_info < (3,11):
             return crypt.crypt(password, salt)
         else:
-            hashed_password = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+            hashed_password = hashlib.pbkdf2_hmac('sha512', password.encode('utf-8'), salt, 100000)
             return hashed_password.hex()
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
