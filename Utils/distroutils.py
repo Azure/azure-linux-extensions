@@ -1,7 +1,9 @@
 import os
 import pwd
 import random
-import crypt
+if sys.version_info < (3,11):
+    import crypt
+import hashlib
 import string
 import platform
 import re
@@ -151,8 +153,12 @@ class GenericDistro(object):
     def gen_password_hash(self, password, crypt_id, salt_len):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
-        salt = "${0}${1}".format(crypt_id, salt)
-        return crypt.crypt(password, salt)
+        salt = "${0}${1}".format(crypt_id, salt)        
+        if sys.version_info < (3,11):
+            return crypt.crypt(password, salt)
+        else:
+            hashed_password = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+            return hashed_password.hex()
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
