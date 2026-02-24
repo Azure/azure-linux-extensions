@@ -20,7 +20,10 @@
 # http://msdn.microsoft.com/en-us/library/cc227282%28PROT.10%29.aspx
 # http://msdn.microsoft.com/en-us/library/cc227259%28PROT.13%29.aspx
 
-import crypt
+if sys.version_info < (3,11):
+    import crypt
+
+import hashlib
 import random
 import array
 import base64
@@ -442,7 +445,11 @@ class AbstractDistro(object):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
-        return crypt.crypt(password, salt)
+        if sys.version_info < (3,11):
+            return crypt.crypt(password, salt)
+        else:
+            hashed_password = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+            return hashed_password.hex()
 
     def load_ata_piix(self):
         return WaAgent.TryLoadAtapiix()
