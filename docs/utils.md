@@ -2,7 +2,7 @@
 
 You can write an extension from scrach using your favourate language following [Design Details](./design-details.md).
 
-The utils we offer are optional. They are writen in Python, and they can accelerate your development. Without them, you need to handle the protocal between WALA and extensions by yourself.
+The utils we offer are optional. They are writen in Python, and they can accelerate your development. Without them, you need to handle the protocol between WALA and extensions by yourself.
 
 ## HandlerUtils
 
