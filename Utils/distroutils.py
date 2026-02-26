@@ -5,58 +5,25 @@ import string
 import hashlib
 import sys
 
-# crypt module was deprecated in Python 3.11 and removed in Python 3.13
+# crypt module was removed in Python 3.13
 # For Python < 3.11: use builtin crypt
 # For Python >= 3.11: try crypt_r package, then ctypes fallback
-def _import_crypt():
-    """Import crypt module with fallbacks for Python 3.13+"""
-    if sys.version_info >= (3, 11):
+if sys.version_info >= (3, 11):
+    try:
+        import crypt_r as crypt
+    except ImportError:
         try:
-            import crypt_r
-            return crypt_r
+            from Utils import crypt_fallback as crypt
         except ImportError:
-            pass
-    else:
+            crypt = None
+else:
+    try:
+        import crypt
+    except ImportError:
         try:
-            import crypt
-            return crypt
+            from Utils import crypt_fallback as crypt
         except ImportError:
-            pass
-    
-    # Fallback 1: try Utils.crypt_fallback (deployed location)
-    try:
-        from Utils import crypt_fallback
-        return crypt_fallback
-    except ImportError:
-        pass
-    
-    # Fallback 2: try relative import from same directory
-    try:
-        from . import crypt_fallback
-        return crypt_fallback
-    except ImportError:
-        pass
-    
-    # Fallback 3: try Common.crypt_fallback (source repo location)
-    try:
-        from Common import crypt_fallback
-        return crypt_fallback
-    except ImportError:
-        pass
-    
-    # Fallback 4: add parent directory to path and try Common
-    try:
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if parent_dir not in sys.path:
-            sys.path.insert(0, parent_dir)
-        from Common import crypt_fallback
-        return crypt_fallback
-    except ImportError:
-        pass
-    
-    return None
-
-crypt = _import_crypt()
+            crypt = None
 
 import platform
 import re
