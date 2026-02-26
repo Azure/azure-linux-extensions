@@ -61,29 +61,29 @@ class TestDiskUtil(unittest.TestCase):
         # empty line
         line = ""
         crypt_item = self.disk_util.parse_crypttab_line(line)
-        self.assertEquals(None, crypt_item)
+        self.assertEqual(None, crypt_item)
 
         # line with not enough entries
         line = "mapper_name dev_path"
         crypt_item = self.disk_util.parse_crypttab_line(line)
-        self.assertEquals(None, crypt_item)
+        self.assertEqual(None, crypt_item)
 
         # commented out line
         line = "# mapper_name dev_path"
         crypt_item = self.disk_util.parse_crypttab_line(line)
-        self.assertEquals(None, crypt_item)
+        self.assertEqual(None, crypt_item)
 
         # An unfamiliar key_file_path implies that we shouln't be processing this crypttab line
         line = "mapper_name /dev/dev_path /non_managed_key_file_path"
         crypt_item = self.disk_util.parse_crypttab_line(line)
-        self.assertEquals(None, crypt_item)
+        self.assertEqual(None, crypt_item)
 
         # a bare bones crypttab line
         line = "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName luks"
         expected_crypt_item = self._create_expected_crypt_item(mapper_name="mapper_name",
                                                                dev_path="/dev/dev_path")
         crypt_item = self.disk_util.parse_crypttab_line(line)
-        self.assertEquals(str(expected_crypt_item), str(crypt_item))
+        self.assertEqual(str(expected_crypt_item), str(crypt_item))
 
         # a line that implies a cleartext key
         line = "mapper_name /dev/dev_path /var/lib/azure_disk_encryption_config/cleartext_key_mapper_name luks"
@@ -91,7 +91,7 @@ class TestDiskUtil(unittest.TestCase):
                                                                dev_path="/dev/dev_path",
                                                                uses_cleartext_key=True)
         crypt_item = self.disk_util.parse_crypttab_line(line)
-        self.assertEquals(str(expected_crypt_item), str(crypt_item))
+        self.assertEqual(str(expected_crypt_item), str(crypt_item))
 
         # a line that implies a luks header
         line = "mapper_name /dev/dev_path /var/lib/azure_disk_encryption_config/cleartext_key_mapper_name luks,header=headerfile"
@@ -100,7 +100,7 @@ class TestDiskUtil(unittest.TestCase):
                                                                uses_cleartext_key=True,
                                                                luks_header_path="headerfile")
         crypt_item = self.disk_util.parse_crypttab_line(line)
-        self.assertEquals(str(expected_crypt_item), str(crypt_item))
+        self.assertEqual(str(expected_crypt_item), str(crypt_item))
 
     @mock.patch('__builtin__.open')
     @mock.patch('os.path.exists', return_value=True)
