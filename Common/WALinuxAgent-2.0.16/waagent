@@ -20,7 +20,28 @@
 # http://msdn.microsoft.com/en-us/library/cc227282%28PROT.10%29.aspx
 # http://msdn.microsoft.com/en-us/library/cc227259%28PROT.13%29.aspx
 
-import crypt
+import sys
+
+# crypt module was removed in Python 3.13
+# For Python < 3.11: use builtin crypt
+# For Python >= 3.11: try crypt_r package, then ctypes fallback
+if sys.version_info >= (3, 11):
+    try:
+        import crypt_r as crypt
+    except ImportError:
+        try:
+            from Utils import crypt_fallback as crypt
+        except ImportError:
+            crypt = None
+else:
+    try:
+        import crypt
+    except ImportError:
+        try:
+            from Utils import crypt_fallback as crypt
+        except ImportError:
+            crypt = None
+
 import random
 import array
 import base64
@@ -442,6 +463,9 @@ class AbstractDistro(object):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
+        
+        if crypt is None:
+            raise ImportError("Password hashing requires the 'crypt' module (Python < 3.13) or 'crypt_r' package. Install with: pip install crypt-r")
         return crypt.crypt(password, salt)
 
     def load_ata_piix(self):
@@ -1183,7 +1207,7 @@ class SuSEDistro(AbstractDistro):
         r = os.listdir("/opt/microsoft/rdma")
         if r is not None:
             for filename in r:
-                if re.match(RdmaConfig.rmda_package_name + "-\d{8}\.(%s).+" % host_version, filename):
+                if re.match(RdmaConfig.rmda_package_name + r"-\d{8}\.(%s).+" % host_version, filename):
                     error, output = RunGetOutput(
                         self.zypper_path + " --non-interactive remove " + RdmaConfig.rmda_package_name)
                     Log("remove rdma package result is " + str(error) + " output is: " + str(output))

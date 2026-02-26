@@ -1,8 +1,63 @@
 import os
 import pwd
 import random
-import crypt
 import string
+import hashlib
+import sys
+
+# crypt module was deprecated in Python 3.11 and removed in Python 3.13
+# For Python < 3.11: use builtin crypt
+# For Python >= 3.11: try crypt_r package, then ctypes fallback
+def _import_crypt():
+    """Import crypt module with fallbacks for Python 3.13+"""
+    if sys.version_info >= (3, 11):
+        try:
+            import crypt_r
+            return crypt_r
+        except ImportError:
+            pass
+    else:
+        try:
+            import crypt
+            return crypt
+        except ImportError:
+            pass
+    
+    # Fallback 1: try Utils.crypt_fallback (deployed location)
+    try:
+        from Utils import crypt_fallback
+        return crypt_fallback
+    except ImportError:
+        pass
+    
+    # Fallback 2: try relative import from same directory
+    try:
+        from . import crypt_fallback
+        return crypt_fallback
+    except ImportError:
+        pass
+    
+    # Fallback 3: try Common.crypt_fallback (source repo location)
+    try:
+        from Common import crypt_fallback
+        return crypt_fallback
+    except ImportError:
+        pass
+    
+    # Fallback 4: add parent directory to path and try Common
+    try:
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+        from Common import crypt_fallback
+        return crypt_fallback
+    except ImportError:
+        pass
+    
+    return None
+
+crypt = _import_crypt()
+
 import platform
 import re
 import Utils.logger as logger
@@ -152,6 +207,9 @@ class GenericDistro(object):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
+        
+        if crypt is None:
+            raise ImportError("Password hashing requires the 'crypt' module (Python < 3.13) or 'crypt_r' package. Install with: pip install crypt-r")
         return crypt.crypt(password, salt)
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
