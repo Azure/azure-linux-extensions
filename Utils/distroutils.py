@@ -1,8 +1,30 @@
 import os
 import pwd
 import random
-import crypt
 import string
+import hashlib
+import sys
+
+# crypt module was removed in Python 3.13
+# For Python < 3.11: use builtin crypt
+# For Python >= 3.11: try crypt_r package, then ctypes fallback
+if sys.version_info >= (3, 11):
+    try:
+        import crypt_r as crypt
+    except ImportError:
+        try:
+            from Utils import crypt_fallback as crypt
+        except ImportError:
+            crypt = None
+else:
+    try:
+        import crypt
+    except ImportError:
+        try:
+            from Utils import crypt_fallback as crypt
+        except ImportError:
+            crypt = None
+
 import platform
 import re
 import Utils.logger as logger
