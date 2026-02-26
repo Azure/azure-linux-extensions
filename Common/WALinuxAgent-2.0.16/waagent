@@ -463,9 +463,6 @@ class AbstractDistro(object):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
-        
-        if crypt is None:
-            raise ImportError("Password hashing requires the 'crypt' module (Python < 3.13) or 'crypt_r' package. Install with: pip install crypt-r")
         return crypt.crypt(password, salt)
 
     def load_ata_piix(self):
