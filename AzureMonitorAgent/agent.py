@@ -2648,7 +2648,7 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             if version.startswith('12'):
                 return 'SSL_CERT_DIR', '/var/lib/ca-certificates/openssl'
-            elif version.startswith('15'):
+            elif version.startswith('15') or version.startswith('16'):
                 return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
     log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
@@ -2863,8 +2863,8 @@ def get_settings():
         public_settings = HUtilObject.get_public_settings()
         protected_settings = HUtilObject.get_protected_settings()
     elif SettingsDict is not None:
-        public_settings = SettingsDict['public_settings']
-        protected_settings = SettingsDict['protected_settings']
+        public_settings = SettingsDict.get('public_settings')
+        protected_settings = SettingsDict.get('protected_settings')
     else:
         SettingsDict = {}
         handler_env = get_handler_env()
