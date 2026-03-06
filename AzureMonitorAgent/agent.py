@@ -2897,8 +2897,8 @@ def get_settings():
         public_settings = HUtilObject.get_public_settings()
         protected_settings = HUtilObject.get_protected_settings()
     elif SettingsDict is not None:
-        public_settings = SettingsDict.get('public_settings')
-        protected_settings = SettingsDict.get('protected_settings')
+        public_settings = SettingsDict['public_settings']
+        protected_settings = SettingsDict['protected_settings']
     else:
         SettingsDict = {}
         handler_env = get_handler_env()
