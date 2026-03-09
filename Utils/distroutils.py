@@ -1,8 +1,30 @@
 import os
 import pwd
 import random
-import crypt
 import string
+import hashlib
+import sys
+
+# crypt module was removed in Python 3.13
+# For Python < 3.11: use builtin crypt
+# For Python >= 3.11: try crypt_r package, then ctypes fallback
+if sys.version_info >= (3, 11):
+    try:
+        import crypt_r as crypt
+    except ImportError:
+        try:
+            from Utils import crypt_fallback as crypt
+        except ImportError:
+            crypt = None
+else:
+    try:
+        import crypt
+    except ImportError:
+        try:
+            from Utils import crypt_fallback as crypt
+        except ImportError:
+            crypt = None
+
 import platform
 import re
 import Utils.logger as logger
@@ -13,7 +35,7 @@ import Utils.constants as constants
 def get_my_distro(config, os_name=None):
     if 'FreeBSD' in platform.system():
         return FreeBSDDistro(config)
-    
+
     if os_name is None:
         if os.path.isfile(constants.os_release):
             os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
@@ -295,8 +317,8 @@ class FreeBSDDistro(GenericDistro):
 
 
     # noinspection PyMethodOverriding
-    def chpasswd(self, user, password):
-        return ext_utils.run_send_stdin(['pw', 'usermod', 'user', '-h', '0'], password, log_cmd=False)
+    def chpasswd(self, user, password, **kwargs):
+        return ext_utils.run_send_stdin(['pw', 'usermod', 'user', '-h', '0'], password.encode('utf-8'), log_cmd=False)
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
@@ -311,8 +333,8 @@ class FreeBSDDistro(GenericDistro):
             pass
         uidmin = None
         try:
-            if os.path.isfile("/etc/login.defs"):
-                uidmin = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
+            if os.path.isfile("/etc/pw.conf"):
+                uidmin = int(ext_utils.get_line_starting_with("minuid", "/etc/pw.conf").split('=')[1].strip(' "'))
         except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
             pass
@@ -389,9 +411,8 @@ class FreeBSDDistro(GenericDistro):
             return
         uidmin = None
         try:
-            if os.path.isfile("/etc/login.defs"):
-                uidmin = int(
-                    ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
+            if os.path.isfile("/etc/pw.conf"):
+                uidmin = int(ext_utils.get_line_starting_with("minuid", "/etc/pw.conf").split('=')[1].strip(' "'))
         except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
         if uidmin is None:

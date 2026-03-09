@@ -1,4 +1,5 @@
 import datetime
+import glob
 import os
 import platform
 import shutil
@@ -7,6 +8,7 @@ import json
 import helpers
 from error_codes        import *
 from connect.check_imds import check_metadata
+from metrics_troubleshooter.metrics_troubleshooter import run_metrics_troubleshooter
 
 
 DPKG_CMD = "dpkg -s azuremonitoragent"
@@ -222,6 +224,45 @@ def collect_azurevm_logs(output_dirpath, pkg_manager):
     return
 
 
+def collect_metrics_logs(output_dirpath):
+    """
+    Run the metrics troubleshooter and collect any MdmDataCollectionOutput_*.tar.gz files.
+    """
+    print("Running metrics troubleshooter...")
+    
+    # Run the metrics troubleshooter (it produces MdmDataCollectionOutput_*.tar.gz)
+    run_metrics_troubleshooter(interactive=False)
+    
+    # Find and copy any MdmDataCollectionOutput_*.tar.gz files from common locations
+    metrics_output_patterns = [
+        "/tmp/MdmDataCollectionOutput_*.tar.gz",
+        "/var/tmp/MdmDataCollectionOutput_*.tar.gz",
+        os.path.join(os.getcwd(), "MdmDataCollectionOutput_*.tar.gz")
+    ]
+    
+    metrics_dir = os.path.join(output_dirpath, "metrics")
+    files_found = False
+    
+    for pattern in metrics_output_patterns:
+        for metrics_file in glob.glob(pattern):
+            if not files_found:
+                if not os.path.isdir(metrics_dir):
+                    os.makedirs(metrics_dir)
+                files_found = True
+            print("Copying metrics output file: {0}".format(metrics_file))
+            try:
+                shutil.copy2(metrics_file, metrics_dir)
+            except Exception as e:
+                print("ERROR: Could not copy {0}: {1}".format(metrics_file, e))
+    
+    if not files_found:
+        print("No MdmDataCollectionOutput_*.tar.gz files found.")
+    else:
+        print("Metrics logs collected")
+    
+    return
+
+
 
 # Outfile function
     
@@ -416,6 +457,11 @@ def run_logcollector(output_location):
     # create out file (for simple checks)
     print("Creating 'amalinux.out' file")
     create_outfile(output_dirpath, logs_date, pkg_manager)
+    print("--------------------------------------------------------------------------------")
+
+    # collect metrics troubleshooter logs
+    print("Collecting metrics troubleshooter logs...")
+    collect_metrics_logs(output_dirpath)
     print("--------------------------------------------------------------------------------")
 
     # zip up logs

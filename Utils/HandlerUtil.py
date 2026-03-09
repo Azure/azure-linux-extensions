@@ -201,24 +201,21 @@ class HandlerUtility:
                 cms_cmd = 'openssl cms -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
                 smime_cmd = 'openssl smime -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
 
-                protected_settings_str = None
+                protected_settings_str = ''
                 for decrypt_cmd in [cms_cmd, smime_cmd]:
                     try:
-                        session = subprocess.Popen([decrypt_cmd], shell=True,
-                                                stdin=subprocess.PIPE,
-                                                stderr=subprocess.STDOUT,
-                                                stdout=subprocess.PIPE)
-                        output = session.communicate(unencodedSettings)
-                        # success only if return code is 0 and we have output
-                        if session.returncode == 0 and output[0]:
-                            protected_settings_str = output[0]
+                        # waagent.RunSendStdin returns a tuple (return code, stdout)
+                        output = waagent.RunSendStdin(decrypt_cmd, unencodedSettings)
+                        if output and output[0] == 0 and output[1]:
+                            protected_settings_str = output[1]
                             if decrypt_cmd == cms_cmd:
                                 self.log('Decrypted protectedSettings using openssl cms.')
                             else:
                                 self.log('Decrypted protectedSettings using openssl smime fallback.')
                             break
                         else:
-                            self.log('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, session.returncode))
+                            rc = output[0] if output else 'N/A'
+                            self.log('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, rc))
                     except OSError:
                         pass
 

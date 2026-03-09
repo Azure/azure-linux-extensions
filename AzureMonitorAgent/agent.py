@@ -135,6 +135,8 @@ WAGuestAgentLogRotateFilePath = '/etc/logrotate.d/waagent-extn.logrotate'
 AmaUninstallContextFile = '/var/opt/microsoft/uninstall-context'
 AmaDataPath = '/var/opt/microsoft/azuremonitoragent/'
 SupportedArch = set(['x86_64', 'aarch64'])
+MDSDFluentPort = 0
+MDSDSyslogPort = 0
 
 # Error codes
 GenericErrorCode = 1
@@ -316,17 +318,17 @@ def copy_amacoreagent_binaries():
     compare_and_copy_bin(amacoreagent_bin_local_path, amacoreagent_bin)
 
     if current_arch == 'x86_64':
-        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
-        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
-        compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
+        #libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.x64.so"
+        #libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.x64.so"
+        #compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
 
         liblz4x64_bin_local_path = os.getcwd() + "/amaCoreAgentBin/liblz4x64.so"
         liblz4x64_bin = "/opt/microsoft/azuremonitoragent/bin/liblz4x64.so"
         compare_and_copy_bin(liblz4x64_bin_local_path, liblz4x64_bin)   
-    elif current_arch == 'aarch64':
-        libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.arm64.so"
-        libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.arm64.so"
-        compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
+    #elif current_arch == 'aarch64':
+        #libgrpc_bin_local_path = os.getcwd() + "/amaCoreAgentBin/libgrpc_csharp_ext.arm64.so"
+        #libgrpc_bin = "/opt/microsoft/azuremonitoragent/bin/libgrpc_csharp_ext.arm64.so"
+        #compare_and_copy_bin(libgrpc_bin_local_path, libgrpc_bin)
                   
     agentlauncher_bin_local_path = os.getcwd() + "/agentLauncherBin/agentlauncher_" + current_arch
     agentlauncher_bin = "/opt/microsoft/azuremonitoragent/bin/agentlauncher"
@@ -407,11 +409,11 @@ def install():
     set_os_arch('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
-    # Check if Debian 12 VMs have rsyslog package (required for AMA 1.31+)
-    if (vm_dist.startswith('debian')) and vm_ver.startswith('12'):
+    # Check if Debian 12 and 13 VMs have rsyslog package (required for AMA 1.31+)
+    if (vm_dist.startswith('debian')) and ((vm_ver.startswith('12') or vm_ver.startswith('13')) or int(vm_ver.split('.')[0]) >= 12):
         check_rsyslog, _ = run_command_and_log("dpkg -s rsyslog")
         if check_rsyslog != 0:
-            hutil_log_info("'rsyslog' package missing from Debian 12 machine, installing to allow AMA to run.")
+            hutil_log_info("'rsyslog' package missing from Debian {0} machine, installing to allow AMA to run.".format(vm_ver))
             rsyslog_exit_code, rsyslog_output = run_command_and_log("DEBIAN_FRONTEND=noninteractive apt-get update && \
                                                                     DEBIAN_FRONTEND=noninteractive apt-get install -y rsyslog")
             if rsyslog_exit_code != 0:
@@ -499,9 +501,9 @@ def install():
 
     set_metrics_binaries()
 
-    # Copy KqlExtension binaries
+    # Copy AstExtension binaries
     # Needs to be revisited for aarch64
-    copy_kqlextension_binaries()
+    copy_astextension_binaries()
 
     # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
@@ -954,9 +956,9 @@ def enable():
 
     if platform.machine() != 'aarch64':
         if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-            # start/enable kql extension only in 3P mode and non aarch64
-            kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
-            output += kql_output # do not block if kql start fails
+            # start/enable ast extension only in 3P mode and non aarch64
+            _, ast_output = run_command_and_log(get_service_command("azuremonitor-astextension", *operations))
+            output += ast_output # do not block if ast start fails
             # start transformation config watcher process
             start_transformconfig_process()
 
@@ -1223,12 +1225,13 @@ def disable():
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
 
     if platform.machine() != 'aarch64':
-        # stop kql extensionso that is not started after system reboot. Do not block if it fails.
-        kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-        if kql_exit_code != 0:
-            status_command = get_service_command("azuremonitor-kqlextension", "status")
-            kql_exit_code, kql_status_output = run_command_and_log(status_command)
-            hutil_log_info(kql_status_output)
+        # stop ast extensionso that is not started after system reboot. Do not block if it fails.
+        ast_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-astextension", "stop", "disable"))
+        if ast_exit_code != 0:
+            hutil_log_info(disable_output)
+            status_command = get_service_command("azuremonitor-astextension", "status")
+            _, ast_status_output = run_command_and_log(status_command)
+            hutil_log_info(ast_status_output)
 
     return exit_code, output
 
@@ -1298,11 +1301,11 @@ def restart_launcher():
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
-def restart_kqlextension():
+def restart_astextension():
     # start agent transformation extension process
-    hutil_log_info('Handler initiating agent transformation extension (KqlExtension) restart and enable')
+    hutil_log_info('Handler initiating agent transformation extension (AstExtension) restart and enable')
     if is_systemd():
-        exit_code, output = run_command_and_log('systemctl restart azuremonitor-kqlextension && systemctl enable azuremonitor-kqlextension')
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-astextension && systemctl enable azuremonitor-astextension')
 
 def set_proxy(address, username, password):
     """
@@ -1424,7 +1427,7 @@ def install_azureotelcollector():
     MetricsExtension is responsible for writing the configuration file.
     Only if configuration is present, otelcollector process will start to run, the watcher service is responsible to monitor the configuration file.
     """
-    if is_feature_enabled("enableAzureOTelCollector") and is_systemd():
+    if is_systemd():
         find_package_manager("Install")
         azureotelcollector_install_command = get_otelcollector_installation_command()
         hutil_log_info('Running command "{0}"'.format(azureotelcollector_install_command))
@@ -1710,7 +1713,7 @@ def metrics_watcher(hutil_error, hutil_log):
     """
     Watcher thread to monitor metric configuration changes and to take action on them
     """
-
+    global MDSDFluentPort
     # Check every 30 seconds
     sleepTime =  30
 
@@ -1733,7 +1736,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
     while True:
         try:
-            if is_feature_enabled("enableAzureOTelCollector") and not azureotelcollector_is_active():
+            if not azureotelcollector_is_active():
                 install_azureotelcollector()
 
             if not me_handler.is_running(is_lad=False):
@@ -1774,10 +1777,10 @@ def metrics_watcher(hutil_error, hutil_log):
             fluent_port = ''
             if os.path.isfile(AMAFluentPortFilePath):
                 f = open(AMAFluentPortFilePath, "r")
-                fluent_port = f.read()
+                fluent_port = validate_port_number(f.read(), "fluent")
                 f.close()
             
-            if fluent_port != '' and os.path.isfile(FluentCfgPath):
+            if fluent_port != '' and os.path.isfile(FluentCfgPath) and fluent_port != MDSDFluentPort:
                 portSetting = "    Port                       "  + fluent_port + "\n"
                 defaultPortSetting = 'Port'
                 portUpdated = True                
@@ -1795,6 +1798,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 print(line, end='')
                     os.chmod(FluentCfgPath, stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IROTH)
+                    MDSDFluentPort = fluent_port
 
                     # add SELinux rules if needed
                     if os.path.exists('/etc/selinux/config') and fluent_port != '':
@@ -1869,7 +1873,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data,
-                                "unix:///run/azuremonitoragent/mdm_influxdb.socket",
+                                "unix:///run/azuremetricsext/mdm_influxdb.socket",
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
@@ -2042,7 +2046,7 @@ def transformconfig_watcher(hutil_error, hutil_log):
                     crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
                     if (crc != last_crc):
-                        restart_kqlextension()
+                        restart_astextension()
                         last_crc = crc
                 f.close()
 
@@ -2059,7 +2063,8 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     """
     Install local syslog configuration files if not present and restart syslog
     """
-
+    global MDSDSyslogPort
+    
     # don't deploy any configuration if no control plane is configured
     if not uses_gcs and not uses_mcs:
         return
@@ -2068,10 +2073,13 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     syslog_port = ''
     if os.path.isfile(AMASyslogPortFilePath):
         f = open(AMASyslogPortFilePath, "r")
-        syslog_port = f.read()
+        syslog_port = validate_port_number(f.read(), "syslog")
         f.close()
         
     useSyslogTcp = False
+
+    if syslog_port == MDSDSyslogPort:
+        return
     
     # always use syslog tcp port, unless 
     # - the distro is Red Hat based and doesn't have semanage
@@ -2093,7 +2101,10 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
                         # allow the syslog port in SELinux
                         run_command_and_log('semanage port -a -t syslogd_port_t -p tcp ' + syslog_port,log_cmd=False, log_output=False)
                 useSyslogTcp = True   
-        
+
+    if syslog_port != '':
+        MDSDSyslogPort = syslog_port
+    
     # 1P tenants use omuxsock, so keep using that for customers using 1P
     if useSyslogTcp == True and syslog_port != '':
         if os.path.exists('/etc/rsyslog.d/'):            
@@ -2637,25 +2648,25 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             if version.startswith('12'):
                 return 'SSL_CERT_DIR', '/var/lib/ca-certificates/openssl'
-            elif version.startswith('15'):
+            elif version.startswith('15') or version.startswith('16'):
                 return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
     log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
 
-def copy_kqlextension_binaries():
-    kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
-    kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
-    kqlextension_runtimesbin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
-    if os.path.exists(kqlextension_runtimesbin):
+def copy_astextension_binaries():
+    astextension_bin_local_path = os.getcwd() + "/AstExtensionBin/"
+    astextension_bin = "/opt/microsoft/azuremonitoragent/bin/astextension/"
+    astextension_runtimesbin = "/opt/microsoft/azuremonitoragent/bin/astextension/runtimes/"
+    if os.path.exists(astextension_runtimesbin):
         # only for versions of AMA with .NET runtimes
-        rmtree(kqlextension_runtimesbin)
-    # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
-    for f in os.listdir(kqlextension_bin):
-        if f != 'KqlExtension' and f != 'appsettings.json':
-            os.remove(os.path.join(kqlextension_bin, f))
+        rmtree(astextension_runtimesbin)
+    # only for versions with Ast .net cleanup .NET files as it is causing issues with AOT runtime
+    for f in os.listdir(astextension_bin):
+        if f != 'AstExtension' and f != 'appsettings.json':
+            os.remove(os.path.join(astextension_bin, f))
 
-    for f in os.listdir(kqlextension_bin_local_path):
-        compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
+    for f in os.listdir(astextension_bin_local_path):
+        compare_and_copy_bin(astextension_bin_local_path + f, astextension_bin + f)
 
 
 def is_arc_installed():
@@ -3056,18 +3067,14 @@ def run_get_output(cmd, chk_err = False, log_cmd = True):
         except subprocess.CalledProcessError as e:
             exit_code = e.returncode
             output = e.output
-
-    try:
-        unicode_type = unicode # Python 2
-    except NameError:
-        unicode_type = str # Python 3
-
-    if all(ord(c) < 128 for c in output) or isinstance(output, unicode_type):
-        output = output.encode('utf-8')
-
-    # On python 3, encode returns a byte object, so we must decode back to a string
-    if sys.version_info >= (3,) and type(output) == bytes:
-        output = output.decode('utf-8', 'ignore')
+    
+    # Python 2: encode unicode -> UTF-8 bytes (str). Python 3: decode bytes -> str.
+    try:  # Python 2
+        if isinstance(output, unicode):  # type: ignore  # noqa: F821
+            output = output.encode('utf-8', 'ignore')
+    except NameError:  # Python 3
+        if isinstance(output, (bytes, bytearray)):
+            output = bytes(output).decode('utf-8', 'ignore')
 
     return exit_code, output.strip()
 
@@ -3147,6 +3154,31 @@ def log_and_exit(operation, exit_code = GenericErrorCode, message = ''):
     else:
         update_status_file(operation, str(exit_code), exit_status, message)
         sys.exit(exit_code)
+
+
+def validate_port_number(port_value, port_name):
+    """
+    Validates that a port value is a valid integer within the range 1-65535.
+
+    Args:
+        port_value: The port value to validate (string)
+        port_name: The name of the port for error messages (e.g., "fluent", "syslog")
+
+    Returns:
+        The validated port number as a string, or empty string if invalid
+    """
+    if not port_value:
+        return ''
+
+    try:
+        port_int = int(port_value.strip())
+        if port_int < 1 or port_int > 65535:
+            hutil_log_error('Invalid {0} port number: {1}. Must be between 1-65535.'.format(port_name, port_int))
+            return ''
+        return str(port_int)
+    except ValueError:
+        hutil_log_error('Invalid {0} port value: {1}. Must be an integer.'.format(port_name, port_value))
+        return ''
 
 
 # Exceptions
