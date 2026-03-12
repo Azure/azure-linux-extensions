@@ -243,7 +243,7 @@ class HandlerUtility:
         try:
             cms_cmd = base64_cmd + " | " + self.patching.openssl_path + " cms -inform DER -decrypt -recip " + cert_path + " -inkey " + pkey_path
             self.log("Attempting decryption using OpenSSL CMS command (supports AES256 and DES_EDE3_CBC)")
-            result = waagent.RunGetOutput(cms_cmd)
+            result = waagent.RunGetOutput(cms_cmd, chk_err=False, log_cmd=False)
             if result[0] == 0 and result[1]:  # Success (return code 0) and non-empty output
                 cleartxt = result[1]
                 self.log("Successfully decrypted protected settings using CMS command")
@@ -251,13 +251,13 @@ class HandlerUtility:
             else:
                 self.log("CMS decryption failed with return code: " + str(result[0]) + ", attempting fallback to SMIME")
         except Exception as e:
-            self.log("CMS decryption failed with exception: " + str(e) + ", attempting fallback to SMIME")
+            self.log("CMS decryption failed with exception: " + type(e).__name__ + ", attempting fallback to SMIME")
         
         # Fallback to OpenSSL SMIME command (supports DES_EDE3_CBC only)
         try:
             smime_cmd = base64_cmd + " | " + self.patching.openssl_path + " smime -inform DER -decrypt -recip " + cert_path + " -inkey " + pkey_path
             self.log("Attempting decryption using OpenSSL SMIME command (fallback - supports DES_EDE3_CBC only)")
-            result = waagent.RunGetOutput(smime_cmd)
+            result = waagent.RunGetOutput(smime_cmd, chk_err=False, log_cmd=False)
             if result[0] == 0 and result[1]:  # Success (return code 0) and non-empty output
                 cleartxt = result[1]
                 self.log("Successfully decrypted protected settings using SMIME command (fallback)")
@@ -265,7 +265,7 @@ class HandlerUtility:
             else:
                 self.error("SMIME decryption also failed with return code: " + str(result[0]))
         except Exception as e:
-            self.error("SMIME decryption failed with exception: " + str(e))
+            self.error("SMIME decryption failed with exception: " + type(e).__name__)
         
         # If both methods fail, raise an error
         if not cleartxt:
@@ -278,9 +278,9 @@ class HandlerUtility:
         try:
             config = json.loads(ctxt)
         except:
-            self.error('JSON exception decoding ' + ctxt)
+            self.error('JSON exception decoding settings file')
         if config == None:
-            self.error("JSON error processing settings file:" + ctxt)
+            self.error('JSON error processing settings file')
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
             if 'protectedSettings' in handlerSettings and \
@@ -301,10 +301,10 @@ class HandlerUtility:
                 jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
+                    self.log('Config decoded correctly.')
                 except:
-                    self.error('JSON exception decoding ' + cleartxt)
+                    self.error('JSON exception decoding decrypted protected settings')
                 handlerSettings['protectedSettings'] = jctxt
-                self.log('Config decoded correctly.')
                 # cleaning/removing the temp files created
                 try:
                     if os.path.isfile(f.name):
