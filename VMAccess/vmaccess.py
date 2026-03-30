@@ -30,6 +30,7 @@ import Utils.extensionutils as ext_utils
 import Utils.distroutils as dist_utils
 import Utils.constants as constants
 import Utils.ovfutils as ovf_utils
+import Utils.crypt_fallback as crypt_fallback
 
 # Define global variables
 ExtensionShortName = 'VMAccess'
