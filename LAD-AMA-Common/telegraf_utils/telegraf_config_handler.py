@@ -358,12 +358,23 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                 telegraf_plugin = splitResult[0]
 
             if not is_lad:
-                configIds = counterConfigIdMap[telegraf_json[omiclass][plugin][field]["displayName"]]
-                for configId in configIds:
-                    input_str += "\n"
-                    input_str += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
-                    input_str += " "*4 + "configurationId=\"" + configId + "\"\n\n"
-                    break
+                # Collect all unique configurationIds from all fields in this plugin
+                all_config_ids = []
+                for f in telegraf_json[omiclass][plugin]:
+                    display_name = telegraf_json[omiclass][plugin][f]["displayName"]
+                    if display_name in counterConfigIdMap:
+                        for cid in counterConfigIdMap[display_name]:
+                            if cid not in all_config_ids:
+                                all_config_ids.append(cid)
+                if all_config_ids:
+                    base_str = input_str
+                    curr_input_str = ""
+                    for cid in all_config_ids:
+                        curr_input_str = base_str
+                        curr_input_str += "\n"
+                        curr_input_str += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
+                        curr_input_str += " "*4 + "configurationId=\"" + cid + "\"\n\n"
+                        input_str += curr_input_str
 
             config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
             output.append(config_file)
