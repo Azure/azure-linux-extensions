@@ -1,4 +1,6 @@
-# Linux Diagnostic Extension (LAD)
+# [DEPRECATED] Linux Azure Diagnostic (LAD) Extension
+
+> :warning: The Azure Diagnostic extension has been **deprecated** and has no support as of **March 31, 2026.** If you use the Azure Diagnostic extension to collect data, [migrate now to the new Azure Monitor agent](https://learn.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-migration-wad-lad).
 
 Allow the owner of a Linux-based Azure Virtual Machine to obtain diagnostic data.
 
