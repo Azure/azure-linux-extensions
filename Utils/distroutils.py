@@ -171,6 +171,9 @@ class GenericDistro(object):
 
     def chpasswd(self, username, password, crypt_id=6, salt_len=10):
         passwd_hash = self.gen_password_hash(password, crypt_id, salt_len)
+        if passwd_hash is None:
+            return "This feature requires one of the 'crypt', 'legacycrypt', 'crypt-r', or 'passlib' Python packages to be installed."
+
         cmd = ['usermod', '-p', passwd_hash, username]
         ret, output = ext_utils.run_command_get_output(cmd, log_cmd=False)
         if ret != 0:
@@ -182,11 +185,11 @@ class GenericDistro(object):
         salt = "${0}${1}".format(crypt_id, salt)
 
         if cryptImported:
-            return crypt.crypt(password, salt)
+            return crypt(password, salt)
         elif passLibImported:
             return sha512_crypt.hash(password)
         else:
-            logger.error("This feature requires one of the 'crypt', 'legacycrypt', 'crypt-r', or passlib Python packages to be installed.")
+            return None
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
