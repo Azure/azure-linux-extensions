@@ -168,217 +168,211 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
     output = []
     output.append(int_file)
 
-    for omiclass in telegraf_json:
-        input_str = ""
-        ama_rename_str = ""
-        metricsext_rename_str = ""
-        lad_specific_rename_str = ""
-        rate_specific_aggregator_str = ""
-        aggregator_str = ""
+    for omiclass in telegraf_json:        
         for plugin in telegraf_json[omiclass]:
-            config_file = {"filename" : omiclass+".conf"}
-            # Arbitrary max value for finding min
-            min_interval = "999999999s"
-            is_vmi = plugin.endswith("_vmi")
-            is_vmi_rate_counter = False
+            # Collect all unique configurationIds from all fields in this plugin
+            all_config_ids = []
             for field in telegraf_json[omiclass][plugin]:
-                if not is_vmi_rate_counter:
-                    is_vmi_rate_counter = telegraf_json[omiclass][plugin][field]["displayName"] in vmi_rate_counters_list
-            
-            # if is_vmi_rate_counter:
-            #     min_interval = "1s"
+                configIds = counterConfigIdMap[telegraf_json[omiclass][plugin][field]["displayName"]]
+                for configId in configIds:
+                    if configId not in all_config_ids:
+                        all_config_ids.append(configId)
+
+            for configId in all_config_ids:
+                config_file = {"filename" : omiclass+"-"+configId+".conf"}
+                input_str = ""
+                ama_rename_str = ""
+                metricsext_rename_str = ""
+                lad_specific_rename_str = ""
+                rate_specific_aggregator_str = ""
+                aggregator_str = ""
                 
-            if is_vmi or is_vmi_rate_counter:
-                splitResult = plugin.split('_')
-                telegraf_plugin = splitResult[0]
-                input_str += "[[inputs." + telegraf_plugin + "]]\n"
-                # plugin = plugin[:-4]
-            else:
-                input_str += "[[inputs." + plugin + "]]\n"
-            # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
-
-            # If it's a lad config then add the namepass fields for sending totals to storage
-            # always skip lad plugin names as they should be dropped from ME
-            lad_plugin_name = plugin + "_total"
-            if lad_plugin_name not in storage_namepass_list:
-                    storage_namepass_list.append(lad_plugin_name)
+                # Arbitrary max value for finding min
+                min_interval = "999999999s"
+                is_vmi = plugin.endswith("_vmi")
+                is_vmi_rate_counter = False
+                for field in telegraf_json[omiclass][plugin]:
+                    if not is_vmi_rate_counter:
+                        is_vmi_rate_counter = telegraf_json[omiclass][plugin][field]["displayName"] in vmi_rate_counters_list
+                
+                # if is_vmi_rate_counter:
+                #     min_interval = "1s"
                     
-            if is_lad:                
-                lad_specific_rename_str += "\n[[processors.rename]]\n"
-                lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"                
-            elif is_vmi  or is_vmi_rate_counter:                
-                if plugin not in storage_namepass_list:
-                    storage_namepass_list.append(plugin + "_mdsd")
-            else:
-                ama_plugin_name = plugin + "_mdsd_la_perf"
-                ama_rename_str += "\n[[processors.rename]]\n"
-                ama_rename_str += " "*2 + "namepass = [\"" + ama_plugin_name + "\"]\n"
-                if ama_plugin_name not in storage_namepass_list:
-                    storage_namepass_list.append(ama_plugin_name)
-
-            namespace = MetricsExtensionNamepsace
-            if is_vmi or is_vmi_rate_counter:
-                namespace = "insights.virtualmachine"
-
-            if is_vmi_rate_counter:
-                # Adding "_rated" as a substring for vmi rate metrics to avoid renaming collisions
-                plugin_name = plugin + "_rated"
-            else:
-                plugin_name = plugin
-
-            metricsext_rename_str += "\n[[processors.rename]]\n"
-            metricsext_rename_str += " "*2 + "namepass = [\"" + plugin_name + "\"]\n"
-            metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-            metricsext_rename_str += " "*4 + "measurement = \"" + plugin_name + "\"\n"
-            metricsext_rename_str += " "*4 + "dest = \"" + namespace + "\"\n"
-
-            fields = ""
-            ops_fields = ""
-            non_ops_fields = ""
-            non_rate_aggregate = False
-            ops = ""
-            rate_aggregate = False
-            for field in telegraf_json[omiclass][plugin]:
-                fields += "\"" + field + "\", "
-                if is_vmi or is_vmi_rate_counter :
-                    if "MB" in field:
-                        fields += "\"" + field.replace('MB','Bytes') + "\", "
-
-                #Use the shortest interval time for the whole plugin
-                new_interval = telegraf_json[omiclass][plugin][field]["interval"]
-                if int(new_interval[:-1]) < int(min_interval[:-1]):
-                    min_interval = new_interval
-
-                #compute values for aggregator options
-                if "op" in telegraf_json[omiclass][plugin][field]:
-                    if telegraf_json[omiclass][plugin][field]["op"] == "rate":
-                        rate_aggregate = True
-                        ops = "\"rate\", \"rate_min\", \"rate_max\", \"rate_count\", \"rate_sum\", \"rate_mean\""
-                    if is_lad:
-                        ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
-                    else:
-                        ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
+                if is_vmi or is_vmi_rate_counter:
+                    splitResult = plugin.split('_')
+                    telegraf_plugin = splitResult[0]
+                    input_str += "[[inputs." + telegraf_plugin + "]]\n"
+                    # plugin = plugin[:-4]
                 else:
-                    non_rate_aggregate = True
+                    input_str += "[[inputs." + plugin + "]]\n"
+                # input_str += " "*2 + "name_override = \"" + omiclass + "\"\n"
+
+                # If it's a lad config then add the namepass fields for sending totals to storage
+                # always skip lad plugin names as they should be dropped from ME
+                lad_plugin_name = plugin + "_total"
+                if lad_plugin_name not in storage_namepass_list:
+                        storage_namepass_list.append(lad_plugin_name)
+                        
+                if is_lad:                
+                    lad_specific_rename_str += "\n[[processors.rename]]\n"
+                    lad_specific_rename_str += " "*2 + "namepass = [\"" + lad_plugin_name + "\"]\n"                
+                elif is_vmi  or is_vmi_rate_counter:                
+                    if plugin not in storage_namepass_list:
+                        storage_namepass_list.append(plugin + "_mdsd")
+                else:
+                    ama_plugin_name = plugin + "_mdsd_la_perf"
+                    ama_rename_str += "\n[[processors.rename]]\n"
+                    ama_rename_str += " "*2 + "namepass = [\"" + ama_plugin_name + "\"]\n"
+                    if ama_plugin_name not in storage_namepass_list:
+                        storage_namepass_list.append(ama_plugin_name)
+
+                namespace = MetricsExtensionNamepsace
+                if is_vmi or is_vmi_rate_counter:
+                    namespace = "insights.virtualmachine"
+
+                if is_vmi_rate_counter:
+                    # Adding "_rated" as a substring for vmi rate metrics to avoid renaming collisions
+                    plugin_name = plugin + "_rated"
+                else:
+                    plugin_name = plugin
+
+                metricsext_rename_str += "\n[[processors.rename]]\n"
+                metricsext_rename_str += " "*2 + "namepass = [\"" + plugin_name + "\"]\n"
+                metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
+                metricsext_rename_str += " "*4 + "measurement = \"" + plugin_name + "\"\n"
+                metricsext_rename_str += " "*4 + "dest = \"" + namespace + "\"\n"
+
+                fields = ""
+                ops_fields = ""
+                non_ops_fields = ""
+                non_rate_aggregate = False
+                ops = ""
+                rate_aggregate = False
+                for field in telegraf_json[omiclass][plugin]:
+                    fields += "\"" + field + "\", "
+                    if is_vmi or is_vmi_rate_counter :
+                        if "MB" in field:
+                            fields += "\"" + field.replace('MB','Bytes') + "\", "
+
+                    #Use the shortest interval time for the whole plugin
+                    new_interval = telegraf_json[omiclass][plugin][field]["interval"]
+                    if int(new_interval[:-1]) < int(min_interval[:-1]):
+                        min_interval = new_interval
+
+                    #compute values for aggregator options
+                    if "op" in telegraf_json[omiclass][plugin][field]:
+                        if telegraf_json[omiclass][plugin][field]["op"] == "rate":
+                            rate_aggregate = True
+                            ops = "\"rate\", \"rate_min\", \"rate_max\", \"rate_count\", \"rate_sum\", \"rate_mean\""
+                        if is_lad:
+                            ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                        else:
+                            ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
+                    else:
+                        non_rate_aggregate = True
+                        if is_lad:
+                            non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
+                        else:
+                            non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
+
+                    #Add respective rename processor plugin based on the displayname
                     if is_lad:
-                        non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\", "
-                    else:
-                        non_ops_fields += "\"" +  telegraf_json[omiclass][plugin][field]["displayName"] + "\", "
+                        lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
+                        lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                        lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
+                    elif not is_vmi and not is_vmi_rate_counter:
+                        # no rename of fields as they are set in telegraf directly                
+                        ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
+                        ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                        ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
 
-                #Add respective rename processor plugin based on the displayname
-                if is_lad:
-                    lad_specific_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-                    lad_specific_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                    lad_specific_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["ladtablekey"] + "\"\n"
-                elif not is_vmi and not is_vmi_rate_counter:
-                    # no rename of fields as they are set in telegraf directly                
-                    ama_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-                    ama_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                    ama_rename_str += " "*4 + "dest = \"" + telegraf_json[omiclass][plugin][field]["displayName"] + "\"\n"
-
-                # Avoid adding the rename logic for the redundant *_filesystem fields for diskio which were added specifically for OMI parity in LAD
-                # Had to re-use these six fields to avoid renaming issues since both Filesystem and Disk in OMI-LAD use them
-                # AMA only uses them once so only need this for LAD
-                if is_lad:
-                    if field in excess_diskio_plugin_list_lad:
-                        excess_diskio_field_drop_list_str += "\"" + field + "\", "
-                    else:
+                    # Avoid adding the rename logic for the redundant *_filesystem fields for diskio which were added specifically for OMI parity in LAD
+                    # Had to re-use these six fields to avoid renaming issues since both Filesystem and Disk in OMI-LAD use them
+                    # AMA only uses them once so only need this for LAD
+                    if is_lad:
+                        if field in excess_diskio_plugin_list_lad:
+                            excess_diskio_field_drop_list_str += "\"" + field + "\", "
+                        else:
+                            metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
+                            metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
+                            metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
+                    elif not is_vmi and not is_vmi_rate_counter:
+                        # no rename of fields as they are set in telegraf directly                
                         metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
                         metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
                         metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
-                elif not is_vmi and not is_vmi_rate_counter:
-                    # no rename of fields as they are set in telegraf directly                
-                    metricsext_rename_str += "\n" + " "*2 + "[[processors.rename.replace]]\n"
-                    metricsext_rename_str += " "*4 + "field = \"" + field + "\"\n"
-                    metricsext_rename_str += " "*4 + "dest = \"" + plugin + "/" + field + "\"\n"
 
-            #Add respective operations for aggregators
-            # if is_lad:
-            if not is_vmi and not is_vmi_rate_counter:
-                suffix = ""
-                if is_lad:
-                    suffix = "_total\"]\n"
-                else:
-                    suffix = "_mdsd_la_perf\"]\n"
-                    
-                if rate_aggregate:
-                    aggregator_str += "[[aggregators.basicstats]]\n"
-                    aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
-                    aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
-                    aggregator_str += " "*2 + "drop_original = true\n"
-                    aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-                    aggregator_str += " "*2 + "stats = [" + ops + "]\n"
+                #Add respective operations for aggregators
+                # if is_lad:
+                if not is_vmi and not is_vmi_rate_counter:
+                    suffix = ""
+                    if is_lad:
+                        suffix = "_total\"]\n"
+                    else:
+                        suffix = "_mdsd_la_perf\"]\n"
+                        
+                    if rate_aggregate:
+                        aggregator_str += "[[aggregators.basicstats]]\n"
+                        aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
+                        aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
+                        aggregator_str += " "*2 + "drop_original = true\n"
+                        aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                        aggregator_str += " "*2 + "stats = [" + ops + "]\n"
 
-                if non_rate_aggregate:
-                    aggregator_str += "[[aggregators.basicstats]]\n"
-                    aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
-                    aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
-                    aggregator_str += " "*2 + "drop_original = true\n"
-                    aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
-                    aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
-            
-            elif is_vmi_rate_counter:
-                # Aggregator config for MDSD
-                aggregator_str += "[[aggregators.basicstats]]\n"
-                aggregator_str += " "*2 + "namepass = [\"" + plugin + "_mdsd\"]\n"
-                aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
-                aggregator_str += " "*2 + "drop_original = true\n"
-                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\\\\\') + "]\n" #-2 to strip the last comma and space
-                aggregator_str += " "*2 + "stats = [" + ops + "]\n\n"
-
-                # Aggregator config for ME
-                aggregator_str += "[[aggregators.mdmratemetrics]]\n"
-                aggregator_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
-                aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
-                aggregator_str += " "*2 + "drop_original = true\n"
-                aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\\\\\') + "]\n" #-2 to strip the last comma and space
-                aggregator_str += " "*2 + "stats = [\"rate\"]\n\n"
-
+                    if non_rate_aggregate:
+                        aggregator_str += "[[aggregators.basicstats]]\n"
+                        aggregator_str += " "*2 + "namepass = [\"" + plugin + suffix
+                        aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
+                        aggregator_str += " "*2 + "drop_original = true\n"
+                        aggregator_str += " "*2 + "fieldpass = [" + non_ops_fields[:-2] + "]\n" #-2 to strip the last comma and space
+                        aggregator_str += " "*2 + "stats = [\"mean\", \"max\", \"min\", \"sum\", \"count\"]\n\n"
                 
-            if is_lad:
-                lad_specific_rename_str += "\n"
-            elif not is_vmi and not is_vmi_rate_counter:
-                # no rename of fields as they are set in telegraf directly            
-                ama_rename_str += "\n"
+                elif is_vmi_rate_counter:
+                    # Aggregator config for MDSD
+                    aggregator_str += "[[aggregators.basicstats]]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "_mdsd\"]\n"
+                    aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
+                    aggregator_str += " "*2 + "drop_original = true\n"
+                    aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\\\\\') + "]\n" #-2 to strip the last comma and space
+                    aggregator_str += " "*2 + "stats = [" + ops + "]\n\n"
 
-            # Using fields[: -2] here to get rid of the last ", " at the end of the string
-            input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"
-            if plugin == "cpu":
-                input_str += " "*2 + "report_active = true\n"
-            
-            # Rate interval needs to be atleast twice the regular sourcing interval for aggregation to work. 
-            # Since we want all the VMI metrics to be sent at the same interval as selected by the customer, To overcome the twice the min internval limitation, 
-            # We are sourcing the VMI metrics that need to be aggregated at half the selected frequency 
-            rated_min_interval = str(int(min_interval[:-1]) // 2) + "s" 
-            input_str += " "*2 + "interval = " + "\"" + rated_min_interval + "\"\n\n"
+                    # Aggregator config for ME
+                    aggregator_str += "[[aggregators.mdmratemetrics]]\n"
+                    aggregator_str += " "*2 + "namepass = [\"" + plugin + "\"]\n"
+                    aggregator_str += " "*2 + "period = \"" + min_interval + "\"\n"
+                    aggregator_str += " "*2 + "drop_original = true\n"
+                    aggregator_str += " "*2 + "fieldpass = [" + ops_fields[:-2].replace('\\','\\\\\\\\') + "]\n" #-2 to strip the last comma and space
+                    aggregator_str += " "*2 + "stats = [\"rate\"]\n\n"
 
-            telegraf_plugin = plugin
-            if is_vmi:
-                splitResult = plugin.split('_')
-                telegraf_plugin = splitResult[0]
+                    
+                if is_lad:
+                    lad_specific_rename_str += "\n"
+                elif not is_vmi and not is_vmi_rate_counter:
+                    # no rename of fields as they are set in telegraf directly            
+                    ama_rename_str += "\n"
 
-            if not is_lad:
-                # Collect all unique configurationIds from all fields in this plugin
-                all_config_ids = []
-                for f in telegraf_json[omiclass][plugin]:
-                    display_name = telegraf_json[omiclass][plugin][f]["displayName"]
-                    if display_name in counterConfigIdMap:
-                        for cid in counterConfigIdMap[display_name]:
-                            if cid not in all_config_ids:
-                                all_config_ids.append(cid)
-                if all_config_ids:
-                    base_str = input_str
-                    curr_input_str = ""
-                    for cid in all_config_ids:
-                        curr_input_str = base_str
-                        curr_input_str += "\n"
-                        curr_input_str += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
-                        curr_input_str += " "*4 + "configurationId=\"" + cid + "\"\n\n"
-                        input_str += curr_input_str
+                # Using fields[: -2] here to get rid of the last ", " at the end of the string
+                input_str += " "*2 + "fieldpass = ["+fields[:-2]+"]\n"
+                if plugin == "cpu":
+                    input_str += " "*2 + "report_active = true\n"
+                
+                # Rate interval needs to be atleast twice the regular sourcing interval for aggregation to work. 
+                # Since we want all the VMI metrics to be sent at the same interval as selected by the customer, To overcome the twice the min internval limitation, 
+                # We are sourcing the VMI metrics that need to be aggregated at half the selected frequency 
+                rated_min_interval = str(int(min_interval[:-1]) // 2) + "s" 
+                input_str += " "*2 + "interval = " + "\"" + rated_min_interval + "\"\n\n"
 
-            config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
-            output.append(config_file)
-            config_file = {}
+                telegraf_plugin = plugin
+                if is_vmi:
+                    splitResult = plugin.split('_')
+                    telegraf_plugin = splitResult[0]
+
+                input_str += "\n"
+                input_str += " "*2 + "[inputs." + telegraf_plugin + ".tags]\n"
+                input_str += " "*4 + "configurationId=\"" + configId + "\"\n\n"            
+                config_file["data"] = input_str + "\n" +  metricsext_rename_str + "\n" + ama_rename_str + "\n" + lad_specific_rename_str + "\n"  +aggregator_str
+                output.append(config_file)
+                config_file = {}
 
     """
     Sample telegraf TOML file output
