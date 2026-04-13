@@ -599,6 +599,8 @@ def uninstall():
 
     remove_localsyslog_configs()
 
+    me_handler.remove_user(HUtilObj=HUtilObject)
+
     uninstall_azureotelcollector()
 
     # remove the logrotate config
@@ -1751,9 +1753,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             is_lad=False,
                             managed_identity=managed_identity_str,
                             HUtilObj=HUtilObject,
-                            is_local_control_channel=False,
-                            user="azuremetricsext",
-                            group="azuremonitoragent")
+                            is_local_control_channel=False)
                         enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
                     elif is_feature_enabled("enableCMV2"):
                         if os.path.exists(me_service_template_path):
