@@ -24,7 +24,8 @@ except ImportError:
     pass 
 
 if cryptImported == False: 
-    if sys.version_info[0] == 3 and sys.version_info[1] >= 13 or sys.version_info[0] > 3:
+    # checking for python version 
+    if (sys.version_info[0] == 3 and sys.version_info[1] >= 13) or (sys.version_info[0] > 3):
         try: 
             from legacycrypt import crypt
             cryptImported = True
@@ -171,9 +172,6 @@ class GenericDistro(object):
 
     def chpasswd(self, username, password, crypt_id=6, salt_len=10):
         passwd_hash = self.gen_password_hash(password, crypt_id, salt_len)
-        if passwd_hash is None:
-            return "This feature requires one of the 'crypt', 'legacycrypt', 'crypt-r', or 'passlib' Python packages to be installed."
-
         cmd = ['usermod', '-p', passwd_hash, username]
         ret, output = ext_utils.run_command_get_output(cmd, log_cmd=False)
         if ret != 0:
@@ -185,11 +183,18 @@ class GenericDistro(object):
         salt = "${0}${1}".format(crypt_id, salt)
 
         if cryptImported:
+            # salt is randomly generated above
+            # default crypt_id is 6 (SHA-512), see change_password() for details
             return crypt(password, salt)
         elif passLibImported:
+            # passlib auto-generates a cryptographically random salt
+            # no crypt id as this uses SHA-512, so passed in crypt_id will be ignored
             return sha512_crypt.hash(password)
         else:
-            return None
+            raise ImportError(
+                "Password hashing is unavailable. Install one of: 'crypt' (Python < 3.13), "
+                "'legacycrypt', or 'passlib'."
+            )
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
