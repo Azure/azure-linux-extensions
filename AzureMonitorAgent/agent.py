@@ -1097,7 +1097,11 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     proxySet = False
 
     # fetch proxy settings
-    if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
+    if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "none":
+        default_configs["MDSD_PROXY_MODE"] = "none"
+        unset_proxy()
+        proxySet = True
+    elif public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
         default_configs["MDSD_PROXY_MODE"] = "application"
 
         if "address" in public_settings.get("proxy"):
