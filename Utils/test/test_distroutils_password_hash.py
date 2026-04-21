@@ -75,6 +75,15 @@ class TestGenPasswordHashWithCrypt(unittest.TestCase):
         hash2 = distro.gen_password_hash("PasswordTwo2!", crypt_id=6, salt_len=10)
         self.assertNotEqual(hash1, hash2)
 
+    def test_same_password_produces_different_hashes_due_to_salting(self):
+        # Each call generates a fresh random salt, so the same password must
+        # produce a different hash every time — proving salting is in effect.
+        distro = _make_distro()
+        password = "TestP@ssw0rd!"
+        hash1 = distro.gen_password_hash(password, crypt_id=6, salt_len=10)
+        hash2 = distro.gen_password_hash(password, crypt_id=6, salt_len=10)
+        self.assertNotEqual(hash1, hash2, "Same password produced identical hashes — salt may not be random")
+
     def test_crypt_id_5_produces_sha256_hash(self):
         distro = _make_distro()
         hash_val = distro.gen_password_hash("TestP@ssw0rd!", crypt_id=5, salt_len=10)
@@ -116,6 +125,18 @@ class TestGenPasswordHashWithPasslib(unittest.TestCase):
             hash2 = distro.gen_password_hash("PasswordTwo2!", crypt_id=6, salt_len=10)
 
         self.assertNotEqual(hash1, hash2)
+
+    def test_passlib_same_password_produces_different_hashes_due_to_salting(self):
+        import Utils.distroutils as du
+
+        with mock.patch.object(du, 'cryptImported', False), \
+             mock.patch.object(du, 'passLibImported', True):
+            distro = du.GenericDistro(_StubConfig())
+            password = "TestP@ssw0rd!"
+            hash1 = distro.gen_password_hash(password, crypt_id=6, salt_len=10)
+            hash2 = distro.gen_password_hash(password, crypt_id=6, salt_len=10)
+
+        self.assertNotEqual(hash1, hash2, "Same password produced identical hashes — passlib salt may not be random")
 
 class TestCreateAccountPasswordHashFailure(unittest.TestCase):
     """
