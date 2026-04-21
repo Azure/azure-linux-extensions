@@ -24,7 +24,7 @@ except ImportError:
     pass 
 
 if cryptImported == False: 
-    # checking for python version 
+    # checking for python version, greater than or equal to 3.13
     if (sys.version_info[0] == 3 and sys.version_info[1] >= 13) or (sys.version_info[0] > 3):
         try: 
             from legacycrypt import crypt
@@ -184,11 +184,11 @@ class GenericDistro(object):
 
         if cryptImported:
             # salt is randomly generated above
-            # default crypt_id is 6 (SHA-512), see change_password() for details
+            # default crypt_id is 6 (SHA-512), else Provisioning.PasswordCryptId is used, see change_password() for details
             return crypt(password, salt)
         elif passLibImported:
             # passlib auto-generates a cryptographically random salt
-            # no crypt id as this uses SHA-512, so passed in crypt_id will be ignored
+            # no crypt id as this uses SHA-512, so crypt_id from Provisioning.PasswordCryptId will be ignored
             return sha512_crypt.hash(password)
         else:
             raise ImportError(
