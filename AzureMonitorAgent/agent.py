@@ -875,7 +875,7 @@ def enable():
         hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
         ensure["azuremonitoragentmgr"] = True
                 
-    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+    elif (protected_settings is None or len(protected_settings) == 0) or get_proxy_mode(public_settings) == "application":
         hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
         ensure["azuremonitoragent"] = True
         handle_mcs_config(public_settings, protected_settings, default_configs)
@@ -1094,52 +1094,17 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     default_configs["PA_FLUENT_SOCKET_PORT"] = "13005"
     # this port will be dynamic in future
     default_configs["PA_DATA_PORT"] = "13005"
-    proxySet = False
-
     # fetch proxy settings
-    if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
-        default_configs["MDSD_PROXY_MODE"] = "application"
+    proxy_mode = get_proxy_mode(public_settings)
 
-        if "address" in public_settings.get("proxy"):
-            default_configs["MDSD_PROXY_ADDRESS"] = public_settings.get("proxy").get("address")
-        else:
-            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
-
-        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == True:
-            if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
-                default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
-                default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
-                set_proxy(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], default_configs["MDSD_PROXY_PASSWORD"])
-                proxySet = True
-            else:
-                log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
-        else:
-            set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
-            proxySet = True
-    
-    # is this Arc? If so, check for proxy     
-    if os.path.isfile(ArcSettingsFile):
-        f = open(ArcSettingsFile, "r")
-        data = f.read()
-
-        if (data != ''):
-            json_data = json.loads(data)
-            BypassProxy = False
-            if json_data is not None and "proxy.bypass" in json_data:
-                bypass = json_data["proxy.bypass"]
-                # proxy.bypass is an array
-                if "AMA" in bypass:
-                    BypassProxy = True
-                    
-            if not BypassProxy and json_data is not None and "proxy.url" in json_data:
-                url = json_data["proxy.url"]
-                # only non-authenticated proxy config is supported
-                if url != '':
-                    default_configs["MDSD_PROXY_ADDRESS"] = url
-                    set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
-                    proxySet = True
-
-    if not proxySet:
+    if apply_arc_proxy(default_configs):
+        pass  # Arc proxy takes precedence over extension settings
+    elif proxy_mode == "none":
+        default_configs["MDSD_PROXY_MODE"] = "none"
+        unset_proxy()
+    elif proxy_mode == "application":
+        apply_application_proxy(public_settings, protected_settings, default_configs)
+    else:
         unset_proxy()
 
     # set arc autonomous endpoints
@@ -1183,7 +1148,7 @@ def get_control_plane_mode():
     # Legacy schema
     elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         GcsEnabled = True
-    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+    elif (protected_settings is None or len(protected_settings) == 0) or get_proxy_mode(public_settings) == "application":
         McsEnabled = True
     else:
         GcsEnabled = True
@@ -1306,6 +1271,75 @@ def restart_astextension():
     hutil_log_info('Handler initiating agent transformation extension (AstExtension) restart and enable')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-astextension && systemctl enable azuremonitor-astextension')
+
+def get_proxy_mode(public_settings):
+    """
+    Extract the proxy mode from public settings, or None if not configured.
+    """
+    if public_settings is None:
+        return None
+    proxy_config = public_settings.get("proxy")
+    if proxy_config is None:
+        return None
+    return proxy_config.get("mode")
+
+def apply_application_proxy(public_settings, protected_settings, default_configs):
+    """
+    Configure explicit application proxy from extension settings.
+    Returns True if proxy was set, False otherwise (exits on invalid config).
+    """
+    proxy_config = public_settings.get("proxy", {})
+    default_configs["MDSD_PROXY_MODE"] = "application"
+
+    address = proxy_config.get("address")
+    if not address:
+        log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
+    default_configs["MDSD_PROXY_ADDRESS"] = address
+
+    username = ""
+    password = ""
+    if proxy_config.get("auth") == True:
+        protected_proxy = (protected_settings or {}).get("proxy", {})
+        username = protected_proxy.get("username")
+        password = protected_proxy.get("password")
+        if not username or not password:
+            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+        default_configs["MDSD_PROXY_USERNAME"] = username
+        default_configs["MDSD_PROXY_PASSWORD"] = password
+
+    set_proxy(address, username, password)
+    return True
+
+def apply_arc_proxy(default_configs):
+    """
+    Check Arc agent settings for proxy configuration (non-authenticated only).
+    Returns True if Arc proxy was applied, False otherwise.
+    """
+    if not os.path.isfile(ArcSettingsFile):
+        return False
+
+    with open(ArcSettingsFile, "r") as f:
+        data = f.read()
+
+    if not data:
+        return False
+
+    json_data = json.loads(data)
+    if json_data is None:
+        return False
+
+    # Check if AMA is in the proxy bypass list
+    bypass_list = json_data.get("proxy.bypass", [])
+    if "AMA" in bypass_list:
+        return False
+
+    url = json_data.get("proxy.url", "")
+    if not url:
+        return False
+
+    default_configs["MDSD_PROXY_ADDRESS"] = url
+    set_proxy(url, "", "")
+    return True
 
 def set_proxy(address, username, password):
     """
