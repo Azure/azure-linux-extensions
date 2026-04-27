@@ -13,6 +13,7 @@ ExecReload=/bin/kill -HUP $MAINPID
 KillMode=control-group
 User=azuremetricsext
 Group=azuremonitoragent
+%SUPPLEMENTARY_GROUPS_LINE%
 RuntimeDirectory=azureotelcollector azuremetricsext
 RuntimeDirectoryMode=0755
 
