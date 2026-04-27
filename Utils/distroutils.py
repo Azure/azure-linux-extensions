@@ -4,33 +4,40 @@ import random
 import string
 import hashlib
 import sys
-
-# crypt module was removed in Python 3.13
-# For Python < 3.11: use builtin crypt
-# For Python >= 3.11: try crypt_r package, then ctypes fallback
-if sys.version_info >= (3, 11):
-    try:
-        import crypt_r as crypt
-    except ImportError:
-        try:
-            from Utils import crypt_fallback as crypt
-        except ImportError:
-            crypt = None
-else:
-    try:
-        import crypt
-    except ImportError:
-        try:
-            from Utils import crypt_fallback as crypt
-        except ImportError:
-            crypt = None
-
 import platform
 import re
 import Utils.logger as logger
 import Utils.extensionutils as ext_utils
 import Utils.constants as constants
 
+# crypt module was removed in Python 3.13
+# first we try to import the crypt module which covers crypt and crypt_r
+# then we try legacyrypt and finally fallback to passlib 
+
+cryptImported = False
+passLibImported = False
+
+try:
+    from crypt import crypt as crypt
+    cryptImported = True
+except ImportError:
+    pass 
+
+if cryptImported == False: 
+    # checking for python version, greater than or equal to 3.13
+    if (sys.version_info[0] == 3 and sys.version_info[1] >= 13) or (sys.version_info[0] > 3):
+        try: 
+            from legacycrypt import crypt
+            cryptImported = True
+        except ImportError:
+            pass 
+
+if cryptImported == False: 
+    try: 
+        from passlib.hash import sha512_crypt
+        passLibImported = True
+    except ImportError:
+        pass 
 
 def get_my_distro(config, os_name=None):
     if 'FreeBSD' in platform.system():
@@ -174,7 +181,20 @@ class GenericDistro(object):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
-        return crypt.crypt(password, salt)
+
+        if cryptImported:
+            # salt is randomly generated above
+            # default crypt_id is 6 (SHA-512), else Provisioning.PasswordCryptId is used, see change_password() for details
+            return crypt(password, salt)
+        elif passLibImported:
+            # passlib auto-generates a cryptographically random salt
+            # no crypt id as this uses SHA-512, so crypt_id from Provisioning.PasswordCryptId will be ignored
+            return sha512_crypt.hash(password)
+        else:
+            raise ImportError(
+                "Password hashing is unavailable. Install one of: 'crypt' (Python < 3.13), "
+                "'legacycrypt', or 'passlib'."
+            )
 
     def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
