@@ -435,43 +435,7 @@ def install():
             hutil_log_info("'which' package missing from SLES {0} machine, attempting to install.".format(vm_ver))
             which_exit_code, which_output = run_command_and_log("zypper --non-interactive install which")
             if which_exit_code != 0:
-                hutil_log_info("Could not install 'which' via zypper (exit code {0}). Creating 'which' shim using 'command -v' as fallback.".format(which_exit_code))
-                # Create a shim script so that calls to 'which' in RPM post-install scripts still work
-                try:
-                    which_shim = "/usr/local/bin/which"
-                    with open(which_shim, "w") as f:
-                        f.write("#!/bin/sh\ncommand -v \"$@\"\n")
-                    os.chmod(which_shim, 0o755)
-                    hutil_log_info("Created 'which' shim at {0}".format(which_shim))
-                except Exception as ex:
-                    hutil_log_error("Failed to create 'which' shim: {0}".format(ex))
-
-    # Check if SLES 16+ VMs have 'which' package (changed from Requires to Recommends in spec, may not be installed)
-    if (vm_dist.startswith('suse') or vm_dist.startswith('sles')) and int(vm_ver.split('.')[0]) >= 16:
-        check_which, _ = run_command_and_log("rpm -q which")
-        if check_which != 0:
-            hutil_log_info("'which' package missing from SLES {0} machine, attempting to install.".format(vm_ver))
-            which_exit_code, which_output = run_command_and_log("zypper --non-interactive install which")
-            if which_exit_code != 0:
-                hutil_log_info("Could not install 'which' via zypper (exit code {0}). Creating 'which' shim using 'command -v' as fallback.".format(which_exit_code))
-                # Create a shim script so that calls to 'which' in RPM post-install scripts still work
-                try:
-                    which_shim = "/usr/local/bin/which"
-                    with open(which_shim, "w") as f:
-                        f.write("#!/bin/sh\ncommand -v \"$@\"\n")
-                    os.chmod(which_shim, 0o755)
-                    hutil_log_info("Created 'which' shim at {0}".format(which_shim))
-                except Exception as ex:
-                    hutil_log_error("Failed to create 'which' shim: {0}".format(ex))
-
-    # Check if SLES 16+ VMs have 'which' package (changed from Requires to Recommends in spec, may not be installed)
-    if (vm_dist.startswith('suse') or vm_dist.startswith('sles')) and int(vm_ver.split('.')[0]) >= 16:
-        check_which, _ = run_command_and_log("rpm -q which")
-        if check_which != 0:
-            hutil_log_info("'which' package missing from SLES {0} machine, attempting to install.".format(vm_ver))
-            which_exit_code, which_output = run_command_and_log("zypper --non-interactive install which")
-            if which_exit_code != 0:
-                hutil_log_info("Could not install 'which' via zypper (exit code {0}). Creating 'which' shim using 'command -v' as fallback.".format(which_exit_code))
+                hutil_log_info("Could not install 'which' via zypper (exit code {0}). Creating 'which' alias using 'command -v' as fallback.".format(which_exit_code))
                 # Create a shim script so that calls to 'which' in RPM post-install scripts still work
                 try:
                     which_shim = "/usr/local/bin/which"
