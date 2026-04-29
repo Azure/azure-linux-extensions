@@ -428,7 +428,7 @@ def install():
             if rsyslog_exit_code != 0:
                 return rsyslog_exit_code, rsyslog_output
     
-    # Check if SLES 16+ VMs have 'which' package (changed from Requires to Recommends in spec, may not be installed)
+    # Check if SLES 16+ VMs have 'which' package
     if (vm_dist.startswith('suse') or vm_dist.startswith('sles')) and int(vm_ver.split('.')[0]) >= 16:
         check_which, _ = run_command_and_log("rpm -q which")
         if check_which != 0:
@@ -436,15 +436,15 @@ def install():
             which_exit_code, which_output = run_command_and_log("zypper --non-interactive install which")
             if which_exit_code != 0:
                 hutil_log_info("Could not install 'which' via zypper (exit code {0}). Creating 'which' alias using 'command -v' as fallback.".format(which_exit_code))
-                # Create a shim script so that calls to 'which' in RPM post-install scripts still work
+                # Create an alias so that calls to 'which' in RPM post-install scripts still work
                 try:
-                    which_shim = "/usr/local/bin/which"
-                    with open(which_shim, "w") as f:
+                    which_alias = "/usr/local/bin/which"
+                    with open(which_alias, "w") as f:
                         f.write("#!/bin/sh\ncommand -v \"$@\"\n")
-                    os.chmod(which_shim, 0o755)
-                    hutil_log_info("Created 'which' shim at {0}".format(which_shim))
+                    os.chmod(which_alias, 0o755)
+                    hutil_log_info("Created 'which' alias at {0}".format(which_alias))
                 except Exception as ex:
-                    hutil_log_error("Failed to create 'which' shim: {0}".format(ex))
+                    hutil_log_error("Failed to create 'which' alias: {0}".format(ex))
 
     # Flag to handle the case where the same package is already installed
     same_package_installed = False
