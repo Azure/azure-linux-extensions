@@ -434,6 +434,9 @@ def install():
         if check_which != 0:
             hutil_log_info("'which' package missing from SLES {0} machine, creating 'which' alias using 'command -v'.".format(vm_ver))
             try:
+                # Note: command -v also reports shell built-ins (e.g. echo, cd) unlike which,
+                # which only searches PATH for files. This is harmless for AMA's usages (e.g. 'which semanage')
+                # since those are always external executables.
                 which_alias = "/usr/local/bin/which"
                 with open(which_alias, "w") as f:
                     f.write("#!/bin/sh\ncommand -v \"$@\"\n")
@@ -636,11 +639,15 @@ def uninstall():
         # Clean up context marker (always do this)
         _cleanup_uninstall_context()
 
+        # Clean up 'which' alias created during install for SLES 16+
+        _cleanup_which_alias()
+
     except Exception as ex:
         exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
                 'Stacktrace: {1}'.format(ex, traceback.format_exc())
     return exit_code, output
+
 
 def force_uninstall_azure_monitor_agent():
     """
@@ -1275,6 +1282,27 @@ def _cleanup_uninstall_context():
             hutil_log_info("Uninstall context file does not exist, nothing to remove")
     except Exception as ex:
         hutil_log_error("Failed to cleanup uninstall context: {0}\n This may result in unintended behavior as described.\nIf the marker file exists and cannot be removed, uninstall will continue to keep the {1} path, leading users to have to remove it manually.".format(ex, AmaDataPath))
+
+def _cleanup_which_alias():
+    """
+    Clean up the 'which' alias created during install for SLES 16+.
+    Only removes the file if it is the shim we created (contains 'command -v').
+    """
+    try:
+        vm_dist, vm_ver = find_vm_distro('Uninstall')
+        vm_major = vm_ver.split('.')[0]
+        if not (vm_dist.startswith('suse') or vm_dist.startswith('sles')) or not vm_major.isdigit() or int(vm_major) < 16:
+            return
+
+        which_alias = "/usr/local/bin/which"
+        if os.path.exists(which_alias):
+            with open(which_alias, "r") as f:
+                content = f.read()
+            if "command -v" in content:
+                os.remove(which_alias)
+                hutil_log_info("Removed 'which' alias at {0}".format(which_alias))
+    except Exception as ex:
+        hutil_log_info("Failed to remove 'which' alias: {0}".format(ex))
 
 def restart_launcher():
     # start agent launcher
