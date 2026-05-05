@@ -4,9 +4,6 @@ Allow the owner of the Azure Virtual Machines to install the Azure Monitor Linux
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
 
-Azure Monitor Linux Agent Extension can:
-* Install the agent and pull configs 
-
 # User Guide
 
 ## 1. Deploying the Extension to a VM
