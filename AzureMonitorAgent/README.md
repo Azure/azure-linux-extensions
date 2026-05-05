@@ -33,6 +33,3 @@ To update the version of the esisting installation of Azure Monitor Linux Agent 
 
 ## Supported Linux Distributions 
 * [Azure Monitor Agent Supported Operating Systems](https://learn.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-supported-operating-systems#linux-operating-systems)
- 
-in HandlerEnvironment.json and reported back to Azure
-* The operation log of the extension is `/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-<version>/extension.log` file.
