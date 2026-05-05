@@ -1,14 +1,11 @@
 # AzureMonitorLinuxAgent Extension
 Allow the owner of the Azure Virtual Machines to install the Azure Monitor Linux Agent
 
-# The Latest Version is 1.6.2
-The extension is currently in Public Preview and is accessible to all public cloud regions in Azure. 
-
 You can read the User Guide below.
 * [Learn more: Azure Virtual Machine Extensions](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/)
 
 Azure Monitor Linux Agent Extension can:
-* Install the agent and pull configs from MCS
+* Install the agent and pull configs 
 
 # User Guide
 
@@ -35,19 +32,7 @@ To update the version of the esisting installation of Azure Monitor Linux Agent 
 
 
 ## Supported Linux Distributions 
- Currently Manually tested only on -
-* CentOS Linux 6, and 7 (x64)
-* Red Hat Enterprise Linux Server 6 and 7 (x64)
-* Ubuntu 16.04 LTS, 18.04 LTS(x64)
-
-Will Add more distros once they are tested
-
-## Troubleshooting
-
-* The status of the extension is reported back to Azure so that user can
-see the status on Azure Portal
-* All the extension installation and config files are unzipped into - 
-`/var/lib/waagent/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-<version>/packages/`
-and the tail of the output is logged into the log directory specified
+* [Azure Monitor Agent Supported Operating Systems](https://learn.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-supported-operating-systems#linux-operating-systems)
+ 
 in HandlerEnvironment.json and reported back to Azure
 * The operation log of the extension is `/var/log/azure/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-<version>/extension.log` file.
