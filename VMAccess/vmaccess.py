@@ -173,6 +173,8 @@ def _forcibly_reset_chap(hutil):
 
 
 def _is_sshd_config_modified(protected_settings):
+    if not protected_settings:
+        return False
     result = protected_settings.get('reset_ssh') or protected_settings.get('restore_backup_ssh') or protected_settings.get('password')
     return result is not None
 
