@@ -29,10 +29,10 @@ import os.path
 # it as a submodule of current module
 #
 def searchWAAgent():
-    agentPath = os.path.join(os.getcwd(), "main/WaagentLib.py")
+    agentPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "WaagentLib.py")
     if(os.path.isfile(agentPath)):
         return agentPath
-    user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
+    user_paths = os.environ.get('PYTHONPATH', '').split(os.pathsep)
     for user_path in user_paths:
         agentPath = os.path.join(user_path, 'waagent')
         if(os.path.isfile(agentPath)):
@@ -43,7 +43,7 @@ def searchWAAgentOld():
     agentPath = '/usr/sbin/waagent'
     if(os.path.isfile(agentPath)):
         return agentPath
-    user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
+    user_paths = os.environ.get('PYTHONPATH', '').split(os.pathsep)
     for user_path in user_paths:
         agentPath = os.path.join(user_path, 'waagent')
         if(os.path.isfile(agentPath)):
