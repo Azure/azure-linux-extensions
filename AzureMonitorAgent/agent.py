@@ -409,11 +409,11 @@ def install():
     set_os_arch('Install')
     vm_dist, vm_ver = find_vm_distro('Install')
 
-    # Check if Debian 12 VMs have rsyslog package (required for AMA 1.31+)
-    if (vm_dist.startswith('debian')) and vm_ver.startswith('12'):
+    # Check if Debian 12 and 13 VMs have rsyslog package (required for AMA 1.31+)
+    if (vm_dist.startswith('debian')) and ((vm_ver.startswith('12') or vm_ver.startswith('13')) or int(vm_ver.split('.')[0]) >= 12):
         check_rsyslog, _ = run_command_and_log("dpkg -s rsyslog")
         if check_rsyslog != 0:
-            hutil_log_info("'rsyslog' package missing from Debian 12 machine, installing to allow AMA to run.")
+            hutil_log_info("'rsyslog' package missing from Debian {0} machine, installing to allow AMA to run.".format(vm_ver))
             rsyslog_exit_code, rsyslog_output = run_command_and_log("DEBIAN_FRONTEND=noninteractive apt-get update && \
                                                                     DEBIAN_FRONTEND=noninteractive apt-get install -y rsyslog")
             if rsyslog_exit_code != 0:
@@ -428,6 +428,23 @@ def install():
             if rsyslog_exit_code != 0:
                 return rsyslog_exit_code, rsyslog_output
     
+    # Check if SLES 16+ VMs have 'which' package (changed from Requires to Recommends in spec, may not be installed)
+    if (vm_dist.startswith('suse') or vm_dist.startswith('sles')) and int(vm_ver.split('.')[0]) >= 16:
+        check_which, _ = run_command_and_log("rpm -q which")
+        if check_which != 0:
+            hutil_log_info("'which' package missing from SLES {0} machine, creating 'which' alias using 'command -v'.".format(vm_ver))
+            try:
+                # Note: command -v also reports shell built-ins (e.g. echo, cd) unlike which,
+                # which only searches PATH for files. This is harmless for AMA's usages (e.g. 'which semanage')
+                # since those are always external executables.
+                which_alias = "/usr/local/bin/which"
+                with open(which_alias, "w") as f:
+                    f.write("#!/bin/sh\ncommand -v \"$@\"\n")
+                os.chmod(which_alias, 0o755)
+                hutil_log_info("Created 'which' alias at {0}".format(which_alias))
+            except Exception as ex:
+                hutil_log_error("Failed to create 'which' alias: {0}".format(ex))
+
     # Flag to handle the case where the same package is already installed
     same_package_installed = False
 
@@ -501,9 +518,9 @@ def install():
 
     set_metrics_binaries()
 
-    # Copy KqlExtension binaries
+    # Copy AstExtension binaries
     # Needs to be revisited for aarch64
-    copy_kqlextension_binaries()
+    copy_astextension_binaries()
 
     # Copy mdsd and fluent-bit with OpenSSL dynamically linked
     if is_feature_enabled('useDynamicSSL'):
@@ -599,6 +616,8 @@ def uninstall():
 
     remove_localsyslog_configs()
 
+    me_handler.remove_user(HUtilObj=HUtilObject)
+
     uninstall_azureotelcollector()
 
     # remove the logrotate config
@@ -620,11 +639,15 @@ def uninstall():
         # Clean up context marker (always do this)
         _cleanup_uninstall_context()
 
+        # Clean up 'which' alias created during install for SLES 16+
+        _cleanup_which_alias()
+
     except Exception as ex:
         exit_code = GenericErrorCode
         output = 'Uninstall failed with error: {0}\n' \
                 'Stacktrace: {1}'.format(ex, traceback.format_exc())
     return exit_code, output
+
 
 def force_uninstall_azure_monitor_agent():
     """
@@ -875,7 +898,7 @@ def enable():
         hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
         ensure["azuremonitoragentmgr"] = True
                 
-    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+    elif (protected_settings is None or len(protected_settings) == 0) or get_proxy_mode(public_settings) == "application":
         hutil_log_info("Detected Azure Monitor mode; azuremonitoragent service will be started to handle Azure Monitor configuration")
         ensure["azuremonitoragent"] = True
         handle_mcs_config(public_settings, protected_settings, default_configs)
@@ -956,9 +979,9 @@ def enable():
 
     if platform.machine() != 'aarch64':
         if "ENABLE_MCS" in default_configs and default_configs["ENABLE_MCS"] == "true":
-            # start/enable kql extension only in 3P mode and non aarch64
-            kql_start_code, kql_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", *operations))
-            output += kql_output # do not block if kql start fails
+            # start/enable ast extension only in 3P mode and non aarch64
+            _, ast_output = run_command_and_log(get_service_command("azuremonitor-astextension", *operations))
+            output += ast_output # do not block if ast start fails
             # start transformation config watcher process
             start_transformconfig_process()
 
@@ -1094,52 +1117,17 @@ def handle_mcs_config(public_settings, protected_settings, default_configs):
     default_configs["PA_FLUENT_SOCKET_PORT"] = "13005"
     # this port will be dynamic in future
     default_configs["PA_DATA_PORT"] = "13005"
-    proxySet = False
-
     # fetch proxy settings
-    if public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application":
-        default_configs["MDSD_PROXY_MODE"] = "application"
+    proxy_mode = get_proxy_mode(public_settings)
 
-        if "address" in public_settings.get("proxy"):
-            default_configs["MDSD_PROXY_ADDRESS"] = public_settings.get("proxy").get("address")
-        else:
-            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
-
-        if "auth" in public_settings.get("proxy") and public_settings.get("proxy").get("auth") == True:
-            if protected_settings is not None and "proxy" in protected_settings and "username" in protected_settings.get("proxy") and "password" in protected_settings.get("proxy"):
-                default_configs["MDSD_PROXY_USERNAME"] = protected_settings.get("proxy").get("username")
-                default_configs["MDSD_PROXY_PASSWORD"] = protected_settings.get("proxy").get("password")
-                set_proxy(default_configs["MDSD_PROXY_ADDRESS"], default_configs["MDSD_PROXY_USERNAME"], default_configs["MDSD_PROXY_PASSWORD"])
-                proxySet = True
-            else:
-                log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
-        else:
-            set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
-            proxySet = True
-    
-    # is this Arc? If so, check for proxy     
-    if os.path.isfile(ArcSettingsFile):
-        f = open(ArcSettingsFile, "r")
-        data = f.read()
-
-        if (data != ''):
-            json_data = json.loads(data)
-            BypassProxy = False
-            if json_data is not None and "proxy.bypass" in json_data:
-                bypass = json_data["proxy.bypass"]
-                # proxy.bypass is an array
-                if "AMA" in bypass:
-                    BypassProxy = True
-                    
-            if not BypassProxy and json_data is not None and "proxy.url" in json_data:
-                url = json_data["proxy.url"]
-                # only non-authenticated proxy config is supported
-                if url != '':
-                    default_configs["MDSD_PROXY_ADDRESS"] = url
-                    set_proxy(default_configs["MDSD_PROXY_ADDRESS"], "", "")
-                    proxySet = True
-
-    if not proxySet:
+    if apply_arc_proxy(default_configs):
+        pass  # Arc proxy takes precedence over extension settings
+    elif proxy_mode == "none":
+        default_configs["MDSD_PROXY_MODE"] = "none"
+        unset_proxy()
+    elif proxy_mode == "application":
+        apply_application_proxy(public_settings, protected_settings, default_configs)
+    else:
         unset_proxy()
 
     # set arc autonomous endpoints
@@ -1183,7 +1171,7 @@ def get_control_plane_mode():
     # Legacy schema
     elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
         GcsEnabled = True
-    elif (protected_settings is None or len(protected_settings) == 0) or (public_settings is not None and "proxy" in public_settings and "mode" in public_settings.get("proxy") and public_settings.get("proxy").get("mode") == "application"):
+    elif (protected_settings is None or len(protected_settings) == 0) or get_proxy_mode(public_settings) == "application":
         McsEnabled = True
     else:
         GcsEnabled = True
@@ -1225,12 +1213,13 @@ def disable():
                 output += "Output of '{0}':\n{1}".format(status_command, status_output)
 
     if platform.machine() != 'aarch64':
-        # stop kql extensionso that is not started after system reboot. Do not block if it fails.
-        kql_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-kqlextension", "stop", "disable"))
-        if kql_exit_code != 0:
-            status_command = get_service_command("azuremonitor-kqlextension", "status")
-            kql_exit_code, kql_status_output = run_command_and_log(status_command)
-            hutil_log_info(kql_status_output)
+        # stop ast extensionso that is not started after system reboot. Do not block if it fails.
+        ast_exit_code, disable_output = run_command_and_log(get_service_command("azuremonitor-astextension", "stop", "disable"))
+        if ast_exit_code != 0:
+            hutil_log_info(disable_output)
+            status_command = get_service_command("azuremonitor-astextension", "status")
+            _, ast_status_output = run_command_and_log(status_command)
+            hutil_log_info(ast_status_output)
 
     return exit_code, output
 
@@ -1294,17 +1283,107 @@ def _cleanup_uninstall_context():
     except Exception as ex:
         hutil_log_error("Failed to cleanup uninstall context: {0}\n This may result in unintended behavior as described.\nIf the marker file exists and cannot be removed, uninstall will continue to keep the {1} path, leading users to have to remove it manually.".format(ex, AmaDataPath))
 
+def _cleanup_which_alias():
+    """
+    Clean up the 'which' alias created during install for SLES 16+.
+    Only removes the file if it is the shim we created (contains 'command -v').
+    """
+    try:
+        vm_dist, vm_ver = find_vm_distro('Uninstall')
+        vm_major = vm_ver.split('.')[0]
+        if not (vm_dist.startswith('suse') or vm_dist.startswith('sles')) or not vm_major.isdigit() or int(vm_major) < 16:
+            return
+
+        which_alias = "/usr/local/bin/which"
+        if os.path.exists(which_alias):
+            with open(which_alias, "r") as f:
+                content = f.read()
+            if "command -v" in content:
+                os.remove(which_alias)
+                hutil_log_info("Removed 'which' alias at {0}".format(which_alias))
+    except Exception as ex:
+        hutil_log_info("Failed to remove 'which' alias: {0}".format(ex))
+
 def restart_launcher():
     # start agent launcher
     hutil_log_info('Handler initiating agent launcher')
     if is_systemd():
         exit_code, output = run_command_and_log('systemctl restart azuremonitor-agentlauncher && systemctl enable azuremonitor-agentlauncher')
 
-def restart_kqlextension():
+def restart_astextension():
     # start agent transformation extension process
-    hutil_log_info('Handler initiating agent transformation extension (KqlExtension) restart and enable')
+    hutil_log_info('Handler initiating agent transformation extension (AstExtension) restart and enable')
     if is_systemd():
-        exit_code, output = run_command_and_log('systemctl restart azuremonitor-kqlextension && systemctl enable azuremonitor-kqlextension')
+        exit_code, output = run_command_and_log('systemctl restart azuremonitor-astextension && systemctl enable azuremonitor-astextension')
+
+def get_proxy_mode(public_settings):
+    """
+    Extract the proxy mode from public settings, or None if not configured.
+    """
+    if public_settings is None:
+        return None
+    proxy_config = public_settings.get("proxy")
+    if proxy_config is None:
+        return None
+    return proxy_config.get("mode")
+
+def apply_application_proxy(public_settings, protected_settings, default_configs):
+    """
+    Configure explicit application proxy from extension settings.
+    Returns True if proxy was set, False otherwise (exits on invalid config).
+    """
+    proxy_config = public_settings.get("proxy", {})
+    default_configs["MDSD_PROXY_MODE"] = "application"
+
+    address = proxy_config.get("address")
+    if not address:
+        log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "address" is required in proxy public setting')
+    default_configs["MDSD_PROXY_ADDRESS"] = address
+
+    username = ""
+    password = ""
+    if proxy_config.get("auth") == True:
+        protected_proxy = (protected_settings or {}).get("proxy", {})
+        username = protected_proxy.get("username")
+        password = protected_proxy.get("password")
+        if not username or not password:
+            log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+        default_configs["MDSD_PROXY_USERNAME"] = username
+        default_configs["MDSD_PROXY_PASSWORD"] = password
+
+    set_proxy(address, username, password)
+    return True
+
+def apply_arc_proxy(default_configs):
+    """
+    Check Arc agent settings for proxy configuration (non-authenticated only).
+    Returns True if Arc proxy was applied, False otherwise.
+    """
+    if not os.path.isfile(ArcSettingsFile):
+        return False
+
+    with open(ArcSettingsFile, "r") as f:
+        data = f.read()
+
+    if not data:
+        return False
+
+    json_data = json.loads(data)
+    if json_data is None:
+        return False
+
+    # Check if AMA is in the proxy bypass list
+    bypass_list = json_data.get("proxy.bypass", [])
+    if "AMA" in bypass_list:
+        return False
+
+    url = json_data.get("proxy.url", "")
+    if not url:
+        return False
+
+    default_configs["MDSD_PROXY_ADDRESS"] = url
+    set_proxy(url, "", "")
+    return True
 
 def set_proxy(address, username, password):
     """
@@ -1750,9 +1829,7 @@ def metrics_watcher(hutil_error, hutil_log):
                             is_lad=False,
                             managed_identity=managed_identity_str,
                             HUtilObj=HUtilObject,
-                            is_local_control_channel=False,
-                            user="azuremetricsext",
-                            group="azuremonitoragent")
+                            is_local_control_channel=False)
                         enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
                     elif is_feature_enabled("enableCMV2"):
                         if os.path.exists(me_service_template_path):
@@ -1776,7 +1853,7 @@ def metrics_watcher(hutil_error, hutil_log):
             fluent_port = ''
             if os.path.isfile(AMAFluentPortFilePath):
                 f = open(AMAFluentPortFilePath, "r")
-                fluent_port = f.read()
+                fluent_port = validate_port_number(f.read(), "fluent")
                 f.close()
             
             if fluent_port != '' and os.path.isfile(FluentCfgPath) and fluent_port != MDSDFluentPort:
@@ -1872,7 +1949,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                             telegraf_config, telegraf_namespaces = telhandler.handle_config(
                                 json_data,
-                                "unix:///run/azuremonitoragent/mdm_influxdb.socket",
+                                "unix:///run/azuremetricsext/mdm_influxdb.socket",
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
@@ -2045,7 +2122,7 @@ def transformconfig_watcher(hutil_error, hutil_log):
                     crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
                     if (crc != last_crc):
-                        restart_kqlextension()
+                        restart_astextension()
                         last_crc = crc
                 f.close()
 
@@ -2072,7 +2149,7 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     syslog_port = ''
     if os.path.isfile(AMASyslogPortFilePath):
         f = open(AMASyslogPortFilePath, "r")
-        syslog_port = f.read()
+        syslog_port = validate_port_number(f.read(), "syslog")
         f.close()
         
     useSyslogTcp = False
@@ -2647,25 +2724,25 @@ def get_ssl_cert_info(operation):
         if distro.startswith(name):
             if version.startswith('12'):
                 return 'SSL_CERT_DIR', '/var/lib/ca-certificates/openssl'
-            elif version.startswith('15'):
+            elif version.startswith('15') or version.startswith('16'):
                 return 'SSL_CERT_DIR', '/etc/ssl/certs'
 
     log_and_exit(operation, GenericErrorCode, 'Unable to determine values for SSL_CERT_DIR or SSL_CERT_FILE')
 
-def copy_kqlextension_binaries():
-    kqlextension_bin_local_path = os.getcwd() + "/KqlExtensionBin/"
-    kqlextension_bin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/"
-    kqlextension_runtimesbin = "/opt/microsoft/azuremonitoragent/bin/kqlextension/runtimes/"
-    if os.path.exists(kqlextension_runtimesbin):
+def copy_astextension_binaries():
+    astextension_bin_local_path = os.getcwd() + "/AstExtensionBin/"
+    astextension_bin = "/opt/microsoft/azuremonitoragent/bin/astextension/"
+    astextension_runtimesbin = "/opt/microsoft/azuremonitoragent/bin/astextension/runtimes/"
+    if os.path.exists(astextension_runtimesbin):
         # only for versions of AMA with .NET runtimes
-        rmtree(kqlextension_runtimesbin)
-    # only for versions with Kql .net cleanup .NET files as it is causing issues with AOT runtime
-    for f in os.listdir(kqlextension_bin):
-        if f != 'KqlExtension' and f != 'appsettings.json':
-            os.remove(os.path.join(kqlextension_bin, f))
+        rmtree(astextension_runtimesbin)
+    # only for versions with Ast .net cleanup .NET files as it is causing issues with AOT runtime
+    for f in os.listdir(astextension_bin):
+        if f != 'AstExtension' and f != 'appsettings.json':
+            os.remove(os.path.join(astextension_bin, f))
 
-    for f in os.listdir(kqlextension_bin_local_path):
-        compare_and_copy_bin(kqlextension_bin_local_path + f, kqlextension_bin + f)
+    for f in os.listdir(astextension_bin_local_path):
+        compare_and_copy_bin(astextension_bin_local_path + f, astextension_bin + f)
 
 
 def is_arc_installed():
@@ -3153,6 +3230,31 @@ def log_and_exit(operation, exit_code = GenericErrorCode, message = ''):
     else:
         update_status_file(operation, str(exit_code), exit_status, message)
         sys.exit(exit_code)
+
+
+def validate_port_number(port_value, port_name):
+    """
+    Validates that a port value is a valid integer within the range 1-65535.
+
+    Args:
+        port_value: The port value to validate (string)
+        port_name: The name of the port for error messages (e.g., "fluent", "syslog")
+
+    Returns:
+        The validated port number as a string, or empty string if invalid
+    """
+    if not port_value:
+        return ''
+
+    try:
+        port_int = int(port_value.strip())
+        if port_int < 1 or port_int > 65535:
+            hutil_log_error('Invalid {0} port number: {1}. Must be between 1-65535.'.format(port_name, port_int))
+            return ''
+        return str(port_int)
+    except ValueError:
+        hutil_log_error('Invalid {0} port value: {1}. Must be an integer.'.format(port_name, port_value))
+        return ''
 
 
 # Exceptions

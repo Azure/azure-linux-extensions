@@ -81,13 +81,6 @@ import datetime
 import Utils.Status
 from Utils.EventLoggerUtil import EventLogger
 from Utils.LogHelper import LoggingLevel, LoggingConstants, FileHelpers
-
-# Handle the deprecation of platform.dist() in Python 3.8+
-try:
-    import distro
-    HAS_DISTRO = True
-except ImportError:
-    HAS_DISTRO = False
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -212,14 +205,75 @@ class HandlerUtility:
     def fetch_log_message(self):
         return self.log_message
 
+    def _decrypt_protected_settings(self, encrypted_file, cert_path, pkey_path):
+        """
+        Decrypt protected settings with FIPS 140-3 AES256 support and defensive fallback.
+        
+        For FIPS 140-3 compliance, CRP is upgrading encryption to AES256. Opted-in VMs receive
+        protected settings encrypted with AES256, while other VMs continue using DES_EDE3_CBC.
+        
+        The 'cms' command supports both AES256 and DES_EDE3_CBC encryption, while 'smime' only
+        supports DES_EDE3_CBC. We try 'cms' first and fallback to 'smime' for compatibility.
+        
+        Args:
+            encrypted_file: Path to temporary file containing encrypted settings
+            cert_path: Path to certificate file (.crt)
+            pkey_path: Path to private key file (.prv)
+            
+        Returns:
+            Decrypted cleartext string
+        """
+        cleartxt = None
+        
+        # Determine base64 decode command based on platform
+        if 'NS-BSD' in platform.system():
+            # base64 tool is not available with NSBSD, use openssl
+            base64_cmd = self.patching.openssl_path + " base64 -d -A -in " + encrypted_file
+        else:
+            base64_cmd = self.patching.base64_path + " -d " + encrypted_file
+        
+        # Try OpenSSL CMS command first (supports both AES256 and DES_EDE3_CBC)
+        try:
+            cms_cmd = base64_cmd + " | " + self.patching.openssl_path + " cms -inform DER -decrypt -recip " + cert_path + " -inkey " + pkey_path
+            self.log("Attempting decryption using OpenSSL CMS command (supports AES256 and DES_EDE3_CBC)")
+            result = waagent.RunGetOutput(cms_cmd, chk_err=False, log_cmd=False)
+            if result[0] == 0 and result[1]:  # Success (return code 0) and non-empty output
+                cleartxt = result[1]
+                self.log("Successfully decrypted protected settings using CMS command")
+                return cleartxt
+            else:
+                self.log("CMS decryption failed with return code: " + str(result[0]) + ", attempting fallback to SMIME")
+        except Exception as e:
+            self.log("CMS decryption failed with exception: " + type(e).__name__ + ", attempting fallback to SMIME")
+        
+        # Fallback to OpenSSL SMIME command (supports DES_EDE3_CBC only)
+        try:
+            smime_cmd = base64_cmd + " | " + self.patching.openssl_path + " smime -inform DER -decrypt -recip " + cert_path + " -inkey " + pkey_path
+            self.log("Attempting decryption using OpenSSL SMIME command (fallback - supports DES_EDE3_CBC only)")
+            result = waagent.RunGetOutput(smime_cmd, chk_err=False, log_cmd=False)
+            if result[0] == 0 and result[1]:  # Success (return code 0) and non-empty output
+                cleartxt = result[1]
+                self.log("Successfully decrypted protected settings using SMIME command (fallback)")
+                return cleartxt
+            else:
+                self.error("SMIME decryption also failed with return code: " + str(result[0]))
+        except Exception as e:
+            self.error("SMIME decryption failed with exception: " + type(e).__name__)
+        
+        # If both methods fail, raise an error
+        if not cleartxt:
+            self.error("Failed to decrypt protected settings using both CMS and SMIME commands")
+            
+        return cleartxt
+
     def _parse_config(self, ctxt):
         config = None
         try:
             config = json.loads(ctxt)
         except:
-            self.error('JSON exception decoding ' + ctxt)
+            self.error('JSON exception decoding settings file')
         if config == None:
-            self.error("JSON error processing settings file:" + ctxt)
+            self.error('JSON error processing settings file')
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
             if 'protectedSettings' in handlerSettings and \
@@ -234,18 +288,16 @@ class HandlerUtility:
                 f.close()
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
-                if 'NS-BSD' in platform.system():
-                    # base64 tool is not available with NSBSD, use openssl
-                    cleartxt = waagent.RunGetOutput(self.patching.openssl_path + " base64 -d -A -in " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
-                else:
-                    cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                # Decrypt protected settings with FIPS 140-3 AES256 support and defensive fallback
+                # Try cms command first (supports both AES256 and DES_EDE3_CBC), fallback to smime if needed
+                cleartxt = self._decrypt_protected_settings(f.name, cert, pkey)
                 jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
+                    self.log('Config decoded correctly.')
                 except:
-                    self.error('JSON exception decoding ' + cleartxt)
+                    self.error('JSON exception decoding decrypted protected settings')
                 handlerSettings['protectedSettings'] = jctxt
-                self.log('Config decoded correctly.')
                 # cleaning/removing the temp files created
                 try:
                     if os.path.isfile(f.name):
@@ -559,74 +611,28 @@ class HandlerUtility:
             if 'NS-BSD' in platform.system():
                 release = re.sub('\\-.*$', '', str(platform.release()))
                 return "NS-BSD", release
-            
-            # Try modern approach first (Python 3.8+ compatible)
-            if HAS_DISTRO:
-                try:
-                    distro_name = distro.name()
-                    distro_version = distro.version()
-                    if distro_name and distro_version:
-                        return distro_name + "-" + distro_version, platform.release()
-                except Exception as e:
-                    self.log('Warning: distro package failed with error: %s' % str(e))
-            
-            # Fallback to linux_distribution (deprecated in Python 3.5, removed in Python 3.8)
-            if hasattr(platform, 'linux_distribution'):
-                try:
-                    distinfo = list(platform.linux_distribution(full_distribution_name=0))
-                    # remove trailing whitespace in distro name
-                    if(distinfo[0] == ''):
-                        osfile= open("/etc/os-release", "r")
-                        for line in osfile:
-                            lists=str(line).split("=")
-                            if(lists[0]== "NAME"):
-                                distroname = lists[1].split("\"")
-                            if(lists[0]=="VERSION"):
-                                distroversion = lists[1].split("\"")
-                        osfile.close()
-                        return distroname[1]+"-"+distroversion[1],platform.release()
-                    distinfo[0] = distinfo[0].strip()
-                    return  distinfo[0]+"-"+distinfo[1],platform.release()
-                except Exception as e:
-                    self.log('Warning: platform.linux_distribution failed with error: %s' % str(e))
-            
-            # Fallback to platform.dist() (deprecated in Python 3.5, removed in Python 3.8+)
-            if hasattr(platform, 'dist'):
-                try:
-                    distinfo = platform.dist()
-                    return  distinfo[0]+"-"+distinfo[1],platform.release()
-                except Exception as e:
-                    self.log('Warning: platform.dist failed with error: %s' % str(e))
-            
-            # Final fallback: try to parse /etc/os-release manually
-            try:
-                distroname = None
-                distroversion = None
-                with open("/etc/os-release", "r") as osfile:
+            if 'linux_distribution' in dir(platform):
+                distinfo = list(platform.linux_distribution(full_distribution_name=0))
+                # remove trailing whitespace in distro name
+                if(distinfo[0] == ''):
+                    osfile= open("/etc/os-release", "r")
                     for line in osfile:
-                        lists = str(line.strip()).split("=", 1)
-                        if len(lists) >= 2:
-                            key = lists[0].strip()
-                            value = lists[1].strip().strip('"')
-                            if key == "NAME":
-                                distroname = value
-                            elif key == "VERSION" or key == "VERSION_ID":
-                                distroversion = value
-                
-                if distroname and distroversion:
-                    return distroname + "-" + distroversion, platform.release()
-                elif distroname:
-                    return distroname + "-Unknown", platform.release()
-            except Exception as e:
-                self.log('Warning: Failed to parse /etc/os-release with error: %s' % str(e))
-            
-            # If all else fails, return unknown
-            return "Unknown", "Unknown"
-            
+                        lists=str(line).split("=")
+                        if(lists[0]== "NAME"):
+                            distroname = lists[1].split("\"")
+                        if(lists[0]=="VERSION"):
+                            distroversion = lists[1].split("\"")
+                    osfile.close()
+                    return distroname[1]+"-"+distroversion[1],platform.release()
+                distinfo[0] = distinfo[0].strip()
+                return  distinfo[0]+"-"+distinfo[1],platform.release()
+            else:
+                distinfo = platform.dist()
+                return  distinfo[0]+"-"+distinfo[1],platform.release()
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
-            return "Unknown","Unknown"
+            return "Unkonwn","Unkonwn"
 
     def substat_new_entry(self,sub_status,code,name,status,formattedmessage):
         sub_status_obj = Utils.Status.SubstatusObj(code,name,status,formattedmessage)
@@ -708,18 +714,9 @@ class HandlerUtility:
         date_place_holder = 'e2794170-c93d-4178-a8da-9bc7fd91ecc0'
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
-        # Convert TopLevelStatus object to JSON array string
-        # Before: stat_rept is TopLevelStatus object with timestampUTC="e2794170-c93d-4178-a8da-9bc7fd91ecc0"
-        # After: stat_rept = '[{"version":"1.0","timestampUTC":"e2794170-c93d-4178-a8da-9bc7fd91ecc0","status":{"name":"VMSnapshotLinux",...}}]'
         stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
-        # Replace placeholder GUID with actual Microsoft JSON date format first
-        # Before: "timestampUTC":"e2794170-c93d-4178-a8da-9bc7fd91ecc0"
-        # After: "timestampUTC":"\/Date(time_span)\/"
+        stat_rept = stat_rept.replace('\\\/', '\/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
         stat_rept = stat_rept.replace(date_place_holder,date_string)
-        # Now remove JSON-escaped forward slashes to get clean date format for C# DateTimeOffset
-        # Before: "timestampUTC":"\/Date(time_span)\/"
-        # After: "timestampUTC":"/Date(time_span)/"
-        stat_rept = stat_rept.replace(r'\/', '/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
 
         # Add Status as sub-status for Status to be written on Status-File
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)

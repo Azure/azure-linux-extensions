@@ -8,13 +8,12 @@ Environment="OTLP_GRPC_PORT=4317"
 Environment="OTLP_GRPC_PROM_HOST=127.0.0.1"
 Environment="OTLP_GRPC_PROM_PORT=4316"
 EnvironmentFile=-/etc/metrics-extension.d/options.conf
-ExecStart=%ME_BIN% -EnableDcrManagedSources -ManagedIdentity %ME_MANAGED_IDENTITY% -DataDirectory %ME_DATA_DIRECTORY% -Input influxdb_local -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -LogLevel Info -Logger Console -OperationEnvironment AMA-Linux/AMA_VERSION -ConfigOverrides "{\"otlp\":{\"endpoints\":[\"${OTLP_GRPC_PROM_HOST}:${OTLP_GRPC_PROM_PORT}\"]}}"
+ExecStart=%ME_BIN% -EnableDcrManagedSources -ManagedIdentity %ME_MANAGED_IDENTITY% -DataDirectory %ME_DATA_DIRECTORY% -Input influxdb_local -InfluxDbSocketPath %ME_INFLUX_SOCKET_FILE_PATH% -LogLevel Info -Logger Console -OperationEnvironment AMA-Linux/AMA_VERSION -ConfigOverrides "{\"otlp\":{\"endpoints\":[\"${OTLP_GRPC_PROM_HOST}:${OTLP_GRPC_PROM_PORT}\"]}}"
 ExecReload=/bin/kill -HUP $MAINPID
-Restart=on-failure
-RestartForceExitStatus=SIGPIPE
 KillMode=control-group
 User=azuremetricsext
 Group=azuremonitoragent
+%SUPPLEMENTARY_GROUPS_LINE%
 RuntimeDirectory=azureotelcollector azuremetricsext
 RuntimeDirectoryMode=0755
 

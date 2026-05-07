@@ -72,6 +72,7 @@ class CommonVariables:
     isAnyWADiskIncluded = 'isAnyWADiskIncluded'
     isAnyDirectDriveDiskIncluded = 'isAnyDirectDriveDiskIncluded'
     diskEncryptionKey = "x-ms-meta-DiskEncryptionSettings"
+    instantAccessDurationMinutes = 'instantAccessDurationMinutes'
 
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'

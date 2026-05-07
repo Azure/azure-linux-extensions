@@ -64,6 +64,11 @@ ARMDomainMap = {
     ArcACloudName:      "armmanagement.autonomous.cloud.private"
 }
 
+MeCMv2RuntimeDirectory = "/var/run/azuremetricsext"
+MeCMv2ServiceUser = "azuremetricsext"
+MeCMv2ServiceGroup = "azuremonitoragent"
+HimdsGroupName = "himds"
+
 
 def is_running(is_lad):
     """
@@ -354,7 +359,7 @@ def get_ArcA_MSI_token(resource = "https://monitoring.azs"):
     return True, token_string, log_messages
 
 
-def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port, managed_identity="sai", HUtilObj=None):
+def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port, managed_identity="sai", HUtilObj=None, supplementary_grps=None):
     """
     Setup the metrics service if VM is using systemd
     :param configFolder: Path for the config folder for metrics extension
@@ -370,6 +375,8 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
     if not os.path.exists(configFolder):
         raise Exception("Metrics extension config directory does not exist. Failed to set up ME service.")
 
+    me_influx_socket_path = configFolder + "/mdm_influxdb.socket"
+
     if os.path.isfile(me_service_template_path):
         copyfile(me_service_template_path, me_service_path)
 
@@ -379,6 +386,11 @@ def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, m
             os.system(r"sed -i 's+%ME_DATA_DIRECTORY%+{1}+' {0}".format(me_service_path, configFolder))
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
             os.system(r"sed -i 's+%ME_MANAGED_IDENTITY%+{1}+' {0}".format(me_service_path, managed_identity))
+            os.system(r"sed -i 's+%ME_INFLUX_SOCKET_FILE_PATH%+{1}+' {0}".format(me_service_path, me_influx_socket_path))
+            supplementary_groups_line = ""
+            if supplementary_grps:
+                supplementary_groups_line = "SupplementaryGroups={0}".format(supplementary_grps)
+            os.system(r"sed -i 's+%SUPPLEMENTARY_GROUPS_LINE%+{1}+' {0}".format(me_service_path, supplementary_groups_line))
             daemon_reload_status = os.system("systemctl daemon-reload")
             if daemon_reload_status != 0:
                 message = "Unable to reload systemd after ME service file change. Failed to set up ME service. Check system for hardening. Exit code:" + str(daemon_reload_status)
@@ -470,7 +482,8 @@ def start_metrics(is_lad, managed_identity="sai"):
         if is_lad:
             binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbHost 127.0.0.1 -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
         else:
-            binary_exec_command = "{0} -TokenSource AMCS -ManagedIdentity {1} -Input influxdb_udp,otlp_grpc,otlp_grpc_prom -InfluxDbSocketPath /var/run/azuremonitoragent/mdm_influxdb.socket -LogLevel Error".format(metrics_ext_bin, managed_identity)
+            log_messages += "MetricsExtension will not be started."
+            return False, log_messages
         
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
@@ -829,33 +842,21 @@ def get_metrics_extension_service_name(is_lad):
         return metrics_constants.metrics_extension_service_name
 
 
-def setup_me(is_lad, managed_identity="sai", HUtilObj=None, is_local_control_channel=True, user=None, group=None):
+def setup_me(is_lad, managed_identity="sai", HUtilObj=None, is_local_control_channel=True):
     """
     The main method for creating and writing MetricsExtension configuration as well as service setup
     :param is_lad: Boolean value for whether the extension is Lad or not (AMA)
     :param is_local_control_channel: Boolean value for whether MetricsExtension needs to be run in `-LocalControlChannel` mode (CMv1 only)
-    :param user: User that would own MetricsExtension process. If not specified, would default to the caller, in this case being root
-    :param group: Group that would own MetricsExtension process. If not specified, would default to the caller, in this case being root
     """
     _, config_folder = get_handler_vars()
     me_config_dir = config_folder + "/metrics_configs/"
-    create_empty_data_directory(me_config_dir)
+    setup_data_directory(me_config_dir)
+    supplementary_grps = ""
 
     if not is_local_control_channel:
         # CMv2 and related modes
         me_monitoring_account = ""
-        if user and group:
-            # Removing it as permissions might not match, and ME will create this with the right permissions
-            remove_file("/var/run/azuremonitoragent/mdm_influxdb.socket")
-            # Create user/group for metrics-extension.service if it is requested
-            ensure_user_and_group(user, group, create_if_missing=True)
-            # For ARC, add user to himds group if it exists
-            ensure_user_and_group(user, "himds", create_if_missing=False)
-            # Append group permissions for folder containing influxDB socket file, so the user can create them - in this case ME
-            setup_user_and_group_access("/var/run/azuremonitoragent/", user)
-            # In CMv2 with user and group specified, create directory for MetricsExtension config caching
-            me_config_dir = "/var/run/azuremetricsext"
-            create_empty_data_directory(me_config_dir, user, group)
+        me_config_dir, supplementary_grps = prepare_cmv2_service_runtime(HUtilObj=HUtilObj)
     else:
         # query imds to get the required information
         az_resource_id, subscription_id, location, az_environment, data = get_imds_values(is_lad)
@@ -951,142 +952,193 @@ def setup_me(is_lad, managed_identity="sai", HUtilObj=None, is_local_control_cha
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
     if metrics_utils.is_systemd():
-        setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port, managed_identity, HUtilObj)
+        setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port, managed_identity, HUtilObj, supplementary_grps=supplementary_grps)
 
     return True
 
 
-def ensure_user_and_group(user, group, create_if_missing=False):
+def remove_user(user=MeCMv2ServiceUser, HUtilObj=None):
     """
-    Ensures if the user and group exists, optionally creating them if it does not exist.
-    Group is checked, user is checked and then user is added to the group.
-    Returns True if all of them are available (or created), else returns False.
+    Removes existing user.
     :param user: linux user
-    :param group: linux group
-    :param create_if_missing: boolean if true, create the requested user and group, where user belongs to the group
+    :param HUtilObj: utility object for logging
     """
-    # Check/Create group if missing
+    try:
+        pwd.getpwnam(user)
+    except KeyError:
+        if HUtilObj:
+            HUtilObj.log('User {0} does not exist.'.format(user))
+        return
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking user {0}: {1}'.format(user, e))
+        return
+
+    try:
+        process = subprocess.Popen(['userdel', '-r', user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        if process.returncode != 0:
+            if HUtilObj:
+                HUtilObj.log('Failed to delete user {0}. stderr: {1}'.format(user, err))
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while deleting user {0}: {1}'.format(user, e))
+
+
+def ensure_group(group, create_if_missing=False, HUtilObj=None):
+    """
+    Ensure the group exists, optionally creating it if it does not exist.
+    :param group: linux group
+    :param create_if_missing: boolean if true, create the requested group if it does not exist
+    """
     try:
         grp.getgrnam(group)
-        print('Group {0} exists.'.format(group))
+        if HUtilObj:
+            HUtilObj.log('Group {0} exists.'.format(group))
+        return True
     except KeyError:
         if create_if_missing:
             try:
                 process = subprocess.Popen(['groupadd', group], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 out, err = process.communicate()
                 if process.returncode != 0:
-                    print('Failed to create group {0}. stderr: {1}'.format(group, err))
+                    if HUtilObj:
+                        HUtilObj.log('Failed to create group {0}. stderr: {1}'.format(group, err))
                     return False
-                print('Group {0} created.'.format(group))
+                if HUtilObj:
+                    HUtilObj.log('Group {0} created.'.format(group))
+                return True
             except Exception as e:
-                print('Error while creating group {0}: {1}'.format(group, e))
+                if HUtilObj:
+                    HUtilObj.log('Error while creating group {0}: {1}'.format(group, e))
                 return False
         else:
-            print('Group {0} does not exist.'.format(group))
+            if HUtilObj:
+                HUtilObj.log('Group {0} does not exist.'.format(group))
             return False
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking group {0}: {1}'.format(group, e))
+        return False
 
-    # Check/Create user if missing
+
+def ensure_user_primary_group(user, group, create_if_missing=False, HUtilObj=None):
+    """
+    Ensure the user exists and uses the provided group as its primary group.
+    If the user is missing and creation is allowed, create it with that primary group.
+    :param user: linux user
+    :param group: linux group
+    :param create_if_missing: boolean if true, create the requested user if it does not exist
+    """
     try:
-        pwd.getpwnam(user)
-        print('User {0} exists.'.format(user))
+        user_info = pwd.getpwnam(user)
+        if HUtilObj:
+            HUtilObj.log('User {0} exists.'.format(user))
     except KeyError:
         if create_if_missing:
             try:
                 process = subprocess.Popen([
-                    'useradd', '--no-create-home', '--system', '--shell', '/usr/sbin/nologin', user
+                    'useradd', '--no-create-home', '--system', '--shell', '/usr/sbin/nologin', '-g', group, user
                 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 out, err = process.communicate()
                 if process.returncode != 0:
-                    print('Failed to create user {0}. stderr: {1}'.format(user, err))
+                    if HUtilObj:
+                        HUtilObj.log('Failed to create user {0}. stderr: {1}'.format(user, err))
                     return False
-                print('User {0} created.'.format(user))
+                if HUtilObj:
+                    HUtilObj.log('User {0} created.'.format(user))
+                    HUtilObj.log('User {0} created with primary group {1}.'.format(user, group))
+                return True
             except Exception as e:
-                print('Error while creating user {0}: {1}'.format(user, e))
+                if HUtilObj:
+                    HUtilObj.log('Error while creating user {0}: {1}'.format(user, e))
                 return False
-        else:
-            print('User {0} does not exist.'.format(user))
-            return False
+        if HUtilObj:
+            HUtilObj.log('User {0} does not exist.'.format(user))
+        return False
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking user {0}: {1}'.format(user, e))
+        return False
 
-    # Add user to group
     try:
-        process = subprocess.Popen(['usermod', '-aG', group, user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        target_group = grp.getgrnam(group)
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking group {0}: {1}'.format(group, e))
+        return False
+
+    if user_info.pw_gid == target_group.gr_gid:
+        if HUtilObj:
+            HUtilObj.log('User {0} already has primary group {1}.'.format(user, group))
+        return True
+
+    try:
+        process = subprocess.Popen(['usermod', '-g', group, user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
         if process.returncode != 0:
-            print('Failed to add user {0} to group {1}. stderr: {2}'.format(user, group, err))
+            if HUtilObj:
+                HUtilObj.log('Failed to set primary group {0} for user {1}. stderr: {2}'.format(group, user, err))
             return False
-        print('User {0} added to group {1}.'.format(user, group))
+        if HUtilObj:
+            HUtilObj.log('User {0} primary group set to {1}.'.format(user, group))
+        return True
     except Exception as e:
-        print('Error while adding user {0} to group {1}: {2}'.format(user, group, e))
-        return False
-
-    print('User {0} added to group {1} (or already a member).'.format(user, group))
-    return True
-
-
-
-def remove_file(file_path):
-    """
-    Removes existing file.
-    Note: This is important as the older MetricsExtension might have created the socket file with root permissions.
-    This mechanism can be removed in the future, if the socket file is renamed.
-    """
-    try:
-        os.remove(file_path)
-        print('File {0} has been removed.'.format(file_path))
-    except Exception as e:
-        print('Error while deleting file {0}: {1}.'.format(file_path, e))
-
-
-def setup_user_and_group_access(directory, user):
-    """
-    Gets the group that owns the directory and enables write and execution permissions for group users.
-    Then the provided user is added to the group so that it is allowed to write and execute in the directory.
-    """
-    try:
-        # Step 1: Get the group owning the directory
-        dir_stat = os.stat(directory)
-        gid = dir_stat.st_gid
-        dir_group_name = grp.getgrgid(gid).gr_name
-        print('Directory group: {0}.'.format(dir_group_name))
-
-        # Step 2: Adjust directory permissions to ensure all group users can write and execute (to create socket file)
-        mode = stat.S_IMODE(dir_stat.st_mode)
-        desired_bits = stat.S_IWGRP | stat.S_IXGRP
-
-        if (mode & desired_bits) != desired_bits:
-            new_mode = mode | desired_bits
-            os.chmod(directory, new_mode)
-            print('Updated directory permissions to add group write+execute: {0} ({1}).'.format(oct(new_mode), directory))
-        else:
-            print('Directory already has group write+execute permission: {0} ({1}).'.format(oct(mode), directory))
-
-        # Step 3: Ensure user exists and is in the directory's group, else create it
-        return ensure_user_and_group(user, dir_group_name, create_if_missing=True)
-    except Exception as e:
-        print('Error in setup_user_and_group_access: {0}.'.format(e))
+        if HUtilObj:
+            HUtilObj.log('Error while setting primary group {0} for user {1}: {2}'.format(group, user, e))
         return False
 
 
-def create_empty_data_directory(me_config_dir, user=None, group=None, mode=0o755):
+def ensure_service_user_and_group(user, group, create_if_missing=False, HUtilObj=None):
+    """
+    Ensure the service group exists and the service user uses it as the primary group.
+    :param user: linux user
+    :param group: linux group
+    :param create_if_missing: boolean if true, create the requested user and group if they do not exist
+    """
+    if not ensure_group(group, create_if_missing=create_if_missing, HUtilObj=HUtilObj):
+        return False
+
+    return ensure_user_primary_group(user, group, create_if_missing=create_if_missing, HUtilObj=HUtilObj)
+
+
+def prepare_cmv2_service_runtime(user=MeCMv2ServiceUser, group=MeCMv2ServiceGroup, HUtilObj=None):
+    """
+    Prepare local runtime prerequisites for the CMv2 MetricsExtension service.
+    Returns the service data directory and any supplementary groups the unit should use at runtime.
+    """
+    if not ensure_service_user_and_group(user, group, create_if_missing=True, HUtilObj=HUtilObj):
+        raise Exception("Failed to ensure user {0} with primary group {1}.".format(user, group))
+
+    supplementary_grps = []
+    if ensure_group(HimdsGroupName, HUtilObj=HUtilObj):
+        supplementary_grps.append(HimdsGroupName)
+
+    setup_data_directory(MeCMv2RuntimeDirectory, user, group, clear_existing=False, HUtilObj=HUtilObj)
+    return MeCMv2RuntimeDirectory, " ".join(supplementary_grps)
+
+
+def setup_data_directory(me_config_dir, user=None, group=None, mode=0o755, clear_existing=True, HUtilObj=None):
     '''
-    Creates an empty data directory where MetricsExtension can store cached configurations.
+    Creates a data directory where MetricsExtension can store cached configurations.
     For CMv1, MetricsExtension requires mdsd to provide all configurations on disk.
-    For CMv2, MetricsExtension requires an empty data directory where it can cache its configurations.
+    For CMv2, MetricsExtension requires a runtime data directory where it can cache its configurations.
     '''
     try:
-        # Clear older config directory if exists.
-        if os.path.exists(me_config_dir):
+        if clear_existing and os.path.exists(me_config_dir):
             rmtree(me_config_dir)
-        os.makedirs(me_config_dir, mode=mode)
+        if not os.path.exists(me_config_dir):
+            os.makedirs(me_config_dir, mode=mode)
+        else:
+            os.chmod(me_config_dir, mode)
 
         if user and group:
-            # Get UID and GID from user and group names
             uid = pwd.getpwnam(user).pw_uid
             gid = grp.getgrnam(group).gr_gid
-
-            # Set the ownership
             os.chown(me_config_dir, uid, gid)
 
-        print('Directory {0} created with ownership {1}:{2}.'.format(me_config_dir, user, group))
+        if HUtilObj:
+            HUtilObj.log('Directory {0} created with ownership {1}:{2}.'.format(me_config_dir, user, group))
     except Exception as e:
-        print('Failed to create directory: {0}'.format(e))
+        if HUtilObj:
+            HUtilObj.log('Failed to create directory: {0}'.format(e))
