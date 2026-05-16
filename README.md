@@ -4,7 +4,7 @@ This project provides the source code of Linux extensions for Microsoft Azure Ia
 
 VM Extensions are injected components authored by Microsoft and Partners into Linux VM (IaaS) to enable software and configuration automation.
 
-You can read the document [about virtual machine extensions and features](https://azure.microsoft.com/en-us/documentation/articles/virtual-machines-extensions-features/).
+You can read the document [about virtual machine extensions and features](https://learn.microsoft.com/en-us/azure/virtual-machines/extensions/overview).
 
 # Extension List
 
