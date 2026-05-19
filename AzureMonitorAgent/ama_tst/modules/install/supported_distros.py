@@ -1,5 +1,4 @@
 supported_dists_x86_64 = {'redhat' : ['7', '8', '9', '10'], # Rhel
-                       'centos' : ['7', '8'], # CentOS
                        'oracle' : ['7', '8', '9'], # Oracle
                        'ol' : ['7', '8', '9'], # Oracle Linux
                        'debian' : ['9', '10', '11', '12', '13'], # Debian
@@ -16,7 +15,6 @@ supported_dists_x86_64 = {'redhat' : ['7', '8', '9', '10'], # Rhel
 supported_dists_aarch64 = {'redhat' : ['8', '9', '10'], # Rhel
                     'ubuntu' : ['18.04', '20.04', '22.04', '24.04'], # Ubuntu
                     'alma' : ['8'], # Alma
-                    'centos' : ['7'], # CentOS
                     'mariner' : ['2'], # Mariner 2
                     'azurelinux' : ['3'], # Azure Linux / Mariner 3
                     'sles' : ['15', '16'], # SLES
