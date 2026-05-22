@@ -257,6 +257,16 @@ def get_free_space_mb(dirname):
     st = os.statvfs(dirname)
     return (st.f_bavail * st.f_frsize) // (1024 * 1024)
 
+def is_truthy(value):
+    """
+    Check if value represents a truthy value in public settings.
+    """
+    if value is True:
+        return True
+    if isinstance(value, str) and value.strip().lower() == "true":
+        return True
+    return False
+
 def is_systemd():
     """
     Check if the system is using systemd
@@ -882,11 +892,11 @@ def enable():
         if len(public_settings) > 1 and ((geneva_configuration and not azure_monitor_configuration) or (azure_monitor_configuration and not geneva_configuration)):
             log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Mixing genevaConfiguration or azureMonitorConfiguration with other configuration schemas is not allowed')
 
-        if geneva_configuration and geneva_configuration.get("enable") == True:
+        if geneva_configuration and is_truthy(geneva_configuration.get("enable")):
             hutil_log_info("Detected Geneva+ mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
             ensure["azuremonitoragentmgr"] = True
             
-        if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
+        if azure_monitor_configuration and is_truthy(azure_monitor_configuration.get("enable")):
             hutil_log_info("Detected Azure Monitor+ mode; azuremonitoragent service will be started to handle Azure Monitor tenant")
             ensure["azuremonitoragent"] = True
             azure_monitor_public_settings = azure_monitor_configuration.get("configuration")
@@ -894,7 +904,7 @@ def enable():
             handle_mcs_config(azure_monitor_public_settings, azure_monitor_protected_settings, default_configs)
 
     # Legacy schema
-    elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
+    elif public_settings is not None and is_truthy(public_settings.get("GCS_AUTO_CONFIG")):
         hutil_log_info("Detected Auto-Config mode; azuremonitoragentmgr service will be started to handle Geneva tenants")
         ensure["azuremonitoragentmgr"] = True
                 
@@ -1164,12 +1174,12 @@ def get_control_plane_mode():
         geneva_configuration = public_settings.get(GenevaConfigKey)
         azure_monitor_configuration = public_settings.get(AzureMonitorConfigKey)
 
-        if geneva_configuration and geneva_configuration.get("enable") == True:
+        if geneva_configuration and is_truthy(geneva_configuration.get("enable")):
             GcsEnabled = True
-        if azure_monitor_configuration and azure_monitor_configuration.get("enable") == True:
+        if azure_monitor_configuration and is_truthy(azure_monitor_configuration.get("enable")):
             McsEnabled = True
     # Legacy schema
-    elif public_settings is not None and public_settings.get("GCS_AUTO_CONFIG") == True:
+    elif public_settings is not None and is_truthy(public_settings.get("GCS_AUTO_CONFIG")):
         GcsEnabled = True
     elif (protected_settings is None or len(protected_settings) == 0) or get_proxy_mode(public_settings) == "application":
         McsEnabled = True
@@ -1342,7 +1352,7 @@ def apply_application_proxy(public_settings, protected_settings, default_configs
 
     username = ""
     password = ""
-    if proxy_config.get("auth") == True:
+    if is_truthy(proxy_config.get("auth")):
         protected_proxy = (protected_settings or {}).get("proxy", {})
         username = protected_proxy.get("username")
         password = protected_proxy.get("password")
