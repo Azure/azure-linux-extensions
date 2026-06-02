@@ -6,6 +6,7 @@ The following document provides quick information on the AMA Troubleshooting Too
 - [Using the Troubleshooter](#using-the-troubleshooter)
 - [Requirements](#requirements)
 - [Scenarios Covered](#scenarios-covered)
+- [Release](#release)
 
 ## Troubleshooter Basics
 
@@ -17,11 +18,21 @@ The AMA Linux Troubleshooter is automatically installed upon installation of AMA
 1. Go to the troubleshooter's installed location: `cd /var/lib/waagent/Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-<version>/ama_tst`
 2. Run the troubleshooter: `sudo sh ama_troubleshooter.sh`
 
-If the troubleshooter isn't properly installed, or needs to be updated, the newest version can be downloaded and run by following the steps below.
+If the troubleshooter isn't properly installed, or needs to be updated, the newest version can be downloaded from the project's [GitHub Releases](https://github.com/Azure/azure-linux-extensions/releases?q=ama_tst&expanded=true) page and run by following the steps below.
 
-1. Copy the troubleshooter bundle onto your machine: `wget https://github.com/Azure/azure-linux-extensions/raw/master/AzureMonitorAgent/ama_tst/ama_tst.tgz`
+1. Download the latest troubleshooter bundle from GitHub Releases:
+    ```bash
+    if command -v gh >/dev/null 2>&1; then
+        gh release download $(gh release list --repo Azure/azure-linux-extensions --limit 100 --json tagName -q 'map(select(.tagName | startswith("ama_tst-"))) | .[0].tagName') \
+            --repo Azure/azure-linux-extensions --pattern 'ama_tst-*.tgz' --output ama_tst.tgz
+    else
+        curl -sSL "$(curl -sSL "https://api.github.com/repos/Azure/azure-linux-extensions/releases?per_page=100" \
+            | grep -oE '"browser_download_url": *"[^"]*ama_tst-[^"]*\.tgz"' \
+            | head -n1 | cut -d'"' -f4)" -o ama_tst.tgz
+    fi
+    ```
 2. Unpack the bundle: `tar -xzvf ama_tst.tgz`
-3. Run the troubleshooter: `sudo sh ama_troubleshooter.sh`
+3. Run the troubleshooter: `sudo sh ama_tst/ama_troubleshooter.sh`
 
 ## Requirements
 
@@ -43,38 +54,73 @@ The AMA Linux Troubleshooter requires Python 2.6+ installed on the machine, but 
 ## Scenarios Covered
 
 1. Agent having installation issues
-	* Supported OS / version
-	* Available disk space
-	* Package manager is available (dpkg/rpm)
-	* Submodules are installed successfully
-	* AMA installed properly
-	* Syslog available (rsyslog/syslog-ng)
-	* Using newest version of AMA
-	* Syslog user generated successfully
+    * Supported OS / version
+    * Available disk space
+    * Package manager is available (dpkg/rpm)
+    * Submodules are installed successfully
+    * AMA installed properly
+    * Syslog available (rsyslog/syslog-ng)
+    * Using newest version of AMA
+    * Syslog user generated successfully
 2. Agent doesn't start, can't connect to Log Analytics
-  	* AMA parameters set up
-  	* AMA DCR created successfully
-  	* Connectivity to endpoints
-  	* Submodules started
-  	* IMDS/HIMDS metadata and MSI tokens available
+    * AMA parameters set up
+    * AMA DCR created successfully
+    * Connectivity to endpoints
+    * Submodules started
+    * IMDS/HIMDS metadata and MSI tokens available
 3. Agent is unhealthy, heartbeat doesn't work properly
-  	* Submodule status
-  	* Parse error files
+    * Submodule status
+    * Parse error files
 4. Agent has high CPU / memory usage
-	* Check logrotate
-	* Monitor CPU/memory usage in 5 minutes (interaction mode only)
-5.  Agent syslog collection doesn't work properly
-	* Rsyslog / syslog-ng set up and running
-	* Syslog configuration being pulled / used
-	* Syslog socket is accessible
+    * Check logrotate
+    * Monitor CPU/memory usage in 5 minutes (interaction mode only)
+5. Agent syslog collection doesn't work properly
+    * Rsyslog / syslog-ng set up and running
+    * Syslog configuration being pulled / used
+    * Syslog socket is accessible
 6. Agent custom log collection doesn't work properly
-	* Custom log configuration being pulled / used
-	* Log file paths is valid
+    * Custom log configuration being pulled / used
+    * Log file paths is valid
 7. Agent metrics collection doesn't work properly
-	* Runs the metrics troubleshooter script
-	* Produces `MdmDataCollectionOutput_*.tar.gz` for investigation
+    * Runs the metrics troubleshooter script
+    * Produces `MdmDataCollectionOutput_*.tar.gz` for investigation
 8. (A) Run all scenarios
-	* Run through scenarios 1-7 in order
+    * Run through scenarios 1-7 in order
 9. (L) Collect logs
-	* Collects all of the logs needed to troubleshoot AMA in a zip file
-	* Includes MDSD and AMACoreAgent environment variables
+    * Collects all of the logs needed to troubleshoot AMA in a zip file
+    * Includes MDSD and AMACoreAgent environment variables
+
+## Release
+
+Release versioning and naming convention:
+- Tag: `ama_tst-<version>` (e.g. `ama_tst-1.7`)
+- Release title: `AMA Troubleshooter v<version>` (e.g. `AMA Troubleshooter v1.7`)
+- Asset: `ama_tst-<version>.tgz` (e.g. `ama_tst-1.7.tgz`)
+
+The single source of truth for the version is the `TST_VERSION` variable in [`ama_troubleshooter.sh`](./ama_troubleshooter.sh).
+
+### Step-by-step
+
+1. Merge any feature/fix PRs into `master`.
+2. Open a one-line PR bumping `TST_VERSION="X.Y"` in `AzureMonitorAgent/ama_tst/ama_troubleshooter.sh`, get it reviewed, and merge to `master`.
+3. From a fresh checkout of `master`, run the script below to build the archive and publish the release.
+
+### Scripted release
+
+The `AzureMonitorAgent/ama_tst/release.sh` script handles steps 3 onward. It reads the version directly from `ama_troubleshooter.sh`, builds a clean `.tgz` from the tip of `master` via `git archive` (so untracked files are never included), and uses the [GitHub CLI](https://cli.github.com/) (`gh`) to create the tagged release and upload the asset.
+
+Usage:
+```bash
+# From the root of your azure-linux-extensions clone, after the version bump has merged:
+bash AzureMonitorAgent/ama_tst/release.sh "Added Debian 13 support for x86_64 and aarch64"
+```
+
+### Verification
+
+After the script finishes:
+- Confirm the release page renders correctly: `https://github.com/Azure/azure-linux-extensions/releases/tag/ama_tst-<version>`
+- Confirm the asset is downloadable via the documented [install steps](#using-the-troubleshooter):
+  ```bash
+  gh release download --repo Azure/azure-linux-extensions --pattern 'ama_tst-*.tgz' --output /tmp/ama_tst.tgz \
+      && tar -tzvf /tmp/ama_tst.tgz | head
+  ``
