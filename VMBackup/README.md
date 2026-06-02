@@ -13,6 +13,45 @@ Azure Backup deploys the extension as part of backup operations after backup is 
 - [Back up a VM with Azure PowerShell](https://learn.microsoft.com/azure/backup/quick-backup-vm-powershell)
 - [Back up a VM with Azure CLI](https://learn.microsoft.com/azure/backup/quick-backup-vm-cli)
 
+## Configuration
+
+The extension reads optional settings from `/etc/azure/vmbackup.conf` under the `[SnapshotThread]` section.
+
+### `onlyLocalFilesystems` (default: `False`)
+
+Set to `True` or `true` to use `df -kl` instead of `df -k` for size calculation. This excludes filesystems that `df` classifies as remote, helping avoid delays caused by unavailable network mounts. It does not change which filesystems are selected for freezing.
+
+### `MountsToSkip` (default: empty)
+
+A comma-separated list of non-root mount points to exclude from filesystem freezing. Mount points are matched exactly; do not insert spaces after commas.
+
+An otherwise eligible root filesystem is still frozen even if `/` is listed.
+
+### `seqsnapshot` (default: `0`)
+
+| Value | Behavior |
+|-------|----------|
+| `0` | Normal selection: sequential for four or fewer disks being snapshotted, parallel for more than four. |
+| `1` | Sequential snapshots, set programmatically by the extension. |
+| `2` | Sequential snapshots, requested by the customer. |
+
+Use `2` to force sequential snapshots if parallel snapshots cause issues. A failed parallel attempt can also fall back to sequential snapshots.
+
+### Legacy `fsfreeze` entry
+
+The shipped template contains `fsfreeze: True`, but the current backup code does not read this entry to control freezing. Do not rely on `fsfreeze=False` to disable freezing; the backup workflow and application-plugin configuration determine freeze behavior.
+
+Filesystem freezing alone provides filesystem consistency, not a guarantee of application consistency.
+
+### Example
+
+```ini
+[SnapshotThread]
+onlyLocalFilesystems = True
+MountsToSkip = /mnt/data1,/mnt/data2
+seqsnapshot = 0
+```
+
 ## Repository layout
 
 ```text
