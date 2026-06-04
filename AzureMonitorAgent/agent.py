@@ -198,10 +198,11 @@ def main():
     # Avoid entering broken state where manual purge actions are necessary in low disk space scenario
     destructive_operations = ['Disable', 'Uninstall']
     if operation not in destructive_operations:
-        exit_code = check_disk_space_availability()
-        if exit_code != 0:
-            message = '{0} failed due to low disk space'.format(operation)
-            log_and_exit(operation, exit_code, message)
+    exit_code, disk_space_detail = check_disk_space_availability()
+    if exit_code != 0:
+        message = '{0} failed due to low disk space: {1}'.format(
+            operation, disk_space_detail)
+        log_and_exit(operation, exit_code, message)
 
     # Invoke operation
     try:
@@ -238,6 +239,11 @@ def main():
 def check_disk_space_availability():
     """
     Check if there is the required space on the machine.
+    Returns a tuple (exit_code, detail). On success, detail is an empty
+    string. On failure, detail contains a human-readable description of
+    which directory was short on space and by how much, so the caller can
+    surface it through log_and_exit() (and therefore the Azure portal's
+    Extensions tab).
     The required space is checked against the AMA target directories
     rather than the top-level mount points. When a dedicated volume is
     mounted at one of those subdirectories, statvfs reports the free
@@ -245,8 +251,6 @@ def check_disk_space_availability():
     nearest existing parent, preserving the previous behaviour on
     standard installs.
     """
-    # (target path, required MB) — target paths mirror the directories
-    # AMA actually writes to (data, config, binaries).
     required_space = [
         ("/var/opt/microsoft/azuremonitoragent", 700),
         ("/etc/opt/microsoft/azuremonitoragent", 500),
@@ -258,13 +262,13 @@ def check_disk_space_availability():
             if free_mb < min_mb:
                 # 52 is the exit code for missing dependency i.e. disk space
                 # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                print('Low disk space on {0}: {1} MB free, {2} MB required'.format(
-                    path, free_mb, min_mb))
-                return MissingDependency
-        return 0
+                detail = '{0} MB free on {1}, {2} MB required'.format(
+                    free_mb, path, min_mb)
+                return MissingDependency, detail
+        return 0, ''
     except:
         print('Failed to check disk usage.')
-        return 0
+        return 0, ''
 
 def get_free_space_mb(dirname):
     """
