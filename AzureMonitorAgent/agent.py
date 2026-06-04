@@ -240,10 +240,11 @@ def check_disk_space_availability():
     """
     Check if there is the required space on the machine.
     Returns a tuple (exit_code, detail). On success, detail is an empty
-    string. On failure, detail contains a human-readable description of
-    which directory was short on space and by how much, so the caller can
-    surface it through log_and_exit() (and therefore the Azure portal's
-    Extensions tab).
+    string. On failure, detail lists every directory that did not meet
+    its threshold (path, free MB, required MB), joined by '; ', so the
+    caller can surface the full picture through log_and_exit() (and
+    therefore the Azure portal's Extensions tab) instead of forcing the
+    user to fix one path at a time.
     The required space is checked against the AMA target directories
     rather than the top-level mount points. When a dedicated volume is
     mounted at one of those subdirectories, statvfs reports the free
@@ -257,14 +258,16 @@ def check_disk_space_availability():
         ("/opt/microsoft/azuremonitoragent",     500),
     ]
     try:
+        failures = []
         for path, min_mb in required_space:
             free_mb = get_free_space_mb(path)
             if free_mb < min_mb:
-                # 52 is the exit code for missing dependency i.e. disk space
-                # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-                detail = '{0} MB free on {1}, {2} MB required'.format(
-                    free_mb, path, min_mb)
-                return MissingDependency, detail
+                failures.append('{0} MB free on {1}, {2} MB required'.format(
+                    free_mb, path, min_mb))
+        if failures:
+            # 52 is the exit code for missing dependency i.e. disk space
+            # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
+            return MissingDependency, '; '.join(failures)
         return 0, ''
     except:
         print('Failed to check disk usage.')
