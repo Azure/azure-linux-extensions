@@ -198,11 +198,11 @@ def main():
     # Avoid entering broken state where manual purge actions are necessary in low disk space scenario
     destructive_operations = ['Disable', 'Uninstall']
     if operation not in destructive_operations:
-    exit_code, disk_space_detail = check_disk_space_availability()
-    if exit_code != 0:
-        message = '{0} failed due to low disk space: {1}'.format(
-            operation, disk_space_detail)
-        log_and_exit(operation, exit_code, message)
+        exit_code, disk_space_detail = check_disk_space_availability()
+        if exit_code != 0:
+            message = '{0} failed due to low disk space: {1}'.format(
+                operation, disk_space_detail)
+            log_and_exit(operation, exit_code, message)
 
     # Invoke operation
     try:
