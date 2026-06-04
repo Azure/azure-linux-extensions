@@ -198,9 +198,10 @@ def main():
     # Avoid entering broken state where manual purge actions are necessary in low disk space scenario
     destructive_operations = ['Disable', 'Uninstall']
     if operation not in destructive_operations:
-        exit_code = check_disk_space_availability()
+        exit_code, disk_space_detail = check_disk_space_availability()
         if exit_code != 0:
-            message = '{0} failed due to low disk space'.format(operation)
+            message = '{0} failed due to low disk space: {1}'.format(
+                operation, disk_space_detail)
             log_and_exit(operation, exit_code, message)
 
     # Invoke operation
@@ -238,23 +239,57 @@ def main():
 def check_disk_space_availability():
     """
     Check if there is the required space on the machine.
+    Returns a tuple (exit_code, detail). On success, detail is an empty
+    string. On failure, detail lists every directory that did not meet
+    its threshold (path, free MB, required MB), joined by '; ', so the
+    caller can surface the full picture through log_and_exit() (and
+    therefore the Azure portal's Extensions tab) instead of forcing the
+    user to fix one path at a time.
+    The required space is checked against the AMA target directories
+    rather than the top-level mount points. When a dedicated volume is
+    mounted at one of those subdirectories, statvfs reports the free
+    space of that volume; otherwise get_free_space_mb() walks up to the
+    nearest existing parent, preserving the previous behaviour on
+    standard installs.
     """
+    required_space = [
+        ("/var/opt/microsoft/azuremonitoragent", 700),
+        ("/etc/opt/microsoft/azuremonitoragent", 500),
+        ("/opt/microsoft/azuremonitoragent",     500),
+    ]
     try:
-        if get_free_space_mb("/var") < 700 or get_free_space_mb("/etc") < 500 or get_free_space_mb("/opt") < 500 :
+        failures = []
+        for path, min_mb in required_space:
+            free_mb = get_free_space_mb(path)
+            if free_mb < min_mb:
+                failures.append('{0} MB free on {1}, {2} MB required'.format(
+                    free_mb, path, min_mb))
+        if failures:
             # 52 is the exit code for missing dependency i.e. disk space
             # https://github.com/Azure/azure-marketplace/wiki/Extension-Build-Notes-Best-Practices#error-codes-and-messages-output-to-stderr
-            return MissingDependency
-        else:
-            return 0
+            return MissingDependency, '; '.join(failures)
+        return 0, ''
     except:
         print('Failed to check disk usage.')
-        return 0
+        return 0, ''
 
 def get_free_space_mb(dirname):
     """
-    Get the free space in MB in the directory path.
+    Get the free space in MB on the filesystem that holds `dirname`.
+    If `dirname` does not yet exist (e.g. on a fresh install before the
+    AMA directories have been created), walk up the path until an
+    existing ancestor is found. This way the check transparently
+    measures a dedicated volume when one is mounted at the AMA
+    subdirectory, and falls back to the parent (/var, /etc, /opt)
+    otherwise.
     """
-    st = os.statvfs(dirname)
+    path = os.path.abspath(dirname)
+    while not os.path.exists(path):
+        parent = os.path.dirname(path)
+        if parent == path:  # reached filesystem root
+            break
+        path = parent
+    st = os.statvfs(path)
     return (st.f_bavail * st.f_frsize) // (1024 * 1024)
 
 def is_truthy(value):
