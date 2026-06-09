@@ -967,15 +967,15 @@ def enable():
         if os.path.isfile(config_file):
             new_config = "\n".join(["export {0}={1}".format(key, value) for key, value in default_configs.items()]) + "\n"
 
-            with open(temp_config_file, "w") as f:
+            tmp_fd = os.open(temp_config_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o400)
+            with os.fdopen(tmp_fd, "w") as f:
                 f.write(new_config)
 
             if not os.path.isfile(temp_config_file):
                 log_and_exit("Enable", GenericErrorCode, "Error while updating environment variables in {0}".format(config_file))
 
             os.remove(config_file)
-            os.rename(temp_config_file, config_file)  
-            os.system('chmod {1} {0}'.format(config_file, 400))
+            os.rename(temp_config_file, config_file)
         else:
             log_and_exit("Enable", GenericErrorCode, "Could not find the file {0}".format(config_file))
     except Exception as e:
