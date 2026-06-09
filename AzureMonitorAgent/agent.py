@@ -247,7 +247,7 @@ def check_disk_space_availability():
         else:
             return 0
     except:
-        print('Failed to check disk usage.')
+        hutil_log_info('Failed to check disk usage.')
         return 0
 
 def get_free_space_mb(dirname):
@@ -499,7 +499,7 @@ def install():
         package_directory = os.path.join(os.getcwd(), PackagesDirectory)
         bundle_path = os.path.join(package_directory, BundleFileName)
         os.chmod(bundle_path, 100)
-        print(PackageManager, " and ", BundleFileName)
+        hutil_log_info("{0} and {1}".format(PackageManager, BundleFileName))
         AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
         hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
 
