@@ -974,7 +974,8 @@ def enable():
                 log_and_exit("Enable", GenericErrorCode, "Error while updating environment variables in {0}".format(config_file))
 
             os.remove(config_file)
-            os.rename(temp_config_file, config_file)            
+            os.rename(temp_config_file, config_file)  
+            os.system('chmod {1} {0}'.format(config_file, 400))
         else:
             log_and_exit("Enable", GenericErrorCode, "Could not find the file {0}".format(config_file))
     except Exception as e:
