@@ -968,7 +968,12 @@ def enable():
             new_config = "\n".join(["export {0}={1}".format(key, value) for key, value in default_configs.items()]) + "\n"
 
             tmp_fd = os.open(temp_config_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o400)
-            with os.fdopen(tmp_fd, "w") as f:
+            try:
+                f = os.fdopen(tmp_fd, "w")
+            except:
+                os.close(tmp_fd)
+                raise
+            with f:
                 f.write(new_config)
 
             if not os.path.isfile(temp_config_file):
