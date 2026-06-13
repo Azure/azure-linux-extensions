@@ -96,7 +96,7 @@ fi
 
 echo "Packaging extension $PACKAGE_NAME to $output_path"
 excluded_files="agent.version packaging.sh apply_version.sh update_version.sh"
-zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./extension-test/*" "./references" "./tmp"
+zip -r $output_path/$PACKAGE_NAME * -x $excluded_files "./test/*" "./tests/*" "./extension-test/*" "./references" "./tmp"
 
 # validate package size is within limits; these limits come from arc, ideally they are removed in the future
 max_uncompressed_size=$((1000 * 1024 * 1024))
