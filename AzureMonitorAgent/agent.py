@@ -2206,7 +2206,13 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     useSyslogTcp = False
 
     if syslog_port == MDSDSyslogPort:
-        return
+        # If none of the syslog config files exist, we should not return early
+        # as we need to regenerate them
+        if (os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf') or
+            os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf') or
+            os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent-tcp.conf') or
+            os.path.exists('/etc/syslog-ng/conf.d/azuremonitoragent.conf')):
+            return
     
     # always use syslog tcp port, unless 
     # - the distro is Red Hat based and doesn't have semanage
@@ -2323,7 +2329,10 @@ def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
 def remove_localsyslog_configs():
     """
     Remove local syslog configuration files if present and restart syslog
-    """    
+    """
+    global MDSDSyslogPort
+    MDSDSyslogPort = 0
+
     if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent.conf') or os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
         if os.path.exists('/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf'):
             os.remove("/etc/rsyslog.d/10-azuremonitoragent-omfwd.conf")
