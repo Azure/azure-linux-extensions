@@ -6,7 +6,7 @@ supported_dists_x86_64 = {
     'opensuse' : ['15'], # openSUSE
     'oracle' : ['7', '8', '9'], 'ol' : ['7', '8', '9'],  # Oracle
     'redhat' : ['7', '8', '9', '10'], # RHEL
-    'rocky' : ['8', '9'], # Rocky
+    'rocky' : ['8', '9', '10'], # Rocky
     'suse' : ['15', '16'], 'sles' : ['15', '16'], # SLES
     'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04'], # Ubuntu
 }
