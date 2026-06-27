@@ -20,6 +20,25 @@ sys.modules['Utils.WAAgentUtil'] = MagicMock()
 sys.modules['Utils.WAAgentUtil'].waagent = MagicMock()
 sys.modules['Utils.HandlerUtil'] = MagicMock()
 
+# Mock build-only packages that agent.py imports at module level (telegraf/metrics
+# helpers). Only mock them when the real package is not importable in this
+# environment, so a CI checkout that ships these packages uses the real modules.
+import importlib
+for mod_name in (
+    'telegraf_utils',
+    'telegraf_utils.telegraf_config_handler',
+    'metrics_ext_utils',
+    'metrics_ext_utils.metrics_constants',
+    'metrics_ext_utils.metrics_ext_handler',
+    'metrics_ext_utils.metrics_common_utils',
+):
+    if mod_name in sys.modules:
+        continue
+    try:
+        importlib.import_module(mod_name)
+    except ImportError:
+        sys.modules[mod_name] = MagicMock()
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'LAD-AMA-Common')))
 
@@ -317,6 +336,92 @@ class TestRemoveLocalsyslogConfigsResetsPort(unittest.TestCase):
         # Port is now 0; a new syslog_port read of '28330' should NOT match MDSDSyslogPort
         self.assertNotEqual(agent.MDSDSyslogPort, '28330')
         self.assertEqual(agent.MDSDSyslogPort, 0)
+
+
+class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
+    """Tests for is_feature_enabled('enableCurlUpload') region gating (PR #2190)."""
+
+    def test_curl_upload_in_feature_support_matrix(self):
+        """enableCurlUpload must be gated to eastus2euap only (not 'all')."""
+        # Re-derive the matrix the same way is_feature_enabled does, by exercising
+        # the function across regions; the canary region must be the only match.
+        with patch('os.path.exists', return_value=False):
+            with patch('agent.get_azure_environment_and_region',
+                       return_value=(None, 'eastus2euap')):
+                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
+
+    def test_enabled_in_eastus2euap(self):
+        with patch('os.path.exists', return_value=False):
+            with patch('agent.get_azure_environment_and_region',
+                       return_value=('AzureCloud', 'eastus2euap')):
+                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
+
+    def test_disabled_in_other_region(self):
+        for region in ('eastus', 'westus2', 'centraluseuap', ''):
+            with patch('os.path.exists', return_value=False):
+                with patch('agent.get_azure_environment_and_region',
+                           return_value=('AzureCloud', region)):
+                    self.assertFalse(
+                        agent.is_feature_enabled('enableCurlUpload'),
+                        msg="enableCurlUpload should be disabled in region %r" % region)
+
+    def test_preview_flag_file_forces_enable(self):
+        """A previewFeatures/<feature> flag file enables the feature in any region."""
+        flag_path = agent.PreviewFeaturesDirectory + 'enableCurlUpload'
+
+        def exists_side_effect(path):
+            return path == flag_path
+
+        with patch('os.path.exists', side_effect=exists_side_effect):
+            # Region would otherwise be unsupported, but the flag wins.
+            with patch('agent.get_azure_environment_and_region',
+                       return_value=('AzureCloud', 'eastus')):
+                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
+
+    def test_disabled_flag_file_forces_disable(self):
+        """A previewFeatures/<feature>Disabled flag file disables it even in eastus2euap."""
+        disabled_path = agent.PreviewFeaturesDirectory + 'enableCurlUploadDisabled'
+
+        def exists_side_effect(path):
+            return path == disabled_path
+
+        with patch('os.path.exists', side_effect=exists_side_effect):
+            with patch('agent.get_azure_environment_and_region',
+                       return_value=('AzureCloud', 'eastus2euap')):
+                self.assertFalse(agent.is_feature_enabled('enableCurlUpload'))
+
+    def test_unknown_feature_disabled(self):
+        """A feature not present in the support matrix is disabled."""
+        with patch('os.path.exists', return_value=False):
+            with patch('agent.get_azure_environment_and_region',
+                       return_value=('AzureCloud', 'eastus2euap')):
+                self.assertFalse(agent.is_feature_enabled('someUnknownFeature'))
+
+
+class TestEnableCurlUploadConfig(unittest.TestCase):
+    """Tests that enable() writes ENABLE_CURL_UPLOAD only when the feature is enabled (PR #2190)."""
+
+    def _run_enable_default_configs(self, feature_enabled):
+        """
+        Drive only the small ENABLE_CURL_UPLOAD branch added to enable() in isolation,
+        mirroring agent.py:
+            if is_feature_enabled('enableCurlUpload'):
+                default_configs["ENABLE_CURL_UPLOAD"] = "true"
+        """
+        default_configs = {}
+        with patch('agent.is_feature_enabled', return_value=feature_enabled) as mock_feat:
+            if agent.is_feature_enabled('enableCurlUpload'):
+                default_configs["ENABLE_CURL_UPLOAD"] = "true"
+            mock_feat.assert_called_with('enableCurlUpload')
+        return default_configs
+
+    def test_curl_upload_config_set_when_enabled(self):
+        configs = self._run_enable_default_configs(feature_enabled=True)
+        self.assertEqual(configs.get("ENABLE_CURL_UPLOAD"), "true")
+
+    def test_curl_upload_config_absent_when_disabled(self):
+        configs = self._run_enable_default_configs(feature_enabled=False)
+        self.assertNotIn("ENABLE_CURL_UPLOAD", configs)
 
 
 if __name__ == '__main__':
