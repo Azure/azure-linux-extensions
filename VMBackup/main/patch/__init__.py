@@ -31,6 +31,7 @@ from patch.KaliPatching import KaliPatching
 from patch.DefaultPatching import DefaultPatching
 from patch.FreeBSDPatching import FreeBSDPatching
 from patch.NSBSDPatching import NSBSDPatching
+from patch.AzureLinuxPatching import AzureLinuxPatching
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
@@ -60,6 +61,21 @@ def DistInfo():
             return distinfo
         if 'Linux' in platform.system():
             distinfo = ["Default"]
+            # On Python 3.8+ linux_distribution is removed; detect via /etc/os-release
+            try:
+                with open("/etc/os-release", "r") as f:
+                    os_id, os_version = "", ""
+                    for line in f:
+                        k, _, v = line.strip().partition("=")
+                        v = v.strip('"')
+                        if k == "ID":
+                            os_id = v
+                        elif k == "VERSION_ID":
+                            os_version = v
+                    if os_id == "azurelinux":
+                        return ["azurelinux", os_version]
+            except Exception:
+                pass
             if "ubuntu" in platform.version().lower():
                 distinfo[0] = "Ubuntu"
             elif 'suse' in platform.version().lower():
@@ -114,6 +130,8 @@ def GetMyPatching(logger):
             Distro = 'oracle'
         elif ('redhat'.lower() in Distro.lower()):
             Distro = 'redhat'
+        elif ('azurelinux' in Distro.lower()):
+            Distro = 'AzureLinux'
         elif ("Kali".lower() in Distro.lower()):
             Distro = 'Kali'
         elif ('FreeBSD'.lower() in  Distro.lower() or 'gaia'.lower() in Distro.lower() or 'panos'.lower() in Distro.lower()):

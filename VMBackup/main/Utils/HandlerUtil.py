@@ -627,8 +627,20 @@ class HandlerUtility:
                 distinfo[0] = distinfo[0].strip()
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
             else:
-                distinfo = platform.dist()
-                return  distinfo[0]+"-"+distinfo[1],platform.release()
+                # platform.dist() removed in Python 3.8; parse /etc/os-release instead
+                try:
+                    with open("/etc/os-release", "r") as f:
+                        os_name, os_version = "Unknown", "Unknown"
+                        for line in f:
+                            k, _, v = line.strip().partition("=")
+                            v = v.strip('"')
+                            if k == "NAME":
+                                os_name = v
+                            elif k == "VERSION":
+                                os_version = v
+                        return os_name + "-" + os_version, platform.release()
+                except Exception:
+                    return "Unknown", "Unknown"
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
@@ -715,7 +727,7 @@ class HandlerUtility:
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
         stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
-        stat_rept = stat_rept.replace('\\\/', '\/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
+        stat_rept = stat_rept.replace('\\/', '/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
         stat_rept = stat_rept.replace(date_place_holder,date_string)
 
         # Add Status as sub-status for Status to be written on Status-File
