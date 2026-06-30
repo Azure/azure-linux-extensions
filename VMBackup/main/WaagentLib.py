@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# WHY: Python 2 defaults source encoding to ASCII; any future non-ASCII char in this
+#      file would raise SyntaxError on Py 2.x (root cause of ICM 783505554).
+# WHAT: Declare UTF-8 encoding per PEP 263 so the file parses on Py 2.6+ and Py 3.x.
+# HOW: Single magic comment recognized by the Python tokenizer on line 1 or 2.
 #
 # Azure Linux Agent
 #
@@ -23,7 +28,16 @@
 # http://msdn.microsoft.com/en-us/library/cc227259%28PROT.13%29.aspx
 #
 
-import crypt
+# WHY: stdlib 'crypt' module was deprecated in Py 3.11 (PEP 594) and REMOVED in Py 3.13.
+#      VMBackup never calls gen_password_hash() (only consumer of crypt), so a hard
+#      'import crypt' at module scope was needlessly killing the extension on Py 3.13+
+#      (Ubuntu 26.04 / Py 3.14, RHEL 10, Debian 13). Root cause of ICM 51000001082652.
+# WHAT: Make the import optional; set crypt=None when unavailable.
+# HOW: try/except ImportError; gen_password_hash() guards on `crypt is None` below.
+try:
+    import crypt
+except ImportError:
+    crypt = None
 import random
 import base64
 
@@ -56,7 +70,78 @@ import zipfile
 import json
 import datetime
 import xml.sax.saxutils
-from distutils.version import LooseVersion
+# WHY: 'distutils' was deprecated in Py 3.10 and REMOVED in Py 3.12. Same failure
+#      mode as 'crypt' / 'imp' -- bundled waagent code that VMBackup snapshot flow
+#      does not actually exercise, but breaks module import at startup.
+# WHAT: Try modern 'packaging.version' first, then legacy distutils, then a tiny
+#      ASCII-only fallback class with semantic-version comparison (alpha/beta/rc
+#      precedence). Logic is identical to PR #2124's Tier 3 class; only the unicode
+#      arrows in the docstring ('->' instead of U+2192) were stripped, because the
+#      arrows were the trigger for ICM 783505554 on Py 2.7.
+# HOW: 3-tier try/except chain; LooseVersion symbol resolves on every Python 2.7+ env.
+try:
+    from packaging.version import Version as LooseVersion
+except ImportError:
+    try:
+        from distutils.version import LooseVersion
+    except ImportError:
+        # Fallback for environments without packaging or distutils
+        class LooseVersion(object):
+
+            def __init__(self, version_string):
+                self.version = str(version_string)
+                # Parse version into comparable parts
+                self._parsed = self._parse_version(self.version)
+
+            def _parse_version(self, version_str):
+                import re
+                # Split by dots, hyphens, and underscores
+                parts = re.split(r'[.\-_]', version_str.lower())
+                parsed = []
+                for part in parts:
+                    # Try to convert to int, otherwise keep as string
+                    try:
+                        parsed.append(int(part))
+                    except ValueError:
+                        # Handle pre-release identifiers with negative values for correct precedence
+                        # This ensures: alpha < beta < rc < release
+                        if part in ('alpha', 'a'):
+                            parsed.append(-1000)  # Lowest precedence
+                        elif part in ('beta', 'b'):
+                            parsed.append(-100)   # Medium precedence
+                        elif part in ('rc', 'pre'):
+                            parsed.append(-10)    # High precedence (but still < release)
+                        else:
+                            parsed.append(part)   # Keep as string for mixed alphanumeric
+                return tuple(parsed)
+
+            def __str__(self):
+                return self.version
+
+            def __eq__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed == other._parsed
+                return self._parsed == LooseVersion(other)._parsed
+
+            def __lt__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed < other._parsed
+                return self._parsed < LooseVersion(other)._parsed
+
+            def __le__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed <= other._parsed
+                return self._parsed <= LooseVersion(other)._parsed
+
+            def __gt__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed > other._parsed
+                return self._parsed > LooseVersion(other)._parsed
+
+            def __ge__(self, other):
+                if isinstance(other, LooseVersion):
+                    return self._parsed >= other._parsed
+                return self._parsed >= LooseVersion(other)._parsed
 
 if not hasattr(subprocess, 'check_output'):
     def check_output(*popenargs, **kwargs):
@@ -374,6 +459,15 @@ class AbstractDistro(object):
             return "Failed to set password for {0}: {1}".format(username, output)
 
     def gen_password_hash(self, password, crypt_id, salt_len):
+        # WHY: 'crypt' may be None on Py 3.13+ (module removed). VMBackup never calls
+        #      this function, but a bundled-waagent caller could; fail loudly instead
+        #      of NoneType.crypt AttributeError to preserve a useful error message.
+        # WHAT: Raise NotImplementedError when crypt stdlib is unavailable.
+        # HOW: Guard before use; behavior on Py <=3.12 is unchanged.
+        if crypt is None:
+            raise NotImplementedError(
+                "gen_password_hash requires the 'crypt' stdlib module, "
+                "which was removed in Python 3.13.")
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
