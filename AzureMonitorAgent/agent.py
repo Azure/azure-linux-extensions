@@ -911,7 +911,7 @@ def enable():
 
     # Enable the libcurl-based ODS upload path (ENABLE_CURL_UPLOAD) only in regions
     # where the feature has been gated on (see is_feature_enabled / feature_support_matrix).
-    # Currently limited to eastus2euap for canary rollout.
+    # Currently limited to eastus2euap and centraluseuap for canary rollout.
     if is_feature_enabled('enableCurlUpload'):
         default_configs["ENABLE_CURL_UPLOAD"] = "true"
 
@@ -2751,7 +2751,7 @@ def is_feature_enabled(feature):
         'useDynamicSSL'             : ['all'],
         'enableCMV2'                : ['all'],
         'enableAzureOTelCollector'  : ['all'],
-        'enableCurlUpload'          : ['eastus2euap']
+        'enableCurlUpload'          : ['eastus2euap', 'centraluseuap']
     }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
