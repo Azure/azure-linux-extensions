@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import os
+import pwd
 import re
 import shutil
 import sys
@@ -42,6 +43,48 @@ SshdConfigBackupPath = '/var/cache/vmaccess/backup'
 
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
+
+
+def validate_ssh_path(pub_path, user_name):
+    p = pwd.getpwnam(user_name)
+    uid = p.pw_uid
+
+    ssh_dir = os.path.dirname(pub_path)
+
+    # Validate .ssh directory is not a symlink and is owned by the target user
+    if os.path.islink(ssh_dir):
+        raise Exception("Refusing to write: {0} is a symlink".format(ssh_dir))
+    if os.path.exists(ssh_dir):
+        st = os.lstat(ssh_dir)
+        if st.st_uid != uid and st.st_uid != 0:
+            raise Exception("Refusing to write: {0} is not owned by {1} or root".format(ssh_dir, user_name))
+
+    # Validate authorized_keys is not a symlink and is owned by the target user
+    if os.path.islink(pub_path):
+        raise Exception("Refusing to write: {0} is a symlink".format(pub_path))
+    if os.path.exists(pub_path):
+        st = os.lstat(pub_path)
+        if st.st_uid != uid and st.st_uid != 0:
+            raise Exception("Refusing to write: {0} is not owned by {1} or root".format(pub_path, user_name))
+
+
+def safe_write_authorized_keys(pub_path, contents, append=False):
+    bytes_to_write = ext_utils.encode_for_writing_to_file(contents)
+    flags = os.O_WRONLY | os.O_NOFOLLOW
+    if append:
+        flags |= os.O_APPEND | os.O_CREAT
+    else:
+        if os.path.exists(pub_path):
+            flags |= os.O_TRUNC
+        else:
+            flags |= os.O_CREAT | os.O_EXCL
+
+    fd = os.open(pub_path, flags, 0o600)
+    try:
+        os.write(fd, bytes_to_write)
+    finally:
+        os.close(fd)
+
 
 def get_os_name():
     if os.path.isfile(constants.os_release):
@@ -273,19 +316,21 @@ def _set_user_account_pub_key(protect_settings, hutil):
             if no_convert:
                 if cert_txt:
                     pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
+                    validate_ssh_path(pub_path, user_name)
                     final_cert_txt = cert_txt
                     if not cert_txt.endswith("\n"):
                         final_cert_txt = final_cert_txt + "\n"
 
                     if remove_prior_keys == True:
-                        ext_utils.set_file_contents(pub_path, final_cert_txt)
+                        safe_write_authorized_keys(pub_path, final_cert_txt, append=False)
                         hutil.log("Removed prior ssh keys and added new key for user %s" % user_name)
                     else:
-                        ext_utils.append_file_contents(pub_path, final_cert_txt)
+                        safe_write_authorized_keys(pub_path, final_cert_txt, append=True)
         
                     MyDistro.set_se_linux_context(
                         pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
-                    ext_utils.change_owner(pub_path, user_name)
+                    p = pwd.getpwnam(user_name)
+                    os.lchown(pub_path, p.pw_uid, p.pw_gid)
                     ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                                   message="create-user")
                     hutil.log("Succeeded in resetting ssh_key.")
@@ -300,12 +345,25 @@ def _set_user_account_pub_key(protect_settings, hutil):
                 # we support PKCS8 certificates besides ssh-rsa public keys
                 _save_cert_str_as_file(cert_txt, 'temp.crt')
                 pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
+                validate_ssh_path(pub_path, user_name)
                 retcode = ext_utils.run_command_and_write_stdout_to_file(
                     [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout', '-pubkey'], "temp.pub")
                 if retcode > 0:
                     raise Exception("Failed to generate public key file.")
 
+                # Remove pub_path before ssh_deploy_public_key so it cannot be a
+                # pre-existing symlink that set_file_contents would follow.
+                if os.path.lexists(pub_path):
+                    if os.path.islink(pub_path):
+                        raise Exception("Refusing to write: {0} is a symlink".format(pub_path))
+                    os.remove(pub_path)
                 MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
+                # Re-validate after ssh_deploy_public_key wrote to pub_path
+                if os.path.islink(pub_path):
+                    os.remove(pub_path)
+                    raise Exception("Refusing to chown: {0} became a symlink".format(pub_path))
+                p = pwd.getpwnam(user_name)
+                os.lchown(pub_path, p.pw_uid, p.pw_gid)
                 os.remove('temp.pub')
                 os.remove('temp.crt')
                 ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
@@ -325,7 +383,7 @@ def _get_other_sudoers(user_name):
     if not os.path.isfile(sudoers_file):
         return None
     sudoers = ext_utils.get_file_contents(sudoers_file).split("\n")
-    pattern = '^{0}\s'.format(user_name)
+    pattern = r'^{0}\s'.format(user_name)
     sudoers = list(filter(lambda x: re.match(pattern, x) is None, sudoers))
     return sudoers
 
