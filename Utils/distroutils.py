@@ -53,7 +53,7 @@ def get_my_distro(config, os_name=None):
         if re.search("fedora", os_name, re.IGNORECASE):
             # Fedora
             return FedoraDistro(config)
-        if re.search("red\s?hat", os_name, re.IGNORECASE):
+        if re.search(r"red\s?hat", os_name, re.IGNORECASE):
             # Red Hat
             return RedhatDistro(config)
         if re.search("centos", os_name, re.IGNORECASE):
