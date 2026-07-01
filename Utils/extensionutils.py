@@ -198,7 +198,7 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
         if chk_err and log_cmd:
             logger.error(
                 'CalledProcessError.  Error message is ' + str(e))
-            return e.errno, str(e)
+        return e.errno, str(e)
     # noinspection PyUnboundLocalVariable
     return 0, output.decode('utf-8')
 

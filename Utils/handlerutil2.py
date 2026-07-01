@@ -181,8 +181,8 @@ class HandlerUtility:
 
     @staticmethod
     def redact_protected_settings(content):
-        redacted_tmp = re.sub('"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
-        redacted = re.sub('"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
+        redacted_tmp = re.sub(r'"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
+        redacted = re.sub(r'"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
         return redacted
 
     def _parse_config(self, ctxt):
@@ -206,12 +206,12 @@ class HandlerUtility:
                 pkey = constants.LibDir + '/' + thumb + '.prv'
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
                 openSSLcmd_cms = ['openssl', 'cms', '-inform', 'DER', '-decrypt', '-recip' , cert, '-inkey', pkey]
-                cleartxt = ext_utils.run_send_stdin(openSSLcmd_cms, unencodedSettings)[1]
-                if cleartxt is None:
+                cms_retcode, cleartxt = ext_utils.run_send_stdin(openSSLcmd_cms, unencodedSettings)
+                if cms_retcode != 0:
                     self.log("OpenSSL decode error using cms command with thumbprint " + thumb + "\n trying smime command")
                     openSSLcmd_smime = ['openssl', 'smime', '-inform', 'DER', '-decrypt', '-recip' , cert, '-inkey', pkey]
-                    cleartxt = ext_utils.run_send_stdin(openSSLcmd_smime, unencodedSettings)[1]
-                    if cleartxt is None:
+                    smime_retcode, cleartxt = ext_utils.run_send_stdin(openSSLcmd_smime, unencodedSettings)
+                    if smime_retcode != 0:
                         self.error("OpenSSL decode error using smime command with thumbprint " + thumb)
                         self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
                 jctxt = ''
@@ -219,6 +219,7 @@ class HandlerUtility:
                     jctxt = json.loads(cleartxt)
                 except:
                     self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(cleartxt))
+                    self.do_exit(1, "Enable", 'error', '1', 'Failed to decode protectedSettings')
                 handlerSettings['protectedSettings']=jctxt
                 self.log('Config decoded correctly.')
         return config
