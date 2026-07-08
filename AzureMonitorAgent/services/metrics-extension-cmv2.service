@@ -4,7 +4,6 @@ After=network.target
 
 [Service]
 Environment="OTLP_GRPC_HOST=127.0.0.1"
-Environment="OTLP_GRPC_PORT=4317"
 Environment="OTLP_GRPC_PROM_HOST=127.0.0.1"
 Environment="OTLP_GRPC_PROM_PORT=4316"
 EnvironmentFile=-/etc/metrics-extension.d/options.conf
