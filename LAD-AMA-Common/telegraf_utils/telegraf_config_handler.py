@@ -179,7 +179,7 @@ def parse_config(data, me_url, mdsd_url, is_lad, az_resource_id, subscription_id
                         all_config_ids.append(configId)
 
             for configId in all_config_ids:
-                config_file = {"filename" : omiclass+"-"+configId+".conf"}
+                config_file = {"filename" : omiclass+"-"+plugin+"-"+configId+".conf"}
                 input_str = ""
                 ama_rename_str = ""
                 metricsext_rename_str = ""
