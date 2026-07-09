@@ -44,48 +44,6 @@ SshdConfigBackupPath = '/var/cache/vmaccess/backup'
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
 
-
-def validate_ssh_path(pub_path, user_name):
-    p = pwd.getpwnam(user_name)
-    uid = p.pw_uid
-
-    ssh_dir = os.path.dirname(pub_path)
-
-    # Validate .ssh directory is not a symlink and is owned by the target user
-    if os.path.islink(ssh_dir):
-        raise Exception("Refusing to write: {0} is a symlink".format(ssh_dir))
-    if os.path.exists(ssh_dir):
-        st = os.lstat(ssh_dir)
-        if st.st_uid != uid and st.st_uid != 0:
-            raise Exception("Refusing to write: {0} is not owned by {1} or root".format(ssh_dir, user_name))
-
-    # Validate authorized_keys is not a symlink and is owned by the target user
-    if os.path.islink(pub_path):
-        raise Exception("Refusing to write: {0} is a symlink".format(pub_path))
-    if os.path.exists(pub_path):
-        st = os.lstat(pub_path)
-        if st.st_uid != uid and st.st_uid != 0:
-            raise Exception("Refusing to write: {0} is not owned by {1} or root".format(pub_path, user_name))
-
-
-def safe_write_authorized_keys(pub_path, contents, append=False):
-    bytes_to_write = ext_utils.encode_for_writing_to_file(contents)
-    flags = os.O_WRONLY | os.O_NOFOLLOW
-    if append:
-        flags |= os.O_APPEND | os.O_CREAT
-    else:
-        if os.path.exists(pub_path):
-            flags |= os.O_TRUNC
-        else:
-            flags |= os.O_CREAT | os.O_EXCL
-
-    fd = os.open(pub_path, flags, 0o600)
-    try:
-        os.write(fd, bytes_to_write)
-    finally:
-        os.close(fd)
-
-
 def get_os_name():
     if os.path.isfile(constants.os_release):
         return ext_utils.get_line_starting_with("NAME", constants.os_release)
@@ -369,6 +327,12 @@ def _set_user_account_pub_key(protect_settings, hutil):
                 ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                               message="create-user")
                 hutil.log("Succeeded in resetting ssh_key.")
+        except KeyError:
+            ext_utils.add_extension_event(name=hutil.get_name(),
+                                          op=constants.WALAEventOperation.Enable,
+                                          is_success=False,
+                                          message="(02100)Failed to reset ssh key.")
+            raise Exception("User '{0}' does not exist".format(user_name))
         except Exception as e:
             hutil.log(str(e))
             ext_utils.add_extension_event(name=hutil.get_name(),
@@ -636,6 +600,38 @@ def _fsck_repair(hutil, disk_name):
         hutil.error("{0}, {1}".format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Repair', 'error', '0', 'Repair failed.')
 
+def validate_ssh_path(pub_path, user_name):
+    p = pwd.getpwnam(user_name)
+    uid = p.pw_uid
+
+    ssh_dir = os.path.dirname(pub_path)
+    _validate_path_safe(ssh_dir, uid, user_name)
+    _validate_path_safe(pub_path, uid, user_name)
+
+def _validate_path_safe(path, uid, user_name):
+    if os.path.islink(path):
+        raise Exception("Refusing to write: {0} is a symlink".format(path))
+    if os.path.exists(path):
+        st = os.lstat(path)
+        if st.st_uid != uid and st.st_uid != 0:
+            raise Exception("Refusing to write: {0} is not owned by {1} or root".format(path, user_name))
+
+def safe_write_authorized_keys(pub_path, contents, append=False):
+    bytes_to_write = ext_utils.encode_for_writing_to_file(contents)
+    flags = os.O_WRONLY | os.O_NOFOLLOW
+    if append:
+        flags |= os.O_APPEND | os.O_CREAT
+    else:
+        if os.path.exists(pub_path):
+            flags |= os.O_TRUNC
+        else:
+            flags |= os.O_CREAT | os.O_EXCL
+
+    fd = os.open(pub_path, flags, 0o600)
+    try:
+        os.write(fd, bytes_to_write)
+    finally:
+        os.close(fd)
 
 if __name__ == '__main__':
     main()
