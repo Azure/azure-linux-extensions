@@ -3,6 +3,7 @@ import os
 from error_codes import *
 from errors      import error_info
 from helpers     import general_info, geninfo_lookup, run_cmd_output
+import glob
 
 CLCONF_PATH = "/etc/opt/microsoft/azuremonitoragent/config-cache/fluentbit/td-agent.conf"
 
@@ -16,13 +17,9 @@ def check_customlog_input():
         # Skip malformed entries that don't look like valid file paths
         if not path or not path.startswith('/'):
             continue
-        try: 
-            check_path = run_cmd_output('ls {0}'.format(path)).strip()
-            if check_path.endswith('No such file or directory'):
-                error_info.append((check_path,))
-                return ERR_CL_INPUT
-        except Exception as e:
-            error_info.append((e,))
+        matches = glob.glob(path)
+        if not matches:
+            error_info.append(("{0}: No such file or directory".format(path),))
             return ERR_CL_INPUT
 
     return NO_ERROR

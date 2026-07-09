@@ -1038,7 +1038,12 @@ def ensure_user_primary_group(user, group, create_if_missing=False, HUtilObj=Non
         if create_if_missing:
             try:
                 process = subprocess.Popen([
-                    'useradd', '--no-create-home', '--system', '--shell', '/usr/sbin/nologin', '-g', group, user
+                    'useradd',
+                    '--no-create-home',
+                    '--home-dir', '/nonexistent',
+                    '--system',
+                    '--shell', '/usr/sbin/nologin',
+                    '--gid', group, user
                 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 out, err = process.communicate()
                 if process.returncode != 0:

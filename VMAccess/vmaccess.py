@@ -73,6 +73,8 @@ class ConfigurationProvider(object):
             for line in ext_utils.get_file_contents(wala_config_file).split('\n'):
                 if not line.startswith("#") and "=" in line:
                     parts = line.split()[0].split('=')
+                    if len(parts) < 2:
+                        continue
                     value = parts[1].strip("\" ")
                     if value != "None":
                         self.values[parts[0]] = value
@@ -373,7 +375,11 @@ def _allow_password_auth(hutil):
 
 
 def _backup_and_update_sshd_config(hutil, attr_name, attr_value):
-    config = ext_utils.get_file_contents(SshdConfigPath).split("\n")
+    sshd_content = ext_utils.get_file_contents(SshdConfigPath)
+    if sshd_content is None:
+        hutil.log("Unable to read sshd_config at %s" % SshdConfigPath)
+        return
+    config = sshd_content.split("\n")
 
     for i in range(0, len(config)):
         if config[i].startswith(attr_name) and attr_value in config[i].lower():
@@ -414,7 +420,7 @@ def _get_default_ssh_config_filename():
             return "debian_default"
         if re.search("fedora", OSName, re.IGNORECASE):
             return "fedora_default"
-        if re.search("red\s?hat", OSName, re.IGNORECASE):
+        if re.search(r"red\s?hat", OSName, re.IGNORECASE):
             return "redhat_default"
         if re.search("suse", OSName, re.IGNORECASE):
             return "SuSE_default"
