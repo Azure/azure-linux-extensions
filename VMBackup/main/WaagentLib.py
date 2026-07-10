@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# WHY: Python 2 defaults source encoding to ASCII; any future non-ASCII char in this
-#      file would raise SyntaxError on Py 2.x (root cause of ICM 783505554).
-# WHAT: Declare UTF-8 encoding per PEP 263 so the file parses on Py 2.6+ and Py 3.x.
-# HOW: Single magic comment recognized by the Python tokenizer on line 1 or 2.
 #
 # Azure Linux Agent
 #
