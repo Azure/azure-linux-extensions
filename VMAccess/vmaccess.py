@@ -611,6 +611,8 @@ def validate_ssh_path(pub_path, user_name):
     uid = p.pw_uid
 
     ssh_dir = os.path.dirname(pub_path)
+    if not ssh_dir:
+        raise Exception("Refusing to write: ssh directory path is empty")
     _validate_path_safe(ssh_dir, uid, user_name)
     _validate_path_safe(pub_path, uid, user_name)
 
