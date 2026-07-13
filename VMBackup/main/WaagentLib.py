@@ -81,63 +81,60 @@ except ImportError:
     try:
         from distutils.version import LooseVersion
     except ImportError:
-        # Fallback for environments without packaging or distutils
+        # Fallback for environments without packaging or distutils.
+        # Splits on '.', '-', '_'; numeric tokens compare as ints; pre-release
+        # tokens (alpha < beta < rc < release) get negative sentinels; on Py 3
+        # mixed-type positions are coerced to str to avoid TypeError.
         class LooseVersion(object):
+
+            _PRERELEASE = {
+                'alpha': -1000, 'a': -1000,
+                'beta':  -100,  'b': -100,
+                'rc':    -10,   'pre': -10,
+            }
 
             def __init__(self, version_string):
                 self.version = str(version_string)
-                # Parse version into comparable parts
                 self._parsed = self._parse_version(self.version)
 
             def _parse_version(self, version_str):
                 import re
-                # Split by dots, hyphens, and underscores
                 parts = re.split(r'[.\-_]', version_str.lower())
                 parsed = []
                 for part in parts:
-                    # Try to convert to int, otherwise keep as string
                     try:
                         parsed.append(int(part))
                     except ValueError:
-                        # Handle pre-release identifiers with negative values for correct precedence
-                        # This ensures: alpha < beta < rc < release
-                        if part in ('alpha', 'a'):
-                            parsed.append(-1000)  # Lowest precedence
-                        elif part in ('beta', 'b'):
-                            parsed.append(-100)   # Medium precedence
-                        elif part in ('rc', 'pre'):
-                            parsed.append(-10)    # High precedence (but still < release)
-                        else:
-                            parsed.append(part)   # Keep as string for mixed alphanumeric
+                        parsed.append(self._PRERELEASE.get(part, part))
                 return tuple(parsed)
+
+            def _cmp(self, other):
+                if not isinstance(other, LooseVersion):
+                    other = LooseVersion(other)
+                a, b = self._parsed, other._parsed
+                for i in range(max(len(a), len(b))):
+                    ai = a[i] if i < len(a) else 0
+                    bi = b[i] if i < len(b) else 0
+                    if type(ai) != type(bi):
+                        ai, bi = str(ai), str(bi)
+                    if ai < bi:
+                        return -1
+                    if ai > bi:
+                        return 1
+                return 0
 
             def __str__(self):
                 return self.version
 
-            def __eq__(self, other):
-                if isinstance(other, LooseVersion):
-                    return self._parsed == other._parsed
-                return self._parsed == LooseVersion(other)._parsed
+            def __repr__(self):
+                return 'LooseVersion(%r)' % self.version
 
-            def __lt__(self, other):
-                if isinstance(other, LooseVersion):
-                    return self._parsed < other._parsed
-                return self._parsed < LooseVersion(other)._parsed
-
-            def __le__(self, other):
-                if isinstance(other, LooseVersion):
-                    return self._parsed <= other._parsed
-                return self._parsed <= LooseVersion(other)._parsed
-
-            def __gt__(self, other):
-                if isinstance(other, LooseVersion):
-                    return self._parsed > other._parsed
-                return self._parsed > LooseVersion(other)._parsed
-
-            def __ge__(self, other):
-                if isinstance(other, LooseVersion):
-                    return self._parsed >= other._parsed
-                return self._parsed >= LooseVersion(other)._parsed
+            def __eq__(self, other): return self._cmp(other) == 0
+            def __ne__(self, other): return self._cmp(other) != 0
+            def __lt__(self, other): return self._cmp(other) < 0
+            def __le__(self, other): return self._cmp(other) <= 0
+            def __gt__(self, other): return self._cmp(other) > 0
+            def __ge__(self, other): return self._cmp(other) >= 0
 
 if not hasattr(subprocess, 'check_output'):
     def check_output(*popenargs, **kwargs):
