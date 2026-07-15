@@ -473,6 +473,15 @@ def install():
             if rsyslog_exit_code != 0:
                 return rsyslog_exit_code, rsyslog_output
     
+    # Check if Azure Linux 4+ VMs have rsyslog package (Azure Linux 4 ships journald-only, no rsyslog by default)
+    if (vm_dist.startswith('azurelinux')) and int(vm_ver.split('.')[0]) >= 4:
+        check_rsyslog, _ = run_command_and_log("rpm -q rsyslog")
+        if check_rsyslog != 0:
+            hutil_log_info("'rsyslog' package missing from Azure Linux {0} machine, installing to allow AMA to run.".format(vm_ver))
+            rsyslog_exit_code, rsyslog_output = run_command_and_log("dnf install -y rsyslog")
+            if rsyslog_exit_code != 0:
+                return rsyslog_exit_code, rsyslog_output
+    
     # Check if SLES 16+ VMs have 'which' package (changed from Requires to Recommends in spec, may not be installed)
     if (vm_dist.startswith('suse') or vm_dist.startswith('sles')) and int(vm_ver.split('.')[0]) >= 16:
         check_which, _ = run_command_and_log("rpm -q which")
