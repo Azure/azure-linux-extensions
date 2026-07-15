@@ -1,7 +1,7 @@
 supported_dists_x86_64 = {
     'alma' : ['8', '9'], # Alma
     'amzn' : ['2', '2023'], # Amazon Linux 2
-    'azurelinux' : ['3'], 'mariner' : ['2'], # Azure Linux
+    'azurelinux' : ['3', '4'], 'mariner' : ['2'], # Azure Linux
     'debian' : ['9', '10', '11', '12', '13'], # Debian
     'opensuse' : ['15'], # openSUSE
     'oracle' : ['7', '8', '9'], 'ol' : ['7', '8', '9'],  # Oracle
@@ -13,7 +13,7 @@ supported_dists_x86_64 = {
 
 supported_dists_aarch64 = {
     'alma' : ['8'], # Alma
-    'azurelinux' : ['3'], 'mariner' : ['2'], # Azure Linux
+    'azurelinux' : ['3', '4'], 'mariner' : ['2'], # Azure Linux
     'debian' : ['11', '12', '13'], # Debian
     'redhat' : ['8', '9', '10'], # RHEL
     'rocky' : ['8', '9', '10'], 'rocky linux' : ['8', '9', '10'],  # Rocky
