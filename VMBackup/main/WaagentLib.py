@@ -23,7 +23,6 @@
 # http://msdn.microsoft.com/en-us/library/cc227259%28PROT.13%29.aspx
 #
 
-import crypt
 import random
 import base64
 
@@ -56,23 +55,55 @@ import zipfile
 import json
 import datetime
 import xml.sax.saxutils
+
+cryptImported = False
+passLibImported = False
+
+try:
+    from crypt import crypt as crypt
+    cryptImported = True
+except ImportError:
+    pass
+
+if cryptImported == False:
+    if (sys.version_info[0] == 3 and sys.version_info[1] >= 13) or (sys.version_info[0] > 3):
+        try:
+            from legacycrypt import crypt
+            cryptImported = True
+        except ImportError:
+            pass
+
+if cryptImported == False:
+    try:
+        from passlib.hash import sha512_crypt
+        passLibImported = True
+    except ImportError:
+        pass
+
 try:
     from distutils.version import LooseVersion
 except ImportError:
-    # distutils removed in Python 3.12; minimal shim for version comparisons
+    # distutils removed in Python 3.12; minimal shim for version comparisons.
+    # Splits on '.', '-', '_'; numeric tokens compare as ints; pre-release
+    # tokens (alpha < beta < rc < release) get negative sentinels; on Py 3
+    # mixed-type positions are coerced to str in _cmp to avoid TypeError.
     import re as _re
     class LooseVersion(object):
+        _PRERELEASE = {
+            'alpha': -1000, 'a': -1000,
+            'beta':  -100,  'b': -100,
+            'rc':    -10,   'pre': -10,
+        }
         def __init__(self, vstring):
             self.vstring = str(vstring)
             self._cmp_key = self._parse(self.vstring)
-        @staticmethod
-        def _parse(s):
+        def _parse(self, s):
             parts = []
-            for tok in _re.split(r'(\d+)', s):
-                if tok.isdigit():
-                    parts.append(int(tok))
-                elif tok:
-                    parts.append(tok)
+            for part in _re.split(r'[.\-_]', s.lower()):
+                try:
+                    parts.append(int(part))
+                except ValueError:
+                    parts.append(self._PRERELEASE.get(part, part))
             return parts
         def __str__(self):
             return self.vstring
@@ -418,7 +449,16 @@ class AbstractDistro(object):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
-        return crypt.crypt(password, salt)
+
+        if cryptImported:
+            return crypt(password, salt)
+        elif passLibImported:
+            return sha512_crypt.hash(password)
+        else:
+            raise ImportError(
+                "Password hashing is unavailable. Install one of: 'crypt' (Python < 3.13), "
+                "'legacycrypt', or 'passlib'."
+            )
 
     def load_ata_piix(self):
         return WaAgent.TryLoadAtapiix()
