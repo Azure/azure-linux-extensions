@@ -58,18 +58,32 @@ try:
        # Search for the old agent path if the new one is not found
        agentPath = searchWAAgentOld()
     if agentPath:
+        # WHY: Previous code caught only ImportError, but on Py 2.7 'importlib.util'
+        #      exists yet lacks module_from_spec (added in Py 3.5) - raising
+        #      AttributeError, which escaped the handler and crashed the extension
+        #      (ICM 783505554). 'imp' was also REMOVED in Py 3.12, so a blind fallback
+        #      breaks newer Pythons. We need an explicit capability check.
+        # WHAT: Pick the loader based on what the running Python actually supports:
+        #        - Py 3.5+   -> importlib.util.spec_from_file_location + module_from_spec
+        #        - Py 2.6 - 3.4 -> imp.load_source (only used where 'imp' still exists)
+        # HOW: hasattr() probe on importlib.util.module_from_spec; defensive try/except
+        #      around each branch so partial-stdlib environments still produce a clear error.
         try:
-            # For Python 3.5 and later, use importlib
             import importlib.util
-            spec = importlib.util.spec_from_file_location('waagent', agentPath)
-            waagent = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(waagent)       
         except ImportError:
-            # For Python 3.4 and earlier, use imp module
+            importlib_util = None
+        else:
+            importlib_util = importlib.util
+
+        if importlib_util is not None and hasattr(importlib_util, 'module_from_spec'):
+            spec = importlib_util.spec_from_file_location('waagent', agentPath)
+            waagent = importlib_util.module_from_spec(spec)
+            spec.loader.exec_module(waagent)
+        else:
+            # Legacy path: Python 2.6 - 3.4 only. 'imp' is gone in 3.12+, but those
+            # versions always have importlib.util.module_from_spec, so we never get here.
             import imp
             waagent = imp.load_source('waagent', agentPath)
-        except Exception:
-            raise Exception("Can't load waagent.")
     else:
         raise Exception("Can't load new or old waagent. Agent path not found.")
 except Exception as e:
