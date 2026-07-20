@@ -50,7 +50,7 @@ The Handlers are packaged as simple zip files for being registered in the Azure 
 
   * **ReportHearbeat** indicates WALA if the handler will be reporting heartbeat or not. The details of heartbeat and status is discussed in section [Heartbeat Reporting](#heartbeat_reporting).
 
-  **Note:** All of the fields in the JSON specified above are required fields and registration of the handler with Azure will fail if one of these fields in not specified. The explanation of the meaning of various fields in the JSON with respect to WALA is provided in the below sections.
+  **Note:** All of the fields in the JSON specified above are required fields and registration of the handler with Azure will fail if one of these fields is not specified. The explanation of the meaning of various fields in the JSON with respect to WALA is provided in the below sections.
 
   An example of the directory structure of the zip file for a handler is:
 
