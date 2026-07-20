@@ -72,7 +72,7 @@ def main():
         total_used_size = 0
         size_calculation_failed = False
         eventlogger = None
-        HandlerUtil.waagent.LoggerInit('/dev/console','/dev/stdout')
+        HandlerUtil.waagent.LoggerInit(None,'/dev/stdout')
         hutil = HandlerUtil.HandlerUtility(HandlerUtil.waagent.Log, HandlerUtil.waagent.Error, CommonVariables.extension_name)
         backup_logger = Backuplogger(hutil)
         MyPatching, patch_class_name, orig_distro = GetMyPatching(backup_logger)
