@@ -33,6 +33,8 @@ from patch.FreeBSDPatching import FreeBSDPatching
 from patch.NSBSDPatching import NSBSDPatching
 from patch.AzureLinuxPatching import AzureLinuxPatching
 
+from Utils.DistroUtil import read_os_release
+
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
     try:
@@ -62,20 +64,9 @@ def DistInfo():
         if 'Linux' in platform.system():
             distinfo = ["Default"]
             # On Python 3.8+ linux_distribution is removed; detect via /etc/os-release
-            try:
-                with open("/etc/os-release", "r") as f:
-                    os_id, os_version = "", ""
-                    for line in f:
-                        k, _, v = line.strip().partition("=")
-                        v = v.strip('"')
-                        if k == "ID":
-                            os_id = v
-                        elif k == "VERSION_ID":
-                            os_version = v
-                    if os_id == "azurelinux":
-                        return ["azurelinux", os_version]
-            except Exception:
-                pass
+            osr = read_os_release()
+            if osr.get("ID") == "azurelinux":
+                return ["azurelinux", osr.get("VERSION_ID", "")]
             if "ubuntu" in platform.version().lower():
                 distinfo[0] = "Ubuntu"
             elif 'suse' in platform.version().lower():
@@ -131,6 +122,10 @@ def GetMyPatching(logger):
         elif ('redhat'.lower() in Distro.lower()):
             Distro = 'redhat'
         elif ('azurelinux' in Distro.lower()):
+            # Select the dedicated AzureLinuxPatching class (see
+            # patch/AzureLinuxPatching.py). NOTE: WaagentLib.GetMyDistro maps
+            # azurelinux -> 'fedora' for waagent's distro classes; the two
+            # mappings differ intentionally.
             Distro = 'AzureLinux'
         elif ("Kali".lower() in Distro.lower()):
             Distro = 'Kali'

@@ -56,29 +56,29 @@ import json
 import datetime
 import xml.sax.saxutils
 
+# 'crypt' was deprecated in Python 3.11 (PEP 594) and removed in 3.13. VMBackup
+# does not call gen_password_hash(), so make the import optional and fall back to
+# the third-party 'legacycrypt' backend on 3.13+ when it is present.
+# Note: 'legacycrypt' is NOT stdlib; hashing only works where it (or 'crypt') is
+# available, which is why gen_password_hash() raises a clear error otherwise.
+# We record why each backend was unavailable so the failure is diagnosable
+# (surfaced in gen_password_hash()) instead of being swallowed silently.
 cryptImported = False
-passLibImported = False
+cryptImportErrors = []
 
 try:
-    from crypt import crypt as crypt
+    from crypt import crypt
     cryptImported = True
-except ImportError:
-    pass
+except ImportError as e:
+    cryptImportErrors.append("crypt (stdlib, removed in Python 3.13): %r" % e)
 
 if cryptImported == False:
     if (sys.version_info[0] == 3 and sys.version_info[1] >= 13) or (sys.version_info[0] > 3):
         try:
             from legacycrypt import crypt
             cryptImported = True
-        except ImportError:
-            pass
-
-if cryptImported == False:
-    try:
-        from passlib.hash import sha512_crypt
-        passLibImported = True
-    except ImportError:
-        pass
+        except ImportError as e:
+            cryptImportErrors.append("legacycrypt (non-stdlib): %r" % e)
 
 try:
     from distutils.version import LooseVersion
@@ -452,13 +452,11 @@ class AbstractDistro(object):
 
         if cryptImported:
             return crypt(password, salt)
-        elif passLibImported:
-            return sha512_crypt.hash(password)
-        else:
-            raise ImportError(
-                "Password hashing is unavailable. Install one of: 'crypt' (Python < 3.13), "
-                "'legacycrypt', or 'passlib'."
-            )
+        raise ImportError(
+            "Password hashing is unavailable: the 'crypt' stdlib module was removed "
+            "in Python 3.13 and no 'legacycrypt' fallback is installed. Tried: "
+            + ("; ".join(cryptImportErrors) if cryptImportErrors else "none")
+        )
 
     def load_ata_piix(self):
         return WaAgent.TryLoadAtapiix()
@@ -4596,6 +4594,10 @@ def GetMyDistro(dist_class_name=''):
             elif ('redhat'.lower() in Distro.lower()):
                 Distro = 'redhat'
             elif ('azurelinux' in Distro.lower()):
+                # Azure Linux is RPM/Fedora-family for waagent's purposes; reuse the
+                # existing 'fedoraDistro' class. NOTE: patch-class selection instead
+                # maps azurelinux -> 'AzureLinux' (dedicated AzureLinuxPatching) in
+                # patch/__init__.py -- the two mappings differ intentionally.
                 Distro = 'fedora'
             elif ('Kali'.lower() in Distro.lower()):
                 Distro = 'Kali'
@@ -4638,19 +4640,14 @@ def DistInfo(fullname=0):
             return distinfo
         if 'Linux' in platform.system():
             distinfo = ["Default"]
-            # On Python 3.8+ linux_distribution is removed; detect via /etc/os-release
+            # linux_distribution removed in Py 3.8; detect Azure Linux via os-release.
+            # Use the shared helper when importable (vendored waagent may run
+            # standalone, so fall through gracefully if Utils is unavailable).
             try:
-                with open("/etc/os-release", "r") as f:
-                    os_id, os_version = "", ""
-                    for line in f:
-                        k, _, v = line.strip().partition("=")
-                        v = v.strip('"')
-                        if k == "ID":
-                            os_id = v
-                        elif k == "VERSION_ID":
-                            os_version = v
-                    if os_id == "azurelinux":
-                        return ["azurelinux", os_version]
+                from Utils.DistroUtil import read_os_release
+                osr = read_os_release()
+                if osr.get("ID") == "azurelinux":
+                    return ["azurelinux", osr.get("VERSION_ID", "")]
             except Exception:
                 pass
             if "ubuntu" in platform.version().lower():
