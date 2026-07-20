@@ -1,6 +1,6 @@
 # Design Details
 
-This page descibes the design details of the extension. You can write an extension from scrach folloing this page.
+This page descibes the design details of the extension. You can write an extension from scrach following this page.
 
 <a name="handler-artifacts"/>
 ## Handler Artifacts
