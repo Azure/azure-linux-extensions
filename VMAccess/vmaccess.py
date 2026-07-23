@@ -311,19 +311,28 @@ def _set_user_account_pub_key(protect_settings, hutil):
                 if retcode > 0:
                     raise Exception("Failed to generate public key file.")
 
-                # Remove pub_path before ssh_deploy_public_key so it cannot be a
-                # pre-existing symlink that set_file_contents would follow.
-                if os.path.lexists(pub_path):
-                    if os.path.islink(pub_path):
-                        raise Exception("Refusing to write: {0} is a symlink".format(pub_path))
-                    os.remove(pub_path)
-                MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
-                # Re-validate after ssh_deploy_public_key wrote to pub_path
-                if os.path.islink(pub_path):
-                    os.remove(pub_path)
-                    raise Exception("Refusing to chown: {0} became a symlink".format(pub_path))
+                # Deploy the converted key to a temp file, then write to
+                # authorized_keys using safe_write to honor remove_prior_keys.
+                MyDistro.ssh_deploy_public_key('temp.pub', 'temp.authorized')
+                deployed_key = ext_utils.get_file_contents('temp.authorized')
+
+                if not deployed_key:
+                    raise Exception("Failed to convert PKCS8 certificate to OpenSSH public key. "
+                                    "ssh-keygen produced no output for the provided certificate.")
+                if not deployed_key.endswith("\n"):
+                    deployed_key += "\n"
+
+                if remove_prior_keys == True:
+                    safe_write_authorized_keys(pub_path, deployed_key, append=False)
+                    hutil.log("Removed prior ssh keys and added new key for user %s" % user_name)
+                else:
+                    safe_write_authorized_keys(pub_path, deployed_key, append=True)
+
+                MyDistro.set_se_linux_context(
+                    pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
                 p = pwd.getpwnam(user_name)
                 os.lchown(pub_path, p.pw_uid, p.pw_gid)
+                os.remove('temp.authorized')
                 os.remove('temp.pub')
                 os.remove('temp.crt')
                 ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
