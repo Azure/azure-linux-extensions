@@ -399,7 +399,7 @@ def _get_default_ssh_config_filename():
         if re.search("fedora", OSName, re.IGNORECASE):
             return "fedora_default"
         if re.search(r"azure\s?linux|mariner", OSName, re.IGNORECASE):
-            return "fedora_default"
+            return "azurelinux_default"
         if re.search(r"red\s?hat", OSName, re.IGNORECASE):
             return "redhat_default"
         if re.search("suse", OSName, re.IGNORECASE):
