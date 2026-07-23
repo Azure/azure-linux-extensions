@@ -2447,9 +2447,13 @@ def parse_context(operation):
                         output = 'Logrotate removal failed with error: {0}\nStacktrace: {1}'.format(ex, traceback.format_exc())
                         hutil_log_info(output)
             else:
-                if not os.path.exists(AMAExtensionLogRotateFilePath):      
-                    logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
-                    copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
+                if not os.path.exists(AMAExtensionLogRotateFilePath):
+                    try:
+                        logrotateFilePath = os.path.join(os.getcwd(), 'azuremonitoragentextension.logrotate')
+                        copyfile(logrotateFilePath,AMAExtensionLogRotateFilePath)
+                    except Exception as ex:
+                        output = 'Logrotate config copy failed with error: {0}\nStacktrace: {1}'.format(ex, traceback.format_exc())
+                        hutil_log_info(output)
             
         # parse_context may throw KeyError if necessary JSON key is not
         # present in settings
@@ -3060,9 +3064,13 @@ def get_settings():
             protected_settings_str = None
             for decrypt_cmd in [cms_cmd, smime_cmd]:
                 try:
+                    # stderr is intentionally captured separately from stdout (and never
+                    # logged verbatim) so that non-fatal openssl warnings (e.g. a missing
+                    # openssl.cnf) can't get concatenated with the decrypted output, corrupt the
+                    # JSON payload, and risk the decrypted secret being echoed in error handling.
                     session = subprocess.Popen([decrypt_cmd], shell=True,
                                                stdin=subprocess.PIPE,
-                                               stderr=subprocess.STDOUT,
+                                               stderr=subprocess.PIPE,
                                                stdout=subprocess.PIPE)
                     output = session.communicate(decoded_settings)
                     # success only if return code is 0 and we have output
