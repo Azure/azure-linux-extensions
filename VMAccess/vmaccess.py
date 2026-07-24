@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import os
+import pwd
 import re
 import shutil
 import sys
@@ -275,19 +276,21 @@ def _set_user_account_pub_key(protect_settings, hutil):
             if no_convert:
                 if cert_txt:
                     pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
+                    validate_ssh_path(pub_path, user_name)
                     final_cert_txt = cert_txt
                     if not cert_txt.endswith("\n"):
                         final_cert_txt = final_cert_txt + "\n"
 
                     if remove_prior_keys == True:
-                        ext_utils.set_file_contents(pub_path, final_cert_txt)
+                        safe_write_authorized_keys(pub_path, final_cert_txt, append=False)
                         hutil.log("Removed prior ssh keys and added new key for user %s" % user_name)
                     else:
-                        ext_utils.append_file_contents(pub_path, final_cert_txt)
+                        safe_write_authorized_keys(pub_path, final_cert_txt, append=True)
         
                     MyDistro.set_se_linux_context(
                         pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
-                    ext_utils.change_owner(pub_path, user_name)
+                    p = pwd.getpwnam(user_name)
+                    os.lchown(pub_path, p.pw_uid, p.pw_gid)
                     ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                                   message="create-user")
                     hutil.log("Succeeded in resetting ssh_key.")
@@ -302,17 +305,45 @@ def _set_user_account_pub_key(protect_settings, hutil):
                 # we support PKCS8 certificates besides ssh-rsa public keys
                 _save_cert_str_as_file(cert_txt, 'temp.crt')
                 pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
+                validate_ssh_path(pub_path, user_name)
                 retcode = ext_utils.run_command_and_write_stdout_to_file(
                     [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout', '-pubkey'], "temp.pub")
                 if retcode > 0:
                     raise Exception("Failed to generate public key file.")
 
-                MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
+                # Deploy the converted key to a temp file, then write to
+                # authorized_keys using safe_write to honor remove_prior_keys.
+                MyDistro.ssh_deploy_public_key('temp.pub', 'temp.authorized')
+                deployed_key = ext_utils.get_file_contents('temp.authorized')
+
+                if not deployed_key:
+                    raise Exception("Failed to convert PKCS8 certificate to OpenSSH public key. "
+                                    "ssh-keygen produced no output for the provided certificate.")
+                if not deployed_key.endswith("\n"):
+                    deployed_key += "\n"
+
+                if remove_prior_keys == True:
+                    safe_write_authorized_keys(pub_path, deployed_key, append=False)
+                    hutil.log("Removed prior ssh keys and added new key for user %s" % user_name)
+                else:
+                    safe_write_authorized_keys(pub_path, deployed_key, append=True)
+
+                MyDistro.set_se_linux_context(
+                    pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
+                p = pwd.getpwnam(user_name)
+                os.lchown(pub_path, p.pw_uid, p.pw_gid)
+                os.remove('temp.authorized')
                 os.remove('temp.pub')
                 os.remove('temp.crt')
                 ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                               message="create-user")
                 hutil.log("Succeeded in resetting ssh_key.")
+        except KeyError:
+            ext_utils.add_extension_event(name=hutil.get_name(),
+                                          op=constants.WALAEventOperation.Enable,
+                                          is_success=False,
+                                          message="(02100)Failed to reset ssh key.")
+            raise Exception("User '{0}' does not exist".format(user_name))
         except Exception as e:
             hutil.log(str(e))
             ext_utils.add_extension_event(name=hutil.get_name(),
@@ -584,6 +615,40 @@ def _fsck_repair(hutil, disk_name):
         hutil.error("{0}, {1}".format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Repair', 'error', '0', 'Repair failed.')
 
+def validate_ssh_path(pub_path, user_name):
+    p = pwd.getpwnam(user_name)
+    uid = p.pw_uid
+
+    ssh_dir = os.path.dirname(pub_path)
+    if not ssh_dir:
+        raise Exception("Refusing to write: ssh directory path is empty")
+    _validate_path_safe(ssh_dir, uid, user_name)
+    _validate_path_safe(pub_path, uid, user_name)
+
+def _validate_path_safe(path, uid, user_name):
+    if os.path.islink(path):
+        raise Exception("Refusing to write: {0} is a symlink".format(path))
+    if os.path.exists(path):
+        st = os.lstat(path)
+        if st.st_uid != uid and st.st_uid != 0:
+            raise Exception("Refusing to write: {0} is not owned by {1} or root".format(path, user_name))
+
+def safe_write_authorized_keys(pub_path, contents, append=False):
+    bytes_to_write = ext_utils.encode_for_writing_to_file(contents)
+    flags = os.O_WRONLY | os.O_NOFOLLOW
+    if append:
+        flags |= os.O_APPEND | os.O_CREAT
+    else:
+        if os.path.exists(pub_path):
+            flags |= os.O_TRUNC
+        else:
+            flags |= os.O_CREAT | os.O_EXCL
+
+    fd = os.open(pub_path, flags, 0o600)
+    try:
+        os.write(fd, bytes_to_write)
+    finally:
+        os.close(fd)
 
 if __name__ == '__main__':
     main()

@@ -125,11 +125,12 @@ class GenericDistro(object):
 
     def set_se_linux_context(self, path, cn):
         """
-        Calls shell 'chcon' with 'path' and 'cn' context.
+        Calls shell 'chcon -h' with 'path' and 'cn' context.
+        Uses -h to not follow symlinks.
         Returns exit result.
         """
         if self.is_se_linux_system():
-            return ext_utils.run(['chcon', cn, path])
+            return ext_utils.run(['chcon', '-h', cn, path])
 
     def restart_ssh_service(self):
         """
