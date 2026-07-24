@@ -58,18 +58,29 @@ try:
        # Search for the old agent path if the new one is not found
        agentPath = searchWAAgentOld()
     if agentPath:
+        # Choose the loader by capability, not by exception type. Previously this
+        # relied on `except ImportError`, but on Python 3.3-3.4 the missing
+        # `importlib.util.module_from_spec` raises AttributeError (not ImportError),
+        # which escaped the handler and crashed the extension (broke PR #2124).
+        # `imp` was also removed in Python 3.12, so a blind fallback is unsafe.
         try:
-            # For Python 3.5 and later, use importlib
             import importlib.util
+            useImportlib = hasattr(importlib.util, 'module_from_spec')
+        except ImportError:
+            # Python 2.6 / 2.7 have no importlib.util
+            useImportlib = False
+
+        if useImportlib:
+            # Python 3.5+
             spec = importlib.util.spec_from_file_location('waagent', agentPath)
             waagent = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(waagent)       
-        except ImportError:
-            # For Python 3.4 and earlier, use imp module
+            spec.loader.exec_module(waagent)
+        else:
+            # Python 2.6 - 3.4. 'imp' was removed in 3.12, but every version that
+            # reaches this branch still has 'imp', because 3.5+ always provides
+            # importlib.util.module_from_spec and takes the branch above.
             import imp
             waagent = imp.load_source('waagent', agentPath)
-        except Exception:
-            raise Exception("Can't load waagent.")
     else:
         raise Exception("Can't load new or old waagent. Agent path not found.")
 except Exception as e:

@@ -81,6 +81,7 @@ import datetime
 import Utils.Status
 from Utils.EventLoggerUtil import EventLogger
 from Utils.LogHelper import LoggingLevel, LoggingConstants, FileHelpers
+from Utils.DistroUtil import read_os_release
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -627,8 +628,11 @@ class HandlerUtility:
                 distinfo[0] = distinfo[0].strip()
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
             else:
-                distinfo = platform.dist()
-                return  distinfo[0]+"-"+distinfo[1],platform.release()
+                # platform.dist() removed in Python 3.8; parse /etc/os-release instead
+                osr = read_os_release()
+                if osr:
+                    return osr.get("NAME", "Unknown") + "-" + osr.get("VERSION", "Unknown"), platform.release()
+                return "Unknown", "Unknown"
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
