@@ -222,8 +222,13 @@ class HandlerUtility:
                 jctxt = ''
                 try:
                     jctxt = json.loads(protected_settings_str)
-                except:
-                    self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(protected_settings_str))
+                except Exception as e:
+                    # Do not log protected_settings_str here: it is the decrypted
+                    # plaintext of protectedSettings and may contain secrets (e.g.
+                    # workspace keys). redact_protected_settings() only knows how to
+                    # redact the outer (still-encrypted) envelope fields, so it would
+                    # not mask secrets that live inside this already-decrypted payload.
+                    self.error('JSON exception decoding protectedSettings: {0}'.format(e))
                 handlerSettings['protectedSettings']=jctxt
                 self.log('Config decoded correctly.')
         return config
