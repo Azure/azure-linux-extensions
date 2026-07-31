@@ -1,5 +1,5 @@
 supported_dists_x86_64 = {
-    'alma' : ['8', '9'], # Alma
+    'alma' : ['8', '9', '10'], # Alma
     'amzn' : ['2', '2023'], # Amazon Linux 2
     'azurelinux' : ['3', '4'], 'mariner' : ['2'], # Azure Linux
     'debian' : ['9', '10', '11', '12', '13'], # Debian
@@ -12,7 +12,7 @@ supported_dists_x86_64 = {
 }
 
 supported_dists_aarch64 = {
-    'alma' : ['8'], # Alma
+    'alma' : ['8', '10'], # Alma
     'azurelinux' : ['3', '4'], 'mariner' : ['2'], # Azure Linux
     'debian' : ['11', '12', '13'], # Debian
     'redhat' : ['8', '9', '10'], # RHEL
