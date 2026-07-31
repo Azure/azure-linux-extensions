@@ -8,7 +8,7 @@ supported_dists_x86_64 = {
     'redhat' : ['7', '8', '9', '10'], # RHEL
     'rocky' : ['8', '9', '10'], # Rocky
     'suse' : ['15', '16'], 'sles' : ['15', '16'], # SLES
-    'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04'], # Ubuntu
+    'ubuntu' : ['16.04', '18.04', '20.04', '22.04', '24.04', '26.04'], # Ubuntu
 }
 
 supported_dists_aarch64 = {
@@ -18,5 +18,5 @@ supported_dists_aarch64 = {
     'redhat' : ['8', '9', '10'], # RHEL
     'rocky' : ['8', '9', '10'], 'rocky linux' : ['8', '9', '10'],  # Rocky
     'sles' : ['15', '16'], # SLES
-    'ubuntu' : ['18.04', '20.04', '22.04', '24.04'], # Ubuntu
+    'ubuntu' : ['18.04', '20.04', '22.04', '24.04', '26.04'], # Ubuntu
 }
