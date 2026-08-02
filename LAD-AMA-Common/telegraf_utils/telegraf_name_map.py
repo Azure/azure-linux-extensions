@@ -20,13 +20,13 @@ name_map = {
 
 ######These are the counter keys and telegraf plugins for LAD/AMA
 
-"processor->cpu io wait time" : {"plugin":"cpu", "field":"usage_iowait", "ladtablekey":"/builtin/processor/percentiowaittime"},
-"processor->cpu user time" : {"plugin":"cpu", "field":"usage_user", "ladtablekey":"/builtin/processor/percentusertime"},
-"processor->cpu nice time" : {"plugin":"cpu", "field":"usage_nice", "ladtablekey":"/builtin/processor/percentnicetime"},
-"processor->cpu percentage guest os" : {"plugin":"cpu", "field":"usage_active", "ladtablekey":"/builtin/processor/percentprocessortime"},
-"processor->cpu interrupt time" : {"plugin":"cpu", "field":"usage_irq", "ladtablekey":"/builtin/processor/percentinterrupttime"},
-"processor->cpu idle time" : {"plugin":"cpu", "field":"usage_idle", "ladtablekey":"/builtin/processor/percentidletime"},
-"processor->cpu privileged time" : {"plugin":"cpu", "field":"usage_system", "ladtablekey":"/builtin/processor/percentprivilegedtime"},
+"cpu io wait time" : {"plugin":"cpu", "field":"usage_iowait", "ladtablekey":"/builtin/processor/percentiowaittime"},
+"cpu user time" : {"plugin":"cpu", "field":"usage_user", "ladtablekey":"/builtin/processor/percentusertime"},
+"cpu nice time" : {"plugin":"cpu", "field":"usage_nice", "ladtablekey":"/builtin/processor/percentnicetime"},
+"cpu percentage guest os" : {"plugin":"cpu", "field":"usage_active", "ladtablekey":"/builtin/processor/percentprocessortime"},
+"cpu interrupt time" : {"plugin":"cpu", "field":"usage_irq", "ladtablekey":"/builtin/processor/percentinterrupttime"},
+"cpu idle time" : {"plugin":"cpu", "field":"usage_idle", "ladtablekey":"/builtin/processor/percentidletime"},
+"cpu privileged time" : {"plugin":"cpu", "field":"usage_system", "ladtablekey":"/builtin/processor/percentprivilegedtime"},
 
 "% IO Wait Time" : {"plugin":"cpu", "field":"usage_iowait", "module":"processor"},
 "% User Time" : {"plugin":"cpu", "field":"usage_user", "module":"processor"},
@@ -41,14 +41,14 @@ name_map = {
 "Processor\\UtilizationPercentage" : {"plugin":"cpu_vmi", "field":"Processor\\\\\\\\UtilizationPercentage", "module":"processor"},
 "Computer\\Heartbeat" : {"plugin":"cpu_heartbeat_vmi", "field":"Computer\\\\\\\\Heartbeat", "module":"processor"},
 
-"network->network in guest os" : {"plugin":"net", "field":"bytes_recv", "ladtablekey":"/builtin/network/bytesreceived"},
-"network->network total bytes" : {"plugin":"net", "field":"bytes_total", "ladtablekey":"/builtin/network/bytestotal"}, #Need to calculate sum
-"network->network out guest os" : {"plugin":"net", "field":"bytes_sent", "ladtablekey":"/builtin/network/bytestransmitted"},
-"network->network collisions" : {"plugin":"net", "field":"drop_total", "ladtablekey":"/builtin/network/totalcollisions"}, #Need to calculate sum
-"network->packets received errors" : {"plugin":"net", "field":"err_in", "ladtablekey":"/builtin/network/totalrxerrors"},
-"network->packets sent" : {"plugin":"net", "field":"packets_sent", "ladtablekey":"/builtin/network/packetstransmitted"},
-"network->packets received" : {"plugin":"net", "field":"packets_recv", "ladtablekey":"/builtin/network/packetsreceived"},
-"network->packets sent errors" : {"plugin":"net", "field":"err_out", "ladtablekey":"/builtin/network/totaltxerrors"},
+"network in guest os" : {"plugin":"net", "field":"bytes_recv", "ladtablekey":"/builtin/network/bytesreceived"},
+"network total bytes" : {"plugin":"net", "field":"bytes_total", "ladtablekey":"/builtin/network/bytestotal"}, #Need to calculate sum
+"network out guest os" : {"plugin":"net", "field":"bytes_sent", "ladtablekey":"/builtin/network/bytestransmitted"},
+"network collisions" : {"plugin":"net", "field":"drop_total", "ladtablekey":"/builtin/network/totalcollisions"}, #Need to calculate sum
+"packets received errors" : {"plugin":"net", "field":"err_in", "ladtablekey":"/builtin/network/totalrxerrors"},
+"packets sent" : {"plugin":"net", "field":"packets_sent", "ladtablekey":"/builtin/network/packetstransmitted"},
+"packets received" : {"plugin":"net", "field":"packets_recv", "ladtablekey":"/builtin/network/packetsreceived"},
+"packets sent errors" : {"plugin":"net", "field":"err_out", "ladtablekey":"/builtin/network/totaltxerrors"},
 
 "Total Bytes Received" : {"plugin":"net", "field":"bytes_recv", "module":"network"},
 "Total Bytes" : {"plugin":"net", "field":"bytes_total", "module":"network"}, #Need to calculate sum
@@ -65,19 +65,19 @@ name_map = {
 "Network\\ReadBytesPerSecond" : {"plugin":"net_recv_vmi", "field":"Network\\\\\\\\ReadBytesPerSecond", "op":"rate", "module":"network"},
 "Network\\WriteBytesPerSecond" : {"plugin":"net_sent_vmi", "field":"Network\\\\\\\\WriteBytesPerSecond", "op":"rate", "module":"network"},
 
-"memory->memory available" : {"plugin":"mem", "field":"available", "ladtablekey":"/builtin/memory/availablememory"},
-"memory->mem. percent available" : {"plugin":"mem", "field":"available_percent", "ladtablekey":"/builtin/memory/percentavailablememory"},
-"memory->memory used" : {"plugin":"mem", "field":"used", "ladtablekey":"/builtin/memory/usedmemory"},
-"memory->memory percentage" : {"plugin":"mem", "field":"used_percent", "ladtablekey":"/builtin/memory/percentusedmemory"},
+"memory available" : {"plugin":"mem", "field":"available", "ladtablekey":"/builtin/memory/availablememory"},
+"mem. percent available" : {"plugin":"mem", "field":"available_percent", "ladtablekey":"/builtin/memory/percentavailablememory"},
+"memory used" : {"plugin":"mem", "field":"used", "ladtablekey":"/builtin/memory/usedmemory"},
+"memory percentage" : {"plugin":"mem", "field":"used_percent", "ladtablekey":"/builtin/memory/percentusedmemory"},
 
-"memory->swap available" : {"plugin":"swap", "field":"free", "ladtablekey":"/builtin/memory/availableswap"},
-"memory->swap percent available" : {"plugin":"swap", "field":"free_percent", "ladtablekey":"/builtin/memory/percentavailableswap"}, #Need to calculate percentage
-"memory->swap used" : {"plugin":"swap", "field":"used", "ladtablekey":"/builtin/memory/usedswap"},
-"memory->swap percent used" : {"plugin":"swap", "field":"used_percent", "ladtablekey":"/builtin/memory/percentusedswap"},
+"swap available" : {"plugin":"swap", "field":"free", "ladtablekey":"/builtin/memory/availableswap"},
+"swap percent available" : {"plugin":"swap", "field":"free_percent", "ladtablekey":"/builtin/memory/percentavailableswap"}, #Need to calculate percentage
+"swap used" : {"plugin":"swap", "field":"used", "ladtablekey":"/builtin/memory/usedswap"},
+"swap percent used" : {"plugin":"swap", "field":"used_percent", "ladtablekey":"/builtin/memory/percentusedswap"},
 
-"memory->page reads": {"plugin":"kernel_vmstat", "field":"pgpgin", "op":"rate", "ladtablekey":"/builtin/memory/pagesreadpersec"},
-"memory->page writes" : {"plugin":"kernel_vmstat", "field":"pgpgout", "op":"rate", "ladtablekey":"/builtin/memory/pageswrittenpersec"},
-"memory->pages" : {"plugin":"kernel_vmstat", "field":"total_pages", "op":"rate", "ladtablekey":"/builtin/memory/pagespersec"},
+"page reads": {"plugin":"kernel_vmstat", "field":"pgpgin", "op":"rate", "ladtablekey":"/builtin/memory/pagesreadpersec"},
+"page writes" : {"plugin":"kernel_vmstat", "field":"pgpgout", "op":"rate", "ladtablekey":"/builtin/memory/pageswrittenpersec"},
+"pages" : {"plugin":"kernel_vmstat", "field":"total_pages", "op":"rate", "ladtablekey":"/builtin/memory/pagespersec"},
 
 "Available MBytes Memory" : {"plugin":"mem", "field":"available", "module":"memory"},
 "% Available Memory" : {"plugin":"mem", "field":"available_percent", "module":"memory"},
@@ -99,19 +99,19 @@ name_map = {
 "Memory\\AvailablePercentage" : {"plugin":"mem_vmi", "field":"Memory\\\\\\\\AvailablePercentage", "module":"memory"},
 
 #OMI Filesystem plugin
-"filesystem->filesystem used space" : {"plugin":"disk", "field":"used", "ladtablekey":"/builtin/filesystem/usedspace"},
-"filesystem->filesystem % used space" : {"plugin":"disk", "field":"used_percent", "ladtablekey":"/builtin/filesystem/percentusedspace"},
-"filesystem->filesystem free space" : {"plugin":"disk", "field":"free", "ladtablekey":"/builtin/filesystem/freespace"},
-"filesystem->filesystem % free space" : {"plugin":"disk", "field":"free_percent", "ladtablekey":"/builtin/filesystem/percentfreespace"}, #Need to calculate percentage
-"filesystem->filesystem % free inodes" : {"plugin":"disk", "field":"inodes_free_percent", "ladtablekey":"/builtin/filesystem/percentfreeinodes"}, #Need to calculate percentage
-"filesystem->filesystem % used inodes" : {"plugin":"disk", "field":"inodes_used_percent", "ladtablekey":"/builtin/filesystem/percentusedinodes"}, #Need to calculate percentage
+"filesystem used space" : {"plugin":"disk", "field":"used", "ladtablekey":"/builtin/filesystem/usedspace"},
+"filesystem % used space" : {"plugin":"disk", "field":"used_percent", "ladtablekey":"/builtin/filesystem/percentusedspace"},
+"filesystem free space" : {"plugin":"disk", "field":"free", "ladtablekey":"/builtin/filesystem/freespace"},
+"filesystem % free space" : {"plugin":"disk", "field":"free_percent", "ladtablekey":"/builtin/filesystem/percentfreespace"}, #Need to calculate percentage
+"filesystem % free inodes" : {"plugin":"disk", "field":"inodes_free_percent", "ladtablekey":"/builtin/filesystem/percentfreeinodes"}, #Need to calculate percentage
+"filesystem % used inodes" : {"plugin":"disk", "field":"inodes_used_percent", "ladtablekey":"/builtin/filesystem/percentusedinodes"}, #Need to calculate percentage
 
-"filesystem->filesystem transfers/sec" : {"plugin":"diskio", "field":"total_transfers_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/transferspersecond"}, #Need to calculate sum
-"filesystem->filesystem read bytes/sec" : {"plugin":"diskio", "field":"read_bytes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/bytesreadpersecond"}, #Need to calculate rate (but each second not each interval)
-"filesystem->filesystem bytes/sec" : {"plugin":"diskio", "field":"total_bytes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/bytespersecond"}, #Need to calculate rate and then sum
-"filesystem->filesystem write bytes/sec" : {"plugin":"diskio", "field":"write_bytes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/byteswrittenpersecond"}, #Need to calculate rate (but each second not each interval)
-"filesystem->filesystem reads/sec" : {"plugin":"diskio", "field":"reads_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/readspersecond"}, #Need to calculate rate (but each second not each interval)
-"filesystem->filesystem writes/sec" : {"plugin":"diskio", "field":"writes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/writespersecond"}, #Need to calculate rate (but each second not each interval)
+"filesystem transfers/sec" : {"plugin":"diskio", "field":"total_transfers_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/transferspersecond"}, #Need to calculate sum
+"filesystem read bytes/sec" : {"plugin":"diskio", "field":"read_bytes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/bytesreadpersecond"}, #Need to calculate rate (but each second not each interval)
+"filesystem bytes/sec" : {"plugin":"diskio", "field":"total_bytes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/bytespersecond"}, #Need to calculate rate and then sum
+"filesystem write bytes/sec" : {"plugin":"diskio", "field":"write_bytes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/byteswrittenpersecond"}, #Need to calculate rate (but each second not each interval)
+"filesystem reads/sec" : {"plugin":"diskio", "field":"reads_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/readspersecond"}, #Need to calculate rate (but each second not each interval)
+"filesystem writes/sec" : {"plugin":"diskio", "field":"writes_filesystem", "op":"rate", "ladtablekey":"/builtin/filesystem/writespersecond"}, #Need to calculate rate (but each second not each interval)
 
 "% Used Space" : {"plugin":"disk", "field":"used_percent", "module":"filesystem"},
 "Free Megabytes" : {"plugin":"disk", "field":"free", "module":"filesystem"},
@@ -157,16 +157,16 @@ name_map = {
 "Unique Users" : {"plugin":"system", "field":"n_unique_users", "module":"system"},
 
 # #OMI Disk plugin
-"disk->disk read guest os" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "ladtablekey":"/builtin/disk/readbytespersecond"},
-"disk->disk write guest os" : {"plugin":"diskio", "field":"write_bytes", "op":"rate", "ladtablekey":"/builtin/disk/writebytespersecond"},
-"disk->disk total bytes" : {"plugin":"diskio", "field":"total_bytes", "op":"rate", "ladtablekey":"/builtin/disk/bytespersecond"},
-"disk->disk reads" : {"plugin":"diskio", "field":"reads", "op":"rate", "ladtablekey":"/builtin/disk/readspersecond"}, #Need to calculate rate (but each second not each interval)
-"disk->disk writes" : {"plugin":"diskio", "field":"writes", "op":"rate", "ladtablekey":"/builtin/disk/writespersecond"},
-"disk->disk transfers" : {"plugin":"diskio", "field":"total_transfers", "op":"rate", "ladtablekey":"/builtin/disk/transferspersecond"},
-"disk->disk read time" : {"plugin":"diskio", "field":"read_time", "op":"rate", "ladtablekey":"/builtin/disk/averagereadtime"},
-"disk->disk write time" : {"plugin":"diskio", "field":"write_time", "op":"rate", "ladtablekey":"/builtin/disk/averagewritetime"},
-"disk->disk transfer time" : {"plugin":"diskio", "field":"io_time", "op":"rate", "ladtablekey":"/builtin/disk/averagetransfertime"},
-"disk->disk queue length" : {"plugin":"diskio", "field":"iops_in_progress", "ladtablekey":"/builtin/disk/averagediskqueuelength"}
+"disk read guest os" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "ladtablekey":"/builtin/disk/readbytespersecond"},
+"disk write guest os" : {"plugin":"diskio", "field":"write_bytes", "op":"rate", "ladtablekey":"/builtin/disk/writebytespersecond"},
+"disk total bytes" : {"plugin":"diskio", "field":"total_bytes", "op":"rate", "ladtablekey":"/builtin/disk/bytespersecond"},
+"disk reads" : {"plugin":"diskio", "field":"reads", "op":"rate", "ladtablekey":"/builtin/disk/readspersecond"}, #Need to calculate rate (but each second not each interval)
+"disk writes" : {"plugin":"diskio", "field":"writes", "op":"rate", "ladtablekey":"/builtin/disk/writespersecond"},
+"disk transfers" : {"plugin":"diskio", "field":"total_transfers", "op":"rate", "ladtablekey":"/builtin/disk/transferspersecond"},
+"disk read time" : {"plugin":"diskio", "field":"read_time", "op":"rate", "ladtablekey":"/builtin/disk/averagereadtime"},
+"disk write time" : {"plugin":"diskio", "field":"write_time", "op":"rate", "ladtablekey":"/builtin/disk/averagewritetime"},
+"disk transfer time" : {"plugin":"diskio", "field":"io_time", "op":"rate", "ladtablekey":"/builtin/disk/averagetransfertime"},
+"disk queue length" : {"plugin":"diskio", "field":"iops_in_progress", "ladtablekey":"/builtin/disk/averagediskqueuelength"}
 
 ##### These are the counter keys and telegraf plugins for Azure Monitor Agent
 
