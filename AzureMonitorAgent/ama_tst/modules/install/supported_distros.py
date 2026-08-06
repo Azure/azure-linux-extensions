@@ -4,7 +4,7 @@ supported_dists_x86_64 = {
     'azurelinux' : ['3', '4'], 'mariner' : ['2'], # Azure Linux
     'debian' : ['9', '10', '11', '12', '13'], # Debian
     'opensuse' : ['15'], # openSUSE
-    'oracle' : ['7', '8', '9'], 'ol' : ['7', '8', '9'],  # Oracle
+    'oracle' : ['7', '8', '9', '10'], 'ol' : ['7', '8', '9', '10'],  # Oracle
     'redhat' : ['7', '8', '9', '10'], # RHEL
     'rocky' : ['8', '9', '10'], # Rocky
     'suse' : ['15', '16'], 'sles' : ['15', '16'], # SLES
@@ -15,6 +15,7 @@ supported_dists_aarch64 = {
     'alma' : ['8', '10'], # Alma
     'azurelinux' : ['3', '4'], 'mariner' : ['2'], # Azure Linux
     'debian' : ['11', '12', '13'], # Debian
+    'oracle' : ['10'], 'ol' : ['10'], # Oracle
     'redhat' : ['8', '9', '10'], # RHEL
     'rocky' : ['8', '9', '10'], 'rocky linux' : ['8', '9', '10'],  # Rocky
     'sles' : ['15', '16'], # SLES
