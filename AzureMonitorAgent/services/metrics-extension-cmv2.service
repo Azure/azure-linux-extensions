@@ -4,10 +4,8 @@ After=network.target
 
 [Service]
 Environment="OTLP_GRPC_HOST=127.0.0.1"
-Environment="OTLP_GRPC_PROM_HOST=127.0.0.1"
-Environment="OTLP_GRPC_PROM_PORT=4316"
 EnvironmentFile=-/etc/metrics-extension.d/options.conf
-ExecStart=%ME_BIN% -EnableDcrManagedSources -ManagedIdentity %ME_MANAGED_IDENTITY% -DataDirectory %ME_DATA_DIRECTORY% -Input influxdb_local -InfluxDbSocketPath %ME_INFLUX_SOCKET_FILE_PATH% -LogLevel Info -Logger Console -OperationEnvironment AMA-Linux/AMA_VERSION -ConfigOverrides "{\"otlp\":{\"endpoints\":[\"${OTLP_GRPC_PROM_HOST}:${OTLP_GRPC_PROM_PORT}\"]}}"
+ExecStart=%ME_BIN% -EnableDcrManagedSources -ManagedIdentity %ME_MANAGED_IDENTITY% -DataDirectory %ME_DATA_DIRECTORY% -Input influxdb_local -InfluxDbSocketPath %ME_INFLUX_SOCKET_FILE_PATH% -LogLevel Info -Logger Console -OperationEnvironment AMA-Linux/AMA_VERSION
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=control-group
 User=azuremetricsext
