@@ -37,8 +37,13 @@ class TestSupportedDistros(unittest.TestCase):
 
     def test_ubuntu_versions_x86(self):
         versions = supported_distros.supported_dists_x86_64['ubuntu']
+        self.assertIn('26.04', versions)
         self.assertIn('22.04', versions)
         self.assertIn('20.04', versions)
+
+    def test_ubuntu_2604_in_aarch64_versions(self):
+        versions = supported_distros.supported_dists_aarch64['ubuntu']
+        self.assertIn('26.04', versions)
 
     def test_all_versions_are_strings(self):
         for dist, versions in supported_distros.supported_dists_x86_64.items():
@@ -62,6 +67,11 @@ class TestFormatAlternateVersions(unittest.TestCase):
         result = format_alternate_versions("rhel", ["7", "8", "9"])
         self.assertEqual(result, "7, 8 or 9")
 
+    def test_does_not_mutate_versions(self):
+        versions = ["20.04", "22.04", "24.04", "26.04"]
+        format_alternate_versions("ubuntu", versions)
+        self.assertEqual(versions, ["20.04", "22.04", "24.04", "26.04"])
+
 
 class TestCheckVmSupported(unittest.TestCase):
     """Tests for check_vm_supported."""
@@ -77,6 +87,11 @@ class TestCheckVmSupported(unittest.TestCase):
     @patch('platform.machine', return_value='x86_64')
     def test_ubuntu_2004_supported(self, _):
         result = check_vm_supported("ubuntu", "20.04")
+        self.assertEqual(result, error_codes.NO_ERROR)
+
+    @patch('platform.machine', return_value='x86_64')
+    def test_ubuntu_2604_supported(self, _):
+        result = check_vm_supported("ubuntu", "26.04")
         self.assertEqual(result, error_codes.NO_ERROR)
 
     @patch('platform.machine', return_value='x86_64')
@@ -102,6 +117,11 @@ class TestCheckVmSupported(unittest.TestCase):
     @patch('platform.machine', return_value='aarch64')
     def test_aarch64_ubuntu_2204(self, _):
         result = check_vm_supported("ubuntu", "22.04")
+        self.assertEqual(result, error_codes.NO_ERROR)
+
+    @patch('platform.machine', return_value='aarch64')
+    def test_aarch64_ubuntu_2604(self, _):
+        result = check_vm_supported("ubuntu", "26.04")
         self.assertEqual(result, error_codes.NO_ERROR)
 
     @patch('platform.machine', return_value='aarch64')

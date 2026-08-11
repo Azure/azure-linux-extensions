@@ -10,11 +10,12 @@ def format_alternate_versions(supported_dist, versions):
     """
     print out warning if running the wrong version of OS
     """
-    last = versions.pop()
-    if (versions == []):
+    last = versions[-1]
+    preceding_versions = versions[:-1]
+    if (preceding_versions == []):
         s = "{0}".format(last)
     else:
-        s = "{0} or {1}".format(', '.join(versions), last)
+        s = "{0} or {1}".format(', '.join(preceding_versions), last)
     return s
 
 

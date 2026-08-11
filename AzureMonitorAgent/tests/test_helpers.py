@@ -73,6 +73,14 @@ class TestFindVmDistro(unittest.TestCase):
         self.assertEqual(ver, '22.04')
         self.assertIsNone(err)
 
+    @patch('builtins.open', mock_open(read_data='ID=ubuntu\nVERSION_ID="26.04"\n'))
+    def test_parses_os_release_ubuntu_2604(self):
+        from helpers import find_vm_distro
+        dist, ver, err = find_vm_distro()
+        self.assertEqual(dist, 'ubuntu')
+        self.assertEqual(ver, '26.04')
+        self.assertIsNone(err)
+
     @patch('builtins.open', mock_open(read_data='ID=rhel\nVERSION_ID="8.5"\n'))
     def test_parses_os_release_rhel(self):
         from helpers import find_vm_distro

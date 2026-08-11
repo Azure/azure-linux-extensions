@@ -7,7 +7,7 @@ import sys
 import os
 import re
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 
 # Mock Linux-only modules before importing
 for mod_name in ('grp', 'pwd'):
@@ -231,6 +231,35 @@ class TestConstants(unittest.TestCase):
     def test_config_keys(self):
         self.assertEqual(agent.GenevaConfigKey, "genevaConfiguration")
         self.assertEqual(agent.AzureMonitorConfigKey, "azureMonitorConfiguration")
+
+
+class TestFindVmDistro(unittest.TestCase):
+    """Tests for production OS detection."""
+
+    @patch('agent.os.path.exists', return_value=True)
+    @patch('builtins.open', mock_open(read_data='ID=ubuntu\nVERSION_ID="26.04"\n'))
+    def test_ubuntu_2604_preserves_major_minor_version(self, _):
+        self.assertEqual(agent.find_vm_distro("Install"), ("ubuntu", "26.04"))
+
+
+class TestIsVmSupportedForExtension(unittest.TestCase):
+    """Tests for the production supported-OS gate."""
+
+    @patch('agent.platform.machine', return_value='x86_64')
+    @patch('agent.find_vm_distro', return_value=('ubuntu', '26.04'))
+    def test_ubuntu_2604_x86_64_supported(self, _, __):
+        self.assertEqual(
+            agent.is_vm_supported_for_extension("Install"),
+            (True, "ubuntu", "26.04")
+        )
+
+    @patch('agent.platform.machine', return_value='aarch64')
+    @patch('agent.find_vm_distro', return_value=('ubuntu', '26.04'))
+    def test_ubuntu_2604_aarch64_supported(self, _, __):
+        self.assertEqual(
+            agent.is_vm_supported_for_extension("Install"),
+            (True, "ubuntu", "26.04")
+        )
 
 
 class TestGenerateLocalsyslogConfigsEarlyReturn(unittest.TestCase):
