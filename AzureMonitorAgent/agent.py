@@ -1671,9 +1671,16 @@ def uninstall_azureotelcollector():
                 hutil_log_error('Error removing azureotelcollector "{0}"'.format(output))
 
 
+def is_telegraf_service_installed():
+    # Whether the telegraf (metrics-sourcer) unit file exists.
+    try:
+        return os.path.isfile(telhandler.get_telegraf_service_path(is_lad=False))
+    except Exception:
+        return False
+
 def stop_metrics_process():
 
-    if telhandler.is_running(is_lad=False):
+    if telhandler.is_running(is_lad=False) or is_telegraf_service_installed():
         #Stop the telegraf and ME services
         tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
         if tel_out:
@@ -1976,7 +1983,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                     if len(json_data) == 0:
                         last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
-                        if telhandler.is_running(is_lad=False):
+                        if telhandler.is_running(is_lad=False) or is_telegraf_service_installed():
                             # Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
