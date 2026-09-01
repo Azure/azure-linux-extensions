@@ -768,6 +768,7 @@ class WorkloadPatch:
 
     def getSuPath(self):
         # Resolve su to an absolute path so a directory injected into PATH (e.g. via ORACLE_HOME) cannot supply a fake su binary run as root.
+        # todo: remove the fallback to su after observing this on prod for sometime.
         su_paths = ["/usr/bin/su", "/bin/su"]
         for su_path in su_paths:
             if os.path.exists(su_path):
