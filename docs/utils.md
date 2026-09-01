@@ -2,11 +2,11 @@
 
 You can write an extension from scrach using your favourate language following [Design Details](./design-details.md).
 
-The utils we offer are optional. They are writen in Python, and they can accelerate your development. Without them, you need to handle the protocal between WALA and extensions by yourself.
+The utils we offer are optional. They are writen in Python, and they can accelerate your development. Without them, you need to handle the protocol between WALA and extensions by yourself.
 
 ## HandlerUtils
 
-[HandlerUtils.py](https://github.com/Azure/azure-linux-extensions/blob/master/Utils/HandlerUtil.py) handles the protocal between WALA and extensions, status and heartbeat reporting, and the logging.
+[HandlerUtils.py](https://github.com/Azure/azure-linux-extensions/blob/master/Utils/HandlerUtil.py) handles the protocol between WALA and extensions, status and heartbeat reporting, and the logging.
 
 * Get your settings
   * `get_public_settings()` method returns the public settings
