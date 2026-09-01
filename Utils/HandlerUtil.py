@@ -177,6 +177,8 @@ class HandlerUtility:
         return redacted
 
     def _parse_config(self, ctxt):
+        if ctxt == "":
+            return None
         config = None
         try:
             config = json.loads(ctxt)
