@@ -430,5 +430,93 @@ class TestEnableCurlUploadConfig(unittest.TestCase):
         self.assertNotIn("ENABLE_CURL_UPLOAD", configs)
 
 
+class TestIsTelegrafServiceInstalled(unittest.TestCase):
+    """Tests for is_telegraf_service_installed (telegraf crash-loop fix)."""
+
+    @patch('agent.telhandler')
+    @patch('os.path.isfile', return_value=True)
+    def test_returns_true_when_unit_file_exists(self, mock_isfile, mock_telhandler):
+        mock_telhandler.get_telegraf_service_path.return_value = \
+            '/lib/systemd/system/metrics-sourcer.service'
+        self.assertTrue(agent.is_telegraf_service_installed())
+        mock_telhandler.get_telegraf_service_path.assert_called_once_with(is_lad=False)
+        mock_isfile.assert_called_once_with('/lib/systemd/system/metrics-sourcer.service')
+
+    @patch('agent.telhandler')
+    @patch('os.path.isfile', return_value=False)
+    def test_returns_false_when_unit_file_missing(self, mock_isfile, mock_telhandler):
+        mock_telhandler.get_telegraf_service_path.return_value = \
+            '/lib/systemd/system/metrics-sourcer.service'
+        self.assertFalse(agent.is_telegraf_service_installed())
+
+    @patch('agent.telhandler')
+    def test_returns_false_on_exception(self, mock_telhandler):
+        # get_telegraf_service_path raises when no systemd unit directory exists.
+        mock_telhandler.get_telegraf_service_path.side_effect = Exception("no systemd unit dir")
+        self.assertFalse(agent.is_telegraf_service_installed())
+
+
+class TestStopMetricsProcessTelegrafCleanup(unittest.TestCase):
+    """Tests stop_metrics_process telegraf teardown when unit file present but not running (crash-loop fix)."""
+
+    @patch('agent.run_command_and_log', return_value=(0, ''))
+    @patch('agent.hutil_log_error')
+    @patch('agent.hutil_log_info')
+    @patch('os.path.exists', return_value=False)
+    @patch('agent.me_handler')
+    @patch('agent.is_telegraf_service_installed', return_value=True)
+    @patch('agent.telhandler')
+    def test_stops_telegraf_when_installed_but_not_running(
+            self, mock_telhandler, mock_installed, mock_me, mock_exists, *_):
+        """Not running + unit file present -> telegraf is stopped and removed."""
+        mock_telhandler.is_running.return_value = False
+        mock_telhandler.stop_telegraf_service.return_value = (True, 'stopped')
+        mock_telhandler.remove_telegraf_service.return_value = (True, 'removed')
+        mock_me.is_running.return_value = False
+
+        agent.stop_metrics_process()
+
+        mock_telhandler.stop_telegraf_service.assert_called_once_with(is_lad=False)
+        mock_telhandler.remove_telegraf_service.assert_called_once_with(is_lad=False)
+
+    @patch('agent.run_command_and_log', return_value=(0, ''))
+    @patch('agent.hutil_log_error')
+    @patch('agent.hutil_log_info')
+    @patch('os.path.exists', return_value=False)
+    @patch('agent.me_handler')
+    @patch('agent.is_telegraf_service_installed', return_value=False)
+    @patch('agent.telhandler')
+    def test_skips_telegraf_when_not_running_and_not_installed(
+            self, mock_telhandler, mock_installed, mock_me, mock_exists, *_):
+        """Not running + no unit file -> telegraf teardown is skipped."""
+        mock_telhandler.is_running.return_value = False
+        mock_me.is_running.return_value = False
+
+        agent.stop_metrics_process()
+
+        mock_telhandler.stop_telegraf_service.assert_not_called()
+        mock_telhandler.remove_telegraf_service.assert_not_called()
+
+    @patch('agent.run_command_and_log', return_value=(0, ''))
+    @patch('agent.hutil_log_error')
+    @patch('agent.hutil_log_info')
+    @patch('os.path.exists', return_value=False)
+    @patch('agent.me_handler')
+    @patch('agent.is_telegraf_service_installed', return_value=False)
+    @patch('agent.telhandler')
+    def test_stops_telegraf_when_running(
+            self, mock_telhandler, mock_installed, mock_me, mock_exists, *_):
+        """Running (regardless of unit file) -> telegraf is stopped and removed."""
+        mock_telhandler.is_running.return_value = True
+        mock_telhandler.stop_telegraf_service.return_value = (True, 'stopped')
+        mock_telhandler.remove_telegraf_service.return_value = (True, 'removed')
+        mock_me.is_running.return_value = False
+
+        agent.stop_metrics_process()
+
+        mock_telhandler.stop_telegraf_service.assert_called_once_with(is_lad=False)
+        mock_telhandler.remove_telegraf_service.assert_called_once_with(is_lad=False)
+
+
 if __name__ == '__main__':
     unittest.main()
