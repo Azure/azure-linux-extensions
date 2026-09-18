@@ -6,6 +6,8 @@ Unit tests for AzureMonitorAgent/agent.py - pure logic functions only.
 import sys
 import os
 import re
+import stat
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -516,6 +518,61 @@ class TestStopMetricsProcessTelegrafCleanup(unittest.TestCase):
 
         mock_telhandler.stop_telegraf_service.assert_called_once_with(is_lad=False)
         mock_telhandler.remove_telegraf_service.assert_called_once_with(is_lad=False)
+
+
+class TestProxyConfiguration(unittest.TestCase):
+    @patch('agent.log_and_exit', side_effect=SystemExit(53))
+    def test_rejects_control_characters_in_proxy_values(self, _):
+        with self.assertRaises(SystemExit):
+            agent.validate_proxy_value('user\ninjected', 'username')
+
+    @patch('agent.log_and_exit', side_effect=SystemExit(53))
+    def test_rejects_unsupported_proxy_scheme(self, _):
+        with self.assertRaises(SystemExit):
+            agent.validate_proxy_address('ftp://proxy.example.com')
+
+    @patch('agent._write_proxy_conf')
+    @patch('agent.run_command_and_log', return_value=(0, ''))
+    def test_set_proxy_writes_configuration_without_shell_commands(
+            self, mock_run, mock_write):
+        agent.set_proxy('https://proxy.example.com:3128', 'user', 'password')
+
+        expected_proxy = 'https://user:password@proxy.example.com:3128'
+        self.assertEqual(
+            mock_write.call_args_list,
+            [
+                unittest.mock.call(
+                    '/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf',
+                    expected_proxy),
+                unittest.mock.call(
+                    '/etc/systemd/system/metrics-extension.service.d/proxy.conf',
+                    expected_proxy),
+            ])
+        commands = [args[0][0] for args in mock_run.call_args_list]
+        self.assertEqual(
+            commands,
+            [
+                'systemctl daemon-reload',
+                'systemctl restart azuremonitor-coreagent',
+                'systemctl restart metrics-extension',
+            ])
+
+    def test_write_proxy_conf_creates_restricted_systemd_drop_in(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            conf_path = os.path.join(temp_dir, 'service.d', 'proxy.conf')
+
+            agent._write_proxy_conf(conf_path, 'http://proxy.example.com:8080')
+
+            with open(conf_path, 'r') as conf:
+                self.assertEqual(
+                    conf.read(),
+                    '[Service]\n'
+                    'Environment="http_proxy=http://proxy.example.com:8080"\n'
+                    'Environment="https_proxy=http://proxy.example.com:8080"\n')
+            if os.name != 'nt':
+                self.assertEqual(
+                    stat.S_IMODE(os.stat(conf_path).st_mode),
+                    0o400)
 
 
 if __name__ == '__main__':
