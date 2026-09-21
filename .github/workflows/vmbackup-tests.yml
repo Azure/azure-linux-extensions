@@ -1,0 +1,75 @@
+name: VMBackup Tests
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'VMBackup/**'
+      - '.github/workflows/vmbackup-tests.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'VMBackup/**'
+      - '.github/workflows/vmbackup-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run VMBackup tests
+        working-directory: VMBackup
+        run: python -m unittest discover -s test -p "test_*.py" -v
+
+  test-python-27:
+    runs-on: ubuntu-latest
+    container:
+      image: python:2.7.18-buster@sha256:c934af72b8bd03b9804d5bde2569c320926e70392d708d113a2e71bcf98c8a20
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Run VMBackup tests on Python 2.7
+        working-directory: VMBackup
+        run: python -m unittest discover -s test -p "test_*.py" -v
+
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Install coverage
+        run: python -m pip install coverage==7.16.0
+
+      - name: Run VMBackup coverage
+        working-directory: VMBackup
+        env:
+          COVERAGE_FILE: ${{ runner.temp }}/vmbackup-coverage-data/.coverage
+          TMPDIR: ${{ runner.temp }}/vmbackup-coverage
+          VMBACKUP_COVERAGE_TEMP: ${{ runner.temp }}/vmbackup-coverage
+        run: |
+          mkdir -p "$TMPDIR" "$(dirname "$COVERAGE_FILE")"
+          python -m coverage erase
+          python -m coverage run -m unittest discover -s test -p "test_*.py" -v
+          python -m coverage combine
+          python -m coverage report
