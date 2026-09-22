@@ -344,25 +344,22 @@ class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
     """Tests for is_feature_enabled('enableCurlUpload') region gating (PR #2190)."""
 
     def test_curl_upload_in_feature_support_matrix(self):
-        """enableCurlUpload must be gated to the canary regions only (not 'all')."""
+        """enableCurlUpload must be gated to the Stage 2 regions (not 'all')."""
         # Re-derive the matrix the same way is_feature_enabled does, by exercising
-        # the function across regions; only the canary regions must match.
+        # the function across regions.
         with patch('os.path.exists', return_value=False):
             with patch('agent.get_azure_environment_and_region',
                        return_value=(None, 'eastus2euap')):
                 self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
 
-    def test_enabled_in_eastus2euap(self):
-        with patch('os.path.exists', return_value=False):
-            with patch('agent.get_azure_environment_and_region',
-                       return_value=('AzureCloud', 'eastus2euap')):
-                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
-
-    def test_enabled_in_centraluseuap(self):
-        with patch('os.path.exists', return_value=False):
-            with patch('agent.get_azure_environment_and_region',
-                       return_value=('AzureCloud', 'centraluseuap')):
-                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
+    def test_enabled_in_stage2_regions(self):
+        for region in ('eastus2euap', 'centraluseuap', 'westcentralus', 'eastasia'):
+            with patch('os.path.exists', return_value=False):
+                with patch('agent.get_azure_environment_and_region',
+                           return_value=('AzureCloud', region)):
+                    self.assertTrue(
+                        agent.is_feature_enabled('enableCurlUpload'),
+                        msg="enableCurlUpload should be enabled in region %r" % region)
 
     def test_disabled_in_other_region(self):
         for region in ('eastus', 'westus2', 'centralus', ''):
