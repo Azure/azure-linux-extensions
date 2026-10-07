@@ -6,6 +6,8 @@ Unit tests for AzureMonitorAgent/agent.py - pure logic functions only.
 import sys
 import os
 import re
+import stat
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -342,25 +344,22 @@ class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
     """Tests for is_feature_enabled('enableCurlUpload') region gating (PR #2190)."""
 
     def test_curl_upload_in_feature_support_matrix(self):
-        """enableCurlUpload must be gated to the canary regions only (not 'all')."""
+        """enableCurlUpload must be gated to the Stage 2 regions (not 'all')."""
         # Re-derive the matrix the same way is_feature_enabled does, by exercising
-        # the function across regions; only the canary regions must match.
+        # the function across regions.
         with patch('os.path.exists', return_value=False):
             with patch('agent.get_azure_environment_and_region',
                        return_value=(None, 'eastus2euap')):
                 self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
 
-    def test_enabled_in_eastus2euap(self):
-        with patch('os.path.exists', return_value=False):
-            with patch('agent.get_azure_environment_and_region',
-                       return_value=('AzureCloud', 'eastus2euap')):
-                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
-
-    def test_enabled_in_centraluseuap(self):
-        with patch('os.path.exists', return_value=False):
-            with patch('agent.get_azure_environment_and_region',
-                       return_value=('AzureCloud', 'centraluseuap')):
-                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
+    def test_enabled_in_stage2_regions(self):
+        for region in ('eastus2euap', 'centraluseuap', 'westcentralus', 'eastasia'):
+            with patch('os.path.exists', return_value=False):
+                with patch('agent.get_azure_environment_and_region',
+                           return_value=('AzureCloud', region)):
+                    self.assertTrue(
+                        agent.is_feature_enabled('enableCurlUpload'),
+                        msg="enableCurlUpload should be enabled in region %r" % region)
 
     def test_disabled_in_other_region(self):
         for region in ('eastus', 'westus2', 'centralus', ''):
@@ -428,6 +427,149 @@ class TestEnableCurlUploadConfig(unittest.TestCase):
     def test_curl_upload_config_absent_when_disabled(self):
         configs = self._run_enable_default_configs(feature_enabled=False)
         self.assertNotIn("ENABLE_CURL_UPLOAD", configs)
+
+
+class TestIsTelegrafServiceInstalled(unittest.TestCase):
+    """Tests for is_telegraf_service_installed (telegraf crash-loop fix)."""
+
+    @patch('agent.telhandler')
+    @patch('os.path.isfile', return_value=True)
+    def test_returns_true_when_unit_file_exists(self, mock_isfile, mock_telhandler):
+        mock_telhandler.get_telegraf_service_path.return_value = \
+            '/lib/systemd/system/metrics-sourcer.service'
+        self.assertTrue(agent.is_telegraf_service_installed())
+        mock_telhandler.get_telegraf_service_path.assert_called_once_with(is_lad=False)
+        mock_isfile.assert_called_once_with('/lib/systemd/system/metrics-sourcer.service')
+
+    @patch('agent.telhandler')
+    @patch('os.path.isfile', return_value=False)
+    def test_returns_false_when_unit_file_missing(self, mock_isfile, mock_telhandler):
+        mock_telhandler.get_telegraf_service_path.return_value = \
+            '/lib/systemd/system/metrics-sourcer.service'
+        self.assertFalse(agent.is_telegraf_service_installed())
+
+    @patch('agent.telhandler')
+    def test_returns_false_on_exception(self, mock_telhandler):
+        # get_telegraf_service_path raises when no systemd unit directory exists.
+        mock_telhandler.get_telegraf_service_path.side_effect = Exception("no systemd unit dir")
+        self.assertFalse(agent.is_telegraf_service_installed())
+
+
+class TestStopMetricsProcessTelegrafCleanup(unittest.TestCase):
+    """Tests stop_metrics_process telegraf teardown when unit file present but not running (crash-loop fix)."""
+
+    @patch('agent.run_command_and_log', return_value=(0, ''))
+    @patch('agent.hutil_log_error')
+    @patch('agent.hutil_log_info')
+    @patch('os.path.exists', return_value=False)
+    @patch('agent.me_handler')
+    @patch('agent.is_telegraf_service_installed', return_value=True)
+    @patch('agent.telhandler')
+    def test_stops_telegraf_when_installed_but_not_running(
+            self, mock_telhandler, mock_installed, mock_me, mock_exists, *_):
+        """Not running + unit file present -> telegraf is stopped and removed."""
+        mock_telhandler.is_running.return_value = False
+        mock_telhandler.stop_telegraf_service.return_value = (True, 'stopped')
+        mock_telhandler.remove_telegraf_service.return_value = (True, 'removed')
+        mock_me.is_running.return_value = False
+
+        agent.stop_metrics_process()
+
+        mock_telhandler.stop_telegraf_service.assert_called_once_with(is_lad=False)
+        mock_telhandler.remove_telegraf_service.assert_called_once_with(is_lad=False)
+
+    @patch('agent.run_command_and_log', return_value=(0, ''))
+    @patch('agent.hutil_log_error')
+    @patch('agent.hutil_log_info')
+    @patch('os.path.exists', return_value=False)
+    @patch('agent.me_handler')
+    @patch('agent.is_telegraf_service_installed', return_value=False)
+    @patch('agent.telhandler')
+    def test_skips_telegraf_when_not_running_and_not_installed(
+            self, mock_telhandler, mock_installed, mock_me, mock_exists, *_):
+        """Not running + no unit file -> telegraf teardown is skipped."""
+        mock_telhandler.is_running.return_value = False
+        mock_me.is_running.return_value = False
+
+        agent.stop_metrics_process()
+
+        mock_telhandler.stop_telegraf_service.assert_not_called()
+        mock_telhandler.remove_telegraf_service.assert_not_called()
+
+    @patch('agent.run_command_and_log', return_value=(0, ''))
+    @patch('agent.hutil_log_error')
+    @patch('agent.hutil_log_info')
+    @patch('os.path.exists', return_value=False)
+    @patch('agent.me_handler')
+    @patch('agent.is_telegraf_service_installed', return_value=False)
+    @patch('agent.telhandler')
+    def test_stops_telegraf_when_running(
+            self, mock_telhandler, mock_installed, mock_me, mock_exists, *_):
+        """Running (regardless of unit file) -> telegraf is stopped and removed."""
+        mock_telhandler.is_running.return_value = True
+        mock_telhandler.stop_telegraf_service.return_value = (True, 'stopped')
+        mock_telhandler.remove_telegraf_service.return_value = (True, 'removed')
+        mock_me.is_running.return_value = False
+
+        agent.stop_metrics_process()
+
+        mock_telhandler.stop_telegraf_service.assert_called_once_with(is_lad=False)
+        mock_telhandler.remove_telegraf_service.assert_called_once_with(is_lad=False)
+
+
+class TestProxyConfiguration(unittest.TestCase):
+    @patch('agent.log_and_exit', side_effect=SystemExit(53))
+    def test_rejects_control_characters_in_proxy_values(self, _):
+        with self.assertRaises(SystemExit):
+            agent.validate_proxy_value('user\ninjected', 'username')
+
+    @patch('agent.log_and_exit', side_effect=SystemExit(53))
+    def test_rejects_unsupported_proxy_scheme(self, _):
+        with self.assertRaises(SystemExit):
+            agent.validate_proxy_address('ftp://proxy.example.com')
+
+    @patch('agent._write_proxy_conf')
+    @patch('agent.run_command_and_log', return_value=(0, ''))
+    def test_set_proxy_writes_configuration_without_shell_commands(
+            self, mock_run, mock_write):
+        agent.set_proxy('https://proxy.example.com:3128', 'user', 'password')
+
+        expected_proxy = 'https://user:password@proxy.example.com:3128'
+        self.assertEqual(
+            mock_write.call_args_list,
+            [
+                unittest.mock.call(
+                    '/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf',
+                    expected_proxy),
+                unittest.mock.call(
+                    '/etc/systemd/system/metrics-extension.service.d/proxy.conf',
+                    expected_proxy),
+            ])
+        commands = [args[0][0] for args in mock_run.call_args_list]
+        self.assertEqual(
+            commands,
+            [
+                'systemctl daemon-reload',
+                'systemctl restart azuremonitor-coreagent',
+                'systemctl restart metrics-extension',
+            ])
+
+    def test_write_proxy_conf_creates_restricted_systemd_drop_in(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            conf_path = os.path.join(temp_dir, 'service.d', 'proxy.conf')
+
+            agent._write_proxy_conf(conf_path, 'http://proxy.example.com:8080')
+
+            with open(conf_path, 'r') as conf:
+                self.assertEqual(
+                    conf.read(),
+                    '[Service]\n'
+                    'Environment="http_proxy=http://proxy.example.com:8080"\n'
+                    'Environment="https_proxy=http://proxy.example.com:8080"\n')
+            if os.name != 'nt':
+                self.assertEqual(
+                    stat.S_IMODE(os.stat(conf_path).st_mode),
+                    0o400)
 
 
 if __name__ == '__main__':

@@ -722,7 +722,8 @@ def thread_for_log_upload():
     backup_logger.commit(para_parser.logsBlobUri)
 
 def start_daemon():
-    args = [os.path.join(os.getcwd(), "main/handle.sh"), "daemon"]
+    handle_sh_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "handle.sh")
+    args = [handle_sh_path, "daemon"]
     #This process will start a new background process by calling
     #    handle.py -daemon
     #to run the script and will exit itself immediatelly.

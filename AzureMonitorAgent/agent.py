@@ -56,9 +56,9 @@ except ImportError:
     import urllib2 as urllib # Python 2
 
 try:
-    from urllib.parse import urlparse  # Python 3+
+    from urllib.parse import urlparse, urlunparse  # Python 3+
 except ImportError:
-    from urlparse import urlparse  # Python 2
+    from urlparse import urlparse, urlunparse  # Python 2
 
 try:
     import urllib.error as urlerror # Python 3+
@@ -920,7 +920,7 @@ def enable():
 
     # Enable the libcurl-based ODS upload path (ENABLE_CURL_UPLOAD) only in regions
     # where the feature has been gated on (see is_feature_enabled / feature_support_matrix).
-    # Currently limited to eastus2euap and centraluseuap for canary rollout.
+    # Limited to the public SDP Stage 2 regions.
     if is_feature_enabled('enableCurlUpload'):
         default_configs["ENABLE_CURL_UPLOAD"] = "true"
 
@@ -1393,6 +1393,37 @@ def get_proxy_mode(public_settings):
         return None
     return proxy_config.get("mode")
 
+def validate_proxy_value(value, field_name):
+    """
+    Validate a proxy configuration value to prevent injection attacks.
+    Rejects control characters, newlines, and NUL bytes that could corrupt
+    systemd unit files or enable command injection.
+    """
+    if not value:
+        return value
+    # Reject control characters and double quotes that could corrupt systemd unit files
+    if re.search(r'[\x00-\x1f\x7f"]', value):
+        log_and_exit("Enable", MissingorInvalidParameterErrorCode,
+                     'Proxy {0} contains invalid characters'.format(field_name))
+    return value
+
+
+def validate_proxy_address(address):
+    """
+    Validate that a proxy address is a well-formed URL with an allowed scheme.
+    """
+    if not address:
+        return address
+    validate_proxy_value(address, "address")
+    parsed = urlparse(address)
+    if parsed.scheme and parsed.scheme not in ("http", "https"):
+        log_and_exit("Enable", MissingorInvalidParameterErrorCode,
+                     'Proxy address must use http or https scheme')
+    if not parsed.hostname:
+        log_and_exit("Enable", MissingorInvalidParameterErrorCode,
+                     'Proxy address must contain a valid hostname')
+    return address
+
 def apply_application_proxy(public_settings, protected_settings, default_configs):
     """
     Configure explicit application proxy from extension settings.
@@ -1414,6 +1445,8 @@ def apply_application_proxy(public_settings, protected_settings, default_configs
         password = protected_proxy.get("password")
         if not username or not password:
             log_and_exit("Enable", MissingorInvalidParameterErrorCode, 'Parameter "username" and "password" not in proxy protected setting')
+        validate_proxy_value(username, "username")
+        validate_proxy_value(password, "password")
         default_configs["MDSD_PROXY_USERNAME"] = username
         default_configs["MDSD_PROXY_PASSWORD"] = password
 
@@ -1451,38 +1484,56 @@ def apply_arc_proxy(default_configs):
     set_proxy(url, "", "")
     return True
 
+def _write_proxy_conf(conf_path, http_proxy):
+    """
+    Write a systemd drop-in proxy.conf file securely using Python file I/O.
+    Creates the file with restrictive permissions (0o400) to protect credentials.
+    """
+    dir_path = os.path.dirname(conf_path)
+    if not os.path.isdir(dir_path):
+        os.makedirs(dir_path)
+
+    # Create file with restrictive permissions from the start (owner read-only)
+    fd = os.open(conf_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o400)
+    with os.fdopen(fd, 'w') as f:
+        f.write('[Service]\n')
+        f.write('Environment="http_proxy={0}"\n'.format(http_proxy))
+        f.write('Environment="https_proxy={0}"\n'.format(http_proxy))
+
+
 def set_proxy(address, username, password):
     """
-    # Set proxy http_proxy env var in dependent services
+    Set proxy http_proxy env var in dependent services.
+    Validates the address and uses Python file I/O to write systemd drop-in
+    files, avoiding shell injection.
     """
-    
+
     try:
-        http_proxy = address
-        address = address.replace("http://","")
+        validate_proxy_address(address)
+        parsed = urlparse(address)
+        scheme = parsed.scheme if parsed.scheme else "http"
 
         if username:
-            http_proxy = "http://" + username + ":" + password + "@" + address
+            netloc = "{0}:{1}@{2}".format(username, password, parsed.hostname)
+        else:
+            netloc = parsed.hostname
+        if parsed.port:
+            netloc = "{0}:{1}".format(netloc, parsed.port)
+
+        http_proxy = urlunparse((scheme, netloc, '', '', '', ''))
 
         # Update Coreagent
-        run_command_and_log("mkdir -p /etc/systemd/system/azuremonitor-coreagent.service.d")
-        run_command_and_log("echo '[Service]' > /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf")
-        run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
-        run_command_and_log("echo 'Environment=\"https_proxy={0}\"' >> /etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf".format(http_proxy))
-        os.system('chmod {1} {0}'.format("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf", 400))
+        _write_proxy_conf("/etc/systemd/system/azuremonitor-coreagent.service.d/proxy.conf", http_proxy)
 
         # Update ME
-        run_command_and_log("mkdir -p /etc/systemd/system/metrics-extension.service.d")
-        run_command_and_log("echo '[Service]' > /etc/systemd/system/metrics-extension.service.d/proxy.conf")
-        run_command_and_log("echo 'Environment=\"http_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
-        run_command_and_log("echo 'Environment=\"https_proxy={0}\"' >> /etc/systemd/system/metrics-extension.service.d/proxy.conf".format(http_proxy))
-        os.system('chmod {1} {0}'.format("/etc/systemd/system/metrics-extension.service.d/proxy.conf", 400))
+        _write_proxy_conf("/etc/systemd/system/metrics-extension.service.d/proxy.conf", http_proxy)
 
         run_command_and_log("systemctl daemon-reload")
         run_command_and_log('systemctl restart azuremonitor-coreagent')
         run_command_and_log('systemctl restart metrics-extension')
-        
-    except:
-        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and /etc/systemd/system/metrics-extension.service.d" )
+
+    except Exception as e:
+        log_and_exit("enable", MissingorInvalidParameterErrorCode, "Failed to update /etc/systemd/system/azuremonitor-coreagent.service.d and /etc/systemd/system/metrics-extension.service.d: {0}".format(e))
 
 def unset_proxy():
     """
@@ -1671,9 +1722,16 @@ def uninstall_azureotelcollector():
                 hutil_log_error('Error removing azureotelcollector "{0}"'.format(output))
 
 
+def is_telegraf_service_installed():
+    # Whether the telegraf (metrics-sourcer) unit file exists.
+    try:
+        return os.path.isfile(telhandler.get_telegraf_service_path(is_lad=False))
+    except Exception:
+        return False
+
 def stop_metrics_process():
 
-    if telhandler.is_running(is_lad=False):
+    if telhandler.is_running(is_lad=False) or is_telegraf_service_installed():
         #Stop the telegraf and ME services
         tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
         if tel_out:
@@ -1976,7 +2034,7 @@ def metrics_watcher(hutil_error, hutil_log):
 
                     if len(json_data) == 0:
                         last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
-                        if telhandler.is_running(is_lad=False):
+                        if telhandler.is_running(is_lad=False) or is_telegraf_service_installed():
                             # Stop the telegraf and ME services
                             tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
                             if tel_out:
@@ -2764,7 +2822,7 @@ def is_feature_enabled(feature):
         'useDynamicSSL'             : ['all'],
         'enableCMV2'                : ['all'],
         'enableAzureOTelCollector'  : ['all'],
-        'enableCurlUpload'          : ['eastus2euap', 'centraluseuap']
+        'enableCurlUpload'          : ['eastus2euap', 'centraluseuap', 'westcentralus', 'eastasia']
     }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature
