@@ -286,6 +286,12 @@ class FreezeSnapshotter(object):
                 run_result = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHostSnapshotRemoteServerError
                 error_msg = 'T:S Enable failed with FailedHostSnapshotRemoteServerError error'
                 self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHostSnapshotRemoteServerError
+            # This is to address the issue where Extension-BHS call failed as BHS was restarting and WireServer returned 504 to extension.
+            # This error does not qualify for client error and should be flagged as server error.
+            elif run_result == CommonVariables.success and doSnapshot_status == "504":
+                run_result = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHostSnapshotRetryableError
+                error_msg = 'T:S Enable failed with FailedHostSnapshotRetryableError error'
+                self.extensionErrorCode = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedHostSnapshotRetryableError
             else: 
                 run_result = ExtensionErrorCodeHelper.ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork
                 error_msg = 'T:S Enable failed with FailedRetryableSnapshotFailedNoNetwork error'

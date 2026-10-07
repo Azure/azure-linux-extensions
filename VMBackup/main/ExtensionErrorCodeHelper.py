@@ -17,6 +17,7 @@ class ExtensionErrorCodeEnum():
 
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedHostSnapshotRemoteServerError = 556
+    FailedHostSnapshotRetryableError = 559
     FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotRateExceeded = 173
     FailedRetryableSnapshotFailedRestrictedNetwork = 761
@@ -71,6 +72,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotRateExceeded : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList : Status.ExtVmHealthStateEnum.green,
+            ExtensionErrorCodeEnum.FailedHostSnapshotRetryableError : Status.ExtVmHealthStateEnum.green,
             
             ExtensionErrorCodeEnum.FailedSafeFreezeBinaryNotFound: Status.ExtVmHealthStateEnum.yellow,
             ExtensionErrorCodeEnum.FailedRetryableFsFreezeFailed : Status.ExtVmHealthStateEnum.yellow,
@@ -160,6 +162,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedRestrictedNetwork : "FailedRetryableSnapshotFailedRestrictedNetwork",
             ExtensionErrorCodeEnum.FailedRetryableSnapshotFailedNoNetwork : "FailedRetryableSnapshotFailedNoNetwork",
             ExtensionErrorCodeEnum.FailedHostSnapshotRemoteServerError : "FailedHostSnapshotRemoteServerError",
+            ExtensionErrorCodeEnum.FailedHostSnapshotRetryableError : "FailedHostSnapshotRetryableError",
             ExtensionErrorCodeEnum.FailedSnapshotLimitReached : "FailedSnapshotLimitReached",
             ExtensionErrorCodeEnum.FailedGuestAgentInvokedCommandTooLate : "FailedGuestAgentInvokedCommandTooLate",
             
