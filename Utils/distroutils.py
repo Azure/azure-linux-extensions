@@ -1,30 +1,59 @@
 import os
 import pwd
 import random
-import crypt
 import string
+import hashlib
+import sys
 import platform
 import re
 import Utils.logger as logger
 import Utils.extensionutils as ext_utils
 import Utils.constants as constants
 
+# crypt module was removed in Python 3.13
+# first we try to import the crypt module which covers crypt and crypt_r
+# then we try legacyrypt and finally fallback to passlib 
 
-def get_my_distro(config):
+cryptImported = False
+passLibImported = False
+
+try:
+    from crypt import crypt as crypt
+    cryptImported = True
+except ImportError:
+    pass 
+
+if cryptImported == False: 
+    # checking for python version, greater than or equal to 3.13
+    if (sys.version_info[0] == 3 and sys.version_info[1] >= 13) or (sys.version_info[0] > 3):
+        try: 
+            from legacycrypt import crypt
+            cryptImported = True
+        except ImportError:
+            pass 
+
+if cryptImported == False: 
+    try: 
+        from passlib.hash import sha512_crypt
+        passLibImported = True
+    except ImportError:
+        pass 
+
+def get_my_distro(config, os_name=None):
     if 'FreeBSD' in platform.system():
         return FreeBSDDistro(config)
 
-    if os.path.isfile(constants.os_release):
-        os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
-    elif os.path.isfile(constants.system_release):
-        os_name = ext_utils.get_file_contents(constants.system_release)
-    else:
-        return GenericDistro(config)
+    if os_name is None:
+        if os.path.isfile(constants.os_release):
+            os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
+        elif os.path.isfile(constants.system_release):
+            os_name = ext_utils.get_file_contents(constants.system_release)
+
     if os_name is not None:
         if re.search("fedora", os_name, re.IGNORECASE):
             # Fedora
             return FedoraDistro(config)
-        if re.search("red\s?hat", os_name, re.IGNORECASE):
+        if re.search(r"red\s?hat", os_name, re.IGNORECASE):
             # Red Hat
             return RedhatDistro(config)
         if re.search("centos", os_name, re.IGNORECASE):
@@ -36,6 +65,13 @@ def get_my_distro(config):
         if re.search("freebsd", os_name, re.IGNORECASE):
             # FreeBSD
             return FreeBSDDistro(config)
+        if re.search("sles", os_name, re.IGNORECASE):
+            # SuSE
+            return SuSEDistro(config)
+        if re.search("ubuntu", os_name, re.IGNORECASE):
+            return UbuntuDistro(config)
+        if re.search("mariner", os_name, re.IGNORECASE):
+            return MarinerDistro(config)
     return GenericDistro(config)
 
 
@@ -89,11 +125,12 @@ class GenericDistro(object):
 
     def set_se_linux_context(self, path, cn):
         """
-        Calls shell 'chcon' with 'path' and 'cn' context.
+        Calls shell 'chcon -h' with 'path' and 'cn' context.
+        Uses -h to not follow symlinks.
         Returns exit result.
         """
         if self.is_se_linux_system():
-            return ext_utils.run(['chcon', cn, path])
+            return ext_utils.run(['chcon', '-h', cn, path])
 
     def restart_ssh_service(self):
         """
@@ -145,9 +182,22 @@ class GenericDistro(object):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
-        return crypt.crypt(password, salt)
 
-    def create_account(self, user, password, expiration, thumbprint):
+        if cryptImported:
+            # salt is randomly generated above
+            # default crypt_id is 6 (SHA-512), else Provisioning.PasswordCryptId is used, see change_password() for details
+            return crypt(password, salt)
+        elif passLibImported:
+            # passlib auto-generates a cryptographically random salt
+            # no crypt id as this uses SHA-512, so crypt_id from Provisioning.PasswordCryptId will be ignored
+            return sha512_crypt.hash(password)
+        else:
+            raise ImportError(
+                "Password hashing is unavailable. Install one of: 'crypt' (Python < 3.13), "
+                "'legacycrypt', or 'passlib'."
+            )
+
+    def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
         Create a user account, with 'user', 'password', 'expiration', ssh keys
         and sudo permissions.
@@ -188,7 +238,7 @@ class GenericDistro(object):
                 # add the include of sudoers.d to the /etc/sudoers
                 ext_utils.set_file_contents(
                     '/etc/sudoers', ext_utils.get_file_contents('/etc/sudoers') + '\n#includedir /etc/sudoers.d\n')
-            if password is None:
+            if password is None or enable_nopasswd:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
@@ -244,6 +294,32 @@ class GenericDistro(object):
             pass
         return
 
+class UbuntuDistro(GenericDistro):
+    def __init__(self, config):
+        """
+        Generic Attributes go here.  These are based on 'majority rules'.
+        This __init__() may be called or overriden by the child.
+        """
+        super(UbuntuDistro, self).__init__(config)
+        self.selinux = False
+        self.ssh_service_name = 'sshd'
+        self.sudoers_dir_base = '/usr/local/etc'
+        self.distro_name = 'Ubuntu'
+
+    def restart_ssh_service(self):
+        """
+        Service call to re(start) the SSH service
+        starting with Ubuntu 22.10, the service name is ssh not sshd, adding fallback incase sshd fails
+        """
+        ssh_restart_cmd = [self.service_cmd, self.ssh_service_name, self.ssh_service_restart_option]
+        ret_code = ext_utils.run(ssh_restart_cmd)
+        if ret_code != 0:
+            self.ssh_service_name = 'ssh'
+            ssh_restart_cmd = [self.service_cmd, self.ssh_service_name, self.ssh_service_restart_option]
+            ret_code = ext_utils.run(ssh_restart_cmd)
+            if ret_code != 0:
+                logger.error("Failed to restart SSH service with return code:" + str(ret_code))
+        return ret_code
 
 class FreeBSDDistro(GenericDistro):
     """
@@ -262,10 +338,10 @@ class FreeBSDDistro(GenericDistro):
 
 
     # noinspection PyMethodOverriding
-    def chpasswd(self, user, password):
-        return ext_utils.run_send_stdin(['pw', 'usermod', 'user', '-h', '0'], password, log_cmd=False)
+    def chpasswd(self, user, password, **kwargs):
+        return ext_utils.run_send_stdin(['pw', 'usermod', 'user', '-h', '0'], password.encode('utf-8'), log_cmd=False)
 
-    def create_account(self, user, password, expiration, thumbprint):
+    def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
         Create a user account, with 'user', 'password', 'expiration', ssh keys
         and sudo permissions.
@@ -278,8 +354,8 @@ class FreeBSDDistro(GenericDistro):
             pass
         uidmin = None
         try:
-            if os.path.isfile("/etc/login.defs"):
-                uidmin = int(ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
+            if os.path.isfile("/etc/pw.conf"):
+                uidmin = int(ext_utils.get_line_starting_with("minuid", "/etc/pw.conf").split('=')[1].strip(' "'))
         except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
             pass
@@ -312,7 +388,7 @@ class FreeBSDDistro(GenericDistro):
                     self.sudoers_dir_base + '/sudoers',
                     ext_utils.get_file_contents(
                         self.sudoers_dir_base + '/sudoers') + '\n#includedir ' + self.sudoers_dir_base + '/sudoers.d\n')
-            if password is None:
+            if password is None or enable_nopasswd:
                 ext_utils.set_file_contents(
                     self.sudoers_dir_base + "/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
@@ -356,9 +432,8 @@ class FreeBSDDistro(GenericDistro):
             return
         uidmin = None
         try:
-            if os.path.isfile("/etc/login.defs"):
-                uidmin = int(
-                    ext_utils.get_line_starting_with("UID_MIN", "/etc/login.defs").split()[1])
+            if os.path.isfile("/etc/pw.conf"):
+                uidmin = int(ext_utils.get_line_starting_with("minuid", "/etc/pw.conf").split('=')[1].strip(' "'))
         except (ValueError, KeyError, AttributeError, EnvironmentError):
             pass
         if uidmin is None:
@@ -408,7 +483,7 @@ class CoreOSDistro(GenericDistro):
         """
         return 0
 
-    def create_account(self, user, password, expiration, thumbprint):
+    def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         """
         Create a user account, with 'user', 'password', 'expiration', ssh keys
         and sudo permissions.
@@ -442,7 +517,7 @@ class CoreOSDistro(GenericDistro):
         if password is not None:
             self.change_password(user, password)
         try:
-            if password is None:
+            if password is None or enable_nopasswd:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) NOPASSWD: ALL\n")
             else:
                 ext_utils.set_file_contents("/etc/sudoers.d/waagent", user + " ALL = (ALL) ALL\n")
@@ -507,8 +582,33 @@ class FedoraDistro(RedhatDistro):
             logger.error("Failed to restart SSH service with return code:" + str(retcode))
         return retcode
 
-    def create_account(self, user, password, expiration, thumbprint):
+    def create_account(self, user, password, expiration, thumbprint, enable_nopasswd):
         ext_utils.run(['/sbin/usermod', user, '-G', 'wheel'])
 
     def delete_account(self, user):
         ext_utils.run(['/sbin/usermod', user, '-G', ''])
+
+
+class SuSEDistro(GenericDistro):
+    def __init__(self, config):
+        super(SuSEDistro, self).__init__(config)
+        self.ssh_service_name = 'sshd'
+        self.distro_name = "SuSE"
+
+
+class MarinerDistro(GenericDistro):
+    def __init__(self, config):
+        super(MarinerDistro, self).__init__(config)
+        self.ssh_service_name = 'sshd'
+        self.service_cmd = '/usr/bin/systemctl'
+        self.distro_name = 'Mariner'
+    
+    def restart_ssh_service(self):
+        """
+        Service call to re(start) the SSH service
+        """
+        ssh_restart_cmd = [self.service_cmd, self.ssh_service_restart_option, self.ssh_service_name]
+        retcode = ext_utils.run(ssh_restart_cmd)
+        if retcode > 0:
+            logger.error("Failed to restart SSH service with return code:" + str(retcode))
+        return retcode

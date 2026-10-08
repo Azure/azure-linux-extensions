@@ -45,10 +45,12 @@ packages_array = []
 main_folder = 'main'
 main_entry = main_folder + '/handle.sh'
 binary_entry = main_folder + '/safefreeze'
+arm64_binary_entry = main_folder + '/safefreezeArm64'
 packages_array.append(main_folder)
 
 plugin_folder = main_folder + '/tempPlugin'
 plugin_conf =  main_folder + '/VMSnapshotPluginHost.conf'
+severity_json =  main_folder + '/LogSeverity.json'
 
 
 patch_folder = main_folder + '/patch'
@@ -79,6 +81,14 @@ target_utils_path = main_folder + '/' + CommonVariables.utils_path_name
 #print('copying end')
 packages_array.append(target_utils_path)
 
+"""
+copy the NodeBased lib to local
+"""
+target_snapshot_service_path = main_folder + '/' + CommonVariables.snapshot_service_path_name
+packages_array.append(target_snapshot_service_path)
+
+polling_service_metadata =  target_snapshot_service_path + '/service_metadata.json'
+polling_service_readme =  target_snapshot_service_path + '/README.md'
 
 """
 generate the HandlerManifest.json file.
@@ -107,6 +117,27 @@ generate the safe freeze binary
 """
 cur_dir = os.getcwd()
 os.chdir("./main/safefreeze")
+chil = subprocess.Popen(["make"], stdout=subprocess.PIPE)
+process_wait_time = 5
+while(process_wait_time >0 and chil.poll() is None):
+    time.sleep(1)
+    process_wait_time -= 1
+
+os.chdir(cur_dir)
+
+
+'''
+due to the lack of cross-compilation support in Mariner.
+It would not be able to get the binaries, so will be using the older binaries
+To Do : Once Mariner starts supporting cross-compilation, 
+will have to modify any necessary scripts to
+enable the generation of safefreezeARM64 binaries.
+'''
+"""
+generate the ARM64 safe freeze binary
+"""
+cur_dir = os.getcwd()
+os.chdir("./main/safefreezeArm64")
 chil = subprocess.Popen(["make"], stdout=subprocess.PIPE)
 process_wait_time = 5
 while(process_wait_time >0 and chil.poll() is None):
@@ -178,19 +209,30 @@ def copy(src, dst):
     shutil.copy2(src, dst)
 
 final_folder_path = target_zip_file_location + target_folder_name
+
 final_binary_path= final_folder_path + '/main/safefreeze'
+final_Arm64binary_path= final_folder_path + '/main/safefreezeArm64'
 final_plugin_path = final_folder_path + '/main/tempPlugin'
 final_workloadscripts_path = final_folder_path + '/main/workloadPatch/DefaultScripts'
 final_workload_customscripts_path = final_folder_path + '/main/workloadPatch/CustomScripts'
 final_workloadutils_path = final_folder_path + '/main/workloadPatch/WorkloadUtils'
+
+copybinary(binary_entry, final_binary_path)
+copybinary(arm64_binary_entry, final_Arm64binary_path)
+copybinary(plugin_folder, final_plugin_path)
 copybinary(workloadscripts_folder, final_workloadscripts_path) 
 copybinary(workload_customscripts_folder, final_workload_customscripts_path)
 copybinary(workloadutils_folder, final_workloadutils_path)
-final_plugin_conf_path = final_folder_path + '/main'
-copybinary(binary_entry, final_binary_path)
-copybinary(plugin_folder, final_plugin_path)
-copy(plugin_conf, final_plugin_conf_path)
-copy(manifest,final_folder_path)
-copy(main_entry,final_plugin_conf_path)
+
+final_main_folder = final_folder_path + '/main'
+final_snapshot_service_path = final_main_folder + '/' + CommonVariables.snapshot_service_path_name
+
+copy(plugin_conf, final_main_folder)
+copy(severity_json, final_main_folder)
+copy(polling_service_metadata, final_snapshot_service_path)
+copy(polling_service_readme, final_snapshot_service_path)
+copy(manifest, final_folder_path)
+copy(main_entry, final_main_folder)
+
 zip(final_folder_path, target_zip_file_path)
 

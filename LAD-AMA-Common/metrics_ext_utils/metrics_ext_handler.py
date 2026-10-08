@@ -16,25 +16,58 @@
 # COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 # OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-# future imports have no effect on python 3 (verified in official docs)
-# importing from source causes import errors on python 3, lets skip import
+import platform
 import sys
-if sys.version_info[0] < 3:
-    from future import standard_library
-    standard_library.install_aliases()
-    from builtins import str
-    
-import urllib.request, urllib.error, urllib.parse
 import json
 import os
 from shutil import copyfile, rmtree
 import stat
+import grp
+import pwd
 import filecmp
 import metrics_ext_utils.metrics_constants as metrics_constants
 import subprocess
 import time
 import signal
 import metrics_ext_utils.metrics_common_utils as metrics_utils
+
+try:
+    import urllib.request as urllib # Python 3+
+except ImportError:
+    import urllib2 as urllib # Python 2
+
+try:
+    import urllib.error as urlerror # Python 3+
+except ImportError:
+    import urllib2 as urlerror # Python 2
+
+try:
+    from urllib.parse import urlparse # Python 3+
+except ImportError:
+    from urlparse import urlparse # Python 2
+
+# Cloud Environments
+PublicCloudName     = "azurepubliccloud"
+FairfaxCloudName    = "azureusgovernmentcloud"
+MooncakeCloudName   = "azurechinacloud"
+USNatCloudName      = "usnat" # EX
+USSecCloudName      = "ussec" # RX
+ArcACloudName       = "azurestackcloud"
+DefaultCloudName    = PublicCloudName # Fallback
+
+ARMDomainMap = {
+    PublicCloudName:    "management.azure.com",
+    FairfaxCloudName:   "management.usgovcloudapi.net",
+    MooncakeCloudName:  "management.chinacloudapi.cn",
+    USNatCloudName:     "management.azure.eaglex.ic.gov",
+    USSecCloudName:     "management.azure.microsoft.scloud",
+    ArcACloudName:      "armmanagement.autonomous.cloud.private"
+}
+
+MeCMv2RuntimeDirectory = "/var/run/azuremetricsext"
+MeCMv2ServiceUser = "azuremetricsext"
+MeCMv2ServiceGroup = "azuremonitoragent"
+HimdsGroupName = "himds"
 
 
 def is_running(is_lad):
@@ -71,15 +104,16 @@ def stop_metrics_service(is_lad):
     # If the VM has systemd, then we will use that to stop
     if metrics_utils.is_systemd():
         code = 1
-        metrics_service_path = get_metrics_extension_service_path()
+        metrics_service_path = get_metrics_extension_service_path(is_lad)
+        metrics_service_name = get_metrics_extension_service_name(is_lad)
 
         if os.path.isfile(metrics_service_path):
-            code = os.system("sudo systemctl stop metrics-extension")
+            code = os.system("systemctl stop {0}".format(metrics_service_name))            
         else:
-            return False, "Metrics Extension service file does not exist. Failed to stop ME service: metrics-extension.service ."
+            return False, "Metrics Extension service file does not exist. Failed to stop ME service: {0}.service.".format(metrics_service_name)
 
         if code != 0:
-            return False, "Unable to stop Metrics Extension service: metrics-extension.service. Failed with code {0}".format(code)
+            return False, "Unable to stop Metrics Extension service: {0}. Failed with code {1}".format(metrics_service_name, code)
     else:
         #This VM does not have systemd, So we will use the pid from the last ran metrics process and terminate it
         _, configFolder = get_handler_vars()
@@ -112,7 +146,7 @@ def remove_metrics_service(is_lad):
     :param is_lad: boolean whether the extension is LAD or not (AMA)
     """
 
-    metrics_service_path = get_metrics_extension_service_path()
+    metrics_service_path = get_metrics_extension_service_path(is_lad)
 
     if os.path.isfile(metrics_service_path):
         code = os.remove(metrics_service_path)
@@ -128,7 +162,7 @@ def remove_metrics_service(is_lad):
 
     return True, "Successfully removed metrics-extensions service and MetricsExtension binary."
 
-def generate_Arc_MSI_token():
+def generate_Arc_MSI_token(resource = "https://ingestion.monitor.azure.com/"):
     """
     This method is used to query the Hyrbid metdadata service of Arc to get the MSI Auth token for the VM and write it to the ME config location
     This is called from the main extension code after config setup is complete
@@ -150,11 +184,11 @@ def generate_Arc_MSI_token():
         while retries <= max_retries:
             arc_endpoint = metrics_utils.get_arc_endpoint()
             try:
-                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=https://ingestion.monitor.azure.com/"
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true'})
-                res = urllib.request.urlopen(req)
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=" + resource
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.urlopen(req)
             except:
-                # The above request is expected to fail and add a key to the path - 
+                # The above request is expected to fail and add a key to the path
                 authkey_dir = "/var/opt/azcmagent/tokens/"
                 if not os.path.exists(authkey_dir):
                     log_messages += "Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir)
@@ -168,8 +202,8 @@ def generate_Arc_MSI_token():
                 with open(authkey_path, "r") as f:
                     key = f.read()
                 auth += key
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
-                res = urllib.request.urlopen(req)
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
+                res = urllib.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
 
             if not data or "access_token" not in data:
@@ -201,13 +235,16 @@ def generate_Arc_MSI_token():
     return True, expiry_epoch_time, log_messages
 
 
-def generate_MSI_token():
+def generate_MSI_token(identifier_name = '', identifier_value = '', is_lad = True):
     """
     This method is used to query the metdadata service to get the MSI Auth token for the VM and write it to the ME config location
     This is called from the main extension code after config setup is complete
     """
 
     if metrics_utils.is_arc_installed():
+        _, _, _, az_environment, _ = get_imds_values(is_lad)
+        if az_environment.lower() == ArcACloudName:
+            return generate_Arc_MSI_token("https://monitoring.azs")
         return generate_Arc_MSI_token()
     else:
         _, configFolder = get_handler_vars()
@@ -220,14 +257,18 @@ def generate_MSI_token():
         sleep_time = 5
 
         if not os.path.exists(me_config_dir):
-            log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token fo ME.\n".format(me_config_dir)
+            log_messages += "Metrics extension config directory - {0} does not exist. Failed to generate MSI auth token for ME.\n".format(me_config_dir)
             return False, expiry_epoch_time, log_messages
         try:
             data = None
             while retries <= max_retries:
                 msiauthurl = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://ingestion.monitor.azure.com/"
-                req = urllib.request.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
-                res = urllib.request.urlopen(req)
+
+                if identifier_name and identifier_value:
+                    msiauthurl += '&{0}={1}'.format(identifier_name, identifier_value)
+
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'Content-Type':'application/json'})
+                res = urllib.urlopen(req)
                 data = json.loads(res.read().decode('utf-8', 'ignore'))
 
                 if not data or "access_token" not in data:
@@ -249,17 +290,76 @@ def generate_MSI_token():
             if "expires_on" in data:
                 expiry_epoch_time  = data["expires_on"]
             else:
-                log_messages += "Error parsing the msi token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
+                log_messages += "Error parsing the MSI token at {0} for the token expiry time. Failed to generate the correct token\n".format(me_auth_file_path)
                 return False, expiry_epoch_time, log_messages
 
         except Exception as e:
-            log_messages += "Failed to get msi auth token. Please check if VM's system assigned Identity is enabled Failed with error {0}\n".format(e)
+            log_messages += "Failed to get MSI auth token. Please check if the VM's system assigned identity is enabled or the user assigned identity "
+            log_messages += "passed in the extension settings exists and is assigned to this VM. Failed with error {0}\n".format(e)
             return False, expiry_epoch_time, log_messages
 
         return True, expiry_epoch_time, log_messages
 
+def get_ArcA_MSI_token(resource = "https://monitoring.azs"):
+    """
+    This method is used to query the Hyrbid metdadata service of ArcA to get the MSI Auth token for the VM
+    """
+    token_string = ""
+    log_messages = ""
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
 
-def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx_port):
+    try:
+        data = None
+        while retries <= max_retries:
+            arc_endpoint = metrics_utils.get_arc_endpoint()
+            try:
+                msiauthurl = arc_endpoint + "/metadata/identity/oauth2/token?api-version=2019-11-01&resource=" + resource
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true'})
+                res = urllib.urlopen(req)
+            except:
+                # The above request is expected to fail and add a key to the path
+                authkey_dir = "/var/opt/azcmagent/tokens/"
+                if not os.path.exists(authkey_dir):
+                    log_messages += "Unable to find the auth key file at {0} returned from the arc msi auth request.".format(authkey_dir)
+                    return False, token_string, log_messages
+                keys_dir = []
+                for filename in os.listdir(authkey_dir):
+                    keys_dir.append(filename)
+
+                authkey_path = authkey_dir + keys_dir[-1]
+                auth = "basic "
+                with open(authkey_path, "r") as f:
+                    key = f.read()
+                auth += key
+                req = urllib.Request(msiauthurl, headers={'Metadata':'true', 'authorization':auth})
+                res = urllib.urlopen(req)
+                data = json.loads(res.read().decode('utf-8', 'ignore'))
+
+            if not data or "access_token" not in data:
+                retries += 1
+            else:
+                break
+
+            log_messages += "Failed to fetch MSI Auth url. Retrying in {2} seconds. Retry Count - {0} out of Mmax Retries - {1}\n".format(retries, max_retries, sleep_time)
+            time.sleep(sleep_time)
+
+
+        if retries > max_retries:
+            log_messages += "Unable to fetch a valid MSI auth token for {0}.\n".format(resource)
+            return False, token_string, log_messages
+
+        token_string = data["access_token"]
+
+    except Exception as e:
+        log_messages += "Failed to get msi auth token. Please check if VM's system assigned Identity is enabled Failed with error {0}\n".format(e)
+        return False, token_string, log_messages
+
+    return True, token_string, log_messages
+
+
+def setup_me_service(is_lad, configFolder, monitoringAccount, metrics_ext_bin, me_influx_port, managed_identity="sai", HUtilObj=None, supplementary_grps=None):
     """
     Setup the metrics service if VM is using systemd
     :param configFolder: Path for the config folder for metrics extension
@@ -268,13 +368,14 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
     :param me_influx_port: Influxdb port that metrics extension will listen on
     """
 
-    me_service_path = get_metrics_extension_service_path()
+    me_service_path = get_metrics_extension_service_path(is_lad)
     me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
     daemon_reload_status = 1
 
     if not os.path.exists(configFolder):
-        raise Exception("Metrics extension config directory does not exist. Failed to setup ME service.")
-        return False
+        raise Exception("Metrics extension config directory does not exist. Failed to set up ME service.")
+
+    me_influx_socket_path = configFolder + "/mdm_influxdb.socket"
 
     if os.path.isfile(me_service_template_path):
         copyfile(me_service_template_path, me_service_path)
@@ -284,21 +385,54 @@ def setup_me_service(configFolder, monitoringAccount, metrics_ext_bin, me_influx
             os.system(r"sed -i 's+%ME_INFLUX_PORT%+{1}+' {0}".format(me_service_path, me_influx_port))
             os.system(r"sed -i 's+%ME_DATA_DIRECTORY%+{1}+' {0}".format(me_service_path, configFolder))
             os.system(r"sed -i 's+%ME_MONITORING_ACCOUNT%+{1}+' {0}".format(me_service_path, monitoringAccount))
-            daemon_reload_status = os.system("sudo systemctl daemon-reload")
+            os.system(r"sed -i 's+%ME_MANAGED_IDENTITY%+{1}+' {0}".format(me_service_path, managed_identity))
+            os.system(r"sed -i 's+%ME_INFLUX_SOCKET_FILE_PATH%+{1}+' {0}".format(me_service_path, me_influx_socket_path))
+            supplementary_groups_line = ""
+            if supplementary_grps:
+                supplementary_groups_line = "SupplementaryGroups={0}".format(supplementary_grps)
+            os.system(r"sed -i 's+%SUPPLEMENTARY_GROUPS_LINE%+{1}+' {0}".format(me_service_path, supplementary_groups_line))
+            daemon_reload_status = os.system("systemctl daemon-reload")
             if daemon_reload_status != 0:
-                raise Exception("Unable to reload systemd after ME service file change. Failed to setup ME service.")
-                return False
+                message = "Unable to reload systemd after ME service file change. Failed to set up ME service. Check system for hardening. Exit code:" + str(daemon_reload_status)
+                if HUtilObj is not None:
+                    HUtilObj.log(message)
+                else:
+                    print('Info: {0}'.format(message))
+
         else:
-            raise Exception("Unable to copy Metrics extension service file to {0}. Failed to setup ME service.".format(me_service_path))
-            return False
+            raise Exception("Unable to copy Metrics extension service file to {0}. Failed to set up ME service.".format(me_service_path))
     else:
-        raise Exception("Metrics extension service template file does not exist at {0}. Failed to setup ME service.".format(me_service_template_path))
-        return False
+        raise Exception("Metrics extension service template file does not exist at {0}. Failed to set up ME service.".format(me_service_template_path))
     return True
 
 
+def start_metrics_cmv2():
+    """
+    Start the metrics service in CMv2 mode
+    """
 
-def start_metrics(is_lad):
+    # Re using the code to grab the config directories and imds values because start will be called from Enable process outside this script
+    log_messages = ""
+
+    metrics_ext_bin = metrics_constants.ama_metrics_extension_bin
+    if not os.path.isfile(metrics_ext_bin):
+        log_messages += "Metrics Extension binary does not exist. Failed to start ME service."
+        return False, log_messages
+
+    # If the VM has systemd, then we use that to start/stop
+    metrics_service_name = get_metrics_extension_service_name(False)
+    if metrics_utils.is_systemd():
+        service_restart_status = os.system("systemctl restart {0}".format(metrics_service_name))
+        if service_restart_status != 0:
+            log_messages += "Unable to start {0} using systemctl. Failed to start ME service. Check system for hardening.".format(metrics_service_name)
+            return False, log_messages
+        else:
+            return True, log_messages
+
+    return False, log_messages
+
+
+def start_metrics(is_lad, managed_identity="sai"):
     """
     Start the metrics service if VM is using is systemd, otherwise start the binary as a process and store the pid,
     to a file in the MetricsExtension config directory,
@@ -322,12 +456,12 @@ def start_metrics(is_lad):
     else:
         me_influx_port = metrics_constants.ama_metrics_extension_udp_port
 
-
     # If the VM has systemd, then we use that to start/stop
+    metrics_service_name = get_metrics_extension_service_name(is_lad)
     if metrics_utils.is_systemd():
-        service_restart_status = os.system("sudo systemctl restart metrics-extension")
+        service_restart_status = os.system("systemctl restart {0}".format(metrics_service_name))
         if service_restart_status != 0:
-            log_messages += "Unable to start metrics-extension.service. Failed to start ME service."
+            log_messages += "Unable to start {0} using systemctl. Failed to start ME service. Check system for hardening.".format(metrics_service_name)
             return False, log_messages
 
     #Else start ME as a process and save the pid to a file so that we can terminate it while disabling/uninstalling
@@ -335,7 +469,7 @@ def start_metrics(is_lad):
         _, configFolder = get_handler_vars()
         me_config_dir = configFolder + "/metrics_configs/"
         #query imds to get the subscription id
-        az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
+        az_resource_id, subscription_id, location, az_environment, data = get_imds_values(is_lad)
 
         if is_lad:
             monitoringAccount = "CUSTOMMETRIC_"+ subscription_id
@@ -344,7 +478,13 @@ def start_metrics(is_lad):
 
         metrics_pid_path = me_config_dir + "metrics_pid.txt"
 
-        binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
+        # If LAD, use ME startup arguments for LAD, otherwise use ME startup arguments for AMA
+        if is_lad:
+            binary_exec_command = "{0} -TokenSource MSI -Input influxdb_udp -InfluxDbHost 127.0.0.1 -InfluxDbUdpPort {1} -DataDirectory {2} -LocalControlChannel -MonitoringAccount {3} -LogLevel Error".format(metrics_ext_bin, me_influx_port, me_config_dir, monitoringAccount)
+        else:
+            log_messages += "MetricsExtension will not be started."
+            return False, log_messages
+        
         proc = subprocess.Popen(binary_exec_command.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         time.sleep(3) #sleeping for 3 seconds before checking if the process is still running, to give it ample time to relay crash info
         p = proc.poll()
@@ -437,20 +577,27 @@ def create_metrics_extension_conf(az_resource_id, aad_url):
 } '''
     return conf_json
 
-def create_custom_metrics_conf(mds_gig_endpoint_region):
+def create_custom_metrics_conf(mds_gig_endpoint_region, gig_endpoint = ""):
     """
     Create the metrics extension config
     :param mds_gig_endpoint_region: mds gig endpoint region for the VM
     """
     # Note : mds gig endpoint url is only for 3rd party customers. 1st party endpoint is different
 
+    if not gig_endpoint:
+        gig_hostname = mds_gig_endpoint_region + ".monitoring.azure.com"
+        gig_ingestion_endpoint = "https://" + gig_hostname + "/api/v1/ingestion/ingest"
+    else:
+        gig_hostname = urlparse(gig_endpoint).netloc
+        gig_ingestion_endpoint = gig_endpoint + "/api/v1/ingestion/ingest"
+
     conf_json = '''{
         "version": 17,
         "maxMetricAgeInSeconds": 0,
         "endpointsForClientForking": [],
-        "homeStampGslbHostname": "''' + mds_gig_endpoint_region + '''.monitoring.azure.com",
+        "homeStampGslbHostname": "''' + gig_hostname + '''",
         "endpointsForClientPublication": [
-            "https://''' + mds_gig_endpoint_region + '''.monitoring.azure.com/api/v1/ingestion/ingest"
+            "''' + gig_ingestion_endpoint + '''"
         ]
     } '''
     return conf_json
@@ -478,34 +625,41 @@ def get_handler_vars():
     return logFolder, configFolder
 
 
-def get_imds_values(is_lad):
+def get_imds_values(is_lad, HUtilObj=None):
     """
     Query imds to get required values for MetricsExtension config for this VM
     """
     retries = 1
     max_retries = 3
     sleep_time = 5
-    imdsurl = ""
+    imds_url = ""
     is_arc = False
 
     if is_lad:
-        imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+        imds_url = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
     else:
         if metrics_utils.is_arc_installed():
-            imdsurl = metrics_utils.get_arc_endpoint()
-            imdsurl += "/metadata/instance?api-version=2019-11-01"
+            imds_url = metrics_utils.get_arc_endpoint()
+            imds_url += "/metadata/instance?api-version=2019-11-01"
             is_arc = True
         else:
-            imdsurl = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
+            imds_url = "http://169.254.169.254/metadata/instance?api-version=2019-03-11"
 
+    message = "IMDS url to query: " + imds_url
+    if HUtilObj is not None:
+        HUtilObj.log(message)
+    else:
+        print('Info: {0}'.format(message))
 
     data = None
     while retries <= max_retries:
 
-        #query imds to get the required information
-        req = urllib.request.Request(imdsurl, headers={'Metadata':'true'})
-        res = urllib.request.urlopen(req)
-        data = json.loads(res.read().decode('utf-8', 'ignore'))
+        try:
+            req = urllib.Request(imds_url, headers={'Metadata':'true'})
+            res = urllib.urlopen(req)
+            data = json.loads(res.read().decode('utf-8', 'ignore'))
+        except:
+            pass
 
         if "compute" not in data:
             retries += 1
@@ -515,110 +669,248 @@ def get_imds_values(is_lad):
         time.sleep(sleep_time)
 
     if retries > max_retries:
-        raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to setup ME.".format(max_retries))
-        return False
-
+        raise Exception("Unable to find 'compute' key in imds query response. Reached max retry limit of - {0} times. Failed to set up ME.".format(max_retries))
 
     if "resourceId" not in data["compute"]:
-        raise Exception("Unable to find 'resourceId' key in imds query response. Failed to setup ME.")
-        return False
+        raise Exception("Unable to find 'resourceId' key in imds query response. Failed to set up ME.")
 
     az_resource_id = data["compute"]["resourceId"]
 
     if "subscriptionId" not in data["compute"]:
-        raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to setup ME.")
-        return False
+        raise Exception("Unable to find 'subscriptionId' key in imds query response. Failed to set up ME.")
 
     subscription_id = data["compute"]["subscriptionId"]
 
     if "location" not in data["compute"]:
-        raise Exception("Unable to find 'location' key in imds query response. Failed to setup ME.")
-        return False
+        raise Exception("Unable to find 'location' key in imds query response. Failed to set up ME.")
 
-    location= data["compute"]["location"]
+    location = data["compute"]["location"]
 
-    return az_resource_id, subscription_id, location, data
+    if "azEnvironment" not in data["compute"]:
+        raise Exception("Unable to find 'azEnvironment' key in imds query response. Failed to set up ME.")
 
+    az_environment = data["compute"]["azEnvironment"]
 
-def get_metrics_extension_service_path():
+    return az_resource_id, subscription_id, location, az_environment, data
+
+def get_arca_endpoints_from_himds():
     """
-    Utility method to get the service path in case /lib/systemd/system doesnt exist on the OS
+    Query himds to get required arca endpoints for MetricsExtension config for this connected machine
     """
-    if os.path.exists("/lib/systemd/system/"):
-        return metrics_constants.metrics_extension_service_path
-    elif os.path.exists("/usr/lib/systemd/system/"):
-        return metrics_constants.metrics_extension_service_path_usr_lib
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
+    imds_url = "http://localhost:40342/metadata/endpoints?api-version=2019-11-01"
+
+    if metrics_utils.is_arc_installed():
+        imds_url = metrics_utils.get_arc_endpoint()
+        imds_url += "/metadata/endpoints?api-version=2019-11-01"
+
+    data = None
+    while retries <= max_retries:
+
+        try:
+            req = urllib.Request(imds_url, headers={'Metadata':'true'})
+            res = urllib.urlopen(req)
+            data = json.loads(res.read().decode('utf-8', 'ignore'))
+        except:
+            pass
+
+        if "dataplaneEndpoints" not in data or "resourceManager" not in data:
+            retries += 1
+        else:
+            break
+
+        time.sleep(sleep_time)
+
+    if retries > max_retries:
+        raise Exception("Unable to find 'dataplaneEndpoints' key in imds query response. Reached max retry limit of - {0} times. Failed to set up ME.".format(max_retries))
+
+    if "arcMonitorControlServiceEndpoint" not in data["dataplaneEndpoints"]:
+        raise Exception("Unable to find 'arcMonitorControlServiceEndpoint' key in imds query response. Failed to set up ME.")
+
+    mcs_endpoint = data["dataplaneEndpoints"]["arcMonitorControlServiceEndpoint"]
+    arm_endpoint = data["resourceManager"]
+
+    return arm_endpoint, mcs_endpoint
+
+def get_arca_ingestion_endpoint_from_mcs():
+    """
+    Query himds to get required arca endpoints for MetricsExtension config for this connected machine
+    """
+    retries = 1
+    max_retries = 3
+    sleep_time = 5
+
+    _, mcs_endpoint = get_arca_endpoints_from_himds()
+    az_resource_id, _, _, _, _ = get_imds_values(False)
+    msi_token_fetched, mcs_token, log_messages = get_ArcA_MSI_token()
+    if not msi_token_fetched:
+        raise Exception("Unable to fetch MCS token, error message: " + log_messages)
+    
+
+    mcs_config_query_url = mcs_endpoint + az_resource_id + "/agentConfigurations?platform=linux&includeMeConfig=true&api-version=2022-06-02"
+
+    if not mcs_token.lower().startswith("bearer "):
+        mcs_token = "Bearer " + mcs_token
+
+    data = None
+    while retries <= max_retries:
+
+        # Query imds to get the required information
+        req = urllib.Request(mcs_config_query_url, headers={'Metadata':'true', 'Authorization':mcs_token})
+        res = urllib.urlopen(req)
+        data = json.loads(res.read().decode('utf-8', 'ignore'))
+
+        if "configurations" not in data:
+            retries += 1
+        else:
+            break
+
+        time.sleep(sleep_time)
+
+    if retries > max_retries:
+        raise Exception("Unable to find 'configurations' key in amcs query response. Reached max retry limit of - {0} times. Failed to set up ME.".format(max_retries))
+
+    if "content" not in data["configurations"][0]:
+        raise Exception("Unable to find 'content' key in amcs query response. Failed to set up ME.")
+    
+    if "channels" not in data["configurations"][0]["content"]:
+        raise Exception("Unable to find 'channels' key in amcs query response. Failed to set up ME.")
+    
+    if "endpoint" not in data["configurations"][0]["content"]["channels"][0]:
+        raise Exception("Unable to find 'endpoint' key in amcs query response. Failed to set up ME.")
+
+    ingestion_endpoint = data["configurations"][0]["content"]["channels"][0]["endpoint"]
+
+    # try:
+    #     gig_hostname = urllib.parse.urlparse(ingestion_endpoint).netloc
+
+    # except Exception as e:
+    #     raise Exception("Failed to retrieve ingestion host name with Exception='{0}'. ".format(e))
+
+    return ingestion_endpoint
+
+def get_arm_domain(az_environment):
+    """
+    Return the ARM domain to use based on the Azure environment
+    """
+
+    try:
+        if az_environment.lower() == ArcACloudName:
+            arm_endpoint, _ = get_arca_endpoints_from_himds()
+            arm_endpoint_parsed = urlparse(arm_endpoint)
+            domain = arm_endpoint_parsed.netloc
+        else:
+            domain = ARMDomainMap[az_environment.lower()]
+
+    except KeyError:
+        raise Exception("Unknown cloud environment \"{0}\". Failed to set up ME.".format(az_environment))
+
+    return domain
+
+
+def get_metrics_extension_service_path(is_lad):
+    """
+    Utility method to get the service path
+    """
+    if(is_lad):
+        if os.path.exists("/lib/systemd/system/"):
+            return metrics_constants.lad_metrics_extension_service_path
+        elif os.path.exists("/usr/lib/systemd/system/"):
+            return metrics_constants.lad_metrics_extension_service_path_usr_lib
+        else:
+            raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
     else:
-        raise Exception("Systemd unit files do not exist at /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
+        if os.path.exists("/etc/systemd/system"):
+            return metrics_constants.metrics_extension_service_path_etc
+        if os.path.exists("/lib/systemd/system/"):
+            return metrics_constants.metrics_extension_service_path
+        elif os.path.exists("/usr/lib/systemd/system/"):
+            return metrics_constants.metrics_extension_service_path_usr_lib
+        else:
+            raise Exception("Systemd unit files do not exist at /etc/systemd/system, /lib/systemd/system or /usr/lib/systemd/system/. Failed to setup Metrics Extension service.")
 
 
+def get_metrics_extension_service_name(is_lad):
+    """
+    Utility method to get the service name
+    """
+    if(is_lad):    
+        return metrics_constants.lad_metrics_extension_service_name
+    else:
+        return metrics_constants.metrics_extension_service_name
 
 
-def setup_me(is_lad):
+def setup_me(is_lad, managed_identity="sai", HUtilObj=None, is_local_control_channel=True):
     """
     The main method for creating and writing MetricsExtension configuration as well as service setup
     :param is_lad: Boolean value for whether the extension is Lad or not (AMA)
+    :param is_local_control_channel: Boolean value for whether MetricsExtension needs to be run in `-LocalControlChannel` mode (CMv1 only)
     """
+    _, config_folder = get_handler_vars()
+    me_config_dir = config_folder + "/metrics_configs/"
+    setup_data_directory(me_config_dir)
+    supplementary_grps = ""
 
-    # query imds to get the required information
-    az_resource_id, subscription_id, location, data = get_imds_values(is_lad)
-
-    # get tenantID
-    # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
-    # The armurl is only for Public Cloud. Needs verification in Sovereign clouds
-    aad_auth_url = ""
-    amrurl = "https://management.azure.com/subscriptions/" + subscription_id + "?api-version=2014-04-01"
-    try:
-        req = urllib.request.Request(amrurl, headers={'Content-Type':'application/json'})
-
-        # urlopen alias in future backport is broken on py2.6, fails on urls with HTTPS - https://github.com/PythonCharmers/python-future/issues/167
-        # Using this hack of switching between py2 and 3 to avoid this
-        if sys.version_info < (2,7):
-            from urllib2 import HTTPError, Request, urlopen
-            urlopen(req)
-        else:
-            res = urllib.request.urlopen(req)
-
-    except Exception as e:
-        err_res = e.headers["WWW-Authenticate"]
-        for line in err_res.split(","):
-                if "Bearer authorization_uri" in line:
-                        data = line.split("=")
-                        aad_auth_url = data[1][1:-1] #Removing the quotes from the front and back
-                        break
-
-    if aad_auth_url == "":
-        raise Exception("Unable to find AAD Authentication URL in the request error response. Failed to setup ME.")
-        return False
-
-    #create metrics conf
-    me_conf = create_metrics_extension_conf(az_resource_id, aad_auth_url)
-
-    #create custom metrics conf
-    custom_conf = create_custom_metrics_conf(location)
-
-    #write configs to disk
-    logFolder, configFolder = get_handler_vars()
-    me_config_dir = configFolder + "/metrics_configs/"
-
-    # Clear older config directory if exists. 
-    if os.path.exists(me_config_dir):
-        rmtree(me_config_dir)    
-    os.mkdir(me_config_dir)
-
-
-    me_conf_path = me_config_dir + "MetricsExtensionV1_Configuration.json"
-    with open(me_conf_path, "w") as f:
-        f.write(me_conf)
-
-    if is_lad:
-        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
+    if not is_local_control_channel:
+        # CMv2 and related modes
+        me_monitoring_account = ""
+        me_config_dir, supplementary_grps = prepare_cmv2_service_runtime(HUtilObj=HUtilObj)
     else:
-        me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + "_" +location
+        # query imds to get the required information
+        az_resource_id, subscription_id, location, az_environment, data = get_imds_values(is_lad)
+        arm_domain = get_arm_domain(az_environment)
 
-    custom_conf_path = me_config_dir + me_monitoring_account +"_MonitoringAccount_Configuration.json"
-    with open(custom_conf_path, "w") as f:
-        f.write(custom_conf)
+        # get tenantID
+        # The url request will fail due to missing authentication header, but we get the auth url from the header of the request fail exception
+        aad_auth_url = ""
+        arm_url = "https://{0}/subscriptions/{1}?api-version=2014-04-01".format(arm_domain, subscription_id)
+        try:
+            req = urllib.Request(arm_url, headers={'Content-Type':'application/json'})
+
+            res = urllib.urlopen(req)
+
+        except urlerror.HTTPError as e:
+            err_res = e.headers["WWW-Authenticate"]
+            for line in err_res.split(","):
+                    if "Bearer authorization_uri" in line:
+                            data = line.split("=")
+                            aad_auth_url = data[1][1:-1] # Removing the quotes from the front and back
+                            break
+
+        except Exception as e:
+            message = "Failed to retrieve AAD Authentication URL from " + arm_url + " with Exception='{0}'. ".format(e)
+            message += "Continuing with metrics setup without AAD auth url."
+            if HUtilObj is not None:
+                HUtilObj.log(message)
+            else:
+                print('Info: {0}'.format(message))
+
+        #create metrics conf
+        me_conf = create_metrics_extension_conf(az_resource_id, aad_auth_url)
+
+        #create custom metrics conf
+        if az_environment.lower() == ArcACloudName:
+            ingestion_endpoint = get_arca_ingestion_endpoint_from_mcs()
+            custom_conf = create_custom_metrics_conf(location, ingestion_endpoint)
+        else:
+            custom_conf = create_custom_metrics_conf(location)
+
+        #write configs to disk
+        me_conf_path = me_config_dir + "MetricsExtensionV1_Configuration.json"
+        with open(me_conf_path, "w") as f:
+            f.write(me_conf)
+
+        if is_lad:
+            me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id
+        else:
+            me_monitoring_account = "CUSTOMMETRIC_"+ subscription_id + "_" +location
+
+        custom_conf_path = me_config_dir + me_monitoring_account.lower() +"_MonitoringAccount_Configuration.json"
+
+        with open(custom_conf_path, "w") as f:
+            f.write(custom_conf)
 
     # Copy MetricsExtension Binary to the bin location
     me_bin_local_path = os.getcwd() + "/MetricsExtensionBin/MetricsExtension"
@@ -650,8 +942,7 @@ def setup_me(is_lad):
             copyfile(me_bin_local_path, metrics_ext_bin)
             os.chmod(metrics_ext_bin, stat.S_IXGRP | stat.S_IRGRP | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXOTH | stat.S_IROTH)
     else:
-        raise Exception("Unable to copy MetricsExtension Binary, could not find file at the location {0} . Failed to setup ME.".format(me_bin_local_path))
-        return False
+        raise Exception("Unable to copy MetricsExtension Binary, could not find file at the location {0} . Failed to set up ME.".format(me_bin_local_path))
 
     if is_lad:
         me_influx_port = metrics_constants.lad_metrics_extension_udp_port
@@ -661,6 +952,198 @@ def setup_me(is_lad):
     # setup metrics extension service
     # If the VM has systemd, then we use that to start/stop
     if metrics_utils.is_systemd():
-        setup_me_service(me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port)
+        setup_me_service(is_lad, me_config_dir, me_monitoring_account, metrics_ext_bin, me_influx_port, managed_identity, HUtilObj, supplementary_grps=supplementary_grps)
 
     return True
+
+
+def remove_user(user=MeCMv2ServiceUser, HUtilObj=None):
+    """
+    Removes existing user.
+    :param user: linux user
+    :param HUtilObj: utility object for logging
+    """
+    try:
+        pwd.getpwnam(user)
+    except KeyError:
+        if HUtilObj:
+            HUtilObj.log('User {0} does not exist.'.format(user))
+        return
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking user {0}: {1}'.format(user, e))
+        return
+
+    try:
+        process = subprocess.Popen(['userdel', '-r', user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        if process.returncode != 0:
+            if HUtilObj:
+                HUtilObj.log('Failed to delete user {0}. stderr: {1}'.format(user, err))
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while deleting user {0}: {1}'.format(user, e))
+
+
+def ensure_group(group, create_if_missing=False, HUtilObj=None):
+    """
+    Ensure the group exists, optionally creating it if it does not exist.
+    :param group: linux group
+    :param create_if_missing: boolean if true, create the requested group if it does not exist
+    """
+    try:
+        grp.getgrnam(group)
+        if HUtilObj:
+            HUtilObj.log('Group {0} exists.'.format(group))
+        return True
+    except KeyError:
+        if create_if_missing:
+            try:
+                process = subprocess.Popen(['groupadd', group], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = process.communicate()
+                if process.returncode != 0:
+                    if HUtilObj:
+                        HUtilObj.log('Failed to create group {0}. stderr: {1}'.format(group, err))
+                    return False
+                if HUtilObj:
+                    HUtilObj.log('Group {0} created.'.format(group))
+                return True
+            except Exception as e:
+                if HUtilObj:
+                    HUtilObj.log('Error while creating group {0}: {1}'.format(group, e))
+                return False
+        else:
+            if HUtilObj:
+                HUtilObj.log('Group {0} does not exist.'.format(group))
+            return False
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking group {0}: {1}'.format(group, e))
+        return False
+
+
+def ensure_user_primary_group(user, group, create_if_missing=False, HUtilObj=None):
+    """
+    Ensure the user exists and uses the provided group as its primary group.
+    If the user is missing and creation is allowed, create it with that primary group.
+    :param user: linux user
+    :param group: linux group
+    :param create_if_missing: boolean if true, create the requested user if it does not exist
+    """
+    try:
+        user_info = pwd.getpwnam(user)
+        if HUtilObj:
+            HUtilObj.log('User {0} exists.'.format(user))
+    except KeyError:
+        if create_if_missing:
+            try:
+                process = subprocess.Popen([
+                    'useradd',
+                    '--no-create-home',
+                    '--home-dir', '/nonexistent',
+                    '--system',
+                    '--shell', '/usr/sbin/nologin',
+                    '--gid', group, user
+                ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = process.communicate()
+                if process.returncode != 0:
+                    if HUtilObj:
+                        HUtilObj.log('Failed to create user {0}. stderr: {1}'.format(user, err))
+                    return False
+                if HUtilObj:
+                    HUtilObj.log('User {0} created.'.format(user))
+                    HUtilObj.log('User {0} created with primary group {1}.'.format(user, group))
+                return True
+            except Exception as e:
+                if HUtilObj:
+                    HUtilObj.log('Error while creating user {0}: {1}'.format(user, e))
+                return False
+        if HUtilObj:
+            HUtilObj.log('User {0} does not exist.'.format(user))
+        return False
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking user {0}: {1}'.format(user, e))
+        return False
+
+    try:
+        target_group = grp.getgrnam(group)
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while checking group {0}: {1}'.format(group, e))
+        return False
+
+    if user_info.pw_gid == target_group.gr_gid:
+        if HUtilObj:
+            HUtilObj.log('User {0} already has primary group {1}.'.format(user, group))
+        return True
+
+    try:
+        process = subprocess.Popen(['usermod', '-g', group, user], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        if process.returncode != 0:
+            if HUtilObj:
+                HUtilObj.log('Failed to set primary group {0} for user {1}. stderr: {2}'.format(group, user, err))
+            return False
+        if HUtilObj:
+            HUtilObj.log('User {0} primary group set to {1}.'.format(user, group))
+        return True
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Error while setting primary group {0} for user {1}: {2}'.format(group, user, e))
+        return False
+
+
+def ensure_service_user_and_group(user, group, create_if_missing=False, HUtilObj=None):
+    """
+    Ensure the service group exists and the service user uses it as the primary group.
+    :param user: linux user
+    :param group: linux group
+    :param create_if_missing: boolean if true, create the requested user and group if they do not exist
+    """
+    if not ensure_group(group, create_if_missing=create_if_missing, HUtilObj=HUtilObj):
+        return False
+
+    return ensure_user_primary_group(user, group, create_if_missing=create_if_missing, HUtilObj=HUtilObj)
+
+
+def prepare_cmv2_service_runtime(user=MeCMv2ServiceUser, group=MeCMv2ServiceGroup, HUtilObj=None):
+    """
+    Prepare local runtime prerequisites for the CMv2 MetricsExtension service.
+    Returns the service data directory and any supplementary groups the unit should use at runtime.
+    """
+    if not ensure_service_user_and_group(user, group, create_if_missing=True, HUtilObj=HUtilObj):
+        raise Exception("Failed to ensure user {0} with primary group {1}.".format(user, group))
+
+    supplementary_grps = []
+    if ensure_group(HimdsGroupName, HUtilObj=HUtilObj):
+        supplementary_grps.append(HimdsGroupName)
+
+    setup_data_directory(MeCMv2RuntimeDirectory, user, group, clear_existing=False, HUtilObj=HUtilObj)
+    return MeCMv2RuntimeDirectory, " ".join(supplementary_grps)
+
+
+def setup_data_directory(me_config_dir, user=None, group=None, mode=0o755, clear_existing=True, HUtilObj=None):
+    '''
+    Creates a data directory where MetricsExtension can store cached configurations.
+    For CMv1, MetricsExtension requires mdsd to provide all configurations on disk.
+    For CMv2, MetricsExtension requires a runtime data directory where it can cache its configurations.
+    '''
+    try:
+        if clear_existing and os.path.exists(me_config_dir):
+            rmtree(me_config_dir)
+        if not os.path.exists(me_config_dir):
+            os.makedirs(me_config_dir, mode=mode)
+        else:
+            os.chmod(me_config_dir, mode)
+
+        if user and group:
+            uid = pwd.getpwnam(user).pw_uid
+            gid = grp.getgrnam(group).gr_gid
+            os.chown(me_config_dir, uid, gid)
+
+        if HUtilObj:
+            HUtilObj.log('Directory {0} created with ownership {1}:{2}.'.format(me_config_dir, user, group))
+    except Exception as e:
+        if HUtilObj:
+            HUtilObj.log('Failed to create directory: {0}'.format(e))

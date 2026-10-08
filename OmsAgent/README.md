@@ -1,4 +1,7 @@
-# OmsAgent Extension
+# [DEPRECATED] OmsAgent Extension
+
+> :warning: The Log Analytics agent has been **deprecated** and has no support as of **August 31, 2024.** If you use the Log Analytics agent to ingest data to Azure Monitor, [migrate now to the new Azure Monitor agent](https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-migration).
+>
 
 [See the latest version and extension-bundle mapping.](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/oms-linux#agent-and-vm-extension-version)
 
@@ -19,11 +22,15 @@ Schema for the public configuration file looks like this:
 
 * `workspaceId`: (required, string) the OMS workspace id to onboard to
 * `stopOnMultipleConnections`: (optional, true/false) warn and stop onboarding if the machine already has a workspace connection; defaults to false
- 
+* `noDigest`: (optional, true/false) RPM manager skips verification of package or header digests when reading (same as running rpm --nodigest --nofiledigest)
+* `skipDockerProviderInstall`: (optional, true/false) if the value is true, then skips the installation of the docker provider; default value is false
+
 ```json
 {
   "workspaceId": "<workspace-id (guid)>",
-  "stopOnMultipleConnections": true/false
+  "stopOnMultipleConnections": true/false,
+  "noDigest": true/false,
+  "skipDockerProviderInstall": true/false
 }
 ```
 
@@ -48,7 +55,7 @@ Schema for the protected configuration file looks like this:
 You can deploy it using Azure CLI, Azure Powershell and ARM template.
 
 
- 
+
 ### 2.1. Using [**Azure CLI**][azure-cli]
 Before deploying OmsAgent Extension, you should configure your `public.json` and `protected.json`
 (in section 1.1 and 1.2 above).
@@ -114,7 +121,9 @@ $Version = '<version>'
 
 $PublicConf = '{
     "workspaceId": "<workspace id>",
-    "stopOnMultipleConnections": true/false
+    "stopOnMultipleConnections": true/false,
+    "noDigest": true/false,
+    "skipDockerProviderInstall": true/false
 }'
 $PrivateConf = '{
     "workspaceKey": "<workspace key>",
@@ -148,7 +157,9 @@ $Version = '<version>'
 
 $PublicConf = '{
     "workspaceId": "<workspace id>",
-    "stopOnMultipleConnections": true/false
+    "stopOnMultipleConnections": true/false,
+    "noDigest": true/false,
+    "skipDockerProviderInstall": true/false
 }'
 $PrivateConf = '{
     "workspaceKey": "<workspace key>",
@@ -179,7 +190,9 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
     "typeHandlerVersion": "1.4",
     "settings": {
       "workspaceId": "<workspace id>",
-      "stopOnMultipleConnections": true/false
+      "stopOnMultipleConnections": true/false,
+      "noDigest": true/false,
+      "skipDockerProviderInstall": true/false
     },
     "protectedSettings": {
       "workspaceKey": "<workspace key>",
@@ -196,7 +209,9 @@ Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
 ```json
 {
   "workspaceId": "MyWorkspaceId",
-  "stopOnMultipleConnections": true
+  "stopOnMultipleConnections": true,
+  "noDigest": false,
+  "skipDockerProviderInstall": true
 }
 ```
 ```json
@@ -240,5 +255,5 @@ Additional error codes and troubleshooting information can be found on the [OMS-
 [azure-powershell]: https://azure.microsoft.com/en-us/documentation/articles/powershell-install-configure/
 [azure-cli-classic]: https://docs.microsoft.com/en-us/cli/azure/install-classic-cli
 [azure-cli]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
-[arm-template]: http://azure.microsoft.com/en-us/documentation/templates/ 
+[arm-template]: http://azure.microsoft.com/en-us/documentation/templates/
 [arm-overview]: https://azure.microsoft.com/en-us/documentation/articles/resource-group-overview/

@@ -24,6 +24,7 @@ HandlerEnvironment.json
   "version": "1.0",
   "handlerEnvironment": {
     "logFolder": "<your log folder location>",
+    "eventFolder": "<your event folder location>",
     "configFolder": "<your config folder location>",
     "statusFolder": "<your status folder location>",
     "heartbeatFile": "<your heartbeat file location>",
@@ -53,6 +54,7 @@ Example Status Report:
 
 import os
 import os.path
+import shlex
 import sys
 import re
 try:
@@ -77,6 +79,9 @@ import platform
 import subprocess
 import datetime
 import Utils.Status
+from Utils.EventLoggerUtil import EventLogger
+from Utils.LogHelper import LoggingLevel, LoggingConstants, FileHelpers
+from Utils.DistroUtil import read_os_release
 from MachineIdentity import MachineIdentity
 import ExtensionErrorCodeHelper
 import traceback
@@ -105,10 +110,16 @@ class HandlerUtility:
         self.partitioncount = 0
         self.logging_file = None
         self.pre_post_enabled = False
+        self.severity_level = self.get_severity_level()
+        self.event_dir = None
+        self.eventlogger = None
+        self.operation = None
 
     def _get_log_prefix(self):
         return '[%s-%s]' % (self._context._name, self._context._version)
 
+    # Look through all .settings files in the config folder and,
+    # Retrieve the most recent modified file's seq#
     def _get_current_seq_no(self, config_folder):
         seq_no = -1
         cur_seq_no = -1
@@ -143,7 +154,12 @@ class HandlerUtility:
         if(current_seq == last_seq):
             self.log("the sequence number are same, so skip, current:" + str(current_seq) + "== last:" + str(last_seq))
             self.update_settings_file()
+            if(self.eventlogger is not None):
+                self.eventlogger.dispose()
             sys.exit(0)
+
+    def set_event_logger(self, eventlogger):
+        self.eventlogger = eventlogger
 
     def log(self, message,level='Info'):
         try:
@@ -152,7 +168,7 @@ class HandlerUtility:
             pass
         except Exception as e:
             try:
-                errMsg='Exception in hutil.log'
+                errMsg = str(e) + 'Exception in hutil.log'
                 self.log_with_no_try_except(errMsg, 'Warning')
             except Exception as e:
                 pass
@@ -163,17 +179,21 @@ class HandlerUtility:
             if sys.version_info > (3,):
                 if self.logging_file is not None:
                     self.log_py3(message)
+                    if self.eventlogger != None:
+                        self.eventlogger.trace_message(level, message)
                 else:
                     pass
             else:
                 self._log(self._get_log_prefix() + message)
-            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , message)
+                if self.eventlogger != None:
+                    self.eventlogger.trace_message(level, message)
+            message = "{0}  {1}  {2} \n".format(str(datetime.datetime.utcnow()) , level , message)
         self.log_message = self.log_message + message
 
     def log_py3(self, msg):
         if type(msg) is not str:
             msg = str(msg, errors="backslashreplace")
-        msg = str(datetime.datetime.now()) + " " + str(self._get_log_prefix()) + msg + "\n"
+        msg = str(datetime.datetime.utcnow()) + " " + str(self._get_log_prefix()) + msg + "\n"
         try:
             with open(self.logging_file, "a+") as C :
                 C.write(msg)
@@ -186,14 +206,75 @@ class HandlerUtility:
     def fetch_log_message(self):
         return self.log_message
 
+    def _decrypt_protected_settings(self, encrypted_file, cert_path, pkey_path):
+        """
+        Decrypt protected settings with FIPS 140-3 AES256 support and defensive fallback.
+        
+        For FIPS 140-3 compliance, CRP is upgrading encryption to AES256. Opted-in VMs receive
+        protected settings encrypted with AES256, while other VMs continue using DES_EDE3_CBC.
+        
+        The 'cms' command supports both AES256 and DES_EDE3_CBC encryption, while 'smime' only
+        supports DES_EDE3_CBC. We try 'cms' first and fallback to 'smime' for compatibility.
+        
+        Args:
+            encrypted_file: Path to temporary file containing encrypted settings
+            cert_path: Path to certificate file (.crt)
+            pkey_path: Path to private key file (.prv)
+            
+        Returns:
+            Decrypted cleartext string
+        """
+        cleartxt = None
+        
+        # Determine base64 decode command based on platform
+        if 'NS-BSD' in platform.system():
+            # base64 tool is not available with NSBSD, use openssl
+            base64_cmd = self.patching.openssl_path + " base64 -d -A -in " + encrypted_file
+        else:
+            base64_cmd = self.patching.base64_path + " -d " + encrypted_file
+        
+        # Try OpenSSL CMS command first (supports both AES256 and DES_EDE3_CBC)
+        try:
+            cms_cmd = base64_cmd + " | " + self.patching.openssl_path + " cms -inform DER -decrypt -recip " + cert_path + " -inkey " + pkey_path
+            self.log("Attempting decryption using OpenSSL CMS command (supports AES256 and DES_EDE3_CBC)")
+            result = waagent.RunGetOutput(cms_cmd, chk_err=False, log_cmd=False)
+            if result[0] == 0 and result[1]:  # Success (return code 0) and non-empty output
+                cleartxt = result[1]
+                self.log("Successfully decrypted protected settings using CMS command")
+                return cleartxt
+            else:
+                self.log("CMS decryption failed with return code: " + str(result[0]) + ", attempting fallback to SMIME")
+        except Exception as e:
+            self.log("CMS decryption failed with exception: " + type(e).__name__ + ", attempting fallback to SMIME")
+        
+        # Fallback to OpenSSL SMIME command (supports DES_EDE3_CBC only)
+        try:
+            smime_cmd = base64_cmd + " | " + self.patching.openssl_path + " smime -inform DER -decrypt -recip " + cert_path + " -inkey " + pkey_path
+            self.log("Attempting decryption using OpenSSL SMIME command (fallback - supports DES_EDE3_CBC only)")
+            result = waagent.RunGetOutput(smime_cmd, chk_err=False, log_cmd=False)
+            if result[0] == 0 and result[1]:  # Success (return code 0) and non-empty output
+                cleartxt = result[1]
+                self.log("Successfully decrypted protected settings using SMIME command (fallback)")
+                return cleartxt
+            else:
+                self.error("SMIME decryption also failed with return code: " + str(result[0]))
+        except Exception as e:
+            self.error("SMIME decryption failed with exception: " + type(e).__name__)
+        
+        # If both methods fail, raise an error
+        if not cleartxt:
+            self.error("Failed to decrypt protected settings using both CMS and SMIME commands")
+            
+        return cleartxt
+
     def _parse_config(self, ctxt):
         config = None
         try:
             config = json.loads(ctxt)
         except:
-            self.error('JSON exception decoding ' + ctxt)
+            self.error('JSON exception decoding settings file')
         if config == None:
-            self.error("JSON error processing settings file:" + ctxt)
+            self.error('JSON error processing settings file')
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
             if 'protectedSettings' in handlerSettings and \
@@ -208,23 +289,27 @@ class HandlerUtility:
                 f.close()
                 waagent.SetFileContents(f.name,config['runtimeSettings'][0]['handlerSettings']['protectedSettings'])
                 cleartxt = None
-                if 'NS-BSD' in platform.system():
-                    # base64 tool is not available with NSBSD, use openssl
-                    cleartxt = waagent.RunGetOutput(self.patching.openssl_path + " base64 -d -A -in " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
-                else:
-                    cleartxt = waagent.RunGetOutput(self.patching.base64_path + " -d " + f.name + " | " + self.patching.openssl_path + " smime  -inform DER -decrypt -recip " + cert + "  -inkey " + pkey)[1]
+                # Decrypt protected settings with FIPS 140-3 AES256 support and defensive fallback
+                # Try cms command first (supports both AES256 and DES_EDE3_CBC), fallback to smime if needed
+                cleartxt = self._decrypt_protected_settings(f.name, cert, pkey)
                 jctxt = {}
                 try:
                     jctxt = json.loads(cleartxt)
+                    self.log('Config decoded correctly.')
                 except:
-                    self.error('JSON exception decoding ' + cleartxt)
+                    self.error('JSON exception decoding decrypted protected settings')
                 handlerSettings['protectedSettings'] = jctxt
-                self.log('Config decoded correctly.')
+                # cleaning/removing the temp files created
+                try:
+                    if os.path.isfile(f.name):
+                        os.remove(f.name)
+                except Exception as e:
+                    self.log('Failed to remove the temporary file ' + str(e))
         return config
 
-    def do_parse_context(self, operation):
+    def do_parse_context(self, operation, seqNo):
         self.operation = operation
-        _context = self.try_parse_context()
+        _context = self.try_parse_context(seqNo)
         getWaagentPathUsed = Utils.WAAgentUtil.GetPathUsed()
         if(getWaagentPathUsed == 0):
             self.log("waagent old path is used")
@@ -232,16 +317,19 @@ class HandlerUtility:
             self.log("waagent new path is used")
         if not _context:
             self.log("maybe no new settings file found")
+            if(self.eventlogger is not None):
+                self.eventlogger.dispose()
             sys.exit(0)
         return _context
 
-    def try_parse_context(self):
+    def try_parse_context(self, seqNo):
         self._context = HandlerContext(self._short_name)
         handler_env = None
         config = None
         ctxt = None
         code = 0
         try:
+            self.log('try_parse_context : Sequence Number received ' + str(seqNo))
             # get the HandlerEnvironment.json.  According to the extension handler
             # spec, it is always in the ./ directory
             self.log('cwd is ' + os.path.realpath(os.path.curdir))
@@ -269,14 +357,30 @@ class HandlerUtility:
             self.logging_file=self._context._log_file
             self._context._shell_log_file = os.path.join(handler_env['handlerEnvironment']['logFolder'],'shell.log')
             self._change_log_file()
+            try:
+                if(self.get_intvalue_from_configfile("disable_logging", 0) == 0):
+                    self._context._event_dir = handler_env['handlerEnvironment']['eventsFolder']
+                    self.event_dir = self._context._event_dir
+            except Exception as e:
+                self._context._event_dir = None
+                self.event_dir = None
+                errorMsg = 'The eventsFolder field is missing in handlerEnvironment.json file. Hence skipping event logging!'
+                self.log(errorMsg, 'Error')
+                self.log(repr(e), 'Error')
             self._context._status_dir = handler_env['handlerEnvironment']['statusFolder']
             self._context._heartbeat_file = handler_env['handlerEnvironment']['heartbeatFile']
-            self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
+            if seqNo != -1:
+                self._context._seq_no = seqNo
+            else:
+                self._context._seq_no = self._get_current_seq_no(self._context._config_dir)
             if self._context._seq_no < 0:
                 self.error("Unable to locate a .settings file!")
                 return None
             self._context._seq_no = str(self._context._seq_no)
-            self.log('sequence number is ' + self._context._seq_no)
+            if seqNo != -1:
+                self.log('sequence number from environment variable is ' + self._context._seq_no)
+            else:
+                self.log('sequence number based on config file-names is ' + self._context._seq_no)
             self._context._status_file = os.path.join(self._context._status_dir, self._context._seq_no + '.status')
             self._context._settings_file = os.path.join(self._context._config_dir, self._context._seq_no + '.settings')
             self.log("setting file path is" + self._context._settings_file)
@@ -319,6 +423,7 @@ class HandlerUtility:
     isanysnapshotfailed = False
     UploadStatusAndLog = True
     WriteLog = True
+    onlyLocalFilesystems = True
 
     seqsnapshot valid values(0-> parallel snapshot, 1-> programatically set sequential snapshot , 2-> customer set it for sequential snapshot)
     '''
@@ -332,7 +437,7 @@ class HandlerUtility:
                 config = ConfigParsers.ConfigParser()
                 config.read(configfile)
                 if config.has_option('SnapshotThread',key):
-                    value = config.get('SnapshotThread',key)
+                    value = config.get('SnapshotThread',key)  
         except Exception as e:
             pass
 
@@ -394,6 +499,7 @@ class HandlerUtility:
     def get_machine_id(self):
         machine_id_file = "/etc/azure/machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123358B"
         machine_id = ""
+        file_pointer = None
         try:
             if not os.path.exists(os.path.dirname(machine_id_file)):
                 os.makedirs(os.path.dirname(machine_id_file))
@@ -402,79 +508,25 @@ class HandlerUtility:
                 file_pointer = open(machine_id_file, "r")
                 machine_id = file_pointer.readline()
                 file_pointer.close()
+             
             else:
                 mi = MachineIdentity()
-                machine_id = mi.stored_identity()[1:-1]
-                file_pointer = open(machine_id_file, "w")
-                file_pointer.write(machine_id)
-                file_pointer.close()
+                if(mi.stored_identity() != None):
+                    machine_id = mi.stored_identity()[1:-1]
+                    file_pointer = open(machine_id_file, "w")
+                    file_pointer.write(machine_id)
+                    file_pointer.close()
         except Exception as e:
             errMsg = 'Failed to retrieve the unique machine id with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg, 'Error')
+        finally :
+            if file_pointer != None :
+                if file_pointer.closed == False :
+                    file_pointer.close()
  
         self.log("Unique Machine Id  : {0}".format(machine_id))
         return machine_id
 
-    def get_total_used_size(self):
-        try:
-            df = subprocess.Popen(["df" , "-k" , "--output=source,fstype,size,used,avail,pcent,target"], stdout=subprocess.PIPE)
-            '''
-            Sample output of the df command
-
-            Filesystem                                              Type     1K-blocks    Used    Avail Use% Mounted on
-            /dev/sda2                                               xfs       52155392 3487652 48667740   7% /
-            devtmpfs                                                devtmpfs   7170976       0  7170976   0% /dev
-            tmpfs                                                   tmpfs      7180624       0  7180624   0% /dev/shm
-            tmpfs                                                   tmpfs      7180624  760496  6420128  11% /run
-            tmpfs                                                   tmpfs      7180624       0  7180624   0% /sys/fs/cgroup
-            /dev/sda1                                               ext4        245679  151545    76931  67% /boot
-            /dev/sdb1                                               ext4      28767204 2142240 25140628   8% /mnt/resource
-            /dev/mapper/mygroup-thinv1                              xfs        1041644   33520  1008124   4% /bricks/brick1
-            /dev/mapper/mygroup-85197c258a54493da7880206251f5e37_0  xfs        1041644   33520  1008124   4% /run/gluster/snaps/85197c258a54493da7880206251f5e37/brick2
-            /dev/mapper/mygroup2-thinv2                             xfs       15717376 5276944 10440432  34% /tmp/test
-            /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0 xfs       15717376 5276944 10440432  34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
-            tmpfs                                                   tmpfs      1436128       0  1436128   0% /run/user/1000
-            //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
-
-            '''
-            process_wait_time = 30
-            while(process_wait_time >0 and df.poll() is None):
-                time.sleep(1)
-                process_wait_time -= 1
-
-            output = df.stdout.read()
-            output = output.split("\n")
-            total_used = 0
-            total_used_network_shares = 0
-            total_used_gluster = 0
-            network_fs_types = []
-            for i in range(1,len(output)-1):
-                device, fstype, size, used, available, percent, mountpoint = output[i].split()
-                self.log("Device name : {0} fstype : {1} size : {2} used space in KB : {3} available space : {4} mountpoint : {5}".format(device,fstype,size,used,available,mountpoint))
-                if "fuse" in fstype.lower() or "nfs" in fstype.lower() or "cifs" in fstype.lower():
-                    if fstype not in network_fs_types :
-                        network_fs_types.append(fstype)
-                    self.log("Not Adding as network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype))
-                    total_used_network_shares = total_used_network_shares + int(used)
-                elif (mountpoint.startswith('/run/gluster/snaps/')):
-                    self.log("Not Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
-                    total_used_gluster = total_used_gluster + int(used)
-                else:
-                    self.log("Adding Device name : {0} used space in KB : {1} mount point : {2}".format(device,used,mountpoint))
-                    total_used = total_used + int(used) #return in KB
-
-            if not len(network_fs_types) == 0:
-                HandlerUtility.add_to_telemetery_data("networkFSTypeInDf",str(network_fs_types))
-                HandlerUtility.add_to_telemetery_data("totalUsedNetworkShare",str(total_used_network_shares))
-                self.log("Total used space in Bytes of network shares : {0}".format(total_used_network_shares * 1024))
-            if total_used_gluster !=0 :
-                HandlerUtility.add_to_telemetery_data("glusterFSSize",str(total_used_gluster))
-            self.log("Total used space in Bytes : {0}".format(total_used * 1024))
-            return total_used * 1024,False #Converting into Bytes
-        except Exception as e:
-            errMsg = 'Unable to fetch total used space with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.log(errMsg)
-            return 0,True
 
     def get_storage_details(self,total_size,failure_flag):
         self.storageDetailsObj = Utils.Status.StorageDetails(self.partitioncount, total_size, False, failure_flag)
@@ -535,13 +587,7 @@ class HandlerUtility:
         try:
             cur_dir = os.getcwd()
             os.chdir("..")
-            p = subprocess.Popen(['/usr/sbin/waagent', '-version'], stdout=subprocess.PIPE)
-            process_wait_time = 30
-            while(process_wait_time > 0 and p.poll() is None):
-                time.sleep(1)
-                process_wait_time -= 1
-            out = p.stdout.read()
-            out = str(out)
+            out = self.command_output_from_subprocess(['/usr/sbin/waagent', '-version'],30)
             if "Goal state agent: " in out:
                  waagent_version = out.split("Goal state agent: ")[1].strip()
             else:
@@ -561,10 +607,10 @@ class HandlerUtility:
     def get_dist_info(self):
         try:
             if 'FreeBSD' in platform.system():
-                release = re.sub('\-.*\Z', '', str(platform.release()))
+                release = re.sub('\\-.*$', '', str(platform.release()))
                 return "FreeBSD",release
             if 'NS-BSD' in platform.system():
-                release = re.sub('\-.*\Z', '', str(platform.release()))
+                release = re.sub('\\-.*$', '', str(platform.release()))
                 return "NS-BSD", release
             if 'linux_distribution' in dir(platform):
                 distinfo = list(platform.linux_distribution(full_distribution_name=0))
@@ -582,8 +628,11 @@ class HandlerUtility:
                 distinfo[0] = distinfo[0].strip()
                 return  distinfo[0]+"-"+distinfo[1],platform.release()
             else:
-                distinfo = platform.dist()
-                return  distinfo[0]+"-"+distinfo[1],platform.release()
+                # platform.dist() removed in Python 3.8; parse /etc/os-release instead
+                osr = read_os_release()
+                if osr:
+                    return osr.get("NAME", "Unknown") + "-" + osr.get("VERSION", "Unknown"), platform.release()
+                return "Unknown", "Unknown"
         except Exception as e:
             errMsg = 'Failed to retrieve the distinfo with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
@@ -604,6 +653,10 @@ class HandlerUtility:
     def add_to_telemetery_data(key,value):
         HandlerUtility.telemetry_data[key]=value
 
+    @staticmethod
+    def get_telemetry_data(key):
+        return HandlerUtility.telemetry_data[key]
+    
     def add_telemetry_data(self):
         os_version,kernel_version = self.get_dist_info()
         workloads = self.get_workload_running()
@@ -623,7 +676,7 @@ class HandlerUtility:
             HandlerUtility.serializable_telemetry_data.append(each_telemetry_data)
  
     def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None,total_size = 0,failure_flag = True ):
-        self.log("{0},{1},{2},{3}".format(operation, status, status_code, message))
+        self.log("{0},{1},{2},{3},{4}".format(operation, status, status_code, message, failure_flag ))
         sub_stat = []
         stat_rept = []
         self.add_telemetry_data()
@@ -655,7 +708,7 @@ class HandlerUtility:
                 consistencyTypeStr = CommonVariables.consistency_none
         HandlerUtility.add_to_telemetery_data("consistencyType", consistencyTypeStr)
 
-        extensionResponseObj = Utils.Status.ExtensionResponse(message, self.SnapshotConsistency, "")
+        extensionResponseObj = Utils.Status.ExtensionResponse(message, self.SnapshotConsistency, "", failure_flag)
         message = str(json.dumps(extensionResponseObj, cls = ComplexEncoder))
 
         self.convert_telemetery_data_to_bcm_serializable_format()
@@ -666,8 +719,9 @@ class HandlerUtility:
         stat_rept.timestampUTC = date_place_holder
         date_string = r'\/Date(' + str((int)(time_span)) + r')\/'
         stat_rept = "[" + json.dumps(stat_rept, cls = ComplexEncoder) + "]"
+        stat_rept = stat_rept.replace('\\\/', '\/') # To fix the datetime format of CreationTime to be consumed by C# DateTimeOffset
         stat_rept = stat_rept.replace(date_place_holder,date_string)
-        
+
         # Add Status as sub-status for Status to be written on Status-File
         sub_stat = self.substat_new_entry(sub_stat,'0',stat_rept,'success',None)
         if self.get_public_settings()[CommonVariables.vmType].lower() == CommonVariables.VmTypeV2.lower() and CommonVariables.isTerminalStatus(status) :
@@ -683,9 +737,11 @@ class HandlerUtility:
 
     def write_to_status_file(self, stat_rept_file):
         try:
+            tempStatusFile =  os.path.join(self._context._status_dir, CommonVariables.TempStatusFileName)
             if self._context._status_file:
-                with open(self._context._status_file,'w+') as f:
+                with open(tempStatusFile,'w+') as f:
                     f.write(stat_rept_file)
+                os.rename(tempStatusFile, self._context._status_file)
         except Exception as e:
             errMsg = 'Status file creation failed with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
             self.log(errMsg)
@@ -700,25 +756,38 @@ class HandlerUtility:
             self.log("exception is getting status file" + traceback.format_exc())
             return False
 
+    # Rename all .settings and .status files that do not belong to current seq# with '_' suffix
+    # Clear older files in the respective directories
     def backup_settings_status_file(self, _seq_no):
         self.log("current seq no is " + _seq_no)
+        file_extn_settings = '.settings'
+        file_extn_status = '.status'
+        maxLimitOfFiles = 60
         for subdir, dirs, files in os.walk(self._context._config_dir):
             for file in files:
                 try:
-                    if(file.endswith('.settings') and file != (_seq_no + ".settings")):
+                    if(file.endswith(file_extn_settings) and file != (_seq_no + file_extn_settings)):
                         new_file_name = file.replace(".","_")
                         os.rename(join(self._context._config_dir,file), join(self._context._config_dir,new_file_name))
                 except Exception as e:
                     self.log("failed to rename the status file.")
+                try:
+                    FileHelpers.clearOldFilesInDirectory(self._context._config_dir, '_settings', maxLimitOfFiles)
+                except Exception as e:
+                    pass  # Ignore the exception in clearing old files and continue
 
         for subdir, dirs, files in os.walk(self._context._status_dir):
             for file in files:
                 try:
-                    if(file.endswith('.status') and file != (_seq_no + ".status")):
+                    if(file.endswith(file_extn_status) and file != (_seq_no + file_extn_status)):
                         new_file_name = file.replace(".","_")
                         os.rename(join(self._context._status_dir,file), join(self._context._status_dir, new_file_name))
                 except Exception as e:
                     self.log("failed to rename the status file.")
+                try:
+                    FileHelpers.clearOldFilesInDirectory(self._context._status_dir, '_status', maxLimitOfFiles)
+                except Exception as e:
+                    pass  # Ignore the exception in clearing old files and continue
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
@@ -726,6 +795,8 @@ class HandlerUtility:
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
+        if(self.eventlogger is not None):
+            self.eventlogger.dispose()
         sys.exit(exit_code)
 
     def get_handler_settings(self):
@@ -811,6 +882,40 @@ class HandlerUtility:
         
     def set_pre_post_enabled(self):
         self.pre_post_enabled = True
+
+    def command_output_from_subprocess(self , args, process_wait_time):
+        process_out = subprocess.Popen(args, stdout=subprocess.PIPE)
+        while(process_wait_time > 0 and process_out.poll() is None):
+            time.sleep(1)
+            process_wait_time -= 1
+        out = process_out.stdout.read().decode()
+        out = str(out)
+        return out
+
+    def get_severity_level(self):
+        logging_level = LoggingLevel(LoggingConstants.DefaultEventLogLevel)
+        try:
+            log_setting_file_path = os.path.join(os.getcwd(), "main", LoggingConstants.LogLevelSettingFile)
+            if os.path.exists(log_setting_file_path):
+                with open(log_setting_file_path, 'r') as file:
+                    logging_level_input = json.load(file)
+                    logging_level.__dict__.update(logging_level_input)
+            else:
+                self.log("Logging level setting file is not present.")
+        except Exception as e:
+            self.log("error in fetching the severity of logs " + str(e))
+        return logging_level.EventLogLevel
+
+    @staticmethod
+    def split(logger,txt):
+        result = None
+        try:
+            result = shlex.split(txt)
+        except Exception as e:
+            logger.log('Shlex.Split threw exception error: %s, stack trace: %s' % (str(e), traceback.format_exc()))
+            result = txt.split()
+        return result
+
         
     @staticmethod
     def convert_to_string(txt):
@@ -819,6 +924,18 @@ class HandlerUtility:
         else:
             txt = str(txt)
         return txt
+    
+    def redact_sensitive_encryption_details(self, request_body):
+        try:
+            meta_list = getattr(request_body, "snapshotMetadata", None)
+            for meta in meta_list:
+                if meta.get("Key") == "DiskEncryptionSettings":
+                    # Redact the entire value of DiskEncryptionSettings
+                    meta["Value"] = "REDACTED"
+            return request_body
+        except Exception as e:
+            self.log("Error while redacting: {0}".format(str(e)), 'Error')
+            return request_body
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -826,4 +943,3 @@ class ComplexEncoder(json.JSONEncoder):
             return obj.convertToDictionary()
         else:
             return obj.__dict__
-

@@ -54,11 +54,16 @@ Example Status Report:
 import os
 import os.path
 import sys
-import imp
 import base64
 import json
 import time
 import re
+import subprocess
+# imp was deprecated in python 3.12
+if sys.version_info >= (3, 12):
+    import importlib
+else:
+    import imp
 
 from xml.etree import ElementTree
 from os.path import join
@@ -167,8 +172,8 @@ class HandlerUtility:
 
     @staticmethod
     def redact_protected_settings(content):
-        redacted_tmp = re.sub('"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
-        redacted = re.sub('"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
+        redacted_tmp = re.sub(r'"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
+        redacted = re.sub(r'"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
         return redacted
 
     def _parse_config(self, ctxt):
@@ -191,16 +196,39 @@ class HandlerUtility:
                 cert = waagent.LibDir + '/' + thumb + '.crt'
                 pkey = waagent.LibDir + '/' + thumb + '.prv'
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
-                openSSLcmd = "openssl smime -inform DER -decrypt -recip {0} -inkey {1}"
-                cleartxt = waagent.RunSendStdin(openSSLcmd.format(cert, pkey), unencodedSettings)[1]
-                if cleartxt is None:
-                    self.error("OpenSSL decode error using  thumbprint " + thumb)
-                    self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
+
+                # FIPS 140-3: use 'openssl cms' (supports AES256 & DES_EDE3_CBC) with fallback to legacy 'openssl smime'
+                cms_cmd = 'openssl cms -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
+                smime_cmd = 'openssl smime -inform DER -decrypt -recip {0} -inkey {1}'.format(cert,pkey)
+
+                protected_settings_str = ''
+                for decrypt_cmd in [cms_cmd, smime_cmd]:
+                    try:
+                        # waagent.RunSendStdin returns a tuple (return code, stdout)
+                        output = waagent.RunSendStdin(decrypt_cmd, unencodedSettings)
+                        if output and output[0] == 0 and output[1]:
+                            protected_settings_str = output[1]
+                            if decrypt_cmd == cms_cmd:
+                                self.log('Decrypted protectedSettings using openssl cms.')
+                            else:
+                                self.log('Decrypted protectedSettings using openssl smime fallback.')
+                            break
+                        else:
+                            rc = output[0] if output else 'N/A'
+                            self.log('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, rc))
+                    except OSError:
+                        pass
+
                 jctxt = ''
                 try:
-                    jctxt = json.loads(cleartxt)
-                except:
-                    self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(cleartxt))
+                    jctxt = json.loads(protected_settings_str)
+                except Exception as e:
+                    # Do not log protected_settings_str here: it is the decrypted
+                    # plaintext of protectedSettings and may contain secrets (e.g.
+                    # workspace keys). redact_protected_settings() only knows how to
+                    # redact the outer (still-encrypted) envelope fields, so it would
+                    # not mask secrets that live inside this already-decrypted payload.
+                    self.error('JSON exception decoding protectedSettings: {0}'.format(e))
                 handlerSettings['protectedSettings']=jctxt
                 self.log('Config decoded correctly.')
         return config

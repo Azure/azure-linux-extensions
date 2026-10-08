@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import os
+import pwd
 import re
 import shutil
 import sys
@@ -35,12 +36,26 @@ import Utils.ovfutils as ovf_utils
 ExtensionShortName = 'VMAccess'
 BeginCertificateTag = '-----BEGIN CERTIFICATE-----'
 EndCertificateTag = '-----END CERTIFICATE-----'
+BeginSSHTag = '---- BEGIN SSH2 PUBLIC KEY ----'
 OutputSplitter = ';'
 SshdConfigPath = '/etc/ssh/sshd_config'
+SshdConfigBackupPath = '/var/cache/vmaccess/backup'
 
 # overwrite the default logger
 logger.global_shared_context_logger = logger.Logger('/var/log/waagent.log', '/dev/stdout')
 
+def get_os_name():
+    if os.path.isfile(constants.os_release):
+        return ext_utils.get_line_starting_with("NAME", constants.os_release)
+    elif os.path.isfile(constants.system_release):
+        return ext_utils.get_file_contents(constants.system_release)
+    return None
+
+def get_linux_agent_conf_filename(os_name):
+    if os_name is not None:
+        if re.search("coreos", os_name, re.IGNORECASE) or re.search("flatcar", os_name, re.IGNORECASE):
+            return "/usr/share/oem/waagent.conf"
+    return "/etc/waagent.conf"
 
 class ConfigurationProvider(object):
     """
@@ -50,11 +65,16 @@ class ConfigurationProvider(object):
     def __init__(self, wala_config_file):
         self.values = dict()
         if not os.path.isfile(wala_config_file):
-            raise ValueError("Missing configuration in {0}".format(wala_config_file))
+            logger.warning("Missing configuration in {0}, setting default values for PasswordCryptId and PasswordCryptSaltLength".format(wala_config_file))
+            self.values["Provisioning.PasswordCryptId"] = "6"
+            self.values["Provisioning.PasswordCryptSaltLength"] = 10
+            return
         try:
             for line in ext_utils.get_file_contents(wala_config_file).split('\n'):
                 if not line.startswith("#") and "=" in line:
                     parts = line.split()[0].split('=')
+                    if len(parts) < 2:
+                        continue
                     value = parts[1].strip("\" ")
                     if value != "None":
                         self.values[parts[0]] = value
@@ -84,8 +104,9 @@ class ConfigurationProvider(object):
             return False
 
 
-Configuration = ConfigurationProvider("/etc/waagent.conf")
-MyDistro = dist_utils.get_my_distro(Configuration)
+OSName = get_os_name()
+Configuration = ConfigurationProvider(get_linux_agent_conf_filename(OSName))
+MyDistro = dist_utils.get_my_distro(Configuration, OSName)
 
 
 def main():
@@ -93,25 +114,11 @@ def main():
 
     try:
         for a in sys.argv[1:]:
-            if re.match("^([-/]*)(disable)", a):
-                disable()
-            elif re.match("^([-/]*)(uninstall)", a):
-                uninstall()
-            elif re.match("^([-/]*)(install)", a):
-                install()
-            elif re.match("^([-/]*)(enable)", a):
+            if re.match("^([-/]*)(enable)", a):
                 enable()
-            elif re.match("^([-/]*)(update)", a):
-                update()
     except Exception as e:
         err_msg = "Failed with error: {0}, {1}".format(e, traceback.format_exc())
         logger.error(err_msg)
-
-
-def install():
-    hutil = handler_util.HandlerUtility()
-    hutil.do_parse_context('Install')
-    hutil.do_exit(0, 'Install', 'success', '0', 'Install Succeeded')
 
 
 def enable():
@@ -122,10 +129,12 @@ def enable():
 
         reset_ssh = None
         remove_user = None
+        restore_backup_ssh = None
         protect_settings = hutil.get_protected_settings()
         if protect_settings:
-            reset_ssh = protect_settings.get('reset_ssh')
+            reset_ssh = protect_settings.get('reset_ssh', False)
             remove_user = protect_settings.get('remove_user')
+            restore_backup_ssh = protect_settings.get('restore_backup_ssh', False)
 
         if remove_user and _is_sshd_config_modified(protect_settings):
             ext_utils.add_extension_event(name=hutil.get_name(),
@@ -136,15 +145,12 @@ def enable():
 
         _forcibly_reset_chap(hutil)
 
-        if _is_sshd_config_modified(protect_settings):
-            _backup_sshd_config(SshdConfigPath)
-
-        if reset_ssh:
+        if reset_ssh or restore_backup_ssh:
             _open_ssh_port()
             hutil.log("Succeeded in check and open ssh port.")
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="reset-ssh")
-            _reset_sshd_config(SshdConfigPath)
-            hutil.log("Succeeded in reset sshd_config.")
+            _reset_sshd_config(hutil, restore_backup_ssh)
+            hutil.log("Succeeded in {0} sshd_config.".format("resetting" if reset_ssh else "restoring"))
 
         if remove_user:
             ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True, message="remove-user")
@@ -165,42 +171,15 @@ def enable():
 
 def _forcibly_reset_chap(hutil):
     name = "ChallengeResponseAuthentication"
-    config = ext_utils.get_file_contents(SshdConfigPath).split("\n")
-    for i in range(0, len(config)):
-        if config[i].startswith(name) and "no" in config[i].lower():
-            ext_utils.add_extension_event(name=hutil.get_name(), op="sshd", is_success=True,
-                                          message="ChallengeResponseAuthentication no")
-            return
-
-    ext_utils.add_extension_event(name=hutil.get_name(), op="sshd", is_success=True,
-                                  message="ChallengeResponseAuthentication yes")
-    _backup_sshd_config(SshdConfigPath)
-    _set_sshd_config(config, name, "no")
-    ext_utils.replace_file_with_contents_atomic(SshdConfigPath, "\n".join(config))
+    _backup_and_update_sshd_config(hutil, name, "no")
     MyDistro.restart_ssh_service()
 
 
 def _is_sshd_config_modified(protected_settings):
-    result = protected_settings.get('reset_ssh') or protected_settings.get('password')
+    if not protected_settings:
+        return False
+    result = protected_settings.get('reset_ssh') or protected_settings.get('restore_backup_ssh') or protected_settings.get('password')
     return result is not None
-
-
-def uninstall():
-    hutil = handler_util.HandlerUtility()
-    hutil.do_parse_context('Uninstall')
-    hutil.do_exit(0, 'Uninstall', 'success', '0', 'Uninstall succeeded')
-
-
-def disable():
-    hutil = handler_util.HandlerUtility()
-    hutil.do_parse_context('Disable')
-    hutil.do_exit(0, 'Disable', 'success', '0', 'Disable Succeeded')
-
-
-def update():
-    hutil = handler_util.HandlerUtility()
-    hutil.do_parse_context('Update')
-    hutil.do_exit(0, 'Update', 'success', '0', 'Update Succeeded')
 
 
 def _remove_user_account(user_name, hutil):
@@ -228,7 +207,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     try:
         ovf_xml = ext_utils.get_file_contents('/var/lib/waagent/ovf-env.xml')
         if ovf_xml is not None:
-            ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration)
+            ovf_env = ovf_utils.OvfEnv.parse(ovf_xml, Configuration, False, False)
     except (EnvironmentError, ValueError, KeyError, AttributeError, TypeError):
         pass
     if ovf_env is None:
@@ -244,6 +223,9 @@ def _set_user_account_pub_key(protect_settings, hutil):
     user_pass = protect_settings.get('password')
     cert_txt = protect_settings.get('ssh_key')
     expiration = protect_settings.get('expiration')
+    remove_prior_keys = protect_settings.get('remove_prior_keys')
+    enable_passwordless_access = protect_settings.get('enable_passwordless_access', False)
+
     no_convert = False
     if not user_pass and not cert_txt and not ovf_env.SshPublicKeys:
         raise Exception("No password or ssh_key is specified.")
@@ -255,7 +237,7 @@ def _set_user_account_pub_key(protect_settings, hutil):
     # Reset user account and password, password could be empty
     sudoers = _get_other_sudoers(user_name)
     error_string = MyDistro.create_account(
-        user_name, user_pass, expiration, None)
+        user_name, user_pass, expiration, None, enable_passwordless_access)
     _save_other_sudoers(sudoers)
 
     if error_string is not None:
@@ -271,11 +253,21 @@ def _set_user_account_pub_key(protect_settings, hutil):
     if user_pass is not None:
         ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                       message="create-user-with-password")
-        _allow_password_auth()
+        _allow_password_auth(hutil)
 
     # Reset ssh key with the new public key passed in or reuse old public key.
     if cert_txt:
-        if cert_txt and cert_txt.strip().lower().startswith("ssh-rsa"):
+        # support for SSH2-compatible format for public keys in addition to OpenSSH-compatible format
+        if cert_txt.strip().startswith(BeginSSHTag):
+            ext_utils.set_file_contents("temp.pub", cert_txt.strip())
+            retcode, output = ext_utils.run_command_get_output(['ssh-keygen', '-i', '-f', 'temp.pub'])
+            if retcode > 0:
+                raise Exception("Failed to convert SSH2 key to OpenSSH key.")
+            hutil.log("Succeeded in converting SSH2 key to OpenSSH key.")
+            cert_txt = output
+            os.remove("temp.pub")
+
+        if cert_txt.strip().lower().startswith("ssh-rsa") or cert_txt.strip().lower().startswith("ssh-ed25519"):
             no_convert = True
         try:
             pub_path = os.path.join('/home/', user_name, '.ssh',
@@ -284,13 +276,21 @@ def _set_user_account_pub_key(protect_settings, hutil):
             if no_convert:
                 if cert_txt:
                     pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
+                    validate_ssh_path(pub_path, user_name)
                     final_cert_txt = cert_txt
                     if not cert_txt.endswith("\n"):
                         final_cert_txt = final_cert_txt + "\n"
-                    ext_utils.append_file_contents(pub_path, final_cert_txt)
+
+                    if remove_prior_keys == True:
+                        safe_write_authorized_keys(pub_path, final_cert_txt, append=False)
+                        hutil.log("Removed prior ssh keys and added new key for user %s" % user_name)
+                    else:
+                        safe_write_authorized_keys(pub_path, final_cert_txt, append=True)
+        
                     MyDistro.set_se_linux_context(
                         pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
-                    ext_utils.change_owner(pub_path, user_name)
+                    p = pwd.getpwnam(user_name)
+                    os.lchown(pub_path, p.pw_uid, p.pw_gid)
                     ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                                   message="create-user")
                     hutil.log("Succeeded in resetting ssh_key.")
@@ -305,17 +305,45 @@ def _set_user_account_pub_key(protect_settings, hutil):
                 # we support PKCS8 certificates besides ssh-rsa public keys
                 _save_cert_str_as_file(cert_txt, 'temp.crt')
                 pub_path = ovf_env.prepare_dir(pub_path, MyDistro)
+                validate_ssh_path(pub_path, user_name)
                 retcode = ext_utils.run_command_and_write_stdout_to_file(
                     [constants.Openssl, 'x509', '-in', 'temp.crt', '-noout', '-pubkey'], "temp.pub")
                 if retcode > 0:
                     raise Exception("Failed to generate public key file.")
 
-                MyDistro.ssh_deploy_public_key('temp.pub', pub_path)
+                # Deploy the converted key to a temp file, then write to
+                # authorized_keys using safe_write to honor remove_prior_keys.
+                MyDistro.ssh_deploy_public_key('temp.pub', 'temp.authorized')
+                deployed_key = ext_utils.get_file_contents('temp.authorized')
+
+                if not deployed_key:
+                    raise Exception("Failed to convert PKCS8 certificate to OpenSSH public key. "
+                                    "ssh-keygen produced no output for the provided certificate.")
+                if not deployed_key.endswith("\n"):
+                    deployed_key += "\n"
+
+                if remove_prior_keys == True:
+                    safe_write_authorized_keys(pub_path, deployed_key, append=False)
+                    hutil.log("Removed prior ssh keys and added new key for user %s" % user_name)
+                else:
+                    safe_write_authorized_keys(pub_path, deployed_key, append=True)
+
+                MyDistro.set_se_linux_context(
+                    pub_path, 'unconfined_u:object_r:ssh_home_t:s0')
+                p = pwd.getpwnam(user_name)
+                os.lchown(pub_path, p.pw_uid, p.pw_gid)
+                os.remove('temp.authorized')
                 os.remove('temp.pub')
                 os.remove('temp.crt')
                 ext_utils.add_extension_event(name=hutil.get_name(), op="scenario", is_success=True,
                                               message="create-user")
                 hutil.log("Succeeded in resetting ssh_key.")
+        except KeyError:
+            ext_utils.add_extension_event(name=hutil.get_name(),
+                                          op=constants.WALAEventOperation.Enable,
+                                          is_success=False,
+                                          message="(02100)Failed to reset ssh key.")
+            raise Exception("User '{0}' does not exist".format(user_name))
         except Exception as e:
             hutil.log(str(e))
             ext_utils.add_extension_event(name=hutil.get_name(),
@@ -330,7 +358,7 @@ def _get_other_sudoers(user_name):
     if not os.path.isfile(sudoers_file):
         return None
     sudoers = ext_utils.get_file_contents(sudoers_file).split("\n")
-    pattern = '^{0}\s'.format(user_name)
+    pattern = r'^{0}\s'.format(user_name)
     sudoers = list(filter(lambda x: re.match(pattern, x) is None, sudoers))
     return sudoers
 
@@ -343,9 +371,34 @@ def _save_other_sudoers(sudoers):
     os.chmod("/etc/sudoers.d/waagent", 0o440)
 
 
-def _allow_password_auth():
-    config = ext_utils.get_file_contents(SshdConfigPath).split("\n")
-    _set_sshd_config(config, "PasswordAuthentication", "yes")
+def _allow_password_auth(hutil):
+    name = "PasswordAuthentication"
+    _backup_and_update_sshd_config(hutil, name, "yes")
+
+    cloudInitConfigPath = "/etc/ssh/sshd_config.d/50-cloud-init.conf"
+    config = ext_utils.get_file_contents(cloudInitConfigPath)
+    if config is not None:
+        config = config.split("\n")
+        _set_sshd_config(config, name, "yes")
+        ext_utils.replace_file_with_contents_atomic(cloudInitConfigPath, "\n".join(config))
+
+
+def _backup_and_update_sshd_config(hutil, attr_name, attr_value):
+    sshd_content = ext_utils.get_file_contents(SshdConfigPath)
+    if sshd_content is None:
+        hutil.log("Unable to read sshd_config at %s" % SshdConfigPath)
+        return
+    config = sshd_content.split("\n")
+
+    for i in range(0, len(config)):
+        if config[i].startswith(attr_name) and attr_value in config[i].lower():
+            hutil.log("%s already set to %s in sshd_config, skip update." % (attr_name, attr_value))
+            return
+
+    hutil.log("Setting %s to %s in sshd_config." % (attr_name, attr_value))
+    
+    _backup_sshd_config(hutil)
+    _set_sshd_config(config, attr_name, attr_value)
     ext_utils.replace_file_with_contents_atomic(SshdConfigPath, "\n".join(config))
 
 
@@ -367,35 +420,34 @@ def _set_sshd_config(config, name, val):
 
 
 def _get_default_ssh_config_filename():
-    if os.path.isfile(constants.os_release):
-        os_name = ext_utils.get_line_starting_with("NAME", constants.os_release)
-    elif os.path.isfile(constants.system_release):
-        os_name = ext_utils.get_file_contents(constants.system_release)
-    else:
-        return "default"
-    if os_name is not None:
+    if OSName is not None:
         # the default ssh config files are present in
         # /var/lib/waagent/Microsoft.OSTCExtensions.VMAccessForLinux-<version>/resources/
-        if re.search("centos", os_name, re.IGNORECASE):
+        if re.search("centos", OSName, re.IGNORECASE):
             return "centos_default"
-        if re.search("debian", os_name, re.IGNORECASE):
+        if re.search("debian", OSName, re.IGNORECASE):
             return "debian_default"
-        if re.search("fedora", os_name, re.IGNORECASE):
+        if re.search("fedora", OSName, re.IGNORECASE):
             return "fedora_default"
-        if re.search("red\s?hat", os_name, re.IGNORECASE):
+        if re.search(r"red\s?hat", OSName, re.IGNORECASE):
             return "redhat_default"
-        if re.search("suse", os_name, re.IGNORECASE):
+        if re.search("suse", OSName, re.IGNORECASE):
             return "SuSE_default"
-        if re.search("ubuntu", os_name, re.IGNORECASE):
+        if re.search("ubuntu", OSName, re.IGNORECASE):
             return "ubuntu_default"
-        return "default"
+    return "default"
 
 
-def _reset_sshd_config(sshd_file_path):
+def _reset_sshd_config(hutil, restore_backup_ssh):
     ssh_default_config_filename = _get_default_ssh_config_filename()
     ssh_default_config_file_path = os.path.join(os.getcwd(), 'resources', ssh_default_config_filename)
-    if not (os.path.exists(ssh_default_config_file_path)):
+
+    if not os.path.exists(ssh_default_config_file_path):
         ssh_default_config_file_path = os.path.join(os.getcwd(), 'resources', 'default')
+
+    if restore_backup_ssh:
+        if os.path.exists(SshdConfigBackupPath):
+            ssh_default_config_file_path = SshdConfigBackupPath
 
     # handle CoreOS differently
     if isinstance(MyDistro, dist_utils.CoreOSDistro):
@@ -417,7 +469,7 @@ def _reset_sshd_config(sshd_file_path):
 
         # Overwrite /etc/ssh/sshd_config
         cfg_content += "write_files:\n"
-        cfg_content += "  - path: {0}\n".format(sshd_file_path)
+        cfg_content += "  - path: {0}\n".format(SshdConfigPath)
         cfg_content += "    permissions: 0600\n"
         cfg_content += "    owner: root:root\n"
         cfg_content += "    content: |\n"
@@ -439,18 +491,27 @@ def _reset_sshd_config(sshd_file_path):
         ext_utils.run(['coreos-cloudinit', '-from-file', cfg_tempfile], chk_err=False)
         os.remove(cfg_tempfile)
     else:
-        shutil.copyfile(ssh_default_config_file_path, sshd_file_path)
+        shutil.copyfile(ssh_default_config_file_path, SshdConfigPath)
+        if ssh_default_config_file_path == SshdConfigBackupPath:
+            hutil.log("sshd_config restored from backup, remove backup file.")
+            # Remove backup config once sshd_config restored
+            os.remove(ssh_default_config_file_path)
         MyDistro.restart_ssh_service()
 
 
-def _backup_sshd_config(sshd_file_path):
-    if os.path.exists(sshd_file_path):
-        backup_file_name = '%s_%s' % (
-            sshd_file_path, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+def _backup_sshd_config(hutil):
+    if os.path.exists(SshdConfigPath) and not os.path.exists(SshdConfigBackupPath):
+        # Create VMAccess cache folder if doesn't exist
+        if not os.path.exists(os.path.dirname(SshdConfigBackupPath)):
+            os.makedirs(os.path.dirname(SshdConfigBackupPath))
+
+        hutil.log("Create backup ssh config file")
+        open(SshdConfigBackupPath, 'a').close()
+        
         # When copying, make sure to preserve permissions and ownership.
-        ownership = os.stat(sshd_file_path)
-        shutil.copy2(sshd_file_path, backup_file_name)
-        os.chown(backup_file_name, ownership.st_uid, ownership.st_gid)
+        ownership = os.stat(SshdConfigPath)
+        shutil.copy2(SshdConfigPath, SshdConfigBackupPath)
+        os.chown(SshdConfigBackupPath, ownership.st_uid, ownership.st_gid)
 
 
 def _save_cert_str_as_file(cert_txt, file_name):
@@ -554,6 +615,40 @@ def _fsck_repair(hutil, disk_name):
         hutil.error("{0}, {1}".format(str(e), traceback.format_exc()))
         hutil.do_exit(1, 'Repair', 'error', '0', 'Repair failed.')
 
+def validate_ssh_path(pub_path, user_name):
+    p = pwd.getpwnam(user_name)
+    uid = p.pw_uid
+
+    ssh_dir = os.path.dirname(pub_path)
+    if not ssh_dir:
+        raise Exception("Refusing to write: ssh directory path is empty")
+    _validate_path_safe(ssh_dir, uid, user_name)
+    _validate_path_safe(pub_path, uid, user_name)
+
+def _validate_path_safe(path, uid, user_name):
+    if os.path.islink(path):
+        raise Exception("Refusing to write: {0} is a symlink".format(path))
+    if os.path.exists(path):
+        st = os.lstat(path)
+        if st.st_uid != uid and st.st_uid != 0:
+            raise Exception("Refusing to write: {0} is not owned by {1} or root".format(path, user_name))
+
+def safe_write_authorized_keys(pub_path, contents, append=False):
+    bytes_to_write = ext_utils.encode_for_writing_to_file(contents)
+    flags = os.O_WRONLY | os.O_NOFOLLOW
+    if append:
+        flags |= os.O_APPEND | os.O_CREAT
+    else:
+        if os.path.exists(pub_path):
+            flags |= os.O_TRUNC
+        else:
+            flags |= os.O_CREAT | os.O_EXCL
+
+    fd = os.open(pub_path, flags, 0o600)
+    try:
+        os.write(fd, bytes_to_write)
+    finally:
+        os.close(fd)
 
 if __name__ == '__main__':
     main()

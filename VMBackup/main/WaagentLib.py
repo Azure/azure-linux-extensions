@@ -23,7 +23,6 @@
 # http://msdn.microsoft.com/en-us/library/cc227259%28PROT.13%29.aspx
 #
 
-import crypt
 import random
 import base64
 
@@ -56,7 +55,80 @@ import zipfile
 import json
 import datetime
 import xml.sax.saxutils
-from distutils.version import LooseVersion
+
+# 'crypt' was deprecated in Python 3.11 (PEP 594) and removed in 3.13. VMBackup
+# does not call gen_password_hash(), so make the import optional and fall back to
+# the third-party 'legacycrypt' backend on 3.13+ when it is present.
+# Note: 'legacycrypt' is NOT stdlib; hashing only works where it (or 'crypt') is
+# available, which is why gen_password_hash() raises a clear error otherwise.
+# We record why each backend was unavailable so the failure is diagnosable
+# (surfaced in gen_password_hash()) instead of being swallowed silently.
+cryptImported = False
+cryptImportErrors = []
+
+try:
+    from crypt import crypt
+    cryptImported = True
+except ImportError as e:
+    cryptImportErrors.append("crypt (stdlib, removed in Python 3.13): %r" % e)
+
+if cryptImported == False:
+    if (sys.version_info[0] == 3 and sys.version_info[1] >= 13) or (sys.version_info[0] > 3):
+        try:
+            from legacycrypt import crypt
+            cryptImported = True
+        except ImportError as e:
+            cryptImportErrors.append("legacycrypt (non-stdlib): %r" % e)
+
+try:
+    from distutils.version import LooseVersion
+except ImportError:
+    # distutils removed in Python 3.12; minimal shim for version comparisons.
+    # Splits on '.', '-', '_'; numeric tokens compare as ints; pre-release
+    # tokens (alpha < beta < rc < release) get negative sentinels; on Py 3
+    # mixed-type positions are coerced to str in _cmp to avoid TypeError.
+    import re as _re
+    class LooseVersion(object):
+        _PRERELEASE = {
+            'alpha': -1000, 'a': -1000,
+            'beta':  -100,  'b': -100,
+            'rc':    -10,   'pre': -10,
+        }
+        def __init__(self, vstring):
+            self.vstring = str(vstring)
+            self._cmp_key = self._parse(self.vstring)
+        def _parse(self, s):
+            parts = []
+            for part in _re.split(r'[.\-_]', s.lower()):
+                try:
+                    parts.append(int(part))
+                except ValueError:
+                    parts.append(self._PRERELEASE.get(part, part))
+            return parts
+        def __str__(self):
+            return self.vstring
+        def __repr__(self):
+            return 'LooseVersion(%r)' % self.vstring
+        def _cmp(self, other):
+            if not isinstance(other, LooseVersion):
+                other = LooseVersion(other)
+            a, b = self._cmp_key, other._cmp_key
+            for i in range(max(len(a), len(b))):
+                ai = a[i] if i < len(a) else 0
+                bi = b[i] if i < len(b) else 0
+                if type(ai) != type(bi):
+                    ai, bi = str(ai), str(bi)
+                if ai < bi:
+                    return -1
+                if ai > bi:
+                    return 1
+            return 0
+        def __lt__(self, other): return self._cmp(other) < 0
+        def __le__(self, other): return self._cmp(other) <= 0
+        def __eq__(self, other): return self._cmp(other) == 0
+        def __ge__(self, other): return self._cmp(other) >= 0
+        def __gt__(self, other): return self._cmp(other) > 0
+        def __ne__(self, other): return self._cmp(other) != 0
 
 if not hasattr(subprocess, 'check_output'):
     def check_output(*popenargs, **kwargs):
@@ -377,7 +449,14 @@ class AbstractDistro(object):
         collection = string.ascii_letters + string.digits
         salt = ''.join(random.choice(collection) for _ in range(salt_len))
         salt = "${0}${1}".format(crypt_id, salt)
-        return crypt.crypt(password, salt)
+
+        if cryptImported:
+            return crypt(password, salt)
+        raise ImportError(
+            "Password hashing is unavailable: the 'crypt' stdlib module was removed "
+            "in Python 3.13 and no 'legacycrypt' fallback is installed. Tried: "
+            + ("; ".join(cryptImportErrors) if cryptImportErrors else "none")
+        )
 
     def load_ata_piix(self):
         return WaAgent.TryLoadAtapiix()
@@ -2255,13 +2334,23 @@ def RunGetOutput(cmd, chk_err=True, log_cmd=True):
         LogIfVerbose(cmd)
     try:
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
+        if isinstance(output, bytes):
+            output = output.decode('latin-1')
     except subprocess.CalledProcessError as e:
         if chk_err and log_cmd:
             Error('CalledProcessError.  Error Code is ' + str(e.returncode))
             Error('CalledProcessError.  Command string was ' + e.cmd)
-            Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
-        return e.returncode, e.output.decode('latin-1')
-    return 0, output.decode('latin-1')
+            if isinstance(e.output[:-1], bytes):
+                Error('CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
+            else:
+                Error('CalledProcessError.  Command result was ' + (e.output[:-1]))
+        if isinstance(e.output, bytes):
+            return_value = e.output.decode('latin-1')
+        else:
+            return_value = e.output
+        return e.returncode, return_value
+    
+    return 0, output
 
 
 def RunSendStdin(cmd, input, chk_err=True, log_cmd=True):
@@ -2283,7 +2372,7 @@ def RunSendStdin(cmd, input, chk_err=True, log_cmd=True):
             Error('CalledProcessError.  Command string was ' + cmd)
             Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
             return 1, output[0].decode('latin-1')
-    if me.returncode is not 0 and chk_err is True and log_cmd:
+    if me.returncode !=  0 and chk_err is True and log_cmd:
         Error('CalledProcessError.  Error Code is ' + str(me.returncode))
         Error('CalledProcessError.  Command string was ' + cmd)
         Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
@@ -4504,6 +4593,12 @@ def GetMyDistro(dist_class_name=''):
                 Distro = 'oracle'
             elif ('redhat'.lower() in Distro.lower()):
                 Distro = 'redhat'
+            elif ('azurelinux' in Distro.lower()):
+                # Azure Linux is RPM/Fedora-family for waagent's purposes; reuse the
+                # existing 'fedoraDistro' class. NOTE: patch-class selection instead
+                # maps azurelinux -> 'AzureLinux' (dedicated AzureLinuxPatching) in
+                # patch/__init__.py -- the two mappings differ intentionally.
+                Distro = 'fedora'
             elif ('Kali'.lower() in Distro.lower()):
                 Distro = 'Kali'
             elif ('FreeBSD'.lower() in  Distro.lower() or 'gaia'.lower() in Distro.lower() or 'panos'.lower() in Distro.lower()):
@@ -4521,11 +4616,11 @@ def GetMyDistro(dist_class_name=''):
 def DistInfo(fullname=0):
     try:
         if 'FreeBSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
+            release = re.sub('\\-.*$', '', str(platform.release()))
             distinfo = ['FreeBSD', release]
             return distinfo
         if 'NS-BSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
+            release = re.sub('\\-.*$', '', str(platform.release()))
             distinfo = ['NS-BSD', release]
             return distinfo
         if 'linux_distribution' in dir(platform):
@@ -4545,6 +4640,16 @@ def DistInfo(fullname=0):
             return distinfo
         if 'Linux' in platform.system():
             distinfo = ["Default"]
+            # linux_distribution removed in Py 3.8; detect Azure Linux via os-release.
+            # Use the shared helper when importable (vendored waagent may run
+            # standalone, so fall through gracefully if Utils is unavailable).
+            try:
+                from Utils.DistroUtil import read_os_release
+                osr = read_os_release()
+                if osr.get("ID") == "azurelinux":
+                    return ["azurelinux", osr.get("VERSION_ID", "")]
+            except Exception:
+                pass
             if "ubuntu" in platform.version().lower():
                 distinfo[0] = "Ubuntu"
             elif 'suse' in platform.version().lower():
@@ -4700,7 +4805,7 @@ def main():
     global force
     force = False
     for a in sys.argv[1:]:
-        if re.match("^([-/]*)(help|usage|\?)", a):
+        if re.match("^([-/]*)(help|usage|\\?)", a):
             sys.exit(Usage())
         elif re.match("^([-/]*)version", a):
             print(GuestAgentVersion + " running on " + LinuxDistro)
@@ -4732,7 +4837,7 @@ def main():
     global daemon
     daemon = False
     for a in args:
-        if re.match("^([-/]*)deprovision\+user", a):
+        if re.match("^([-/]*)deprovision\\+user", a):
             sys.exit(Deprovision(force, True))
         elif re.match("^([-/]*)deprovision", a):
             sys.exit(Deprovision(force, False))

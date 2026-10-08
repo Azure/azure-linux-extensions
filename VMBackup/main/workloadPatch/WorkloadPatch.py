@@ -731,7 +731,7 @@ class WorkloadPatch:
     def timeoutDaemonOracleInstance(self, instanceIndex, commandPath):
         global daemonProcess
 
-        argsDaemon = "su - "+self.linux_user+" -c " + "'" + os.path.join(self.temp_script_folder, self.scriptpath + "/timeoutDaemon.sh")+" "+self.name+" "+commandPath+" \""+self.cred_string+"\" "+self.timeout+" "+os.path.join(self.temp_script_folder, self.scriptpath + "'")
+        argsDaemon = self.getSuPath()+" - "+self.linux_user+" -c " + "'" + os.path.join(self.temp_script_folder, self.scriptpath + "/timeoutDaemon.sh")+" "+self.name+" "+commandPath+" \""+self.cred_string+"\" "+self.timeout+" "+os.path.join(self.temp_script_folder, self.scriptpath + "'")
         devnull = open(os.devnull, 'w')
     
         oracleInstance = self.instance_list[instanceIndex]
@@ -765,6 +765,17 @@ class WorkloadPatch:
     
     def getRole(self):
         return "master"
+
+    def getSuPath(self):
+        # Resolve su to an absolute path so a directory injected into PATH (e.g. via ORACLE_HOME) cannot supply a fake su binary run as root.
+        # todo: remove the fallback to su after observing this on prod for sometime.
+        su_paths = ["/usr/bin/su", "/bin/su"]
+        for su_path in su_paths:
+            if os.path.exists(su_path):
+                self.logger.log("WorkloadPatch: Using su binary at " + su_path)
+                return su_path
+        self.logger.log("WorkloadPatch: Falling back to su resolved from PATH")
+        return "su"
     
     def callLogBackup(self):
         if 'enable' in self.logbackup.lower():

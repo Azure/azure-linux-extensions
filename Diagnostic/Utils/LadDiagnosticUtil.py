@@ -79,8 +79,6 @@ def getAggregationPeriodsFromLadCfg(ladCfg):
             if 'scheduledTransferPeriod' in item:
                 # assert isinstance(item['scheduledTransferPeriod'], str)
                 results.append(item['scheduledTransferPeriod'])
-    else:
-        results.append('PT1H')
     return results
 
 

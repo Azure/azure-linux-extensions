@@ -1,0 +1,1 @@
+# Connection check helper script for AMA

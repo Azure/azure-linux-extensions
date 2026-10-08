@@ -17,15 +17,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import imp
+import sys
 import os
 
 def load_waagent(path=None):
     if path is None:
         pwd = os.path.dirname(os.path.abspath(__file__))
         path = os.path.join(pwd, 'waagent')
-    waagent = imp.load_source('waagent', path)
-    waagent.LoggerInit('/var/log/waagent.log','/dev/stdout')
+    waagent = None
+    if sys.version_info >= (3, 12):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('waagent', path)
+        waagent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(waagent)
+    else:
+        import imp
+        waagent = imp.load_source('waagent', path)
+    waagent.LoggerInit('/var/log/waagent.log', '/dev/stdout')
     waagent.MyDistro = waagent.GetMyDistro()
     waagent.Config = waagent.ConfigurationProvider(None)
     return waagent

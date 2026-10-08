@@ -1,0 +1,18 @@
+[Unit]
+Description=Metrics Extension service for Linux Agent metrics sourcing
+After=network.target
+
+[Service]
+Environment="OTLP_GRPC_HOST=127.0.0.1"
+EnvironmentFile=-/etc/metrics-extension.d/options.conf
+ExecStart=%ME_BIN% -EnableDcrManagedSources -ManagedIdentity %ME_MANAGED_IDENTITY% -DataDirectory %ME_DATA_DIRECTORY% -Input influxdb_local -InfluxDbSocketPath %ME_INFLUX_SOCKET_FILE_PATH% -LogLevel Info -Logger Console -OperationEnvironment AMA-Linux/AMA_VERSION
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=control-group
+User=azuremetricsext
+Group=azuremonitoragent
+%SUPPLEMENTARY_GROUPS_LINE%
+RuntimeDirectory=azureotelcollector azuremetricsext
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

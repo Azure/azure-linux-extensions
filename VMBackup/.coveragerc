@@ -1,0 +1,19 @@
+[run]
+branch = True
+parallel = True
+source =
+    main
+    ${VMBACKUP_COVERAGE_TEMP}
+omit =
+    ${VMBACKUP_COVERAGE_TEMP}/vmbackup-test-ext-*/main/WaagentLib.py
+    ${VMBACKUP_COVERAGE_TEMP}/vmbackup-test-ext-*/main/Utils/__init__.py
+
+[paths]
+vmbackup_source =
+    main
+    ${VMBACKUP_COVERAGE_TEMP}/vmbackup-test-ext-*/main
+
+[report]
+fail_under = 0.41
+precision = 2
+show_missing = True

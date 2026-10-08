@@ -83,7 +83,7 @@ class OvfEnv(object):
 
     # this is a static function to return an instance of  OfvEnv
     @staticmethod
-    def parse(xml_text, configuration, is_deprovision=False):
+    def parse(xml_text, configuration, is_deprovision=False, write_custom_data=True):
         """
         Parse xml tree, retrieving user and ssh key information.
         Return self.
@@ -130,18 +130,20 @@ class OvfEnv(object):
         except (KeyError, ValueError, AttributeError, IndexError):
             pass
 
-        try:
-            cd_section = section.getElementsByTagNameNS(ovf_env.WaNs, "CustomData")
-            if len(cd_section) > 0:
-                ovf_env.CustomData = get_node_text_data(cd_section[0])
-                if len(ovf_env.CustomData) > 0:
-                    ext_utils.set_file_contents(constants.LibDir + '/CustomData', bytearray(
-                        translate_custom_data(ovf_env.CustomData, configuration)))
-                    logger.log('Wrote ' + constants.LibDir + '/CustomData')
-                else:
-                    logger.error('<CustomData> contains no data!')
-        except Exception as e:
-            logger.error(str(e) + ' occured creating ' + constants.LibDir + '/CustomData')
+        if write_custom_data:
+            try:
+                cd_section = section.getElementsByTagNameNS(ovf_env.WaNs, "CustomData")
+                if len(cd_section) > 0:
+                    ovf_env.CustomData = get_node_text_data(cd_section[0])
+                    if len(ovf_env.CustomData) > 0:
+                        ext_utils.set_file_contents(constants.LibDir + '/CustomData', bytearray(
+                            translate_custom_data(ovf_env.CustomData, configuration)))
+                        logger.log('Wrote ' + constants.LibDir + '/CustomData')
+                    else:
+                        logger.error('<CustomData> contains no data!')
+            except Exception as e:
+                logger.error(str(e) + ' occured creating ' + constants.LibDir + '/CustomData')
+        
         disable_ssh_passwd = section.getElementsByTagNameNS(ovf_env.WaNs, "DisableSshPasswordAuthentication")
         if len(disable_ssh_passwd) != 0:
             ovf_env.DisableSshPasswordAuthentication = (get_node_text_data(disable_ssh_passwd[0]).lower() == "true")

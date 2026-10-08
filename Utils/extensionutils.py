@@ -192,15 +192,15 @@ def run_command_get_output(cmd, chk_err=True, log_cmd=True):
             logger.error('CalledProcessError.  Error Code is ' + str(e.returncode))
             logger.error('CalledProcessError.  Command string was ' + str(cmd))
             logger.error(
-                'CalledProcessError.  Command result was ' + (e.output[:-1]).decode('latin-1'))
-        return e.returncode, e.output.decode('latin-1')
+                'CalledProcessError.  Command result was ' + (e.output[:-1]).decode('utf-8'))
+        return e.returncode, e.output.decode('utf-8')
     except EnvironmentError as e:
         if chk_err and log_cmd:
             logger.error(
                 'CalledProcessError.  Error message is ' + str(e))
-            return e.errno, str(e)
+        return e.errno, str(e)
     # noinspection PyUnboundLocalVariable
-    return 0, output.decode('latin-1')
+    return 0, output.decode('utf-8')
 
 
 def run(cmd, chk_err=True):
@@ -238,8 +238,8 @@ def run_send_stdin(cmd, cmd_input, chk_err=True, log_cmd=True):
         logger.error('CalledProcessError.  Error Code is ' + str(me.returncode))
         logger.error('CalledProcessError.  Command was ' + str(cmd))
         logger.error(
-            'CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
-    return me.returncode, output[0].decode('latin-1')
+            'CalledProcessError.  Command result was ' + output[0].decode('utf-8'))
+    return me.returncode, output[0].decode('utf-8')
 
 
 def get_line_starting_with(prefix, filepath):
@@ -315,7 +315,7 @@ class WALAEvent(object):
             os.mkdir(event_folder)
             os.chmod(event_folder, 0o700)
         if len(os.listdir(event_folder)) > 1000:
-            raise Exception("WriteToFolder:Too many file under " + event_folder + " exit")
+            logger.log("Warning: Too many files under " + event_folder)
 
         filename = os.path.join(event_folder, str(int(time.time() * 1000000)))
         with open(filename + ".tmp", 'wb+') as h_file:

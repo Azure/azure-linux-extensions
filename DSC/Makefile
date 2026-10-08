@@ -7,6 +7,7 @@ SOURCES = \
     serializerfactory.py \
     httpclient.py \
     urllib2httpclient.py \
+	urllib3httpclient.py \
     dsc.py \
 	test \
 	HandlerManifest.json \

@@ -20,7 +20,28 @@
 # http://msdn.microsoft.com/en-us/library/cc227282%28PROT.10%29.aspx
 # http://msdn.microsoft.com/en-us/library/cc227259%28PROT.13%29.aspx
 
-import crypt
+import sys
+
+# crypt module was removed in Python 3.13
+# For Python < 3.11: use builtin crypt
+# For Python >= 3.11: try crypt_r package, then ctypes fallback
+if sys.version_info >= (3, 11):
+    try:
+        import crypt_r as crypt
+    except ImportError:
+        try:
+            from Utils import crypt_fallback as crypt
+        except ImportError:
+            crypt = None
+else:
+    try:
+        import crypt
+    except ImportError:
+        try:
+            from Utils import crypt_fallback as crypt
+        except ImportError:
+            crypt = None
+
 import random
 import array
 import base64
@@ -47,7 +68,14 @@ import zipfile
 import json
 import datetime
 import xml.sax.saxutils
-from distutils.version import LooseVersion
+# distutils.version was deprecated in Python 3.10 and removed in Python 3.12
+def import_loose_version():
+    if sys.version_info >= (3, 12):
+        return LooseVersionComparator
+    else:
+        from distutils.version import LooseVersion
+        return LooseVersion
+
 
 if sys.version_info[0] == 3:
     import http.client as httpclient
@@ -154,6 +182,55 @@ Please do not use this disk for storing any personal or application data.
 For additional details to please refer to the MSDN documentation at : http://msdn.microsoft.com/en-us/library/windowsazure/jj672979.aspx
 """
 
+class LooseVersionComparator:
+    """
+    Class to parse and compare versions with pre-release tags
+    Based on LooseVersion from distutils.version as that was removed in python 3.12.
+    Python's standard library does not include a direct replacement for `distutils.version.LooseVersion` 
+    or `StrictVersion` for arbitrary version string comparison outside of the context of installed packages.
+    This is needed to avoid installing pip.
+    
+    """
+    def __init__(self, version):
+        self.version, self.prerelease = self.parse_version(version)
+    
+    def parse_version(self, version):
+        # Regular expression to parse versions with pre-release tags
+        match = re.match(r'^(\d+(?:\.\d+)*)(?:-([\da-zA-Z-]+))?$', version)
+        if not match:
+            raise ValueError("Invalid version format: {0}".format(version))
+        
+        main_version = tuple(map(int, match.group(1).split('.')))
+        prerelease = match.group(2)
+        return main_version, prerelease
+
+    def __lt__(self, other):
+        if self.version == other.version:
+            return self._compare_prerelease(self.prerelease, other.prerelease) < 0
+        return self.version < other.version
+
+    def __gt__(self, other):
+        if self.version == other.version:
+            return self._compare_prerelease(self.prerelease, other.prerelease) > 0
+        return self.version > other.version
+
+    def __eq__(self, other):
+        return self.version == other.version and self.prerelease == other.prerelease
+
+    def __str__(self):
+        return ".".join(map(str, self.version)) + ("-{0}".format(self.prerelease) if self.prerelease else "")
+
+    @staticmethod
+    def _compare_prerelease(pr1, pr2):
+        if pr1 is None and pr2 is None:
+            return 0
+        if pr1 is None:
+            return 1
+        if pr2 is None:
+            return -1
+        return (pr1 > pr2) - (pr1 < pr2)
+
+LooseVersion = import_loose_version()
 
 ############################################################
 # BEGIN DISTRO CLASS DEFS
@@ -538,7 +615,7 @@ class AbstractDistro(object):
                 Log("GPT detected.")
                 # GPT(Guid Partition Table) is used.
                 # Get partitions.
-                parts = filter(lambda x: re.match("^\s*[0-9]+", x), ret[1].split("\n"))
+                parts = filter(lambda x: re.match(r"^\s*[0-9]+", x), ret[1].split("\n"))
                 # If there are more than 1 partitions, remove all partitions
                 # and create a new one using the entire disk space.
                 if len(parts) > 1:
@@ -713,7 +790,7 @@ class AbstractDistro(object):
         try:
             with open("/var/lib/hyperv/.kvp_pool_0", "r") as f:
                 lines = f.read()
-            r = re.search("NdDriverVersion\0+(\d\d\d\.\d)", lines)
+            r = re.search(r"NdDriverVersion\0+(\d\d\d\.\d)", lines)
             if r is not None:
                 NdDriverVersion = r.groups()[0]
                 return NdDriverVersion  # e.g.  NdDriverVersion = 142.0
@@ -1037,7 +1114,7 @@ class SuSEDistro(AbstractDistro):
         """
         error, output = RunGetOutput(self.zypper_path + " info " + RdmaConfig.rmda_package_name)
         if (error == RdmaConfig.process_success):
-            r = re.search("Version: (\S+)", output)
+            r = re.search(r"Version: (\S+)", output)
             if r is not None:
                 package_version = r.groups()[0]  # e.g.  package_version is "20150707.140.0_k3.12.28_4-3.1."
                 return package_version
@@ -1127,7 +1204,7 @@ class SuSEDistro(AbstractDistro):
         r = os.listdir("/opt/microsoft/rdma")
         if r is not None:
             for filename in r:
-                if re.match(RdmaConfig.rmda_package_name + "-\d{8}\.(%s).+" % host_version, filename):
+                if re.match(RdmaConfig.rmda_package_name + r"-\d{8}\.(%s).+" % host_version, filename):
                     error, output = RunGetOutput(
                         self.zypper_path + " --non-interactive remove " + RdmaConfig.rmda_package_name)
                     Log("remove rdma package result is " + str(error) + " output is: " + str(output))
@@ -2575,7 +2652,7 @@ def RunSendStdin(cmd, input, chk_err=True, log_cmd=True, use_shell=True):
             Error('CalledProcessError.  Command string was ' + cmd)
             Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
             return 1, output[0].decode('latin-1')
-    if me.returncode is not 0 and chk_err is True and log_cmd:
+    if me.returncode != 0 and chk_err is True and log_cmd:
         Error('CalledProcessError.  Error Code is ' + str(me.returncode))
         Error('CalledProcessError.  Command string was ' + cmd)
         Error('CalledProcessError.  Command result was ' + output[0].decode('latin-1'))
@@ -3066,7 +3143,7 @@ def DoInstallRHUIRPM():
         SetFileContents(LibDir + "/rhuirpminstalled", "")
 
     Log("Begin to install RHUI RPM")
-    cmd = "grep '<Location>' /var/lib/waagent/ExtensionsConfig* --no-filename | sed 's/<Location>//g' | sed 's/<\/Location>//g' | sed 's/ //g' | tr 'A-Z' 'a-z' | uniq"
+    cmd = r"grep '<Location>' /var/lib/waagent/ExtensionsConfig* --no-filename | sed 's/<Location>//g' | sed 's/<\/Location>//g' | sed 's/ //g' | tr 'A-Z' 'a-z' | uniq"
 
     retcode, out = RunGetOutput(cmd, True)
     region = out.rstrip("\n")
@@ -3879,8 +3956,8 @@ class RdmaHandler(object):
 
     def write_dat_conf(self, dat_conf_file):
         Log("Write config to {0}".format(dat_conf_file))
-        old = ("ofa-v2-ib0 u2.0 nonthreadsafe default libdaplofa.so.2 "
-               "dapl.2.0 \"\S+ 0\"")
+        old = (r"ofa-v2-ib0 u2.0 nonthreadsafe default libdaplofa.so.2 "
+               r"dapl.2.0 \"\S+ 0\"")
         new = ("ofa-v2-ib0 u2.0 nonthreadsafe default libdaplofa.so.2 "
                "dapl.2.0 \"{0} 0\"").format(self.ip_addr)
         lines = GetFileContents(dat_conf_file)
@@ -6528,7 +6605,7 @@ def GetMyDistro(dist_class_name=''):
 
 def DistInfo(fullname=0):
     if 'FreeBSD' in platform.system():
-        release = re.sub('\-.*\Z', '', str(platform.release()))
+        release = re.sub(r'\-.*\Z', '', str(platform.release()))
         distinfo = ['FreeBSD', release]
         return distinfo
 
@@ -6724,7 +6801,7 @@ def main():
     global force
     force = False
     for a in sys.argv[1:]:
-        if re.match("^([-/]*)(help|usage|\?)", a):
+        if re.match(r"^([-/]*)(help|usage|\?)", a):
             sys.exit(Usage())
         elif re.match("^([-/]*)version", a):
             print(GuestAgentVersion + " running on " + LinuxDistro)
@@ -6756,7 +6833,7 @@ def main():
     global daemon
     daemon = False
     for a in args:
-        if re.match("^([-/]*)deprovision\+user", a):
+        if re.match(r"^([-/]*)deprovision\+user", a):
             sys.exit(Deprovision(force, True))
         elif re.match("^([-/]*)deprovision", a):
             sys.exit(Deprovision(force, False))

@@ -29,8 +29,8 @@ waagent.Log(name+" - enable.py starting.")
 
 logfile=waagent.Log
 
-hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),
-                     time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),name,'Enable', 'NotReady', '0', 'Enabling',
+hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),name,'Enable', 'NotReady', '0', 'Enabling',
                      'Process Config', 'NotReady', '0', 'Parsing ' + settings_file)
 pub=""
 priv = ""
@@ -112,8 +112,8 @@ waagent.SetFileContents('./service_pid.txt',str(pid))
 # report ready 
 waagent.Log(name+" enabled.")
 
-hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),
-                     time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),name,'Enable','Ready','0',
+hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),name,'Enable','Ready','0',
                      'Enable service Succeed.', 'Exit Successfull', 'Ready', '0', 'Enable Completed.')
 
 #Spawn heartbeat.py if required.

@@ -1,20 +1,22 @@
 # VMAccess Extension
 Provide several ways to allow owner of the VM to get the SSH access back and perform additional VM disk check tasks. 
 
-Current version is [1.5](https://github.com/Azure/azure-linux-extensions/releases/tag/VMAccess-1.5.1).
+Current version is [1.5](https://github.com/Azure/azure-linux-extensions/releases/tag/VMAccess-1.5.18).
 
 You can read the User Guide below.
-* [Using VMAccess Extension to Reset Login Credentials, Add New User and Add SSH Key for Linux VM](https://azure.microsoft.com/blog/2014/08/25/using-vmaccess-extension-to-reset-login-credentials-for-linux-vm/)
+* [Manage administrative users, SSH, and check or repair disks on Linux VMs by using the VMAccess extension](https://learn.microsoft.com/en-us/azure/virtual-machines/extensions/vmaccess)
 
 VMAccess Extension can:
 * Reset the password of the original sudo user 
 * Create a new sudo user with the password specified
 * Set the public host key with the key given
 * Reset the public host key provided during VM provisioning if host key not provided
-* Open the SSH port(22) and restore the sshd_config if reset_ssh is set to true
+* Open the SSH port(22) and reset the sshd_config if reset_ssh is set to true
 * Remove the existing user
 * Check disks
-* Repair added disk.
+* Repair added disk
+* Remove prior public keys when a new public key is provided
+* Restore the original backup sshd_config if restore_backup_ssh is set to true
 
 # Security Notes:
 * VMAccess Extension is designed for regaining access to a VM in the event that access is lost. 
@@ -28,13 +30,15 @@ VMAccess Extension can:
 
 Schema for the public configuration file looks like:
 
-* `check_disk`: (boolean) whether or not to check disk
-* `repair_disk`: (boolean, string) whether or not to repair disk, disk name
+* `check_disk`: (optional, boolean) whether or not to check disk
+* `repair_disk`: (optional, boolean) whether or not to repair disk
+* `disk_name`: (boolean) name of disk to repair (required when repair_disk is true)
 
 ```json
 {
   "check_disk": "true",
-  "repair_disk": "true, user-disk-name"
+  "repair_disk": "true",
+  "disk_name": "<disk-name>"
 }
 ```
 
@@ -47,7 +51,9 @@ Schema for the protected configuration file looks like this:
 * `ssh_key`: (optional, string) the public key of the user
 * `reset_ssh`: (optional, boolean) whether or not reset the ssh
 * `remove_user`: (optional, string) the user name to remove
-* `expiration`: (options, string) expiration of the account, defaults to never, e.g. 2016-01-01.
+* `expiration`: (optional, string) expiration of the account, defaults to never, e.g. 2016-01-01.
+* `remove_prior_keys`: (optional, boolean) whether or not to remove old SSH keys when adding a new one
+* `restore_backup_ssh`: (optional, boolean) whether or not to restore original backed-up sshd config
 
 ```json
 {
@@ -56,16 +62,24 @@ Schema for the protected configuration file looks like this:
   "ssh_key": "<cert-contents>",
   "reset_ssh": true,
   "remove_user": "<username-to-remove>",
-  "expiration": "<yyyy-mm-dd>"
+  "expiration": "<yyyy-mm-dd>",
+  "remove_prior_keys": true,
+  "restore_backup_ssh": true
 }
 ```
 
-`ssh_key` supports both `ssh-rsa` and `.pem` format.
+`ssh_key` supports `ssh-rsa`, `ssh-ed25519` and `.pem` formats.
 
 * If your public key is in `ssh-rsa` format, for example, `ssh-rsa XXXXXXXX`, you can use:
 
   ```
   "ssh_key": "ssh-rsa XXXXXXXX"
+  ```
+
+* If your public key is in `ssh-ed25519` format, for example, `ssh-ed25519 XXXXXXXX`, you can use:
+
+  ```
+  "ssh_key": "ssh-ed25519 XXXXXXXX"
   ```
 
 * If your public key is in `.pem` format, use the following UNIX command to convert the .pem file to a value that can be passed in a JSON string:
@@ -82,126 +96,56 @@ Schema for the protected configuration file looks like this:
 ## 2. Deploying the Extension to a VM
 
 You can deploy it using Azure CLI, Azure Powershell and ARM template.
-
-> **NOTE:** Creating VM in Azure has two deployment model: Classic and [Resource Manager][arm-overview].
-In diffrent models, the deploying commands have different syntaxes. Please select the right
-one in section 2.1 and 2.2 below.
  
 ### 2.1. Using [**Azure CLI**][azure-cli]
-Before deploying VMAccess Extension, you should configure your `protected.json`
-(in section 1.2 above).
 
-#### 2.1.1 Classic
-The Classic mode is also called Azure Service Management mode. You can change to it by running:
+Create a `settings.json` (optional) and a `protected_settings.json` and run:
 ```
-$ azure config mode asm
-```
-
-You can deploying VMAccess Extension by running:
-```
-$ azure vm extension set <vm-name> \
-VMAccessForLinux Microsoft.OSTCExtensions <version> \
---private-config-path protected.json
+$ azure vm extension set \
+--resource-group <resource-group> \
+--vm-name <vm-name> \
+--name VMAccessForLinux \
+--publisher Microsoft.OSTCExtensions \
+--version 1.5 \
+--settings settings.json
+--protected-settings protected_settings.json
 ```
 
-In the command above, you can change version with `"*"` to use latest
-version available, or `"1.*"` to get newest version that does not introduce non-
-breaking schema changes. To learn the latest version available, run:
+To retrieve the deployment state of extensions for a given VM, run:
 ```
-$ azure vm extension list
+$ azure vm extension list \
+--resource-group <resource-group> \
+--vm-name <vm-name> -o table
 ```
-
-#### 2.1.2 Resource Manager
-You can change to Azure Resource Manager mode by running:
-```
-$ azure config mode arm
-```
-
-You can deploying VMAccess Extension by running:
-```
-$ azure vm extension set <resource-group> <vm-name> \
-VMAccessForLinux Microsoft.OSTCExtensions <version> \
---private-config-path protected.json
-```
-
-> **NOTE:** In ARM mode, `azure vm extension list` is not available for now.
-
-In ARM mode, there is another specific and simple command to reset your password.
-
-```
-$ azure vm reset-access [options] <resource-group> <name>
-```
-
->**NOTE:** Currently, only public key PEM file is supported for `azure vm reset-access`. It's filed as an [issue](https://github.com/Azure/azure-xplat-cli/issues/2437).
 
 ### 2.2. Using [**Azure Powershell**][azure-powershell]
 
-#### 2.2.1 Classic
-
-You can login to your Azure account (Azure Service Management mode) by running:
-
-```powershell
-Add-AzureAccount
-```
-
 You can deploying VMAccess Extension by running:
 
 ```powershell
-$VmName = '<vm-name>'
-$vm = Get-AzureVM -ServiceName $VmName -Name $VmName
+$username = "<username>"
+$sshKey = "<cert-contents>"
 
-$ExtensionName = 'VMAccessForLinux'
-$Publisher = 'Microsoft.OSTCExtensions'
-$Version = '<version>'
+$settings = @{"check_disk" = $true};
+$protectedSettings = @{"username" = $username; "ssh_key" = $sshKey};
 
-$PublicConf = '{}'
-$PrivateConf = '{
-  "username": "<username>",
-  "password": "<password>",
-  "ssh_key": "<cert-contents>",
-  "reset_ssh": true|false,
-  "remove_user": "<username-to-remove>"
-}'
-
-Set-AzureVMExtension -ExtensionName $ExtensionName -VM $vm `
-  -Publisher $Publisher -Version $Version `
-  -PrivateConfiguration $PrivateConf -PublicConfiguration $PublicConf |
-  Update-AzureVM
+Set-AzVMExtension -ResourceGroupName "<resource-group>" -VMName "<vm-name>" -Location "<location>" `
+-Publisher "Microsoft.OSTCExtensions" -ExtensionType "VMAccessForLinux" -Name "VMAccessForLinux" `
+-TypeHandlerVersion "1.5" -Settings $settings -ProtectedSettings $protectedSettings
 ```
 
-#### 2.2.2 Resource Manager
-
-You can login to your Azure account (Azure Resource Manager mode) by running:
+You can provide and modify extension settings by using strings:
 
 ```powershell
-Login-AzureRmAccount
-```
+$username = "<username>"
+$sshKey = "<cert-contents>"
 
-Click [**HERE**](https://azure.microsoft.com/en-us/documentation/articles/powershell-azure-resource-manager/) to learn more about how to use Azure PowerShell with Azure Resource Manager.
+$settingsString = '{"check_disk":true}';
+$protectedSettingsString = '{"username":"' + $username + '","ssh_key":"' + $sshKey + '"}';
 
-You can deploying VMAccess Extension by running:
-
-```powershell
-$RGName = '<resource-group-name>'
-$VmName = '<vm-name>'
-$Location = '<location>'
-
-$ExtensionName = 'VMAccessForLinux'
-$Publisher = 'Microsoft.OSTCExtensions'
-$Version = '<version>'
-
-$PublicConf = '{}'
-$PrivateConf = '{
-  "username": "<username>",
-  "password": "<password>",
-  "ssh_key": "<cert-contents>",
-  "reset_ssh": true|false,
-  "remove_user": "<username-to-remove>"
-}'
-
-Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Location `
-  -Name $ExtensionName -Publisher $Publisher -ExtensionType $ExtensionName `
-  -TypeHandlerVersion $Version -Settingstring $PublicConf -ProtectedSettingString $PrivateConf
+Set-AzVMExtension -ResourceGroupName "<resource-group>" -VMName "<vm-name>" -Location "<location>" `
+-Publisher "Microsoft.OSTCExtensions" -ExtensionType "VMAccessForLinux" -Name "VMAccessForLinux" `
+-TypeHandlerVersion "1.5" -SettingString $settingsString -ProtectedSettingString $protectedSettingsString
 ```
 
 ### 2.3. Using [**ARM Template**][arm-template]
@@ -217,7 +161,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
   "properties": {
     "publisher": "Microsoft.OSTCExtensions",
     "type": "VMAccessForLinux",
-    "typeHandlerVersion": "1.4",
+    "typeHandlerVersion": "1.5",
     "autoUpgradeMinorVersion": true,
     "settings": {},
     "protectedSettings": {
@@ -231,7 +175,7 @@ Set-AzureRmVMExtension -ResourceGroupName $RGName -VMName $VmName -Location $Loc
 }
 ```
 
-The sample ARM template is [201-vmaccess-on-ubuntu](https://github.com/Azure/azure-quickstart-templates/tree/master/201-vmaccess-on-ubuntu).
+Refer to the following sample [ARM template](https://github.com/azure/azure-quickstart-templates/tree/master/demos/vmaccess-on-ubuntu).
 
 For more details about ARM template, please visit [Authoring Azure Resource Manager templates](https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/).
 
@@ -248,7 +192,7 @@ in the Public Settings
 
 > VMAccessForLinux resets and restarts the SSH server if a password is specified. This is necessary if the VM was deployed with public key authentication because the SSH server is not configured to accept passwords.  For this reason, the SSH server's configuration is reset to allow password authentication, and restarted to accept this new configuration.  This behavior can be disabled by setting the reset_ssh value to false.
 
-in the Protectect Settings
+in the Protected Settings
 ```json
 {
   "username": "currentusername",
@@ -336,6 +280,23 @@ in the Protectect Settings
     "disk_name": "userdisktofix"
 }
 ```
+
+### 3.10 Removing prior SSH keys (only when provided a new one)
+```json
+{
+    "username": "newusername",
+    "ssh_key": "contentofsshkey",
+    "remove_prior_keys": true
+}
+```
+
+### 3.11 Restoring original SSH configuration
+```json
+{
+    "restore_backup_ssh": true
+}
+```
+
 ## Supported Linux Distributions
 - Ubuntu 12.04 and higher
 - CentOS 6.5 and higher

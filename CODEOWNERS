@@ -23,7 +23,7 @@
 /LAD-AMA-Common/ @Azure/geneva-linux-agents
 
 # DSCForLinux Extension
-/DSC/ @nitinbps @kwirkykat
+/DSC/ @Bhargava-Chary-Chollaty
 
 # OMS Agent Extension
 /OmsAgent/ @Azure/geneva-linux-agents
@@ -35,10 +35,10 @@
 /VMAccess/ @D1v38om83r @nkuchta @Azure/azure-agent-extensions
 
 # VMBackup Extension
-/VMBackup/ @bpramod @soumyapattnaik @vityagi
+/VMBackup/ @Azure/VMSnapshotLinuxExtension
 
 # VMEncryption Extension
-/VMEncryption/ @vimish @ejarvi @vermashi
+/VMEncryption/ @vimish @ejarvi
 
 # WALinuxAgent
 /Common/ @D1v38om83r @nkuchta @Azure/walinuxagent @Azure/azure-agent-extensions

@@ -26,24 +26,43 @@ class MachineIdentity:
         self.store_identity_file = './machine_identity_FD76C85E-406F-4CFA-8EB0-CF18B123365C'
 
     def current_identity(self):
-        file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
-        xmlText = file.read()
-        dom = xml.dom.minidom.parseString(xmlText)
-        deployment = dom.getElementsByTagName("Role")
-        identity=deployment[0].getAttribute("guid")
+        identity = None
+        file = None
+        try:
+            if os.path.exists("/var/lib/waagent/HostingEnvironmentConfig.xml"):
+                file = open("/var/lib/waagent/HostingEnvironmentConfig.xml",'r')
+                xmlText = file.read()
+                dom = xml.dom.minidom.parseString(xmlText)
+                deployment = dom.getElementsByTagName("Role")
+                identity=deployment[0].getAttribute("guid")
+        finally:
+            if file != None:
+                if file.closed == False:
+                    file.close()
         return identity
 
     def save_identity(self):
-        file = open(self.store_identity_file,'w')
-        machine_identity = self.current_identity()
-        file.write(machine_identity)
-        file.close()
+        file = None
+        try:
+            file = open(self.store_identity_file,'w')
+            machine_identity = self.current_identity()
+            if( machine_identity != None ):
+                file.write(machine_identity)
+        finally:
+            if file != None:
+                if file.closed == False:
+                    file.close()
 
     def stored_identity(self):
         identity_stored = None
-        if(os.path.exists(self.store_identity_file)):
-            file = open(self.store_identity_file,'r')
-            identity_stored = file.read()
-            file.close()
+        file = None
+        try:
+            if(os.path.exists(self.store_identity_file)):
+                file = open(self.store_identity_file,'r')
+                identity_stored = file.read()
+        finally:
+            if file != None:
+                if file.closed == False:
+                    file.close()
         return identity_stored
 

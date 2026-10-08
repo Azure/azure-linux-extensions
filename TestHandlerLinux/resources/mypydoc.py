@@ -1384,14 +1384,14 @@ def pipepager(text, cmd):
 def tempfilepager(text, cmd):
     """Page through text by invoking a program on a temporary file."""
     import tempfile
-    filename = tempfile.mktemp()
+    fd, filename = tempfile.mkstemp()
     file = open(filename, 'w')
     file.write(text)
     file.close()
     try:
         os.system(cmd + ' "' + filename + '"')
     finally:
-        os.unlink(filename)
+        os.close(fd)
 
 def ttypager(text):
     """Page through text on a text terminal."""

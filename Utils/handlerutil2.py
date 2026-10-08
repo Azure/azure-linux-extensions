@@ -69,6 +69,7 @@ DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
 MANIFEST_XML = "manifest.xml"
 
+ENV_CONFIG_SEQUENCE_NUMBER = "ConfigSequenceNumber"
 
 class HandlerContext:
     def __init__(self, name):
@@ -131,20 +132,33 @@ class HandlerUtility:
         seq_no = -1
         cur_seq_no = -1
         freshest_time = None
-        for subdir, dirs, files in os.walk(config_folder):
-            for file in files:
-                try:
-                    cur_seq_no = int(os.path.basename(file).split('.')[0])
-                    if (freshest_time == None):
-                        freshest_time = os.path.getmtime(join(config_folder, file))
-                        seq_no = cur_seq_no
-                    else:
-                        current_file_m_time = os.path.getmtime(join(config_folder, file))
-                        if (current_file_m_time > freshest_time):
-                            freshest_time = current_file_m_time
-                            seq_no = cur_seq_no
-                except ValueError:
-                    continue
+
+        # First read the sequence number from the environment variable
+        seq_no_from_env = os.getenv(ENV_CONFIG_SEQUENCE_NUMBER)
+        if (seq_no_from_env is not None):
+            try:
+                seq_no = int(seq_no_from_env)
+            except ValueError:
+                self.error("Unable to convert sequence number to int:" + seq_no_from_env)
+        if seq_no == -1:
+            # Otherwise look for the most recent sequence number from the files
+            self.log("Searching for sequence number in config folder: " + config_folder)
+            for subdir, dirs, file_names in os.walk(config_folder):
+                for file_name in file_names:
+                    try:
+                        file_basename = os.path.basename(file_name)
+                        if "." in file_basename:
+                            cur_seq_no = int(file_basename.split('.')[0])
+                            if (freshest_time is None):
+                                freshest_time = os.path.getmtime(join(config_folder, file_name))
+                                seq_no = cur_seq_no
+                            else:
+                                current_file_m_time = os.path.getmtime(join(config_folder, file_name))
+                                if (current_file_m_time > freshest_time):
+                                    freshest_time = current_file_m_time
+                                    seq_no = cur_seq_no
+                    except ValueError:
+                        continue
         return seq_no
 
     def log(self, message):
@@ -167,8 +181,8 @@ class HandlerUtility:
 
     @staticmethod
     def redact_protected_settings(content):
-        redacted_tmp = re.sub('"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
-        redacted = re.sub('"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
+        redacted_tmp = re.sub(r'"protectedSettings":\s*"[^"]+=="', '"protectedSettings": "*** REDACTED ***"', content)
+        redacted = re.sub(r'"protectedSettingsCertThumbprint":\s*"[^"]+"', '"protectedSettingsCertThumbprint": "*** REDACTED ***"', redacted_tmp)
         return redacted
 
     def _parse_config(self, ctxt):
@@ -191,16 +205,21 @@ class HandlerUtility:
                 cert = constants.LibDir + '/' + thumb + '.crt'
                 pkey = constants.LibDir + '/' + thumb + '.prv'
                 unencodedSettings = base64.standard_b64decode(protectedSettings)
-                openSSLcmd = ['openssl', 'smime', '-inform', 'DER', '-decrypt', '-recip' , cert,  '-inkey', pkey]
-                cleartxt = ext_utils.run_send_stdin(openSSLcmd, unencodedSettings)[1]
-                if cleartxt is None:
-                    self.error("OpenSSL decode error using  thumbprint " + thumb)
-                    self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
+                openSSLcmd_cms = ['openssl', 'cms', '-inform', 'DER', '-decrypt', '-recip' , cert, '-inkey', pkey]
+                cms_retcode, cleartxt = ext_utils.run_send_stdin(openSSLcmd_cms, unencodedSettings)
+                if cms_retcode != 0:
+                    self.log("OpenSSL decode error using cms command with thumbprint " + thumb + "\n trying smime command")
+                    openSSLcmd_smime = ['openssl', 'smime', '-inform', 'DER', '-decrypt', '-recip' , cert, '-inkey', pkey]
+                    smime_retcode, cleartxt = ext_utils.run_send_stdin(openSSLcmd_smime, unencodedSettings)
+                    if smime_retcode != 0:
+                        self.error("OpenSSL decode error using smime command with thumbprint " + thumb)
+                        self.do_exit(1, "Enable", 'error', '1', 'Failed to decrypt protectedSettings')
                 jctxt = ''
                 try:
                     jctxt = json.loads(cleartxt)
                 except:
                     self.error('JSON exception decoding ' + HandlerUtility.redact_protected_settings(cleartxt))
+                    self.do_exit(1, "Enable", 'error', '1', 'Failed to decode protectedSettings')
                 handlerSettings['protectedSettings']=jctxt
                 self.log('Config decoded correctly.')
         return config
@@ -364,7 +383,11 @@ class HandlerUtility:
 
     def get_protected_settings(self):
         if (self._context._config != None):
-            return self.get_handler_settings().get('protectedSettings')
+            protectedSettings = self.get_handler_settings().get('protectedSettings')
+            if (isinstance(protectedSettings, dict)):
+                return protectedSettings
+            else:
+                self.error("Protected settings is not of type dictionary")
         return None
 
     def get_public_settings(self):

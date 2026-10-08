@@ -35,6 +35,9 @@ class Backuplogger(object):
         self.logging_off = False
 
     def enforce_local_flag(self, enforced_local):
+        #Pause file logging during I/O freeze period by setting Enforced_local_flag_value to False
+        #Enforced_local_flag_value is turned to False from True when Freeze Starts
+        #Enforced_local_flag_value is turned to True from False when Freeze Ends
         if (self.hutil.get_intvalue_from_configfile('LoggingOff', 0) == 1):
             self.logging_off = True
         if (self.enforced_local_flag_value != False and enforced_local == False and self.logging_off == True):
@@ -56,7 +59,7 @@ class Backuplogger(object):
             if sys.version_info > (3,):
                 log_msg = self.log_to_con_py3(msg, level)
             else:
-                log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.now()) , level , msg)
+                log_msg = "{0}  {1}  {2} \n".format(str(datetime.datetime.utcnow()) , level , msg)
                 if(self.enforced_local_flag_value != False):
                     self.log_to_con(log_msg)
             if(self.enforced_local_flag_value == False):
@@ -79,7 +82,7 @@ class Backuplogger(object):
         try:
             if type(msg) is not str:
                 msg = str(msg, errors="backslashreplace")
-            time = datetime.datetime.now().strftime(u'%Y/%m/%d %H:%M:%S.%f')
+            time = datetime.datetime.utcnow().strftime(u'%Y/%m/%d %H:%M:%S.%f')
             log_msg = u"{0}  {1}  {2} \n".format(time , level , msg)
             log_msg= str(log_msg.encode('ascii', "backslashreplace"), 
                          encoding="ascii")

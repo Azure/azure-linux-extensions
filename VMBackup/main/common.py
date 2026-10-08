@@ -19,6 +19,7 @@
 class CommonVariables:
     azure_path = 'main/azure'
     utils_path_name = 'Utils'
+    snapshot_service_path_name = "IaaSExtensionSnapshotService"
     extension_name = 'MyBackupTestLinuxInt'
     extension_version = "1.0.9120.0"
     extension_zip_version = "1"
@@ -40,6 +41,18 @@ class CommonVariables:
     VmTypeV2 = 'microsoft.compute/virtualmachines'
     customSettings = 'customSettings'
     statusBlobUploadError = 'statusBlobUploadError'
+    TempStatusFileName = 'tempStatusFile.status'
+    onlyLocalFilesystems = 'onlyLocalFilesystems'
+    
+    # -------------------- Dynamic Settings from CRP --------------------
+    isSnapshotTtlEnabled = 'isSnapshotTtlEnabled'
+    useMccfForLad = 'useMccfForLad'
+    useMccfToFetchDsasForAllDisks = 'useMccfToFetchDsasForAllDisks'
+    enableSnapshotExtensionPolling = "EnableVMSnapshotExtensionPolling"
+    isVmmdBlobIncluded = 'isVmmdBlobIncluded'
+    key = 'Key'
+    value = 'Value'
+    snapshotTtlHeader = 'x-ms-snapshot-ttl-expiry-hours'
 
     snapshotTaskToken = 'snapshotTaskToken'
     snapshotCreator = 'snapshotCreator'
@@ -51,6 +64,15 @@ class CommonVariables:
     isAnyDiskExcluded = 'isAnyDiskExcluded'
     dataDiskLunList = 'dataDiskLunList'
     isOSDiskIncluded = 'isOSDiskIncluded'
+    isVmgsBlobIncluded = 'isVmgsBlobIncluded'
+    isVMADEEnabled = 'isVMADEEnabled'
+    isOsDiskADEEncrypted = 'isOsDiskADEEncrypted'
+    areDataDisksADEEncrypted = 'areDataDisksADEEncrypted'
+    diskEncryptionSettings = 'DiskEncryptionSettings'
+    isAnyWADiskIncluded = 'isAnyWADiskIncluded'
+    isAnyDirectDriveDiskIncluded = 'isAnyDirectDriveDiskIncluded'
+    diskEncryptionKey = "x-ms-meta-DiskEncryptionSettings"
+    instantAccessDurationMinutes = 'instantAccessDurationMinutes'
 
     onlyGuest = 'onlyGuest'
     firstGuestThenHost = 'firstGuestThenHost'
@@ -84,13 +106,15 @@ class CommonVariables:
     error_http_failure = 15
     FailedHandlerGuestAgentCertificateNotFound = 16
     #error_upload_status_blob = 16
+
     FailedRetryableSnapshotFailedNoNetwork = 76
     FailedSnapshotLimitReached = 85
     FailedRetryableSnapshotRateExceeded = 173
     FailedFsFreezeFailed = 121
     FailedFsFreezeTimeout = 122
     FailedUnableToOpenMount = 123
-
+    FailedSafeFreezeBinaryNotFound = 124
+    FailedHostSnapshotRemoteServerError = 556
     """
     Pre-Post Plugin error code definitions
     """
@@ -99,6 +123,7 @@ class CommonVariables:
     PrePost_ScriptStatus_Success = 0
     PrePost_ScriptStatus_Error = 1
     PrePost_ScriptStatus_Warning = 2
+    FailedInvalidDataDiskLunList = 17
 
     FailedPrepostPreScriptFailed = 300
     FailedPrepostPostScriptFailed = 301

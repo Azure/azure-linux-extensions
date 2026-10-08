@@ -357,13 +357,12 @@ $publicConfig = '{
 ```
 
 ## 4. Supported Linux Distributions
-- Ubuntu 14.04 LTS, 16.04 LTS, 18.04 LTS
-- Debian 8
+- Ubuntu 14.04 LTS, 16.04 LTS, 18.04 LTS and 20.04 LTS
+- Debian 8, 9 and 10
 - Oracle Linux 6 and 7
-- CentOS 6 and 7
-- RHEL 6 and 7
-- openSUSE 13.1 and 42.5
-- SUSE Linux Enterprise Server 11 SP3 and 12
+- CentOS 6, 7 and 8
+- RHEL 6, 7 and 8
+- SUSE Linux Enterprise Server 12 and 15
 
 ## 5. Debug
 * The status of the extension is reported back to Azure so that user can see the status on Azure Portal

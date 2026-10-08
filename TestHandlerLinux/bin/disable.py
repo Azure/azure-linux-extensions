@@ -28,8 +28,8 @@ waagent.Log(name+" - disable.py starting.")
 
 logfile=waagent.Log
 
-hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),
-                     time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),name,
+hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),name,
                      'Disable', 'transitioning', '0', 'Disabling', 'Process Config', 'transitioning', '0', 'Parsing ' + settings_file)
 hutil.doHealthReport(heartbeat_file,'NotReady','0','Proccessing Settings')
 
@@ -40,8 +40,8 @@ if not os.path.isfile(pidfile):
     error_string += pidfile +" is missing."
     error_string = "Error: " + error_string
     waagent.Error(error_string)
-    hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),
-                     time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),name,
+    hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),name,
                      'Disable', 'transitioning', '0', 'Disabling', 'Process Config', 'transitioning', '0', 'Parsing ' + settings_file)
 else:
     pid = waagent.GetFileContents(pidfile)

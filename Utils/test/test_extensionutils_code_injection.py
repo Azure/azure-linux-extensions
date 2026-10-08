@@ -16,7 +16,8 @@ class TestCodeInjection(unittest.TestCase):
     test_dir = "./test_output"
 
     def get_random_filename(self):
-        return tempfile.mktemp(dir=TestCodeInjection.test_dir)
+        f = tempfile.NamedTemporaryFile(dir=TestCodeInjection.test_dir, delete=False)
+        return f.name
 
     def cleanup(self):
         shutil.rmtree(TestCodeInjection.test_dir)

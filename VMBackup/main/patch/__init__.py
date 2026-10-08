@@ -31,16 +31,19 @@ from patch.KaliPatching import KaliPatching
 from patch.DefaultPatching import DefaultPatching
 from patch.FreeBSDPatching import FreeBSDPatching
 from patch.NSBSDPatching import NSBSDPatching
+from patch.AzureLinuxPatching import AzureLinuxPatching
+
+from Utils.DistroUtil import read_os_release
 
 # Define the function in case waagent(<2.0.4) doesn't have DistInfo()
 def DistInfo():
     try:
         if 'FreeBSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
+            release = re.sub('\\-.*$', '', str(platform.release()))
             distinfo = ['FreeBSD', release]
             return distinfo
         if 'NS-BSD' in platform.system():
-            release = re.sub('\-.*\Z', '', str(platform.release()))
+            release = re.sub('\\-.*$', '', str(platform.release()))
             distinfo = ['NS-BSD', release]
             return distinfo
         if 'linux_distribution' in dir(platform):
@@ -60,6 +63,10 @@ def DistInfo():
             return distinfo
         if 'Linux' in platform.system():
             distinfo = ["Default"]
+            # On Python 3.8+ linux_distribution is removed; detect via /etc/os-release
+            osr = read_os_release()
+            if osr.get("ID") == "azurelinux":
+                return ["azurelinux", osr.get("VERSION_ID", "")]
             if "ubuntu" in platform.version().lower():
                 distinfo[0] = "Ubuntu"
             elif 'suse' in platform.version().lower():
@@ -114,6 +121,12 @@ def GetMyPatching(logger):
             Distro = 'oracle'
         elif ('redhat'.lower() in Distro.lower()):
             Distro = 'redhat'
+        elif ('azurelinux' in Distro.lower()):
+            # Select the dedicated AzureLinuxPatching class (see
+            # patch/AzureLinuxPatching.py). NOTE: WaagentLib.GetMyDistro maps
+            # azurelinux -> 'fedora' for waagent's distro classes; the two
+            # mappings differ intentionally.
+            Distro = 'AzureLinux'
         elif ("Kali".lower() in Distro.lower()):
             Distro = 'Kali'
         elif ('FreeBSD'.lower() in  Distro.lower() or 'gaia'.lower() in Distro.lower() or 'panos'.lower() in Distro.lower()):

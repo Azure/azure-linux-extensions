@@ -141,6 +141,21 @@ name_map = {
 "LogicalDisk\\ReadsPerSecond" : {"plugin":"diskio_vmi", "field":"LogicalDisk\\\\\\\\ReadsPerSecond", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 "LogicalDisk\\WritesPerSecond" : {"plugin":"diskio_vmi", "field":"LogicalDisk\\\\\\\\WritesPerSecond", "op":"rate", "module":"filesystem"}, #Need to calculate rate (but each second not each interval)
 
+# Process plugin
+"Pct User Time" : {"plugin":"procstat", "field":"cpu_time_user", "module":"process"},
+"Pct Privileged Time" : {"plugin":"procstat", "field":"cpu_time_system", "module":"process"},
+"Used Memory" : {"plugin":"procstat", "field":"memory_rss", "module":"process"},
+"Virtual Shared Memory" : {"plugin":"procstat", "field":"memory_vms", "module":"process"},
+  
+# System plugin
+"Uptime" : {"plugin":"system", "field":"uptime", "module":"system"},
+"Load1" : {"plugin":"system", "field":"load1", "module":"system"},
+"Load5" : {"plugin":"system", "field":"load5", "module":"system"},
+"Load15" : {"plugin":"system", "field":"load15", "module":"system"},
+"Users" : {"plugin":"system", "field":"n_users", "module":"system"},
+"CPUs" : {"plugin":"system", "field":"n_cpus", "module":"system"},
+"Unique Users" : {"plugin":"system", "field":"n_unique_users", "module":"system"},
+
 # #OMI Disk plugin
 "disk->disk read guest os" : {"plugin":"diskio", "field":"read_bytes", "op":"rate", "ladtablekey":"/builtin/disk/readbytespersecond"},
 "disk->disk write guest os" : {"plugin":"diskio", "field":"write_bytes", "op":"rate", "ladtablekey":"/builtin/disk/writebytespersecond"},

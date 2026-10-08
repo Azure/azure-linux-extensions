@@ -32,7 +32,7 @@ waagent.Log(name+" - update.py starting.")
 
 logfile=waagent.Log
 
-hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),time.strftime("%Y-%M-%dT%H:%M:%SZ", time.gmtime()),name,
+hutil.doStatusReport(name,seqNo,version,status_file,time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),name,
                'Update', 'transitioning', '0', 'Updating', 'Process Config', 'transitioning', '0', 'Parsing ' + settings_file)
 hutil.doHealthReport(heartbeat_file,'NotReady','0','Proccessing Settings')
 
