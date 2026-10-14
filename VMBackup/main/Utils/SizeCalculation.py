@@ -11,6 +11,7 @@ except ImportError:
     import configparser as ConfigParsers
 import base64
 import json
+import re
 import tempfile
 import time
 from Utils.DiskUtil import DiskUtil
@@ -21,6 +22,15 @@ import subprocess
 import shlex
 from common import CommonVariables
 
+AZURE_DISK_SYMLINK_DIR = '/dev/disk/azure'
+SYS_BLOCK_DIR = '/sys/block'
+AZURE_NVME_REMOTE_DISK_MODEL = 'MSFT NVMe Accelerator v1.0'
+TEMP_DISK_WARNING_FILE = 'DATALOSS_WARNING_README.txt'
+DF_TIMEOUT_IN_SECONDS = 300
+
+# One row of POSIX (df -P) output; mount points may contain spaces.
+DF_LINE_REGEX = re.compile(r'^(?P<device>.+?)\s+(?P<size>-|\d+)\s+(?P<used>-|-?\d+)\s+(?P<available>-|-?\d+)\s+(?P<percent>-|\d+%)\s+(?P<mountpoint>/.*)$')
+
 class SizeCalculation(object):
 
     def __init__(self,patching, hutil, logger,para_parser):
@@ -29,7 +39,7 @@ class SizeCalculation(object):
         self.hutil = hutil
         self.includedLunList = []
         self.file_systems_info = []
-        self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
+        self.non_physical_file_systems = ['fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'iso']
         self.known_fs = ['ext3', 'ext4', 'jfs', 'xfs', 'reiserfs', 'devtmpfs', 'tmpfs', 'rootfs', 'fuse', 'nfs', 'cifs', 'overlay', 'aufs', 'lustre', 'secfs2', 'zfs', 'btrfs', 'iso']
         self.isOnlyOSDiskBackupEnabled = False
         try:
@@ -51,6 +61,14 @@ class SizeCalculation(object):
         self.disksToBeIncluded = []
         self.root_devices = []
         self.root_mount_points = ['/' , '/boot/efi']
+        self.os_disk_mount_points = ['/', '/boot', '/boot/efi']
+        self.lsscsi_list = []
+        self.output_lsblk = []
+        self.pvs_output = []
+        self.pvs_dict = {}
+        self.lvs_output = []
+        self.lv_segments = {}
+        self.partial_logicalVolumeGroups = []
 
         self.devicesToInclude = [] #partitions to be included
         self.device_mount_points = []
@@ -90,15 +108,212 @@ class SizeCalculation(object):
 
     def get_pvs_list(self):
         try:
-            command = "pvs"
+            command = "pvs --noheadings -o pv_name,vg_name"
             if (self.sudo_off == 0):
                 command = "sudo " + command
-            self.pvs_output = os.popen(command).read().strip().split("\n")
-            self.pvs_output = self.pvs_output[1:]
+            self.pvs_output = os.popen(command).read().strip().splitlines()
         except Exception as e:
             error_msg = "Failed to execute the command \"%s\" because of error %s , stack trace: %s" % (command, str(e), traceback.format_exc())
             self.logger.log(error_msg, True ,'Error')
             self.pvs_output = []
+
+    def build_pvs_dict(self):
+        '''
+            Builds {volume group : [physical volumes]} from "pvs --noheadings -o pv_name,vg_name"
+            Sample output:
+              /dev/sda4  rootvg
+              /dev/sdc1  datavg
+              /dev/sdd          (physical volume which is not part of any volume group)
+        '''
+        self.pvs_dict = {}
+        try:
+            for pvs_item in self.pvs_output:
+                pvs_item_split = pvs_item.strip().split()
+                if(len(pvs_item_split) >= 2):
+                    physicalVolume = pvs_item_split[0]
+                    logicalVolumeGroup = pvs_item_split[1]
+                    self.pvs_dict.setdefault(logicalVolumeGroup, []).append(physicalVolume)
+            self.logger.log("The pvs_dict contains {0}".format(str(self.pvs_dict)))
+        except Exception as e:
+            errMsg = 'Failed to serialize pvs_output with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
+
+    @staticmethod
+    def is_device_on_disk(device, disk):
+        # True if device is the disk itself or one of its partitions (/dev/sdc1 on /dev/sdc, /dev/nvme0n2p1 on /dev/nvme0n2)
+        if device is None or disk is None or not device.startswith(disk):
+            return False
+        suffix = device[len(disk):]
+        if suffix == '':
+            return True
+        if disk[-1].isdigit():
+            return re.match(r'^p\d+$', suffix) is not None
+        return suffix.isdigit()
+
+    def get_vg_lv_name(self, device):
+        '''
+            Returns (volume group, logical volume) of an LVM logical volume device, else (None, None).
+            /dev/mapper/<vg>-<lv> (a '-' inside a vg or lv name is escaped as '--') or /dev/<vg>/<lv>
+        '''
+        if device is None:
+            return None, None
+        if device.startswith('/dev/mapper/'):
+            name = device[len('/dev/mapper/'):]
+            index = 0
+            while index < len(name):
+                if name[index] == '-':
+                    if index + 1 < len(name) and name[index + 1] == '-':
+                        index += 2
+                        continue
+                    return name[:index].replace('--', '-'), name[index + 1:].replace('--', '-')
+                index += 1
+            return None, None
+        parts = device.split('/')
+        if len(parts) == 4 and parts[1] == 'dev' and parts[2] in self.pvs_dict:
+            return parts[2], parts[3]
+        return None, None
+
+    def get_vg_name(self, device):
+        return self.get_vg_lv_name(device)[0]
+
+    def has_azure_os_disk_symlink(self):
+        for name in ('root', 'os'):
+            if os.path.exists(os.path.join(AZURE_DISK_SYMLINK_DIR, name)):
+                return True
+        return False
+
+    def get_root_devices(self):
+        '''
+            Since root devices are at mount points '/', '/boot' and '/boot/efi' we use file_systems_info to find the root_devices based on the mount points.
+            Sample output for file_systems_info
+            [('sysfs', 'sysfs', '/sys'), ('proc', 'proc', '/proc'), ('udev', 'devtmpfs', '/dev'),..]
+            When the root file system is on LVM (/dev/mapper/rootvg-rootlv), the physical volumes of the volume group are added
+            so that the OS disk can be identified, unless the Azure udev rules already identify the OS disk.
+        '''
+        root_devices = []
+        for file_system in self.file_systems_info:
+            if(file_system[2] in self.os_disk_mount_points and file_system[0] not in root_devices):
+                root_devices.append(file_system[0])
+        if not self.has_azure_os_disk_symlink():
+            for root_device in list(root_devices):
+                vg_name = self.get_vg_name(root_device)
+                if vg_name is not None and vg_name in self.pvs_dict:
+                    for pv in self.pvs_dict[vg_name]:
+                        if pv not in root_devices:
+                            root_devices.append(pv)
+        return root_devices
+
+    def get_disk_luns_from_azure_symlinks(self):
+        '''
+            Uses the udev symlinks created by WALinuxAgent and azure-vm-utils
+              /dev/disk/azure/scsi1/lun<lun>   -> SCSI data disks
+              /dev/disk/azure/data/by-lun/<lun> -> NVMe (and SCSI) data disks
+              /dev/disk/azure/root, /dev/disk/azure/os -> OS disk
+        '''
+        disk_luns = {}
+        try:
+            for link_dir, prefix in ((os.path.join(AZURE_DISK_SYMLINK_DIR, 'scsi1'), 'lun'), (os.path.join(AZURE_DISK_SYMLINK_DIR, 'data', 'by-lun'), '')):
+                if not os.path.isdir(link_dir):
+                    continue
+                for name in os.listdir(link_dir):
+                    lun = name[len(prefix):] if name.startswith(prefix) else ''
+                    if lun.isdigit(): # skips partition links like lun0-part1
+                        disk_luns[os.path.realpath(os.path.join(link_dir, name))] = int(lun)
+            for name in ('root', 'os'):
+                link = os.path.join(AZURE_DISK_SYMLINK_DIR, name)
+                if os.path.exists(link):
+                    disk_luns[os.path.realpath(link)] = -1
+        except Exception as e:
+            errMsg = 'Failed to read the azure disk symlinks with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Warning')
+        return disk_luns
+
+    def get_azure_nvme_lun(self, device_name):
+        '''
+            For Azure remote NVMe disks (model "MSFT NVMe Accelerator v1.0") namespace 1 is the OS disk and namespace N is the data disk at LUN N-2.
+            Returns None for other NVMe devices (for example local NVMe temp disks).
+        '''
+        match = re.match(r'^nvme\d+n(\d+)$', os.path.basename(device_name))
+        if match is None:
+            return None
+        try:
+            with open(os.path.join(SYS_BLOCK_DIR, os.path.basename(device_name), 'device', 'model')) as model_file:
+                model = model_file.read().strip()
+        except (IOError, OSError):
+            return None
+        if model != AZURE_NVME_REMOTE_DISK_MODEL:
+            return None
+        namespace_id = int(match.group(1))
+        return -1 if namespace_id == 1 else namespace_id - 2
+
+    def add_azure_nvme_disk_luns(self, disk_luns):
+        try:
+            if not os.path.isdir(SYS_BLOCK_DIR):
+                return
+            for name in os.listdir(SYS_BLOCK_DIR):
+                device_name = '/dev/' + name
+                if device_name in disk_luns:
+                    continue
+                lun = self.get_azure_nvme_lun(device_name)
+                if lun is not None:
+                    disk_luns[device_name] = lun
+        except Exception as e:
+            errMsg = 'Failed to enumerate nvme disks with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Warning')
+
+    def is_non_physical_fs(self, fstype):
+        fstype = (fstype or '').lower()
+        if fstype == 'fuseblk': # FUSE on a local block device, for example ntfs-3g
+            return False
+        for nonPhysicalFsType in self.non_physical_file_systems:
+            if nonPhysicalFsType in fstype:
+                return True
+        return False
+
+    def get_resource_disk_device(self):
+        resource_disk_partition = self.resource_disk.get_resource_disk_mount_point(0)
+        self.logger.log("resource_disk_device: {0}".format(resource_disk_partition),True)
+        if resource_disk_partition:
+            return "/dev/{0}".format(resource_disk_partition)
+        resource_disk_link = os.path.join(AZURE_DISK_SYMLINK_DIR, 'resource-part1')
+        if os.path.exists(resource_disk_link):
+            resource_disk_device = os.path.realpath(resource_disk_link)
+            self.logger.log("resource_disk_device from {0}: {1}".format(resource_disk_link, resource_disk_device),True)
+            return resource_disk_device
+        self.logger.log("Unable to detect the resource disk, file systems having {0} at their root will be treated as temporary disks".format(TEMP_DISK_WARNING_FILE),True)
+        return None
+
+    def is_temp_disk(self, device, mountpoint, resource_disk_device):
+        if resource_disk_device is not None:
+            return device == resource_disk_device
+        return os.path.isfile(os.path.join(mountpoint, TEMP_DISK_WARNING_FILE))
+
+    def get_df_output(self, command):
+        # stdout goes to a file instead of a pipe so that a large df output can't fill the pipe buffer and block df
+        df_output_file = tempfile.TemporaryFile()
+        try:
+            df = subprocess.Popen(command, stdout=df_output_file)
+            process_wait_time = DF_TIMEOUT_IN_SECONDS
+            while(process_wait_time > 0 and df.poll() is None):
+                time.sleep(1)
+                process_wait_time -= 1
+            self.logger.log("df command executed for process wait time value" + str(process_wait_time), True)
+            if df.poll() is None:
+                self.logger.log("df command did not complete in {0} seconds".format(DF_TIMEOUT_IN_SECONDS), True, 'Error')
+                # not waiting for df to exit, it can be stuck in uninterruptible sleep on a hung network mount
+                try:
+                    df.kill()
+                except Exception:
+                    pass
+                return None
+            self.logger.log("df return code "+str(df.returncode), True)
+            df_output_file.seek(0)
+            output = df_output_file.read()
+        finally:
+            df_output_file.close()
+        if sys.version_info > (3,):
+            return output.decode('utf-8', 'backslashreplace')
+        return str(output)
 
     def get_loop_devices(self):
         global disk_util
@@ -113,59 +328,145 @@ class SizeCalculation(object):
                 disk_loop_devices_file_systems.append(file_system_info[0])
         return disk_loop_devices_file_systems
   
+    def get_disk_luns(self):
+        '''
+            Returns {disk device : LUN}, the OS disk has the LUN -1.
+            Azure udev symlinks are preferred, lsscsi is used for the SCSI disks which are not covered by them and
+            sysfs is used for the Azure remote NVMe disks.
+            Sample output of the lsscsi command
+            [1:0:0:15]   disk    Msft     Virtual Disk     1.0   /dev/sda
+            [1:0:0:18]   disk    Msft     Virtual Disk     1.0   /dev/sdc
+            [N:0:1:2]    disk    MSFT NVMe Accelerator v1.0__1   /dev/nvme0n2
+        '''
+        disk_luns = self.get_disk_luns_from_azure_symlinks()
+        self.logger.log("LUNs from azure disk symlinks {0}".format(disk_luns))
+        for item in self.lsscsi_list:
+            try:
+                hctl = item[item.index('[') + 1:item.index(']')]
+                device_name = item.split()[-1]
+                # nvme namespace ids are not LUNs, they are handled by add_azure_nvme_disk_luns
+                if hctl.startswith('N:') or not device_name.startswith('/dev/') or device_name in disk_luns:
+                    continue
+                disk_luns[device_name] = int(hctl.split(':')[-1])
+            except Exception as e:
+                self.logger.log("Unable to parse the lsscsi line {0}, error {1}".format(item, str(e)), True, 'Warning')
+        self.add_azure_nvme_disk_luns(disk_luns)
+        for device_name in disk_luns:
+            for root_device in self.root_devices:
+                if self.is_device_on_disk(root_device, device_name):
+                    disk_luns[device_name] = -1 # Changing the Lun# of OS Disk to -1
+        return disk_luns
+
     def disk_list_for_billing(self):
-        if(len(self.lsscsi_list) != 0):
-            for item in self.lsscsi_list:
-                idxOfColon = item.rindex(':',0,item.index(']'))# to get the index of last ':'
-                idxOfColon += 1
-                lunNumber = int(item[idxOfColon:item.index(']')])
-                # item_split is the list of elements present in the one row of the cmd sudo lsscsi
-                self.item_split = item.split()
-                #storing the corresponding device name from the list
-                device_name = self.item_split[len(self.item_split)-1]
-
-                for device in self.root_devices :
-                    if device_name in device :
-                        lunNumber = -1
-                        # Changing the Lun# of OS Disk to -1
-
+        disk_luns = self.get_disk_luns()
+        if(len(disk_luns) != 0):
+            for device_name in sorted(disk_luns.keys()):
+                lunNumber = disk_luns[device_name]
                 if lunNumber in self.includedLunList :
                     self.disksToBeIncluded.append(device_name)
-                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name))   
+                self.logger.log("LUN Number {0}, disk {1}".format(lunNumber,device_name))
             self.logger.log("Disks to be included {0}".format(self.disksToBeIncluded))
         else:
             self.size_calc_failed = True
-            self.logger.log("There is some glitch in executing the command 'lsscsi' and therefore size calculation is marked as failed.")
+            self.logger.log("Unable to map the disks to LUNs using lsscsi, azure disk symlinks or nvme namespaces and therefore size calculation is marked as failed.")
+
+    def is_pv_included(self, pv):
+        return any(self.is_device_on_disk(pv, disk) for disk in self.disksToBeIncluded)
 
     def get_logicalVolumes_for_billing(self):
-        try:
-            self.pvs_dict = {}
-            for pvs_item in self.pvs_output:
-                pvs_item_split  = pvs_item.strip().split()
-                if(len(pvs_item_split) > 2):
-                    physicalVolume = pvs_item_split[0]
-                    logicalVolumeGroup = pvs_item_split[1]
-                    if(logicalVolumeGroup in self.pvs_dict.keys()):
-                        self.pvs_dict.get(logicalVolumeGroup).append(physicalVolume)
-                    else:
-                        self.pvs_dict[logicalVolumeGroup] = []
-                        self.pvs_dict.get(logicalVolumeGroup).append(physicalVolume)
-            self.logger.log("The pvs_dict contains {0}".format(str(self.pvs_dict)))
-        except Exception as e:
-            errMsg = 'Failed to serialize pvs_output with error: %s, stack trace: %s' % (str(e), traceback.format_exc())
-            self.logger.log(errMsg, True, 'Error') 
+        partial_vgs = []
         for lvg in self.pvs_dict.keys():
-            count = 0
-            for disk in self.disksToBeIncluded:
-                for pv in self.pvs_dict[lvg]:
-                    if(disk in pv):
-                        count = count+1
-            if(count == len(self.pvs_dict[lvg])):
-                lvg = "/dev/mapper/" + lvg
+            included_pvs = [pv for pv in self.pvs_dict[lvg] if self.is_pv_included(pv)]
+            if len(included_pvs) == len(self.pvs_dict[lvg]):
                 self.logicalVolume_to_bill.append(lvg)
+            elif len(included_pvs) > 0:
+                partial_vgs.append(lvg)
+                self.logger.log("The logical volume group {0} spans included and excluded disks, its logical volumes are billed in proportion to their extents on the included disks".format(lvg))
             else:
-                self.logger.log("Partial snapshotting for the logical volume group {0} can't be taken".format(lvg))
-        self.logger.log("the lvm list to bill are {0}".format(self.logicalVolume_to_bill))
+                self.logger.log("The logical volume group {0} is not on any of the disks to be included".format(lvg))
+        self.partial_logicalVolumeGroups = partial_vgs
+        if len(partial_vgs) > 0:
+            self.get_lvs_list()
+            self.build_lv_segments()
+        self.logger.log("the lvm list to bill are {0}, partially included lvm list {1}".format(self.logicalVolume_to_bill, self.partial_logicalVolumeGroups))
+
+    def get_lvs_list(self):
+        try:
+            command = "lvs -a --segments --noheadings --separator : -o vg_name,lv_name,seg_size_pe,devices,pool_lv"
+            if (self.sudo_off == 0):
+                command = "sudo " + command
+            self.lvs_output = os.popen(command).read().strip().splitlines()
+        except Exception as e:
+            error_msg = "Failed to execute the command \"%s\" because of error %s , stack trace: %s" % (command, str(e), traceback.format_exc())
+            self.logger.log(error_msg, True ,'Error')
+            self.lvs_output = []
+
+    def build_lv_segments(self):
+        '''
+            Builds {(volume group, logical volume) : [(segment size in extents, [devices], pool)]} from
+            "lvs -a --segments --noheadings --separator : -o vg_name,lv_name,seg_size_pe,devices,pool_lv"
+            Sample output:
+              datavg:lvlinear:2559:/dev/sdc1(0):
+              datavg:lvstriped:512:/dev/sdc1(2559),/dev/sdd1(0):          (striped segment)
+              datavg:lvraid:256:lvraid_rimage_0(0),lvraid_rimage_1(0):    (raid / mirror)
+              datavg:[lvraid_rimage_0]:256:/dev/sdc1(3071):               (hidden sub volume)
+              datavg:thinlv:1024::pool                                    (thin volume)
+              datavg:pool:512:pool_tdata(0):                              (thin pool)
+        '''
+        self.lv_segments = {}
+        for line in self.lvs_output:
+            fields = [field.strip() for field in line.strip().split(':')]
+            if len(fields) < 5:
+                continue
+            vg_name, lv_name, seg_size, devices, pool = fields[:5]
+            try:
+                seg_size = int(seg_size)
+            except ValueError:
+                continue
+            devices = [re.sub(r'\(\d+\)$', '', device.strip()).strip('[]') for device in devices.split(',') if device.strip() != '']
+            self.lv_segments.setdefault((vg_name, lv_name.strip('[]')), []).append((seg_size, devices, pool.strip('[]')))
+        self.logger.log("The lv segments are {0}".format(str(self.lv_segments)))
+
+    def get_lv_extents_per_pv(self, vg_name, lv_name, visited=None):
+        # Resolves the extents of a logical volume to physical volumes, following raid/mirror/cache sub volumes and thin pools
+        if visited is None:
+            visited = set()
+        if (vg_name, lv_name) in visited or (vg_name, lv_name) not in self.lv_segments:
+            return {}
+        visited.add((vg_name, lv_name))
+        extents = {}
+        for seg_size, devices, pool in self.lv_segments[(vg_name, lv_name)]:
+            sub_volumes = [device for device in devices if not device.startswith('/dev/')]
+            if len(devices) == 0 and pool != '':
+                sub_volumes = [pool]
+            for device in devices:
+                if device.startswith('/dev/'):
+                    extents[device] = extents.get(device, 0) + float(seg_size) / len(devices)
+            for sub_volume in sub_volumes:
+                for pv, pv_extents in self.get_lv_extents_per_pv(vg_name, sub_volume, visited).items():
+                    extents[pv] = extents.get(pv, 0) + pv_extents
+        return extents
+
+    def get_lv_billing_fraction(self, device):
+        vg_name, lv_name = self.get_vg_lv_name(device)
+        if vg_name is None:
+            return 0
+        if vg_name in self.logicalVolume_to_bill:
+            return 1
+        if vg_name not in self.partial_logicalVolumeGroups:
+            return 0
+        extents = self.get_lv_extents_per_pv(vg_name, lv_name)
+        total_extents = sum(extents.values())
+        if total_extents <= 0:
+            self.logger.log("Unable to find the physical volumes of the logical volume {0}".format(device), True)
+            return 0
+        included_extents = sum(pv_extents for pv, pv_extents in extents.items() if self.is_pv_included(pv))
+        fraction = included_extents / total_extents
+        self.logger.log("Logical volume {0} has {1} of {2} extents on the included disks".format(device, included_extents, total_extents), True)
+        return fraction
+
+    def get_billable_lv_used(self, device, used):
+        return int(used * self.get_lv_billing_fraction(device))
 
     def device_list_for_billing(self):
         self.logger.log("In device_list_for_billing",True)
@@ -181,7 +482,6 @@ class SizeCalculation(object):
         '''
             Sample output for file_systems_info
             [('sysfs', 'sysfs', '/sys'), ('proc', 'proc', '/proc'), ('udev', 'devtmpfs', '/dev'),..]
-            Since root devices are at mount points '/' and '/boot/efi' we use file_system_info to find the root_devices based on the mount points.
         '''
 
         # check if user off the sudo usage in commands
@@ -192,17 +492,11 @@ class SizeCalculation(object):
         self.get_lsscsi_list() #populates self.lsscsi_list 
         self.get_lsblk_list() #populates self.lsblk_list
         self.get_pvs_list()#populates pvs list
+        self.build_pvs_dict()
 
-        for file_system in self.file_systems_info:
-            if(file_system[2] in self.root_mount_points):
-                self.root_devices.append(file_system[0])
+        self.root_devices = self.get_root_devices()
         self.logger.log("root_devices {0}".format(str(self.root_devices)))
         self.logger.log("lsscsi_list {0}".format(self.lsscsi_list))
-        '''
-            Sample output of the lsscsi command 
-            [1:0:0:15]   disk    Msft     Virtual Disk     1.0   /dev/sda
-            [1:0:0:18]   disk    Msft     Virtual Disk     1.0   /dev/sdc
-        '''
 
         self.disk_list_for_billing() 
         self.get_logicalVolumes_for_billing()
@@ -238,7 +532,7 @@ class SizeCalculation(object):
             self.logger.log("There is some glitch in executing the command 'lsblk -n --list --output name,mountpoint' and therefore size calculation is marked as failed.")
         
         for item in self.output_lsblk: 
-            item_split = item.split()
+            item_split = item.strip().split(None, 1) # mount points may contain spaces
             if(len(item_split)==2):
                 device = item_split[0]
                 mount_point = item_split[1]
@@ -248,7 +542,7 @@ class SizeCalculation(object):
             if device != '' and mount_point != '':
                 device = '/dev/' + device
                 for disk in self.disksToBeIncluded :
-                    if disk in device and device not in self.devicesToInclude:
+                    if self.is_device_on_disk(device, disk) and device not in self.devicesToInclude:
                         self.devicesToInclude.append(device)
                         self.device_mount_points.append(mount_point)
                         break              
@@ -263,45 +557,35 @@ class SizeCalculation(object):
 
             onlyLocalFilesystems = self.hutil.get_strvalue_from_configfile(CommonVariables.onlyLocalFilesystems, "False") 
             # df command gives the information of all the devices which have mount points
+            # -P (POSIX format) keeps every file system on a single line
             if onlyLocalFilesystems in ['True', 'true']:  
-                df = subprocess.Popen(["df" , "-kl"], stdout=subprocess.PIPE)
+                df_command = ["df" , "-klP"]
             else:
-                df = subprocess.Popen(["df" , "-k"], stdout=subprocess.PIPE)
+                df_command = ["df" , "-kP"]
 
             '''
             Sample output of the df command
-            Filesystem                                              Type     1K-blocks    Used    Avail Use% Mounted on
-            /dev/sda2                                               xfs       52155392 3487652 48667740   7% /
-            devtmpfs                                                devtmpfs   7170976       0  7170976   0% /dev
-            tmpfs                                                   tmpfs      7180624       0  7180624   0% /dev/shm
-            tmpfs                                                   tmpfs      7180624  760496  6420128  11% /run
-            tmpfs                                                   tmpfs      7180624       0  7180624   0% /sys/fs/cgroup
-            /dev/sda1                                               ext4        245679  151545    76931  67% /boot
-            /dev/sdb1                                               ext4      28767204 2142240 25140628   8% /mnt/resource
-            /dev/mapper/mygroup-thinv1                              xfs        1041644   33520  1008124   4% /bricks/brick1
-            /dev/mapper/mygroup-85197c258a54493da7880206251f5e37_0  xfs        1041644   33520  1008124   4% /run/gluster/snaps/85197c258a54493da7880206251f5e37/brick2
-            /dev/mapper/mygroup2-thinv2                             xfs       15717376 5276944 10440432  34% /tmp/test
-            /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0 xfs       15717376 5276944 10440432  34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
-            tmpfs                                                   tmpfs      1436128       0  1436128   0% /run/user/1000
-            //Centos72test/cifs_test                                cifs      52155392 4884620 47270772  10% /mnt/cifs_test2
+            Filesystem                                              1024-blocks    Used Available Capacity Mounted on
+            /dev/sda2                                                  52155392 3487652  48667740       7% /
+            devtmpfs                                                    7170976       0   7170976       0% /dev
+            tmpfs                                                       7180624       0   7180624       0% /dev/shm
+            tmpfs                                                       7180624  760496   6420128      11% /run
+            tmpfs                                                       7180624       0   7180624       0% /sys/fs/cgroup
+            /dev/sda1                                                    245679  151545     76931      67% /boot
+            /dev/sdb1                                                  28767204 2142240  25140628       8% /mnt/resource
+            /dev/mapper/mygroup-thinv1                                  1041644   33520   1008124       4% /bricks/brick1
+            /dev/mapper/mygroup-85197c258a54493da7880206251f5e37_0      1041644   33520   1008124       4% /run/gluster/snaps/85197c258a54493da7880206251f5e37/brick2
+            /dev/mapper/mygroup2-thinv2                                15717376 5276944  10440432      34% /tmp/test
+            /dev/mapper/mygroup2-63a858543baf4e40a3480a38a2f232a0_0    15717376 5276944  10440432      34% /run/gluster/snaps/63a858543baf4e40a3480a38a2f232a0/brick2
+            tmpfs                                                       1436128       0   1436128       0% /run/user/1000
+            //Centos72test/cifs_test                                   52155392 4884620  47270772      10% /mnt/cifs_test2
             '''
-            output = ""
-            process_wait_time = 300
-            while(df is not None and process_wait_time >0 and df.poll() is None):
-                time.sleep(1)
-                process_wait_time -= 1
-            self.logger.log("df command executed for process wait time value" + str(process_wait_time), True)
-            if(df is not None and df.poll() is not None):
-                self.logger.log("df return code "+str(df.returncode), True)
-                output = df.stdout.read().decode()
-            if sys.version_info > (3,):
-                try:
-                    output = str(output, encoding='utf-8', errors="backslashreplace")
-                except:
-                    output = str(output)
-            else:
-                output = str(output)
-            output = output.strip().split("\n")
+            output = self.get_df_output(df_command)
+            if output is None:
+                self.logger.log("Unable to get the output of df, so marking the size computation as failed and returning zero", True)
+                self.size_calc_failed = True
+                return 0,self.size_calc_failed
+            output = output.strip().splitlines()
             self.logger.log("output of df : {0}".format(str(output)),True)
             disk_loop_devices_file_systems = self.get_loop_devices()
             self.logger.log("outside loop device", True)
@@ -325,26 +609,29 @@ class SizeCalculation(object):
 
             output_length = len(output)
             index = 1
+            df_parse_failed = False
             self.resource_disk = ResourceDiskUtil(patching = self.patching, logger = self.logger)
-            resource_disk_device = self.resource_disk.get_resource_disk_mount_point(0)
-            self.logger.log("resource_disk_device: {0}".format(resource_disk_device),True)
-            resource_disk_device = "/dev/{0}".format(resource_disk_device)
+            resource_disk_device = self.get_resource_disk_device()
             self.logger.log("ResourceDisk is excluded in billing as it represents the Actual Temporary disk")
 
             if(self.LunListEmpty != True and self.isAnyDiskExcluded == True):
                 device_list = self.device_list_for_billing() #new logic: calculate the disk size for billing
 
             while index < output_length:
-                if(len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) < 6 ): #when a row is divided in 2 lines
-                    index = index+1
-                    if(index < output_length and len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index-1])) + len(Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])) == 6):
-                        output[index] = output[index-1] + output[index]
-                    else:
-                        self.logger.log("Output of df command is not in desired format",True)
-                        total_used = 0
-                        self.size_calc_failed = True
-                        break
-                device, size, used, available, percent, mountpoint =Utils.HandlerUtil.HandlerUtility.split(self.logger, output[index])
+                df_line = DF_LINE_REGEX.match(output[index].rstrip('\r'))
+                if df_line is None:
+                    if output[index].strip() != '':
+                        self.logger.log("Output of df command is not in desired format, skipping the line : {0}".format(output[index]),True)
+                        df_parse_failed = True
+                    index = index + 1
+                    continue
+                device = df_line.group('device')
+                size = df_line.group('size')
+                used = df_line.group('used')
+                available = df_line.group('available')
+                mountpoint = df_line.group('mountpoint')
+                if used == '-':
+                    used = '0'
                 fstype = ''
                 isNetworkFs = False
                 isKnownFs = False
@@ -359,10 +646,7 @@ class SizeCalculation(object):
                         fstype = file_system_info[1]
                 self.logger.log("index :{0} Device name : {1} fstype : {2} size : {3} used space in KB : {4} available space : {5} mountpoint : {6}".format(index,device,fstype,size,used,available,mountpoint),True)
 
-                for nonPhysicaFsType in self.non_physical_file_systems:
-                    if nonPhysicaFsType in fstype.lower():
-                        isNetworkFs = True
-                        break
+                isNetworkFs = self.is_non_physical_fs(fstype)
 
                 for knownFs in self.known_fs:
                     if knownFs in fstype.lower():
@@ -386,7 +670,7 @@ class SizeCalculation(object):
                     self.logger.log("Not Adding network-drive, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
-                elif device == "/dev/sdb1"  and self.isOnlyOSDiskBackupEnabled == False : #<todo> in some cases root is mounted on /dev/sdb1
+                elif self.isOnlyOSDiskBackupEnabled == False and self.is_temp_disk(device, mountpoint, resource_disk_device) :
                     self.logger.log("Not Adding temporary disk, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_temporary_disks = total_used_temporary_disks + int(used)
 
@@ -440,19 +724,21 @@ class SizeCalculation(object):
                                 total_used = total_used + int(used) #return in KB
                             else:
                                 #check for logicalVolumes
-                                templgv = device.split("-")
-                                if(len(templgv) > 1 and templgv[0] in self.logicalVolume_to_bill):
-                                    self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                                    total_used = total_used + int(used) #return in KB
+                                billable_lv_used = self.get_billable_lv_used(device, int(used))
+                                if(billable_lv_used > 0):
+                                    self.logger.log("Adding Device name : {0} for billing used space in KB : {1} billed used space in KB : {2} mount point : {3} fstype : {4}".format(device,used,billable_lv_used,mountpoint,fstype),True)
+                                    total_used = total_used + billable_lv_used #return in KB
+                                    excluded_disks_used = excluded_disks_used + int(used) - billable_lv_used
                                 else:
                                     self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                     excluded_disks_used = excluded_disks_used + int(used)
                         else:
                             # check for logicalVolumes even if os disk is not included
-                            templgv = device.split("-")
-                            if(len(templgv) > 1 and templgv[0] in self.logicalVolume_to_bill):
-                                self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                                total_used = total_used + int(used) #return in KB
+                            billable_lv_used = self.get_billable_lv_used(device, int(used))
+                            if(billable_lv_used > 0):
+                                self.logger.log("Adding Device name : {0} for billing used space in KB : {1} billed used space in KB : {2} mount point : {3} fstype : {4}".format(device,used,billable_lv_used,mountpoint,fstype),True)
+                                total_used = total_used + billable_lv_used #return in KB
+                                excluded_disks_used = excluded_disks_used + int(used) - billable_lv_used
                             else:
                                 self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                                 excluded_disks_used = excluded_disks_used + int(used)
@@ -486,6 +772,8 @@ class SizeCalculation(object):
             if total_sd_size != 0 :
                 Utils.HandlerUtil.HandlerUtility.add_to_telemetery_data("totalsdSize",str(total_sd_size))
             self.logger.log("Total sd* used space in Bytes : {0}".format(total_sd_size * 1024),True)
+            if df_parse_failed:
+                self.size_calc_failed = True
             self.logger.log("SizeComputationFailedFlag {0}".format(self.size_calc_failed))
             return total_used * 1024,self.size_calc_failed #Converting into Bytes
         except Exception as e:
