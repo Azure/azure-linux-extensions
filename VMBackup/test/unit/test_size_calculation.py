@@ -113,15 +113,16 @@ class SizeCalculationTests(unittest.TestCase):
 
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp(prefix="vmbackup-size-test-")
-        self.saved_constants = (self.module.AZURE_DISK_SYMLINK_DIR, self.module.SYS_BLOCK_DIR, self.module.DF_TIMEOUT_IN_SECONDS)
+        self.saved_constants = (self.module.AZURE_DISK_SYMLINK_DIR, self.module.SYS_BLOCK_DIR, self.module.DF_TIMEOUT_IN_SECONDS, self.module.PROC_MOUNTS_FILE)
         self.module.AZURE_DISK_SYMLINK_DIR = os.path.join(self.temp_dir, "azure")
         self.module.SYS_BLOCK_DIR = os.path.join(self.temp_dir, "sys", "block")
+        self.module.PROC_MOUNTS_FILE = os.path.join(self.temp_dir, "proc_mounts")
         _FakeResourceDiskUtil.partition = "sdb1"
         _FakeDiskUtil.file_systems_info = []
         _HandlerUtility.telemetry = {}
 
     def tearDown(self):
-        self.module.AZURE_DISK_SYMLINK_DIR, self.module.SYS_BLOCK_DIR, self.module.DF_TIMEOUT_IN_SECONDS = self.saved_constants
+        self.module.AZURE_DISK_SYMLINK_DIR, self.module.SYS_BLOCK_DIR, self.module.DF_TIMEOUT_IN_SECONDS, self.module.PROC_MOUNTS_FILE = self.saved_constants
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _calculator(self, lun_list, is_any_disk_excluded=False, df_output="", lsscsi=None, lsblk=None, pvs=None, lvs=None):
@@ -209,6 +210,56 @@ class SizeCalculationTests(unittest.TestCase):
 
         self.assertFalse(failed)
         self.assertEqual((1000 + 2000 + 4000) * 1024, total)
+
+    def test_btrfs_subvolumes_and_bind_mounts_are_counted_once(self):
+        _FakeDiskUtil.file_systems_info = [
+            ("/dev/sda3", "btrfs", "/"),
+            ("/dev/sda3", "btrfs", "/home"),
+            ("/dev/sda3", "btrfs", "/var"),
+            ("/dev/sdc1", "xfs", "/data"),
+            ("/dev/sdc1", "xfs", "/srv/data"),
+        ]
+        df_output = _df(("/dev/sda3", 5000, "/"),
+                        ("/dev/sda3", 5000, "/home"),
+                        ("/dev/sda3", 5000, "/var"),
+                        ("/dev/sdc1", 7000, "/data"),
+                        ("/dev/sdc1", 7000, "/srv/data"))
+        calc = self._calculator([-1, 0], df_output=df_output)
+
+        total, failed = calc.get_total_used_size()
+
+        self.assertFalse(failed)
+        self.assertEqual((5000 + 7000) * 1024, total)
+
+    def test_only_block_device_file_systems_are_counted(self):
+        # Seen in production: cluster / network file systems with unknown type names and
+        # NFS / tmpfs mounted after the cached mount output was taken (empty fstype)
+        _FakeDiskUtil.file_systems_info = [
+            ("/dev/sda1", "xfs", "/"),
+            ("10.70.32.100/wkafs01", "wekafs", "/cpfs/wkafs01"),
+            ("mvfs", "mvfs", "/rview"),
+            ("snfs1", "cvfs", "/data/snfs1"),
+            ("rpool/data", "zfs", "/rpool/data"),
+        ]
+        self._write(self.module.PROC_MOUNTS_FILE,
+                    "/dev/sda1 / xfs rw 0 0\n"
+                    "10.24.34.76:/sd/mount/oracle /mnt/oracle\\040backup nfs4 rw 0 0\n"
+                    "tmpfs /run/user/1000 tmpfs rw 0 0\n")
+        df_output = _df(("/dev/sda1", 1000, "/"),
+                        ("10.70.32.100/wkafs01", 10000000, "/cpfs/wkafs01"),
+                        ("mvfs", 20000000, "/rview"),
+                        ("snfs1", 30000000, "/data/snfs1"),
+                        ("10.24.34.76:/sd/mount/oracle", 40000000, "/mnt/oracle backup"),
+                        ("tmpfs", 50000000, "/run/user/1000"),
+                        ("/dev/sdx1", 60000000, "/late/unknown"),
+                        ("rpool/data", 2000, "/rpool/data"))
+        calc = self._calculator([-1, 0], df_output=df_output)
+
+        total, failed = calc.get_total_used_size()
+
+        self.assertFalse(failed)
+        self.assertEqual((1000 + 60000000 + 2000) * 1024, total)
+        self.assertEqual("nfs4", calc.get_proc_mounts_fstypes()[("10.24.34.76:/sd/mount/oracle", "/mnt/oracle backup")])
 
     def test_resource_disk_is_excluded(self):
         _FakeDiskUtil.file_systems_info = [("/dev/sda1", "ext4", "/"), ("/dev/sdb1", "ext4", "/mnt")]

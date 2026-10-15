@@ -24,6 +24,7 @@ from common import CommonVariables
 
 AZURE_DISK_SYMLINK_DIR = '/dev/disk/azure'
 SYS_BLOCK_DIR = '/sys/block'
+PROC_MOUNTS_FILE = '/proc/self/mounts'
 AZURE_NVME_REMOTE_DISK_MODEL = 'MSFT NVMe Accelerator v1.0'
 TEMP_DISK_WARNING_FILE = 'DATALOSS_WARNING_README.txt'
 DF_TIMEOUT_IN_SECONDS = 300
@@ -69,6 +70,7 @@ class SizeCalculation(object):
         self.lvs_output = []
         self.lv_segments = {}
         self.partial_logicalVolumeGroups = []
+        self.counted_devices = set()
 
         self.devicesToInclude = [] #partitions to be included
         self.device_mount_points = []
@@ -270,6 +272,35 @@ class SizeCalculation(object):
                 return True
         return False
 
+    @staticmethod
+    def is_block_device_fs(device, fstype):
+        # Only file systems on block devices (and zfs datasets) can be on the backed up disks.
+        # This excludes network and cluster file systems whatever their type is called (wekafs, mvfs, cvfs, gpfs, nfs mounted later, ...)
+        return device.startswith('/dev/') or (fstype or '').lower() == 'zfs'
+
+    @staticmethod
+    def unescape_mount_field(field):
+        # /proc/self/mounts escapes space, tab, newline and backslash as octal
+        return re.sub(r'\\([0-7]{3})', lambda match: chr(int(match.group(1), 8)), field)
+
+    def get_proc_mounts_fstypes(self):
+        '''
+            Reads the current mount table so that file systems mounted after the cached mount output was taken also get their type.
+            Returns {(device, mount point) : fstype}
+        '''
+        fstypes = {}
+        try:
+            if os.path.isfile(PROC_MOUNTS_FILE):
+                with open(PROC_MOUNTS_FILE) as mounts_file:
+                    for line in mounts_file:
+                        fields = line.split()
+                        if len(fields) >= 3:
+                            fstypes[(self.unescape_mount_field(fields[0]), self.unescape_mount_field(fields[1]))] = fields[2]
+        except Exception as e:
+            errMsg = 'Failed to read %s with error: %s, stack trace: %s' % (PROC_MOUNTS_FILE, str(e), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Warning')
+        return fstypes
+
     def get_resource_disk_device(self):
         resource_disk_partition = self.resource_disk.get_resource_disk_mount_point(0)
         self.logger.log("resource_disk_device: {0}".format(resource_disk_partition),True)
@@ -468,6 +499,15 @@ class SizeCalculation(object):
     def get_billable_lv_used(self, device, used):
         return int(used * self.get_lv_billing_fraction(device))
 
+    def count_device_once(self, device, used):
+        # A block device shows up once per mount (btrfs subvolumes, bind mounts) with the used size of the whole file system
+        if device.startswith('/dev/'):
+            if device in self.counted_devices:
+                self.logger.log("Device {0} is already counted, skipping its used space in KB : {1}".format(device, used), True)
+                return 0
+            self.counted_devices.add(device)
+        return used
+
     def device_list_for_billing(self):
         self.logger.log("In device_list_for_billing",True)
         devices_to_bill = [] #list to store device names to be billed
@@ -610,6 +650,8 @@ class SizeCalculation(object):
             output_length = len(output)
             index = 1
             df_parse_failed = False
+            self.counted_devices = set()
+            proc_mount_fstypes = self.get_proc_mounts_fstypes()
             self.resource_disk = ResourceDiskUtil(patching = self.patching, logger = self.logger)
             resource_disk_device = self.get_resource_disk_device()
             self.logger.log("ResourceDisk is excluded in billing as it represents the Actual Temporary disk")
@@ -641,9 +683,11 @@ class SizeCalculation(object):
                     self.size_calc_failed = True
                     return 0,self.size_calc_failed
 
-                for file_system_info in self.file_systems_info:
-                    if device == file_system_info[0] and mountpoint == file_system_info[2]:
-                        fstype = file_system_info[1]
+                fstype = proc_mount_fstypes.get((device, mountpoint), '')
+                if fstype == '':
+                    for file_system_info in self.file_systems_info:
+                        if device == file_system_info[0] and mountpoint == file_system_info[2]:
+                            fstype = file_system_info[1]
                 self.logger.log("index :{0} Device name : {1} fstype : {2} size : {3} used space in KB : {4} available space : {5} mountpoint : {6}".format(index,device,fstype,size,used,available,mountpoint),True)
 
                 isNetworkFs = self.is_non_physical_fs(fstype)
@@ -690,17 +734,23 @@ class SizeCalculation(object):
                     self.logger.log("Not Adding network-drive as it starts with slahes, Device name : {0} used space in KB : {1} fstype : {2}".format(device,used,fstype),True)
                     total_used_network_shares = total_used_network_shares + int(used)
 
+                elif not self.is_block_device_fs(device, fstype):
+                    if fstype not in network_fs_types :
+                        network_fs_types.append(fstype)
+                    self.logger.log("Not Adding as it is not on a block device, Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
+                    total_used_network_shares = total_used_network_shares + int(used)
+
                 else:
                     #Only when OS disk is included
                     if(self.isOnlyOSDiskBackupEnabled == True):
                         if(mountpoint == '/'):
-                            total_used = total_used + int(used)
+                            total_used = total_used + self.count_device_once(device, int(used))
                             self.logger.log("Adding only root device to size calculation. Device name : {0} used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             self.logger.log("Total Used Space: {0}".format(total_used),True)
                     #Handling a case where LunList is empty for UnmanagedVM's and failures if occurred( as we will billing for all the non resource disks)
                     elif( (self.size_calc_failed == True or self.LunListEmpty == True) and device != resource_disk_device):
                         self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                        total_used = total_used + int(used) #return in KB
+                        total_used = total_used + self.count_device_once(device, int(used)) #return in KB
                     #LunList is empty but the device is an actual temporary disk so excluding it
                     elif( (self.size_calc_failed == True or self.LunListEmpty == True) and device == resource_disk_device):
                         self.logger.log("Device {0} is not included for billing as it is a resource disk, used space in KB : {1} mount point : {2} fstype :{3}".format(device,used,mountpoint,fstype),True)
@@ -710,24 +760,24 @@ class SizeCalculation(object):
                         if self.isAnyDiskExcluded == False and device != resource_disk_device:
                             #No disk has been excluded So can include every non resource disk
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                            total_used = total_used + int(used) #return in KB
+                            total_used = total_used + self.count_device_once(device, int(used)) #return in KB
                         elif self.isAnyDiskExcluded == False and device == resource_disk_device:
                             #excluding resource disk even in the case where all disks are included as it is the actual temporary disk
                             self.logger.log("Device {0} is not included for billing as it is a resource disk, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
                             excluded_disks_used = excluded_disks_used + int(used)
                         elif mountpoint in self.device_mount_points and device != resource_disk_device:
                             self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                            total_used = total_used + int(used) #return in KB
+                            total_used = total_used + self.count_device_once(device, int(used)) #return in KB
                         elif device != resource_disk_device and -1 in self.includedLunList:
                             if mountpoint in self.root_mount_points :
                                 self.logger.log("Adding Device name : {0} for billing used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
-                                total_used = total_used + int(used) #return in KB
+                                total_used = total_used + self.count_device_once(device, int(used)) #return in KB
                             else:
                                 #check for logicalVolumes
                                 billable_lv_used = self.get_billable_lv_used(device, int(used))
                                 if(billable_lv_used > 0):
                                     self.logger.log("Adding Device name : {0} for billing used space in KB : {1} billed used space in KB : {2} mount point : {3} fstype : {4}".format(device,used,billable_lv_used,mountpoint,fstype),True)
-                                    total_used = total_used + billable_lv_used #return in KB
+                                    total_used = total_used + self.count_device_once(device, billable_lv_used) #return in KB
                                     excluded_disks_used = excluded_disks_used + int(used) - billable_lv_used
                                 else:
                                     self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
@@ -737,7 +787,7 @@ class SizeCalculation(object):
                             billable_lv_used = self.get_billable_lv_used(device, int(used))
                             if(billable_lv_used > 0):
                                 self.logger.log("Adding Device name : {0} for billing used space in KB : {1} billed used space in KB : {2} mount point : {3} fstype : {4}".format(device,used,billable_lv_used,mountpoint,fstype),True)
-                                total_used = total_used + billable_lv_used #return in KB
+                                total_used = total_used + self.count_device_once(device, billable_lv_used) #return in KB
                                 excluded_disks_used = excluded_disks_used + int(used) - billable_lv_used
                             else:
                                 self.logger.log("Device {0} is not included for billing as it is not part of the disks to be included, used space in KB : {1} mount point : {2} fstype : {3}".format(device,used,mountpoint,fstype),True)
