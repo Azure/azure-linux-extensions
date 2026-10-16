@@ -67,12 +67,12 @@ class UbuntuPatching(AbstractPatching):
         if ret == CommonVariables.process_success:
             self.logger.log("azguestattestation1 package is already available!")
             return True
-        cmd = 'wget https://packages.microsoft.com/repos/azurecore/pool/main/a/azguestattestation1/azguestattestation1_1.0.5_amd64.deb'
+        cmd = 'wget https://packages.microsoft.com/repos/azurecore/pool/main/a/azguestattestation1/azguestattestation1_1.1.2_amd64.deb'
         #download the package
         ret = self.command_executor.Execute(cmd,timeout=30)
         if ret == CommonVariables.process_success:
             #install package
-            cmd = 'dpkg -i azguestattestation1_1.0.5_amd64.deb'
+            cmd = 'dpkg -i azguestattestation1_1.1.2_amd64.deb'
             ret = self.command_executor.Execute(cmd,timeout=30)
             if ret == CommonVariables.process_success:
                 self.logger.log("azguestattestation1 package installation is successful!")
