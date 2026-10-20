@@ -47,6 +47,66 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import agent
 
 
+class TestRpmSigningKey(unittest.TestCase):
+    def setUp(self):
+        for name in ('exit_if_vm_not_supported', 'find_package_manager', 'set_os_arch',
+                     'hutil_log_info', 'hutil_log_error', 'os.chmod'):
+            patcher = patch('agent.' + name)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        patcher = patch('agent.find_vm_distro', return_value=('redhat', '10.0'))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch('agent.get_installed_package_version', return_value=(False, []))
+        self.installed = patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch('agent.run_command_and_log', return_value=(9, 'unexpected command'))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch('agent.run_command_with_retries_output')
+        self.run = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_imports_key_before_rpm_install(self):
+        for arch in ('x86_64', 'aarch64'):
+            with self.subTest(arch=arch), patch.object(agent, 'PackageManager', 'rpm'), \
+                    patch.object(agent, 'BundleFileName', 'azuremonitoragent-1.0.' + arch + '.rpm'):
+                self.run.reset_mock()
+                self.run.side_effect = [(0, ''), (7, 'install failed')]
+                self.assertEqual((7, 'install failed'), agent.install())
+                commands = [call.args[0] for call in self.run.call_args_list]
+                key_path = os.path.join(os.path.dirname(os.path.abspath(agent.__file__)), 'microsoft-2025.asc')
+                self.assertEqual('rpm --import "{0}"'.format(key_path), commands[0])
+                self.assertIn(' -i ', commands[1])
+                self.assertTrue(commands[1].endswith(agent.BundleFileName))
+
+    def test_import_failure_prevents_install(self):
+        with patch.object(agent, 'PackageManager', 'rpm'):
+            self.run.return_value = (2, 'key import failed')
+            self.assertEqual((2, 'key import failed'), agent.install())
+            self.run.assert_called_once()
+            self.assertTrue(self.run.call_args.args[0].startswith('rpm --import '))
+            self.assertIs(self.run.call_args.kwargs['retry_check'], agent.retry_if_dpkg_or_rpm_locked)
+            self.assertIs(self.run.call_args.kwargs['final_check'], agent.final_check_if_dpkg_or_rpm_locked)
+            agent.hutil_log_error.assert_called_once()
+
+    def test_dpkg_does_not_import_rpm_key(self):
+        with patch.object(agent, 'PackageManager', 'dpkg'):
+            self.run.return_value = (7, 'install failed')
+            self.assertEqual((7, 'install failed'), agent.install())
+            self.run.assert_called_once()
+            self.assertTrue(self.run.call_args.args[0].startswith('dpkg '))
+
+    def test_already_installed_does_not_import_key(self):
+        with patch.object(agent, 'PackageManager', 'rpm'), \
+                patch.object(agent, 'get_current_bundle_file', return_value='azuremonitoragent-1.0'), \
+                patch.object(agent, 'copy_amacoreagent_binaries', side_effect=RuntimeError('after install')):
+            self.installed.return_value = (True, ['azuremonitoragent-1.0'])
+            with self.assertRaisesRegex(RuntimeError, 'after install'):
+                agent.install()
+            self.run.assert_not_called()
+
+
 class TestIsTruthy(unittest.TestCase):
     """Tests for is_truthy function."""
 
