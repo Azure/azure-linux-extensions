@@ -61,7 +61,7 @@ class TestRpmSigningKey(unittest.TestCase):
         self.installed = patcher.start()
         self.addCleanup(patcher.stop)
         patcher = patch('agent.run_command_and_log', return_value=(9, 'unexpected command'))
-        patcher.start()
+        self.command = patcher.start()
         self.addCleanup(patcher.stop)
         patcher = patch('agent.run_command_with_retries_output')
         self.run = patcher.start()
@@ -80,15 +80,28 @@ class TestRpmSigningKey(unittest.TestCase):
                 self.assertIn(' -i ', commands[1])
                 self.assertTrue(commands[1].endswith(agent.BundleFileName))
 
-    def test_import_failure_prevents_install(self):
+    def test_import_failure_continues_to_rpm_install(self):
         with patch.object(agent, 'PackageManager', 'rpm'):
-            self.run.return_value = (2, 'key import failed')
-            self.assertEqual((2, 'key import failed'), agent.install())
-            self.run.assert_called_once()
-            self.assertTrue(self.run.call_args.args[0].startswith('rpm --import '))
-            self.assertIs(self.run.call_args.kwargs['retry_check'], agent.retry_if_dpkg_or_rpm_locked)
-            self.assertIs(self.run.call_args.kwargs['final_check'], agent.final_check_if_dpkg_or_rpm_locked)
-            agent.hutil_log_error.assert_called_once()
+            self.run.side_effect = [(2, 'key import failed'), (0, 'package installed')]
+            self.command.return_value = (9, 'after package install')
+            self.assertEqual((9, 'after package install'), agent.install())
+            import_call, install_call = self.run.call_args_list
+            self.assertTrue(import_call.args[0].startswith('rpm --import '))
+            self.assertTrue(install_call.args[0].startswith('rpm '))
+            self.assertIn(' -i ', install_call.args[0])
+            self.assertIs(import_call.kwargs['retry_check'], agent.retry_if_dpkg_or_rpm_locked)
+            self.assertIs(import_call.kwargs['final_check'], agent.final_check_if_dpkg_or_rpm_locked)
+            agent.hutil_log_error.assert_called_once_with(
+                "Failed to import the Azure Monitor Agent RPM signing key (exit code 2); "
+                "continuing installation using keys already trusted by RPM.")
+            self.command.assert_called_once_with("systemctl daemon-reload")
+
+    def test_rpm_failure_after_import_failure_is_returned(self):
+        with patch.object(agent, 'PackageManager', 'rpm'):
+            self.run.side_effect = [(2, 'key import failed'), (1, 'signature not trusted')]
+            self.assertEqual((1, 'signature not trusted'), agent.install())
+            self.assertEqual(2, self.run.call_count)
+            self.command.assert_not_called()
 
     def test_dpkg_does_not_import_rpm_key(self):
         with patch.object(agent, 'PackageManager', 'dpkg'):

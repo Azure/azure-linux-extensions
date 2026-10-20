@@ -552,8 +552,8 @@ def install():
                 retry_check=retry_if_dpkg_or_rpm_locked,
                 final_check=final_check_if_dpkg_or_rpm_locked)
             if exit_code != 0:
-                hutil_log_error("Failed to import the Azure Monitor Agent RPM signing key.")
-                return exit_code, output
+                hutil_log_error("Failed to import the Azure Monitor Agent RPM signing key (exit code {0}); "
+                                "continuing installation using keys already trusted by RPM.".format(exit_code))
         AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
         hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
 
