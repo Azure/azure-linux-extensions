@@ -104,11 +104,17 @@ class TestRpmSigningKey(unittest.TestCase):
             self.command.assert_not_called()
 
     def test_dpkg_does_not_import_rpm_key(self):
-        with patch.object(agent, 'PackageManager', 'dpkg'):
-            self.run.return_value = (7, 'install failed')
-            self.assertEqual((7, 'install failed'), agent.install())
-            self.run.assert_called_once()
-            self.assertTrue(self.run.call_args.args[0].startswith('dpkg '))
+        for arch in ('x86_64', 'aarch64'):
+            with self.subTest(arch=arch), patch.object(agent, 'PackageManager', 'dpkg'), \
+                    patch.object(agent, 'BundleFileName', 'azuremonitoragent_1.0_' + arch + '.deb'):
+                self.run.reset_mock()
+                self.run.return_value = (7, 'install failed')
+                self.assertEqual((7, 'install failed'), agent.install())
+                self.run.assert_called_once()
+                command = self.run.call_args.args[0]
+                self.assertTrue(command.startswith('dpkg '))
+                self.assertIn(' -i ', command)
+                self.assertTrue(command.endswith(agent.BundleFileName))
 
     def test_already_installed_does_not_import_key(self):
         with patch.object(agent, 'PackageManager', 'rpm'), \
