@@ -36,6 +36,8 @@ python -m unittest discover -s test -p "test_*.py" -v
 
 Unit-test modules should be placed under `test/unit/` and named `test_<module>.py`. Keep reusable helpers under `test/helpers/`.
 
+Status-reporting regression tests verify that retryable host-server error 556 uses green VM health and that unmapped error codes use red VM health without blocking terminal status. The original numeric error code is retained in VM health status; unmapped codes are also logged and included in `unmappedExtensionErrorCode` telemetry.
+
 Pull-request validation runs the unit tests on Python 2.7.18 in a digest-pinned container and on Python 3.8 through Python 3.14 using the GitHub-hosted Python tool cache.
 
 ## Measure code coverage

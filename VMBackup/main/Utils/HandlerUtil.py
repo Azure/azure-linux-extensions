@@ -675,6 +675,14 @@ class HandlerUtility:
             each_telemetry_data["Key"] = k
             HandlerUtility.serializable_telemetry_data.append(each_telemetry_data)
  
+    def get_vm_health_state(self):
+        try:
+            return ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode]
+        except KeyError:
+            self.log("Warning: Unmapped extension error code {0}; using red VM health.".format(self.ExtErrorCode))
+            HandlerUtility.add_to_telemetery_data("unmappedExtensionErrorCode", str(self.ExtErrorCode))
+            return Utils.Status.ExtVmHealthStateEnum.red
+
     def do_status_report(self, operation, status, status_code, message, taskId = None, commandStartTimeUTCTicks = None, snapshot_info = None,total_size = 0,failure_flag = True ):
         self.log("{0},{1},{2},{3},{4}".format(operation, status, status_code, message, failure_flag ))
         sub_stat = []
@@ -693,7 +701,7 @@ class HandlerUtility:
             message = "{0} {1}={2}, ".format(message , CommonVariables.statusBlobUploadError , HandlerUtility.telemetry_data[CommonVariables.statusBlobUploadError])
         message = message + snapshotTelemetry
 
-        vm_health_obj = Utils.Status.VmHealthInfoObj(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode], int(self.ExtErrorCode))
+        vm_health_obj = Utils.Status.VmHealthInfoObj(self.get_vm_health_state(), int(self.ExtErrorCode))
 
         consistencyTypeStr = CommonVariables.consistency_crashConsistent
         if (self.SnapshotConsistency != Utils.Status.SnapshotConsistencyType.crashConsistent):
@@ -791,7 +799,7 @@ class HandlerUtility:
 
     def do_exit(self, exit_code, operation,status,code,message):
         try:
-            HandlerUtility.add_to_telemetery_data("extErrorCode", str(ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.ExtensionErrorCodeDict[self.ExtErrorCode]))
+            HandlerUtility.add_to_telemetery_data("extErrorCode", str(self.get_vm_health_state()))
             self.do_status_report(operation, status,code,message)
         except Exception as e:
             self.log("Can't update status: " + str(e))
