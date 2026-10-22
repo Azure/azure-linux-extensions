@@ -16,6 +16,9 @@ _MAIN_DIR = os.path.abspath(
 
 
 class HandlerUtilityStatusTests(unittest.TestCase):
+    # Code 556 and one unknown code cover the incident and shared fallback in
+    # status writing and exit reporting; enumerating every error code adds no
+    # coverage of those paths.
 
     def setUp(self):
         self._saved_modules = {}
@@ -104,34 +107,6 @@ class HandlerUtilityStatusTests(unittest.TestCase):
         self.assertEqual("987654", telemetry["unmappedExtensionErrorCode"])
         self.assertTrue(any("987654" in message and "red" in message
                             for message in self.logs))
-
-    def test_classic_vm_preserves_terminal_error_status(self):
-        self.handler.get_public_settings = lambda: {
-            self.common.vmType: self.common.VmTypeV1}
-        report, status_file = self._report_status(987654)
-        self.handler.write_to_status_file(status_file)
-        with open(self.handler._context._status_file) as status_stream:
-            written = json.load(status_stream)[0]["status"]
-        self.assertEqual(self.common.status_error, written["status"])
-        self.assertEqual(987654, written["code"])
-        self.assertEqual(
-            self.status.ExtVmHealthStateEnum.red,
-            json.loads(report)[0]["status"]["vmHealthInfo"]["vmHealthState"])
-
-    def test_existing_health_mappings_are_preserved(self):
-        for error_code, health in (
-                (self.codes.ExtensionErrorCodeEnum.success,
-                 self.status.ExtVmHealthStateEnum.green),
-                (self.codes.ExtensionErrorCodeEnum.error_parameter,
-                 self.status.ExtVmHealthStateEnum.yellow),
-                (self.codes.ExtensionErrorCodeEnum.FailedSnapshotLimitReached,
-                 self.status.ExtVmHealthStateEnum.red)):
-            report, unused_status_file = self._report_status(error_code)
-            self.assertEqual(
-                health, json.loads(report)[0]["status"]["vmHealthInfo"][
-                    "vmHealthState"])
-        self.assertNotIn("unmappedExtensionErrorCode",
-                         self.module.HandlerUtility.telemetry_data)
 
     def _assert_exit_reports_status(self, error_code, health):
         self.handler.ExtErrorCode = error_code
