@@ -1909,6 +1909,73 @@ def stop_transformconfig_process():
 
         run_command_and_log("rm "+ pids_filepath)
 
+def restart_metrics_process(name, running, retries, restart, errors, hutil_error, hutil_log,
+                            force=False):
+    max_retries = 10
+    if running:
+        retries[name] = 0
+        errors.pop(name, None)
+        if not force:
+            return
+
+    exhausted_message = (
+        '{0} is not running after {1} restart attempts. Inspect its service logs and '
+        'correct the failure before restarting the extension.'.format(name, max_retries))
+    if retries[name] >= max_retries:
+        errors[name] = exhausted_message
+        return
+
+    # Count before starting so setup exceptions cannot bypass the retry budget.
+    retries[name] += 1
+    hutil_log('Restarting {0}, attempt {1}/{2}.'.format(name, retries[name], max_retries))
+    try:
+        started, message = restart()
+        if started:
+            hutil_log('Started {0}.'.format(name))
+        else:
+            hutil_error(message)
+            if retries[name] == max_retries:
+                errors[name] = exhausted_message
+    except Exception as error:
+        hutil_error('Unable to restart {0}: {1}'.format(name, error))
+        if retries[name] == max_retries:
+            errors[name] = exhausted_message
+
+
+def report_metrics_restart_status(errors, previous_message):
+    global SettingsSequenceNumber
+    message = '; '.join(errors[key] for key in sorted(errors)) or None
+    if message == previous_message:
+        return previous_message
+    try:
+        # A long-lived watcher must report against the current settings sequence.
+        SettingsSequenceNumber = None
+        if message:
+            hutil_log_error(message)
+            update_status_file('Enable', str(GenericErrorCode), 'error', message)
+        else:
+            hutil_log_info('Metrics restart failures cleared.')
+            update_status_file('Enable', '0', 'success', 'Metrics restart failures cleared.')
+    except Exception:
+        hutil_log_error('Unable to update metrics restart status.')
+        return previous_message
+    return message
+
+
+def start_metrics_extension(managed_identity, service_template, cmv2):
+    template = os.path.join(os.getcwd(), 'services', 'metrics-extension.service')
+    if os.path.exists(template):
+        os.remove(template)
+    copyfile(os.path.join(os.getcwd(), 'services', service_template), template)
+    options = dict(is_lad=False, managed_identity=managed_identity, HUtilObj=HUtilObject)
+    if cmv2:
+        options['is_local_control_channel'] = False
+    me_handler.setup_me(**options)
+    if cmv2:
+        return me_handler.start_metrics_cmv2()
+    return me_handler.start_metrics(is_lad=False, managed_identity=managed_identity)
+
+
 def metrics_watcher(hutil_error, hutil_log):
     """
     Watcher thread to monitor metric configuration changes and to take action on them
@@ -1933,43 +2000,23 @@ def metrics_watcher(hutil_error, hutil_log):
     me_msi_token_expiry_epoch = None
     enabled_me_CMv2_mode = False
     log_messages = ""
+    restart_retries = {'Telegraf': 0, 'MetricsExtension': 0}
+    restart_errors = {}
+    last_restart_status = None
 
     while True:
         try:
             if not azureotelcollector_is_active():
                 install_azureotelcollector()
 
-            if not me_handler.is_running(is_lad=False):
-                me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
-
-                try:
-                    if is_feature_enabled("enableAzureOTelCollector"):
-                        if os.path.exists(me_service_template_path):
-                            os.remove(me_service_template_path)
-                        copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
-                        me_handler.setup_me(
-                            is_lad=False,
-                            managed_identity=managed_identity_str,
-                            HUtilObj=HUtilObject,
-                            is_local_control_channel=False)
-                        enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
-                    elif is_feature_enabled("enableCMV2"):
-                        if os.path.exists(me_service_template_path):
-                            os.remove(me_service_template_path)
-                        copyfile(os.getcwd() + "/services/metrics-extension-otlp.service", me_service_template_path)
-                        me_handler.setup_me(
-                            is_lad=False,
-                            managed_identity=managed_identity_str,
-                            HUtilObj=HUtilObject,
-                            is_local_control_channel=False)
-                        enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
-                except Exception as e:
-                    hutil_log_error("Error in setting up metrics-extension.service in CMv2 mode. Exception={0}".format(e))
-
-                if enabled_me_CMv2_mode:
-                    hutil_log_info("Successfully started metrics-extension.")
-                elif log_messages:
-                    hutil_log_error(log_messages)
+            use_otel = is_feature_enabled("enableAzureOTelCollector")
+            enabled_me_CMv2_mode = use_otel or is_feature_enabled("enableCMV2")
+            if enabled_me_CMv2_mode:
+                service_template = 'metrics-extension-cmv2.service' if use_otel else 'metrics-extension-otlp.service'
+                restart_metrics_process(
+                    'MetricsExtension', me_handler.is_running(is_lad=False), restart_retries,
+                    lambda: start_metrics_extension(managed_identity_str, service_template, True),
+                    restart_errors, hutil_error, hutil_log)
 
             # update fluent config for fluent port if needed
             fluent_port = ''
@@ -2031,6 +2078,9 @@ def metrics_watcher(hutil_error, hutil_log):
                     json_data = json.loads(data)
 
                     if len(json_data) == 0:
+                        restart_errors.pop('Telegraf', None)
+                        if not enabled_me_CMv2_mode:
+                            restart_errors.pop('MetricsExtension', None)
                         last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
                         if telhandler.is_running(is_lad=False) or is_telegraf_service_installed():
                             # Stop the telegraf and ME services
@@ -2063,7 +2113,8 @@ def metrics_watcher(hutil_error, hutil_log):
                     else:
                         crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
 
-                        if(crc != last_crc):
+                        config_changed = crc != last_crc
+                        if config_changed:
                             # Resetting the me_msi_token_expiry_epoch variable if we set up ME again.
                             me_msi_token_expiry_epoch = None
                             hutil_log("Start processing metric configuration")
@@ -2075,25 +2126,17 @@ def metrics_watcher(hutil_error, hutil_log):
                                 "unix:///run/azuremonitoragent/default_influx.socket",
                                 is_lad=False)
 
-                            start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
-                            if start_telegraf_res:
-                                hutil_log("Successfully started metrics-sourcer.")
-                            else:
-                                hutil_error(log_messages)
+                            restart_metrics_process(
+                                'Telegraf', telhandler.is_running(is_lad=False), restart_retries,
+                                lambda: telhandler.start_telegraf(is_lad=False),
+                                restart_errors, hutil_error, hutil_log, force=True)
 
                             if not enabled_me_CMv2_mode:
-                                me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
-                                if os.path.exists(me_service_template_path):
-                                    os.remove(me_service_template_path)
-
-                                copyfile(os.getcwd() + "/services/metrics-extension-cmv1.service", me_service_template_path)
-                                me_handler.setup_me(is_lad=False, managed_identity=managed_identity_str, HUtilObj=HUtilObject)
-
-                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
-                                if start_metrics_out:
-                                    hutil_log("Successfully started metrics-extension.")
-                                else:
-                                    hutil_error(log_messages)
+                                restart_metrics_process(
+                                    'MetricsExtension', me_handler.is_running(is_lad=False), restart_retries,
+                                    lambda: start_metrics_extension(
+                                        managed_identity_str, 'metrics-extension-cmv1.service', False),
+                                    restart_errors, hutil_error, hutil_log, force=True)
 
                             last_crc = crc
 
@@ -2126,50 +2169,28 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(log_messages)
 
-                        telegraf_restart_retries = 0
-                        me_restart_retries = 0
-                        max_restart_retries = 10
+                        if not config_changed:
+                            def restart_telegraf():
+                                stopped, message = telhandler.stop_telegraf_service(is_lad=False)
+                                if not stopped:
+                                    hutil_error(message)
+                                return telhandler.start_telegraf(is_lad=False)
 
-                        # Check if telegraf is running, if not, then restart
-                        if not telhandler.is_running(is_lad=False):
-                            if telegraf_restart_retries < max_restart_retries:
-                                telegraf_restart_retries += 1
-                                hutil_log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
-                                tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
-                                if tel_out:
-                                    hutil_log(tel_msg)
-                                else:
-                                    hutil_error(tel_msg)
-                                start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
-                                if start_telegraf_res:
-                                    hutil_log("Successfully started metrics-sourcer.")
-                                else:
-                                    hutil_error(log_messages)
-                            else:
-                                hutil_error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log".format(max_restart_retries))
-                        else:
-                            telegraf_restart_retries = 0
+                            restart_metrics_process(
+                                'Telegraf', telhandler.is_running(is_lad=False), restart_retries,
+                                restart_telegraf, restart_errors, hutil_error, hutil_log)
 
-                        # Check if ME is running, if not, then restart
-                        if not me_handler.is_running(is_lad=False):
-                            if me_restart_retries < max_restart_retries:
-                                me_restart_retries += 1
-                                hutil_log("MetricsExtension binary process is not running. Restarting MetricsExtension now. Retry count - {0}".format(me_restart_retries))
-                                me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
-                                if me_out:
-                                    hutil_log(me_msg)
-                                else:
-                                    hutil_error(me_msg)
-                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
+                            if not enabled_me_CMv2_mode:
+                                def restart_me():
+                                    stopped, message = me_handler.stop_metrics_service(is_lad=False)
+                                    if not stopped:
+                                        hutil_error(message)
+                                    return start_metrics_extension(
+                                        managed_identity_str, 'metrics-extension-cmv1.service', False)
 
-                                if start_metrics_out:
-                                    hutil_log("Successfully started metrics-extension.")
-                                else:
-                                    hutil_error(log_messages)
-                            else:
-                                hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
-                        else:
-                            me_restart_retries = 0
+                                restart_metrics_process(
+                                    'MetricsExtension', me_handler.is_running(is_lad=False), restart_retries,
+                                    restart_me, restart_errors, hutil_error, hutil_log)
 
         except IOError as e:
             hutil_error('I/O error in setting up or monitoring metrics. Exception={0}'.format(e))
@@ -2178,6 +2199,7 @@ def metrics_watcher(hutil_error, hutil_log):
             hutil_error('Error in setting up or monitoring metrics. Exception={0}'.format(e))
 
         finally:
+            last_restart_status = report_metrics_restart_status(restart_errors, last_restart_status)
             time.sleep(sleepTime)
 
 def syslogconfig_watcher(hutil_error, hutil_log):
@@ -2831,13 +2853,16 @@ def is_feature_enabled(feature):
     if os.path.exists(featurePreviewDisabledFlagPath):
         return False
     
-    _, region = get_azure_environment_and_region()
+    supported_regions = feature_support_matrix.get(feature, [])
+    if "all" in supported_regions:
+        return True
+    if not supported_regions:
+        return False
 
-    if feature in feature_support_matrix.keys():
-        if region in feature_support_matrix[feature] or "all" in feature_support_matrix[feature]:
-            return True
-    
-    return False
+    environment, region = get_azure_environment_and_region()
+    if not environment or not region:
+        raise RuntimeError('Cannot evaluate a region-gated feature without Azure metadata')
+    return region in supported_regions
 
 
 def get_ssl_cert_info(operation):
@@ -2935,25 +2960,39 @@ def get_azure_environment_and_region():
     req = urllib.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
-    environment = region = None
+    max_attempts = 4
+    failure = 'request failed or timed out'
+    for attempt in range(max_attempts):
+        try:
+            with contextlib.closing(urllib.urlopen(req, timeout=30)) as response:
+                metadata = json.loads(response.read().decode('utf-8'))
+            compute = metadata['compute']
+            environment = compute['azEnvironment'].strip().lower()
+            region = compute['location'].strip().lower()
+            if not environment or not region:
+                raise ValueError('Missing environment or region')
+            return environment, region
+        except urlerror.HTTPError as error:
+            failure = 'HTTP {0}'.format(error.code)
+            retryable = error.code in (408, 429, 500, 502, 503, 504)
+            error.close()
+            hutil_log_error('Metadata request failed with {0} (attempt {1}/{2}).'.format(
+                failure, attempt + 1, max_attempts))
+            if not retryable:
+                break
+        except (ValueError, KeyError, TypeError, AttributeError):
+            failure = 'invalid environment or region metadata'
+            hutil_log_error('Metadata response has invalid environment or region data.')
+            break
+        except (urlerror.URLError, IOError):
+            failure = 'request failed or timed out'
+            hutil_log_error('Metadata request failed or timed out (attempt {0}/{1}).'.format(
+                attempt + 1, max_attempts))
 
-    try:
-        response = json.loads(urllib.urlopen(req).read().decode('utf-8', 'ignore'))
+        if attempt + 1 < max_attempts:
+            time.sleep(2 ** attempt)
 
-        if ('compute' in response):
-            if ('azEnvironment' in response['compute']):
-                environment = response['compute']['azEnvironment'].lower()
-            if ('location' in response['compute']):
-                region = response['compute']['location'].lower()
-    except urlerror.HTTPError as e:
-        hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
-        hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
-    except Exception as e:
-        hutil_log_error('Unexpected error from Metadata service: {0}'.format(e))
-
-    hutil_log_info('Detected environment: {0}, region: {1}'.format(environment, region))
-
-    return environment, region
+    raise RuntimeError('Unable to determine Azure environment and region from metadata: {0}'.format(failure))
 
 
 def run_command_and_log(cmd, check_error = True, log_cmd = True, log_output = True):
