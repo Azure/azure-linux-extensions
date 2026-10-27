@@ -34,18 +34,17 @@ import platform
 import subprocess
 import json
 import base64
+import inspect
 import shutil
 import hashlib
 import fileinput
 import contextlib
-import errno
-import tempfile
 import ama_tst.modules.install.supported_distros as supported_distros
 from collections import OrderedDict
 from hashlib import sha256
 from shutil import copyfile, rmtree, copytree, copy2
 
-from threading import Event, Thread
+from threading import Thread
 import telegraf_utils.telegraf_config_handler as telhandler
 import metrics_ext_utils.metrics_constants as metrics_constants
 import metrics_ext_utils.metrics_ext_handler as me_handler
@@ -156,90 +155,6 @@ HUtilObject = None
 SettingsSequenceNumber = None
 HandlerEnvironment = None
 SettingsDict = None
-ShutdownRequested = False
-CommandTimeoutSeconds = 120
-DecryptTimeoutSeconds = 60
-ImdsTimeoutSeconds = 30
-MaxMetricsRestartRetries = 10
-ServiceFailureThreshold = 3
-
-
-class AgentShutdown(BaseException):
-    """Cancellation must escape ordinary operational error handlers."""
-
-
-class ProcessTimeout(Exception):
-    pass
-
-
-def handle_sigterm(signum, frame):
-    global ShutdownRequested
-    ShutdownRequested = True
-
-
-def check_shutdown():
-    if ShutdownRequested:
-        raise AgentShutdown()
-
-
-def wait_for_shutdown(seconds):
-    clock = getattr(time, 'monotonic', time.time)
-    deadline = clock() + seconds
-    while not ShutdownRequested:
-        remaining = deadline - clock()
-        if remaining <= 0:
-            break
-        time.sleep(min(remaining, 0.1))
-    return ShutdownRequested
-
-
-def _kill_subprocess_group(process):
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except OSError as error:
-        if error.errno != errno.ESRCH:
-            raise
-
-
-def run_subprocess(args, timeout=CommandTimeoutSeconds, input_data=None,
-                   shell=False, stderr=subprocess.STDOUT):
-    """Bound communication on Python 2 as well as Python 3, including shell children."""
-    check_shutdown()
-    options = {'start_new_session': True} if sys.version_info >= (3, 2) else {'preexec_fn': os.setsid}
-    process = subprocess.Popen(args, shell=shell, stdin=subprocess.PIPE if input_data is not None else None,
-                               stdout=subprocess.PIPE, stderr=stderr, close_fds=True, **options)
-    completed = Event()
-    timed_out = [False]
-    clock = getattr(time, 'monotonic', time.time)
-    deadline = clock() + timeout
-
-    def watch_deadline():
-        while not completed.is_set():
-            completed.wait(0.1)
-            if completed.is_set():
-                return
-            if ShutdownRequested or clock() >= deadline:
-                timed_out[0] = not ShutdownRequested
-                _kill_subprocess_group(process)
-                return
-
-    watchdog = Thread(target=watch_deadline)
-    watchdog.daemon = True
-    try:
-        watchdog.start()
-        output, error_output = process.communicate(input_data)
-    finally:
-        completed.set()
-        if watchdog.ident is not None:
-            watchdog.join()
-        if process.poll() is None:
-            _kill_subprocess_group(process)
-            process.communicate()
-
-    check_shutdown()
-    if timed_out[0]:
-        raise ProcessTimeout('Process timed out after {0} seconds'.format(timeout))
-    return process.returncode, output, error_output
 
 
 def main():
@@ -247,7 +162,6 @@ def main():
     Main method
     Parse out operation from argument, invoke the operation, and finish.
     """
-    signal.signal(signal.SIGTERM, handle_sigterm)
     init_waagent_logger()
     waagent_log_info('Azure Monitoring Agent for Linux started to handle.')
 
@@ -293,10 +207,8 @@ def main():
     # Invoke operation
     try:
         global HUtilObject
-        check_shutdown()
         HUtilObject = parse_context(operation)
         exit_code, output = operations[operation]()
-        check_shutdown()
 
         # Exit code 1 indicates a general problem that doesn't have a more
         # specific error code; it often indicates a missing dependency
@@ -312,11 +224,6 @@ def main():
             message = '{0} failed with exit code {1} {2}'.format(operation,
                                                              exit_code, output)
 
-    except AgentShutdown:
-        if operation in ('Metrics', 'Syslogconfig', 'Transformconfig'):
-            sys.exit(0)
-        exit_code = 128 + signal.SIGTERM
-        message = '{0} interrupted by SIGTERM'.format(operation)
     except AzureMonitorAgentForLinuxException as e:
         exit_code = e.error_code
         message = e.get_error_message(operation)
@@ -411,64 +318,11 @@ def get_service_command(service, *operations):
         hutil_log_info("The VM doesn't have systemctl. Using the init.d service to start {0}.".format(service))
         return '/etc/init.d/{0} {1}'.format(service, operations[0])
 
-def _process_identity(pid, executable):
-    try:
-        proc_dir = os.path.join('/proc', str(pid))
-        if os.readlink(os.path.join(proc_dir, 'exe')) not in (executable, executable + ' (deleted)'):
-            return None
-        with open(os.path.join(proc_dir, 'stat'), 'r') as proc_stat:
-            fields = proc_stat.read().rsplit(')', 1)[1].split()
-        return fields[19] if fields[0] != 'Z' else None
-    except (IOError, OSError, IndexError):
-        return None
-
-
-def _reap_process(pid):
-    try:
-        os.waitpid(pid, os.WNOHANG)
-    except OSError as error:
-        if error.errno not in (errno.ECHILD, errno.ESRCH):
-            raise
-
-
 def check_kill_process(pstring):
-    executable = os.path.realpath(pstring)
-    targets = {}
-    for proc_dir in glob.glob('/proc/[0-9]*'):
-        pid = int(os.path.basename(proc_dir))
-        identity = _process_identity(pid, executable)
-        if identity is not None:
-            targets[pid] = identity
-
-    def signal_targets(signum):
-        for pid, identity in list(targets.items()):
-            if _process_identity(pid, executable) == identity:
-                try:
-                    os.kill(pid, signum)
-                except OSError as error:
-                    if error.errno != errno.ESRCH:
-                        raise
-
-    def wait_for_exit(seconds):
-        clock = getattr(time, 'monotonic', time.time)
-        deadline = clock() + seconds
-        while targets:
-            check_shutdown()
-            for pid, identity in list(targets.items()):
-                _reap_process(pid)
-                if _process_identity(pid, executable) != identity:
-                    del targets[pid]
-            remaining = deadline - clock()
-            if not targets or remaining <= 0:
-                break
-            wait_for_shutdown(min(0.1, remaining))
-
-    signal_targets(signal.SIGTERM)
-    wait_for_exit(10)
-    if targets:
-        signal_targets(signal.SIGKILL)
-        wait_for_exit(1)
-    return not targets
+    for line in os.popen("ps ax | grep " + pstring + " | grep -v grep"):
+        fields = line.split()
+        pid = fields[0]
+        os.kill(int(pid), signal.SIGKILL)
 
 def compare_and_copy_bin(src, dest):
     # Check if previous file exist at the location, compare the two binaries,
@@ -1026,29 +880,6 @@ def _remove_package_files_from_list(package_files):
     except Exception as ex:
         hutil_log_error("Error during file removal from list: {0}\n Were these files removed already?".format(ex))
 
-def replace_config_file(config_file, contents):
-    original = os.stat(config_file)
-    fd, temp_config_file = tempfile.mkstemp(
-        prefix=os.path.basename(config_file) + '.', dir=os.path.dirname(config_file))
-    try:
-        try:
-            os.fchmod(fd, 0o400)
-            os.fchown(fd, original.st_uid, original.st_gid)
-            stream = os.fdopen(fd, 'w')
-        except:
-            os.close(fd)
-            raise
-        with stream:
-            stream.write(contents)
-            stream.flush()
-            os.fsync(stream.fileno())
-        check_shutdown()
-        os.rename(temp_config_file, config_file)
-    finally:
-        if os.path.exists(temp_config_file):
-            os.remove(temp_config_file)
-
-
 def enable():
     """
     Start the Azure Monitor Linux Agent Service
@@ -1145,16 +976,28 @@ def enable():
         generate_localsyslog_configs(uses_gcs=True, uses_mcs=McsEnabled)
 
     config_file = "/etc/default/azuremonitoragent"
+    temp_config_file = "/etc/default/azuremonitoragent_temp"
 
     try:
         if os.path.isfile(config_file):
             new_config = "\n".join(["export {0}={1}".format(key, value) for key, value in default_configs.items()]) + "\n"
 
-            replace_config_file(config_file, new_config)
+            tmp_fd = os.open(temp_config_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o400)
+            try:
+                f = os.fdopen(tmp_fd, "w")
+            except:
+                os.close(tmp_fd)
+                raise
+            with f:
+                f.write(new_config)
+
+            if not os.path.isfile(temp_config_file):
+                log_and_exit("Enable", GenericErrorCode, "Error while updating environment variables in {0}".format(config_file))
+
+            os.remove(config_file)
+            os.rename(temp_config_file, config_file)
         else:
             log_and_exit("Enable", GenericErrorCode, "Could not find the file {0}".format(config_file))
-    except AgentShutdown:
-        raise
     except Exception as e:
         log_and_exit("Enable", GenericErrorCode, "Failed to add environment variables to {0}: {1}".format(config_file, e))
 
@@ -1416,27 +1259,19 @@ def disable():
     #stop agent transform config watcher process
     stop_transformconfig_process()
 
-    exit_code, output = 0, ''
-
     # stop amacoreagent and agent launcher
     hutil_log_info('Handler initiating Core Agent and agent launcher')
     if is_systemd():
-        for service in ('azuremonitor-coreagent', 'azuremonitor-agentlauncher'):
-            stop_code, stop_output = run_command_and_log('systemctl stop ' + service)
-            disable_code, disable_output = run_command_and_log('systemctl disable ' + service)
-            output += stop_output + disable_output
-            exit_code = exit_code or stop_code or disable_code
-            if service == 'azuremonitor-agentlauncher' and stop_code != 0:
-                if not check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit'):
-                    output += 'Fluent Bit did not exit after graceful and forced termination.\n'
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-coreagent && systemctl disable azuremonitor-coreagent')
+        exit_code, output = run_command_and_log('systemctl stop azuremonitor-agentlauncher && systemctl disable azuremonitor-agentlauncher')
+        # in case AL is not cleaning up properly
+        check_kill_process('/opt/microsoft/azuremonitoragent/bin/fluent-bit')
 
     # Stop and disable systemd services so they are not started after system reboot.
     for service in ["azuremonitoragent", "azuremonitoragentmgr"]:
-        service_code, service_output = run_command_and_log(get_service_command(service, "stop", "disable"))
-        output += service_output
-        exit_code = exit_code or service_code
+        exit_code, output = run_command_and_log(get_service_command(service, "stop", "disable"))
 
-        if service_code != 0:
+        if exit_code != 0:
             status_command = get_service_command(service, "status")
             status_exit_code, status_output = run_command_and_log(status_command)
 
@@ -1773,10 +1608,9 @@ def azureotelcollector_is_active():
     """
     if is_systemd():
         try:
-            rc, _, _ = run_subprocess(
-                ["systemctl", "is-active", "--quiet", "azureotelcollector-watcher.path"], timeout=10)
+            rc = subprocess.call(["systemctl", "is-active", "--quiet", "azureotelcollector-watcher.path"])
             return rc == 0
-        except (OSError, ProcessTimeout):
+        except OSError:
             return False
 
     return False
@@ -2020,9 +1854,9 @@ def start_metrics_process():
         # Start metrics watcher
         ama_path = os.path.join(os.getcwd(), 'agent.py')
         args = [sys.executable, ama_path, '-metrics']
+        log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
         hutil_log_info('start watcher process '+str(args))
-        with open(os.path.join(os.getcwd(), 'daemon.log'), 'w') as log:
-            subprocess.Popen(args, stdout=log, stderr=log)
+        subprocess.Popen(args, stdout=log, stderr=log)
 
 def start_syslogconfig_process():
     """
@@ -2037,9 +1871,9 @@ def start_syslogconfig_process():
         # Start syslog config watcher
         ama_path = os.path.join(os.getcwd(), 'agent.py')
         args = [sys.executable, ama_path, '-syslogconfig']
+        log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
         hutil_log_info('start syslog watcher process '+str(args))
-        with open(os.path.join(os.getcwd(), 'daemon.log'), 'w') as log:
-            subprocess.Popen(args, stdout=log, stderr=log)
+        subprocess.Popen(args, stdout=log, stderr=log)
 
 def start_transformconfig_process():
     """
@@ -2054,9 +1888,9 @@ def start_transformconfig_process():
         # Start agent transform config watcher
         ama_path = os.path.join(os.getcwd(), 'agent.py')
         args = [sys.executable, ama_path, '-transformconfig']
+        log = open(os.path.join(os.getcwd(), 'daemon.log'), 'w')
         hutil_log_info('start agent transform config watcher process '+str(args))
-        with open(os.path.join(os.getcwd(), 'daemon.log'), 'w') as log:
-            subprocess.Popen(args, stdout=log, stderr=log)
+        subprocess.Popen(args, stdout=log, stderr=log)
 
 def stop_transformconfig_process():
 
@@ -2077,79 +1911,6 @@ def stop_transformconfig_process():
 
         run_command_and_log("rm "+ pids_filepath)
 
-def monitor_agent_services(failures, health_errors):
-    services = ['azuremonitoragent']
-    systemd = is_systemd()
-    if systemd:
-        services.append('azuremonitor-coreagent')
-    for service in services:
-        command = ('systemctl is-active --quiet ' + service) if systemd else get_service_command(service, 'status')
-        try:
-            code, _ = run_get_output(command, log_cmd=False, timeout=10)
-        except OSError:
-            code = 1
-        if code == 0:
-            failures[service] = 0
-            health_errors.pop(service, None)
-        else:
-            failures[service] = failures.get(service, 0) + 1
-            if failures[service] >= ServiceFailureThreshold:
-                health_errors[service] = '{0} is not running; inspect the service journal and restart limit.'.format(service)
-
-
-def report_watcher_health(health_errors, previous_message):
-    global SettingsSequenceNumber
-    message = '; '.join(health_errors[key] for key in sorted(health_errors)) or None
-    if message == previous_message or ShutdownRequested:
-        return previous_message
-    try:
-        SettingsSequenceNumber = None
-        if message:
-            hutil_log_error(message)
-            update_status_file('Enable', str(GenericErrorCode), 'error', message)
-        else:
-            hutil_log_info('Agent services recovered.')
-            update_status_file('Enable', '0', 'success', 'Agent services recovered.')
-    except (IOError, OSError):
-        hutil_log_error('Unable to update agent health status.')
-        return previous_message
-    return message
-
-
-def restart_metrics_process(name, running, retries, restart, health_errors, hutil_error, hutil_log):
-    if running:
-        health_errors.pop(name, None)
-        return 0
-    if retries >= MaxMetricsRestartRetries:
-        health_errors[name] = '{0} is not running after {1} restart attempts; inspect its service logs.'.format(name, retries)
-        return retries
-
-    retries += 1
-    hutil_log('Restarting {0}, attempt {1}/{2}.'.format(name, retries, MaxMetricsRestartRetries))
-    try:
-        started, message = restart()
-        if started:
-            hutil_log('Started {0}.'.format(name))
-        else:
-            hutil_error(message)
-    except AgentShutdown:
-        raise
-    except Exception as error:
-        hutil_error('Unable to restart {0}: {1}'.format(name, error))
-    return retries
-
-
-def start_metrics_cmv2(managed_identity, use_otel):
-    template = os.path.join(os.getcwd(), 'services', 'metrics-extension.service')
-    if os.path.exists(template):
-        os.remove(template)
-    source = 'metrics-extension-cmv2.service' if use_otel else 'metrics-extension-otlp.service'
-    copyfile(os.path.join(os.getcwd(), 'services', source), template)
-    me_handler.setup_me(is_lad=False, managed_identity=managed_identity,
-                        HUtilObj=HUtilObject, is_local_control_channel=False)
-    return me_handler.start_metrics_cmv2()
-
-
 def metrics_watcher(hutil_error, hutil_log):
     """
     Watcher thread to monitor metric configuration changes and to take action on them
@@ -2168,32 +1929,49 @@ def metrics_watcher(hutil_error, hutil_log):
         managed_identity_str = "sai"
 
     # Sleep before starting the monitoring
-    if wait_for_shutdown(sleepTime):
-        return
+    time.sleep(sleepTime)
     last_crc = None
     last_crc_fluent = None
     me_msi_token_expiry_epoch = None
     enabled_me_CMv2_mode = False
     log_messages = ""
-    telegraf_restart_retries = 0
-    me_restart_retries = 0
-    service_failures = {}
-    health_errors = {}
-    last_health_message = None
 
-    while not ShutdownRequested:
+    while True:
         try:
-            monitor_agent_services(service_failures, health_errors)
             if not azureotelcollector_is_active():
                 install_azureotelcollector()
 
-            use_otel = is_feature_enabled("enableAzureOTelCollector")
-            enabled_me_CMv2_mode = use_otel or is_feature_enabled("enableCMV2")
-            if enabled_me_CMv2_mode:
-                me_restart_retries = restart_metrics_process(
-                    'MetricsExtension', me_handler.is_running(is_lad=False), me_restart_retries,
-                    lambda: start_metrics_cmv2(managed_identity_str, use_otel),
-                    health_errors, hutil_error, hutil_log)
+            if not me_handler.is_running(is_lad=False):
+                me_service_template_path = os.getcwd() + "/services/metrics-extension.service"
+
+                try:
+                    if is_feature_enabled("enableAzureOTelCollector"):
+                        if os.path.exists(me_service_template_path):
+                            os.remove(me_service_template_path)
+                        copyfile(os.getcwd() + "/services/metrics-extension-cmv2.service", me_service_template_path)
+                        me_handler.setup_me(
+                            is_lad=False,
+                            managed_identity=managed_identity_str,
+                            HUtilObj=HUtilObject,
+                            is_local_control_channel=False)
+                        enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
+                    elif is_feature_enabled("enableCMV2"):
+                        if os.path.exists(me_service_template_path):
+                            os.remove(me_service_template_path)
+                        copyfile(os.getcwd() + "/services/metrics-extension-otlp.service", me_service_template_path)
+                        me_handler.setup_me(
+                            is_lad=False,
+                            managed_identity=managed_identity_str,
+                            HUtilObj=HUtilObject,
+                            is_local_control_channel=False)
+                        enabled_me_CMv2_mode, log_messages = me_handler.start_metrics_cmv2()
+                except Exception as e:
+                    hutil_log_error("Error in setting up metrics-extension.service in CMv2 mode. Exception={0}".format(e))
+
+                if enabled_me_CMv2_mode:
+                    hutil_log_info("Successfully started metrics-extension.")
+                elif log_messages:
+                    hutil_log_error(log_messages)
 
             # update fluent config for fluent port if needed
             fluent_port = ''
@@ -2255,11 +2033,6 @@ def metrics_watcher(hutil_error, hutil_log):
                     json_data = json.loads(data)
 
                     if len(json_data) == 0:
-                        telegraf_restart_retries = 0
-                        health_errors.pop('Telegraf', None)
-                        if not enabled_me_CMv2_mode:
-                            me_restart_retries = 0
-                            health_errors.pop('MetricsExtension', None)
                         last_crc = hashlib.sha256(data.encode('utf-8')).hexdigest()
                         if telhandler.is_running(is_lad=False) or is_telegraf_service_installed():
                             # Stop the telegraf and ME services
@@ -2355,29 +2128,51 @@ def metrics_watcher(hutil_error, hutil_log):
                             else:
                                 hutil_error(log_messages)
 
-                        def restart_telegraf():
-                            stopped, message = telhandler.stop_telegraf_service(is_lad=False)
-                            if not stopped:
-                                hutil_error(message)
-                            return telhandler.start_telegraf(is_lad=False)
+                        telegraf_restart_retries = 0
+                        me_restart_retries = 0
+                        max_restart_retries = 10
 
-                        telegraf_restart_retries = restart_metrics_process(
-                            'Telegraf', telhandler.is_running(is_lad=False), telegraf_restart_retries,
-                            restart_telegraf, health_errors, hutil_error, hutil_log)
+                        # Check if telegraf is running, if not, then restart
+                        if not telhandler.is_running(is_lad=False):
+                            if telegraf_restart_retries < max_restart_retries:
+                                telegraf_restart_retries += 1
+                                hutil_log("Telegraf binary process is not running. Restarting telegraf now. Retry count - {0}".format(telegraf_restart_retries))
+                                tel_out, tel_msg = telhandler.stop_telegraf_service(is_lad=False)
+                                if tel_out:
+                                    hutil_log(tel_msg)
+                                else:
+                                    hutil_error(tel_msg)
+                                start_telegraf_res, log_messages = telhandler.start_telegraf(is_lad=False)
+                                if start_telegraf_res:
+                                    hutil_log("Successfully started metrics-sourcer.")
+                                else:
+                                    hutil_error(log_messages)
+                            else:
+                                hutil_error("Telegraf binary process is not running. Failed to restart after {0} retries. Please check telegraf.log".format(max_restart_retries))
+                        else:
+                            telegraf_restart_retries = 0
 
-                        if not enabled_me_CMv2_mode:
-                            def restart_me():
-                                stopped, message = me_handler.stop_metrics_service(is_lad=False)
-                                if not stopped:
-                                    hutil_error(message)
-                                return me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
+                        # Check if ME is running, if not, then restart
+                        if not me_handler.is_running(is_lad=False):
+                            if me_restart_retries < max_restart_retries:
+                                me_restart_retries += 1
+                                hutil_log("MetricsExtension binary process is not running. Restarting MetricsExtension now. Retry count - {0}".format(me_restart_retries))
+                                me_out, me_msg = me_handler.stop_metrics_service(is_lad=False)
+                                if me_out:
+                                    hutil_log(me_msg)
+                                else:
+                                    hutil_error(me_msg)
+                                start_metrics_out, log_messages = me_handler.start_metrics(is_lad=False, managed_identity=managed_identity_str)
 
-                            me_restart_retries = restart_metrics_process(
-                                'MetricsExtension', me_handler.is_running(is_lad=False), me_restart_retries,
-                                restart_me, health_errors, hutil_error, hutil_log)
+                                if start_metrics_out:
+                                    hutil_log("Successfully started metrics-extension.")
+                                else:
+                                    hutil_error(log_messages)
+                            else:
+                                hutil_error("MetricsExtension binary process is not running. Failed to restart after {0} retries. Please check /var/log/syslog for ME logs".format(max_restart_retries))
+                        else:
+                            me_restart_retries = 0
 
-        except AgentShutdown:
-            raise
         except IOError as e:
             hutil_error('I/O error in setting up or monitoring metrics. Exception={0}'.format(e))
 
@@ -2385,8 +2180,7 @@ def metrics_watcher(hutil_error, hutil_log):
             hutil_error('Error in setting up or monitoring metrics. Exception={0}'.format(e))
 
         finally:
-            last_health_message = report_watcher_health(health_errors, last_health_message)
-            wait_for_shutdown(sleepTime)
+            time.sleep(sleepTime)
 
 def syslogconfig_watcher(hutil_error, hutil_log):
     """
@@ -2397,12 +2191,11 @@ def syslogconfig_watcher(hutil_error, hutil_log):
     sleepTime =  30
 
     # Sleep before starting the monitoring
-    if wait_for_shutdown(sleepTime):
-        return
+    time.sleep(sleepTime)
 
     GcsEnabled, McsEnabled = get_control_plane_mode()
         
-    while not ShutdownRequested:
+    while True:
         try:       
             if os.path.isfile(AMASyslogConfigMarkerPath):
                 f = open(AMASyslogConfigMarkerPath, "r")
@@ -2424,8 +2217,6 @@ def syslogconfig_watcher(hutil_error, hutil_log):
                 # remove syslog local configs
                 remove_localsyslog_configs()
 
-        except AgentShutdown:
-            raise
         except IOError as e:
             hutil_error('I/O error in setting up syslog config watcher. Exception={0}'.format(e))
 
@@ -2433,7 +2224,7 @@ def syslogconfig_watcher(hutil_error, hutil_log):
             hutil_error('Error in setting up syslog config watcher. Exception={0}'.format(e))
 
         finally:
-            wait_for_shutdown(sleepTime)
+            time.sleep(sleepTime)
 
 def transformconfig_watcher(hutil_error, hutil_log):
     """
@@ -2443,11 +2234,10 @@ def transformconfig_watcher(hutil_error, hutil_log):
     sleepTime =  30
 
     # Sleep before starting the monitoring
-    if wait_for_shutdown(sleepTime):
-        return
+    time.sleep(sleepTime)
     last_crc = None
 
-    while not ShutdownRequested:
+    while True:
         try:
             if os.path.isfile(AMAAstTransformConfigMarkerPath):
                 f = open(AMAAstTransformConfigMarkerPath, "r")
@@ -2460,8 +2250,6 @@ def transformconfig_watcher(hutil_error, hutil_log):
                         last_crc = crc
                 f.close()
 
-        except AgentShutdown:
-            raise
         except IOError as e:
             hutil_error('I/O error in setting up agent transform config watcher. Exception={0}'.format(e))
 
@@ -2469,7 +2257,7 @@ def transformconfig_watcher(hutil_error, hutil_log):
             hutil_error('Error in setting up agent transform config watcher. Exception={0}'.format(e))
 
         finally:
-            wait_for_shutdown(sleepTime)
+            time.sleep(sleepTime)
 
 def generate_localsyslog_configs(uses_gcs = False, uses_mcs = False):
     """
@@ -2636,41 +2424,50 @@ def remove_localsyslog_configs():
         run_command_and_log(get_service_command("syslog-ng", "restart"))
         hutil_log_info("Removed local syslog configuration files if found and restarted syslog")
 
-def run_watcher(pid_filename, watcher):
-    check_shutdown()
-    pid_path = os.path.join(os.getcwd(), pid_filename)
-    own_pid = str(os.getpid())
-    with open(pid_path, 'w') as pid_file:
-        pid_file.write(own_pid + '\n')
-    try:
-        watcher(hutil_log_error, hutil_log_info)
-    finally:
-        try:
-            with open(pid_path, 'r') as pid_file:
-                owned = pid_file.read().strip() == own_pid
-            if owned:
-                os.remove(pid_path)
-        except (IOError, OSError) as error:
-            if error.errno != errno.ENOENT:
-                hutil_log_error('Unable to clean up watcher PID file.')
-    return 0, ''
-
-
 def metrics():
-    """Run metric monitoring until shutdown, then remove the owned PID file."""
-    return run_watcher('amametrics.pid', metrics_watcher)
+    """
+    Take care of setting up telegraf and ME for metrics if configuration is present
+    """
+    pids_filepath = os.path.join(os.getcwd(), 'amametrics.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = metrics_watcher, args = [hutil_log_error, hutil_log_info])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
 
 def syslogconfig():
     """
     Take care of setting up syslog configuration change watcher
     """
-    return run_watcher('amasyslogconfig.pid', syslogconfig_watcher)
+    pids_filepath = os.path.join(os.getcwd(), 'amasyslogconfig.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = syslogconfig_watcher, args = [hutil_log_error, hutil_log_info])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
 
 def transformconfig():
     """
     Take care of setting up agent transformation configuration change watcher
     """
-    return run_watcher('amatransformconfig.pid', transformconfig_watcher)
+    pids_filepath = os.path.join(os.getcwd(), 'amatransformconfig.pid')
+    py_pid = os.getpid()
+    with open(pids_filepath, 'w') as f:
+        f.write(str(py_pid) + '\n')
+
+    watcher_thread = Thread(target = transformconfig_watcher, args = [hutil_log_error, hutil_log_info])
+    watcher_thread.start()
+    watcher_thread.join()
+
+    return 0, ""
 
 # Dictionary of operations strings to methods
 operations = {'Disable' : disable,
@@ -3036,16 +2833,13 @@ def is_feature_enabled(feature):
     if os.path.exists(featurePreviewDisabledFlagPath):
         return False
     
-    supported_regions = feature_support_matrix.get(feature, [])
-    if 'all' in supported_regions:
-        return True
-    if not supported_regions:
-        return False
-
     _, region = get_azure_environment_and_region()
-    if not region:
-        raise RuntimeError('Cannot evaluate region-gated feature without metadata')
-    return region in supported_regions
+
+    if feature in feature_support_matrix.keys():
+        if region in feature_support_matrix[feature] or "all" in feature_support_matrix[feature]:
+            return True
+    
+    return False
 
 
 def get_ssl_cert_info(operation):
@@ -3094,7 +2888,7 @@ def is_arc_installed():
     Check if this is an Arc machine
     """
     # Using systemctl to check this since Arc only supports VMs that have systemd
-    check_arc, _ = run_get_output('systemctl is-active --quiet himdsd', log_cmd=False, timeout=10)
+    check_arc = os.system('systemctl status himdsd 1>/dev/null 2>&1')
     return check_arc == 0
 
 
@@ -3143,34 +2937,25 @@ def get_azure_environment_and_region():
     req = urllib.Request(imds_endpoint)
     req.add_header('Metadata', 'True')
 
-    for attempt in range(3):
-        check_shutdown()
-        try:
-            with contextlib.closing(urllib.urlopen(req, timeout=ImdsTimeoutSeconds)) as response:
-                metadata = json.loads(response.read().decode('utf-8', 'ignore'))
-            compute = metadata.get('compute', {})
-            environment = compute.get('azEnvironment')
-            region = compute.get('location')
-            if not environment or not region:
-                raise ValueError('Missing environment or region')
-            return environment.lower(), region.lower()
-        except urlerror.HTTPError as error:
-            retryable = error.code in (408, 429, 500, 502, 503, 504)
-            error.close()
-            hutil_log_error('Metadata request failed with HTTP {0} (attempt {1}/3).'.format(error.code, attempt + 1))
-            if not retryable:
-                break
-        except (ValueError, TypeError, AttributeError):
-            hutil_log_error('Metadata response has invalid environment or region data.')
-            break
-        except (urlerror.URLError, IOError):
-            hutil_log_error('Metadata request failed or timed out (attempt {0}/3).'.format(attempt + 1))
+    environment = region = None
 
-        if attempt < 2:
-            wait_for_shutdown(2 ** attempt)
-            check_shutdown()
+    try:
+        response = json.loads(urllib.urlopen(req).read().decode('utf-8', 'ignore'))
 
-    raise RuntimeError('Unable to determine Azure environment and region from metadata')
+        if ('compute' in response):
+            if ('azEnvironment' in response['compute']):
+                environment = response['compute']['azEnvironment'].lower()
+            if ('location' in response['compute']):
+                region = response['compute']['location'].lower()
+    except urlerror.HTTPError as e:
+        hutil_log_error('Request to Metadata service URL failed with an HTTPError: {0}'.format(e))
+        hutil_log_error('Response from Metadata service: {0}'.format(e.read()))
+    except Exception as e:
+        hutil_log_error('Unexpected error from Metadata service: {0}'.format(e))
+
+    hutil_log_info('Detected environment: {0}, region: {1}'.format(environment, region))
+
+    return environment, region
 
 
 def run_command_and_log(cmd, check_error = True, log_cmd = True, log_output = True):
@@ -3229,8 +3014,7 @@ def run_command_with_retries_output(cmd, retries, retry_check, final_check = Non
             break
         try_count += 1
         hutil_log_info(retry_message)
-        wait_for_shutdown(sleep_time)
-        check_shutdown()
+        time.sleep(sleep_time)
         sleep_time *= sleep_increase_factor
 
     if final_check is not None:
@@ -3332,30 +3116,31 @@ def get_settings():
 
 
              # FIPS 140-3: use 'openssl cms' (supports AES256 & DES_EDE3_CBC) with fallback to legacy 'openssl smime'
+            cms_cmd = 'openssl cms -inform DER -decrypt -recip {0} -inkey {1}'.format(encoded_cert_path, encoded_key_path)
+            smime_cmd = 'openssl smime -inform DER -decrypt -recip {0} -inkey {1}'.format(encoded_cert_path, encoded_key_path)
+
             protected_settings_str = None
-            for decrypt_mode in ['cms', 'smime']:
+            for decrypt_cmd in [cms_cmd, smime_cmd]:
                 try:
                     # stderr is intentionally captured separately from stdout (and never
                     # logged verbatim) so that non-fatal openssl warnings (e.g. a missing
                     # openssl.cnf) can't get concatenated with the decrypted output, corrupt the
                     # JSON payload, and risk the decrypted secret being echoed in error handling.
-                    decrypt_cmd = ['openssl', decrypt_mode, '-inform', 'DER', '-decrypt',
-                                   '-recip', encoded_cert_path, '-inkey', encoded_key_path]
-                    returncode, output, _ = run_subprocess(
-                        decrypt_cmd, timeout=DecryptTimeoutSeconds, input_data=decoded_settings,
-                        stderr=subprocess.PIPE)
+                    session = subprocess.Popen([decrypt_cmd], shell=True,
+                                               stdin=subprocess.PIPE,
+                                               stderr=subprocess.PIPE,
+                                               stdout=subprocess.PIPE)
+                    output = session.communicate(decoded_settings)
                     # success only if return code is 0 and we have output
-                    if returncode == 0 and output:
-                        protected_settings_str = output
-                        if decrypt_mode == 'cms':
+                    if session.returncode == 0 and output[0]:
+                        protected_settings_str = output[0]
+                        if decrypt_cmd == cms_cmd:
                             hutil_log_info('Decrypted protectedSettings using openssl cms.')
                         else:
                             hutil_log_info('Decrypted protectedSettings using openssl smime fallback.')
                         break
                     else:
-                        hutil_log_info('Attempt to decrypt protectedSettings with openssl {0} failed (rc={1}).'.format(decrypt_mode, returncode))
-                except ProcessTimeout:
-                    log_and_exit('Enable', GenericErrorCode, 'Timed out decrypting protectedSettings')
+                        hutil_log_info('Attempt to decrypt protectedSettings with "{0}" failed (rc={1}).'.format(decrypt_cmd, session.returncode))
                 except OSError:
                     pass
 
@@ -3407,14 +3192,10 @@ def update_status_file(operation, exit_code, exit_status, message):
     latest_seq_no = get_latest_seq_no()
 
     status_path = os.path.join(status_dir, '{0}.status'.format(latest_seq_no))
-    fd, status_tmp = tempfile.mkstemp(prefix='{0}.'.format(latest_seq_no), suffix='.tmp', dir=status_dir)
-    try:
-        with os.fdopen(fd, 'w') as tmp_file:
-            tmp_file.write(status_json)
-        os.rename(status_tmp, status_path)
-    finally:
-        if os.path.exists(status_tmp):
-            os.remove(status_tmp)
+    status_tmp = '{0}.tmp'.format(status_path)
+    with open(status_tmp, 'w+') as tmp_file:
+        tmp_file.write(status_json)
+    os.rename(status_tmp, status_path)
 
 
 def get_handler_env():
@@ -3473,18 +3254,37 @@ def get_latest_seq_no():
     return SettingsSequenceNumber
 
 
-def run_get_output(cmd, chk_err = False, log_cmd = True, timeout=CommandTimeoutSeconds):
+def run_get_output(cmd, chk_err = False, log_cmd = True):
     """
-    Run a bounded shell command and return its exit code and output.
+    Mimic waagent mothod RunGetOutput in case waagent is not available
+    Run shell command and return exit code and output
     """
-    # Older waagent RunGetOutput implementations cannot bound the command lifetime.
-    try:
-        exit_code, output, _ = run_subprocess(cmd, timeout=timeout, shell=True)
-    except ProcessTimeout:
-        hutil_log_error('Command timed out after {0} seconds.'.format(timeout))
-        return 124, 'Command timed out after {0} seconds'.format(timeout)
-    if chk_err and exit_code != 0:
-        hutil_log_error('Command failed with exit code {0}.'.format(exit_code))
+    if 'Utils.WAAgentUtil' in sys.modules:
+        # WALinuxAgent-2.0.14 allows only 2 parameters for RunGetOutput
+        # If checking the number of parameters fails, pass 2
+        try:
+            sig = inspect.signature(waagent.RunGetOutput)
+            params = sig.parameters
+            waagent_params = len(params)
+        except:
+            try:
+                spec = inspect.getargspec(waagent.RunGetOutput)
+                params = spec.args
+                waagent_params = len(params)
+            except:
+                waagent_params = 2
+        if waagent_params >= 3:
+            exit_code, output = waagent.RunGetOutput(cmd, chk_err, log_cmd)
+        else:
+            exit_code, output = waagent.RunGetOutput(cmd, chk_err)
+    else:
+        try:
+            output = subprocess.check_output(cmd, stderr = subprocess.STDOUT,
+                                             shell = True)
+            exit_code = 0
+        except subprocess.CalledProcessError as e:
+            exit_code = e.returncode
+            output = e.output
     
     # Python 2: encode unicode -> UTF-8 bytes (str). Python 3: decode bytes -> str.
     try:  # Python 2
