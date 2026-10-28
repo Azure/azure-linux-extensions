@@ -544,6 +544,16 @@ def install():
         bundle_path = os.path.join(package_directory, BundleFileName)
         os.chmod(bundle_path, 100)
         hutil_log_info("{0} and {1}".format(PackageManager, BundleFileName))
+        if PackageManager == 'rpm':
+            # Use the current Microsoft key, whose certification does not require SHA-1.
+            key_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'microsoft-2025.asc')
+            exit_code, output = run_command_with_retries_output(
+                'rpm --import "{0}"'.format(key_path), retries=15,
+                retry_check=retry_if_dpkg_or_rpm_locked,
+                final_check=final_check_if_dpkg_or_rpm_locked)
+            if exit_code != 0:
+                hutil_log_error("Failed to import the Azure Monitor Agent RPM signing key (exit code {0}); "
+                                "continuing installation using keys already trusted by RPM.".format(exit_code))
         AMAInstallCommand = "{0} {1} -i {2}".format(PackageManager, PackageManagerOptions, bundle_path)
         hutil_log_info('Running command "{0}"'.format(AMAInstallCommand))
 
