@@ -7,9 +7,11 @@ import sys
 import os
 import re
 import stat
+import io
+import json
 import tempfile
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open, call
 
 # Mock Linux-only modules before importing
 for mod_name in ('grp', 'pwd'):
@@ -341,19 +343,12 @@ class TestRemoveLocalsyslogConfigsResetsPort(unittest.TestCase):
 
 
 class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
-    """Tests for is_feature_enabled('enableCurlUpload') region gating (PR #2190)."""
+    """Tests for global libcurl upload enablement and feature overrides."""
 
-    def test_curl_upload_in_feature_support_matrix(self):
-        """enableCurlUpload must be gated to the Stage 2 regions (not 'all')."""
-        # Re-derive the matrix the same way is_feature_enabled does, by exercising
-        # the function across regions.
-        with patch('os.path.exists', return_value=False):
-            with patch('agent.get_azure_environment_and_region',
-                       return_value=(None, 'eastus2euap')):
-                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
-
-    def test_enabled_in_stage2_regions(self):
-        for region in ('eastus2euap', 'centraluseuap', 'westcentralus', 'eastasia'):
+    def test_enabled_in_all_regions(self):
+        for region in ('eastus2euap', 'centraluseuap', 'westcentralus', 'eastasia',
+                       'eastus', 'westus2', 'centralus', 'usgovvirginia', 'chinaeast2',
+                       'future-region'):
             with patch('os.path.exists', return_value=False):
                 with patch('agent.get_azure_environment_and_region',
                            return_value=('AzureCloud', region)):
@@ -361,14 +356,13 @@ class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
                         agent.is_feature_enabled('enableCurlUpload'),
                         msg="enableCurlUpload should be enabled in region %r" % region)
 
-    def test_disabled_in_other_region(self):
-        for region in ('eastus', 'westus2', 'centralus', ''):
-            with patch('os.path.exists', return_value=False):
-                with patch('agent.get_azure_environment_and_region',
-                           return_value=('AzureCloud', region)):
-                    self.assertFalse(
-                        agent.is_feature_enabled('enableCurlUpload'),
-                        msg="enableCurlUpload should be disabled in region %r" % region)
+    def test_global_features_do_not_query_imds(self):
+        with patch('os.path.exists', return_value=False), \
+                patch('agent.get_azure_environment_and_region', side_effect=RuntimeError) as metadata:
+            for feature in ('enableCurlUpload', 'useDynamicSSL', 'enableCMV2', 'enableAzureOTelCollector'):
+                self.assertTrue(agent.is_feature_enabled(feature))
+            self.assertFalse(agent.is_feature_enabled('someUnknownFeature'))
+            metadata.assert_not_called()
 
     def test_preview_flag_file_forces_enable(self):
         """A previewFeatures/<feature> flag file enables the feature in any region."""
@@ -378,13 +372,12 @@ class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
             return path == flag_path
 
         with patch('os.path.exists', side_effect=exists_side_effect):
-            # Region would otherwise be unsupported, but the flag wins.
             with patch('agent.get_azure_environment_and_region',
                        return_value=('AzureCloud', 'eastus')):
                 self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
 
     def test_disabled_flag_file_forces_disable(self):
-        """A previewFeatures/<feature>Disabled flag file disables it even in eastus2euap."""
+        """The explicit disable flag overrides global default enablement."""
         disabled_path = agent.PreviewFeaturesDirectory + 'enableCurlUploadDisabled'
 
         def exists_side_effect(path):
@@ -392,7 +385,7 @@ class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
 
         with patch('os.path.exists', side_effect=exists_side_effect):
             with patch('agent.get_azure_environment_and_region',
-                       return_value=('AzureCloud', 'eastus2euap')):
+                       return_value=('AzureCloud', 'eastus')):
                 self.assertFalse(agent.is_feature_enabled('enableCurlUpload'))
 
     def test_unknown_feature_disabled(self):
@@ -570,6 +563,190 @@ class TestProxyConfiguration(unittest.TestCase):
                 self.assertEqual(
                     stat.S_IMODE(os.stat(conf_path).st_mode),
                     0o400)
+
+
+class TestMetricsRestartBudgets(unittest.TestCase):
+    class StopWatcher(Exception):
+        pass
+
+    def test_failed_health_checks_exhaust_both_budgets_even_if_start_reports_success(self):
+        for started in (False, True):
+            with self.subTest(started=started):
+                retries = {'Telegraf': 0, 'MetricsExtension': 0}
+                errors = {}
+                restart = MagicMock(return_value=(started, 'start result'))
+                for _ in range(12):
+                    for name in retries:
+                        agent.restart_metrics_process(
+                            name, False, retries, restart, errors, MagicMock(), MagicMock())
+                self.assertEqual(restart.call_count, 20)
+                self.assertEqual(retries, {'Telegraf': 10, 'MetricsExtension': 10})
+                self.assertEqual(set(errors), set(retries))
+
+    def test_recovery_resets_only_the_healthy_process_budget(self):
+        retries = {'Telegraf': 10, 'MetricsExtension': 10}
+        errors = {'Telegraf': 'failed', 'MetricsExtension': 'failed'}
+        restart = MagicMock(return_value=(False, 'failed'))
+        agent.restart_metrics_process(
+            'MetricsExtension', True, retries, restart, errors, MagicMock(), MagicMock())
+        self.assertEqual(retries, {'Telegraf': 10, 'MetricsExtension': 0})
+        self.assertEqual(errors, {'Telegraf': 'failed'})
+        for _ in range(4):
+            for name in retries:
+                agent.restart_metrics_process(
+                    name, False, retries, restart, errors, MagicMock(), MagicMock())
+        self.assertEqual(restart.call_count, 4)
+        agent.restart_metrics_process(
+            'Telegraf', True, retries, restart, errors, MagicMock(), MagicMock())
+        self.assertEqual(retries, {'Telegraf': 0, 'MetricsExtension': 4})
+        agent.restart_metrics_process(
+            'Telegraf', False, retries, restart, errors, MagicMock(), MagicMock())
+        self.assertEqual(restart.call_count, 5)
+
+    def test_setup_exceptions_consume_the_budget(self):
+        retries = {'MetricsExtension': 0}
+        errors = {}
+        restart = MagicMock(side_effect=OSError('setup failed'))
+        for _ in range(12):
+            agent.restart_metrics_process(
+                'MetricsExtension', False, retries, restart, errors, MagicMock(), MagicMock())
+        self.assertEqual(restart.call_count, 10)
+        self.assertIn('MetricsExtension', errors)
+
+    def test_exhaustion_status_is_deduplicated_and_clears_after_all_recover(self):
+        errors = {'Telegraf': 'Telegraf exhausted', 'MetricsExtension': 'ME exhausted'}
+        with patch('agent.update_status_file') as status, \
+                patch.object(agent, 'SettingsSequenceNumber', 42):
+            previous = agent.report_metrics_restart_status(errors, None)
+            self.assertIsNone(agent.SettingsSequenceNumber)
+            agent.report_metrics_restart_status(errors, previous)
+            self.assertEqual(status.call_count, 1)
+            self.assertEqual(status.call_args.args[2], 'error')
+            del errors['MetricsExtension']
+            previous = agent.report_metrics_restart_status(errors, previous)
+            self.assertEqual(status.call_count, 2)
+            self.assertEqual(status.call_args.args[2], 'error')
+            del errors['Telegraf']
+            previous = agent.report_metrics_restart_status(errors, previous)
+            self.assertEqual(status.call_count, 3)
+            self.assertEqual(status.call_args.args[2], 'success')
+            self.assertIsNone(previous)
+            agent.report_metrics_restart_status(errors, previous)
+            self.assertEqual(status.call_count, 3)
+
+    def run_watcher_until_exhausted(self, cmv2, changing_config=False):
+        config = mock_open(read_data='[{"name": "counter"}]')
+        if changing_config:
+            config.return_value.read.side_effect = [
+                json.dumps([{'name': 'counter-{0}'.format(index)}]) for index in range(12)]
+        with patch('agent.telhandler') as telegraf, \
+                patch('agent.me_handler') as me, \
+                patch('agent.get_managed_identity', return_value=(None, None, '')), \
+                patch('agent.azureotelcollector_is_active', return_value=True), \
+                patch('agent.is_feature_enabled', return_value=cmv2), \
+                patch('agent.copyfile'), \
+                patch('agent.os.path.exists', return_value=False), \
+                patch('agent.os.path.isfile', side_effect=lambda path: not cmv2 and path == agent.MdsdCounterJsonPath), \
+                patch('builtins.open', config), \
+                patch('agent.time.sleep', side_effect=[None] * 12 + [self.StopWatcher()]), \
+                patch('agent.update_status_file') as status, \
+                patch.object(agent, 'SettingsSequenceNumber', None):
+            telegraf.is_running.return_value = False
+            telegraf.handle_config.return_value = (True, [])
+            telegraf.stop_telegraf_service.return_value = (True, 'stopped')
+            telegraf.start_telegraf.return_value = (False, 'failed')
+            me.is_running.return_value = False
+            me.stop_metrics_service.return_value = (True, 'stopped')
+            me.start_metrics.return_value = (False, 'failed')
+            me.start_metrics_cmv2.return_value = (False, 'failed')
+            me.generate_MSI_token.return_value = (False, None, 'token unavailable')
+            with self.assertRaises(self.StopWatcher):
+                agent.metrics_watcher(MagicMock(), MagicMock())
+            self.assertEqual(status.call_count, 1)
+            self.assertEqual(status.call_args.args[2], 'error')
+            if cmv2:
+                self.assertEqual(me.start_metrics_cmv2.call_count, 10)
+                me.start_metrics.assert_not_called()
+                telegraf.start_telegraf.assert_not_called()
+            else:
+                self.assertEqual(telegraf.start_telegraf.call_count, 10)
+                self.assertEqual(me.start_metrics.call_count, 10)
+                me.start_metrics_cmv2.assert_not_called()
+
+    def test_cmv1_restart_limits_persist_across_watcher_cycles(self):
+        self.run_watcher_until_exhausted(False)
+
+    def test_configuration_changes_cannot_bypass_restart_limits(self):
+        self.run_watcher_until_exhausted(False, changing_config=True)
+
+    def test_cmv2_startup_is_bounded_even_without_metrics_configuration(self):
+        self.run_watcher_until_exhausted(True)
+
+
+class TestMetadataRetries(unittest.TestCase):
+    def setUp(self):
+        endpoint = patch('agent.get_imds_endpoint', return_value='http://metadata/instance')
+        endpoint.start()
+        self.addCleanup(endpoint.stop)
+
+    def test_first_failure_recovers_with_finite_timeout_and_response_cleanup(self):
+        failures = [
+            agent.urlerror.URLError('unavailable'),
+            agent.urlerror.HTTPError('http://metadata', 429, 'throttled', {}, io.BytesIO()),
+            agent.urlerror.HTTPError('http://metadata', 503, 'unavailable', {}, io.BytesIO()),
+        ]
+        for failure in failures:
+            with self.subTest(failure=type(failure).__name__):
+                response = MagicMock()
+                response.read.return_value = json.dumps({
+                    'compute': {'azEnvironment': 'AzurePublicCloud', 'location': 'EastUS'}}).encode('utf-8')
+                with patch('agent.urllib.urlopen', side_effect=[failure, response]) as request, \
+                        patch('agent.time.sleep') as sleep:
+                    self.assertEqual(agent.get_azure_environment_and_region(), ('azurepubliccloud', 'eastus'))
+                self.assertEqual(request.call_count, 2)
+                self.assertTrue(all(c.kwargs['timeout'] == 30 for c in request.call_args_list))
+                sleep.assert_called_once_with(1)
+                response.close.assert_called_once()
+
+    def test_exhausted_retries_raise_instead_of_returning_missing_metadata(self):
+        with patch('agent.urllib.urlopen', side_effect=agent.urlerror.URLError('unavailable')) as request, \
+                patch('agent.time.sleep') as sleep:
+            with self.assertRaises(RuntimeError):
+                agent.get_azure_environment_and_region()
+        self.assertEqual(request.call_count, 4)
+        self.assertEqual(sleep.call_args_list, [call(1), call(2), call(4)])
+
+    def test_permanent_http_error_is_not_retried_or_logged_with_its_body(self):
+        response_body = io.BytesIO(b'example-response-body')
+        error = agent.urlerror.HTTPError('http://metadata', 404, 'not found', {}, response_body)
+        with patch('agent.urllib.urlopen', side_effect=error) as request, \
+                patch('agent.time.sleep') as sleep, \
+                patch('agent.hutil_log_error') as log:
+            with self.assertRaisesRegex(RuntimeError, 'HTTP 404'):
+                agent.get_azure_environment_and_region()
+        self.assertEqual(request.call_count, 1)
+        sleep.assert_not_called()
+        self.assertTrue(response_body.closed)
+        self.assertNotIn('example-response-body', str(log.call_args_list))
+
+    def test_malformed_responses_fail_explicitly_and_close_the_response(self):
+        responses = [
+            b'not-json', b'{}', b'{"compute": null}',
+            b'{"compute": {"azEnvironment": "AzurePublicCloud"}}',
+            b'{"compute": {"azEnvironment": 123, "location": "eastus"}}',
+            b'{"compute": {"azEnvironment": "AzurePublicCloud", "location": " "}}',
+        ]
+        for payload in responses:
+            with self.subTest(payload=payload):
+                response = MagicMock()
+                response.read.return_value = payload
+                with patch('agent.urllib.urlopen', return_value=response) as request, \
+                        patch('agent.time.sleep') as sleep:
+                    with self.assertRaises(RuntimeError):
+                        agent.get_azure_environment_and_region()
+                self.assertEqual(request.call_count, 1)
+                sleep.assert_not_called()
+                response.close.assert_called_once()
 
 
 if __name__ == '__main__':
