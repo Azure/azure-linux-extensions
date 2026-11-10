@@ -918,9 +918,7 @@ def enable():
     ssl_cert_var_name, ssl_cert_var_value = get_ssl_cert_info('Enable')
     default_configs[ssl_cert_var_name] = ssl_cert_var_value
 
-    # Enable the libcurl-based ODS upload path (ENABLE_CURL_UPLOAD) only in regions
-    # where the feature has been gated on (see is_feature_enabled / feature_support_matrix).
-    # Limited to the public SDP Stage 2 regions.
+    # Enable the libcurl-based ODS upload path globally, respecting feature overrides.
     if is_feature_enabled('enableCurlUpload'):
         default_configs["ENABLE_CURL_UPLOAD"] = "true"
 
@@ -2822,7 +2820,7 @@ def is_feature_enabled(feature):
         'useDynamicSSL'             : ['all'],
         'enableCMV2'                : ['all'],
         'enableAzureOTelCollector'  : ['all'],
-        'enableCurlUpload'          : ['eastus2euap', 'centraluseuap', 'westcentralus', 'eastasia']
+        'enableCurlUpload'          : ['all']
     }
     
     featurePreviewFlagPath = PreviewFeaturesDirectory + feature

@@ -341,19 +341,12 @@ class TestRemoveLocalsyslogConfigsResetsPort(unittest.TestCase):
 
 
 class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
-    """Tests for is_feature_enabled('enableCurlUpload') region gating (PR #2190)."""
+    """Tests for global libcurl upload enablement and feature overrides."""
 
-    def test_curl_upload_in_feature_support_matrix(self):
-        """enableCurlUpload must be gated to the Stage 2 regions (not 'all')."""
-        # Re-derive the matrix the same way is_feature_enabled does, by exercising
-        # the function across regions.
-        with patch('os.path.exists', return_value=False):
-            with patch('agent.get_azure_environment_and_region',
-                       return_value=(None, 'eastus2euap')):
-                self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
-
-    def test_enabled_in_stage2_regions(self):
-        for region in ('eastus2euap', 'centraluseuap', 'westcentralus', 'eastasia'):
+    def test_enabled_in_all_regions(self):
+        for region in ('eastus2euap', 'centraluseuap', 'westcentralus', 'eastasia',
+                       'eastus', 'westus2', 'centralus', 'usgovvirginia', 'chinaeast2',
+                       'future-region'):
             with patch('os.path.exists', return_value=False):
                 with patch('agent.get_azure_environment_and_region',
                            return_value=('AzureCloud', region)):
@@ -361,14 +354,14 @@ class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
                         agent.is_feature_enabled('enableCurlUpload'),
                         msg="enableCurlUpload should be enabled in region %r" % region)
 
-    def test_disabled_in_other_region(self):
-        for region in ('eastus', 'westus2', 'centralus', ''):
+    def test_enabled_without_region_metadata(self):
+        for region in ('', None):
             with patch('os.path.exists', return_value=False):
                 with patch('agent.get_azure_environment_and_region',
-                           return_value=('AzureCloud', region)):
-                    self.assertFalse(
+                           return_value=(None, region)):
+                    self.assertTrue(
                         agent.is_feature_enabled('enableCurlUpload'),
-                        msg="enableCurlUpload should be disabled in region %r" % region)
+                        msg="enableCurlUpload should not require region metadata")
 
     def test_preview_flag_file_forces_enable(self):
         """A previewFeatures/<feature> flag file enables the feature in any region."""
@@ -378,13 +371,12 @@ class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
             return path == flag_path
 
         with patch('os.path.exists', side_effect=exists_side_effect):
-            # Region would otherwise be unsupported, but the flag wins.
             with patch('agent.get_azure_environment_and_region',
                        return_value=('AzureCloud', 'eastus')):
                 self.assertTrue(agent.is_feature_enabled('enableCurlUpload'))
 
     def test_disabled_flag_file_forces_disable(self):
-        """A previewFeatures/<feature>Disabled flag file disables it even in eastus2euap."""
+        """The explicit disable flag overrides global default enablement."""
         disabled_path = agent.PreviewFeaturesDirectory + 'enableCurlUploadDisabled'
 
         def exists_side_effect(path):
@@ -392,7 +384,7 @@ class TestIsFeatureEnabledCurlUpload(unittest.TestCase):
 
         with patch('os.path.exists', side_effect=exists_side_effect):
             with patch('agent.get_azure_environment_and_region',
-                       return_value=('AzureCloud', 'eastus2euap')):
+                       return_value=('AzureCloud', 'eastus')):
                 self.assertFalse(agent.is_feature_enabled('enableCurlUpload'))
 
     def test_unknown_feature_disabled(self):
