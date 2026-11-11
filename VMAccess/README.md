@@ -18,12 +18,6 @@ VMAccess Extension can:
 * Remove prior public keys when a new public key is provided
 * Restore the original backup sshd_config if restore_backup_ssh is set to true
 
-On Azure Linux and CBL-Mariner, `reset_ssh` uses an Azure Linux-specific
-`sshd_config` baseline. It preserves the `Include /etc/ssh/sshd_config.d/*.conf`
-directive and uses `/usr/libexec/openssh/sftp-server` for SFTP. Settings in
-existing drop-in files still apply; resetting SSH does not remove those files.
-`restore_backup_ssh` continues to prefer the original backed-up configuration.
-
 # Security Notes:
 * VMAccess Extension is designed for regaining access to a VM in the event that access is lost. 
 * Based on this principle, it will grant sudo permission to the account specified in the username field.
