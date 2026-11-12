@@ -1,3 +1,6 @@
+1.4.0.29
+- Version parity
+
 1.4.0.28
 - Version parity
 
