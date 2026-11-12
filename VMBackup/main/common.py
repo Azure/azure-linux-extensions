@@ -43,6 +43,8 @@ class CommonVariables:
     statusBlobUploadError = 'statusBlobUploadError'
     TempStatusFileName = 'tempStatusFile.status'
     onlyLocalFilesystems = 'onlyLocalFilesystems'
+    # Largest managed disk size (64 TiB), used as the upper bound of the used size reported per backed up disk
+    maxDiskSizeInBytes = 64 * 1024 * 1024 * 1024 * 1024
     
     # -------------------- Dynamic Settings from CRP --------------------
     isSnapshotTtlEnabled = 'isSnapshotTtlEnabled'

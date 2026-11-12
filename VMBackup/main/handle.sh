@@ -12,6 +12,7 @@ logfile=$logfolder'/shell.log'
 
 rc=3
 arc=0
+skip=0
 
 if [ "$1" = "install" ]
 then
