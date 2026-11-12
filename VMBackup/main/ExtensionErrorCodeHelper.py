@@ -71,6 +71,7 @@ class ExtensionErrorCodeHelper:
             ExtensionErrorCodeEnum.error_12 : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.SuccessAlreadyProcessedInput : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.FailedRetryableSnapshotRateExceeded : Status.ExtVmHealthStateEnum.green,
+            ExtensionErrorCodeEnum.FailedHostSnapshotRemoteServerError : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.FailedInvalidDataDiskLunList : Status.ExtVmHealthStateEnum.green,
             ExtensionErrorCodeEnum.FailedHostSnapshotRetryableError : Status.ExtVmHealthStateEnum.green,
             
