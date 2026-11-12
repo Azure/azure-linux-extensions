@@ -11,6 +11,7 @@ from common import CommonVariables
 from pwd import getpwuid
 from stat import *
 import traceback
+from Utils.TrustedPath import is_trusted_root_owned_file
 
 
     # [pre_post]
@@ -112,6 +113,11 @@ class PluginHost(object):
         dobackup = True
         fsFreeze_on = True
 
+        # Fix #2: Protect configuration paths before reopening their checked names.
+        if not is_trusted_root_owned_file(self.configLocation, self.logger, 0o044):
+            return (CommonVariables.FailedPrepostPluginhostConfigPermissionError,
+                    dobackup, fsFreeze_on)
+
         try:
             self.logger.log('config file: '+str(self.configLocation),True,'Info')
             config = ConfigParsers.ConfigParser()
@@ -135,7 +141,9 @@ class PluginHost(object):
 
                 if os.path.isfile(pcpath):
                     permissions = self.get_permissions(pcpath)
-                    if (int(permissions[0]) %2 == 1) or int(permissions[1]) > 0 or int(permissions[2]) > 0:
+                    if (not is_trusted_root_owned_file(pcpath, self.logger) or
+                            (int(permissions[0]) %2 == 1) or
+                            int(permissions[1]) > 0 or int(permissions[2]) > 0):
                         self.logger.log('Plugin Config file does not have desired permissions', True, 'Error')
                         errorCode = CommonVariables.FailedPrepostPluginConfigPermissionError
                     if not self.find_owner(pcpath) == 'root':
@@ -145,19 +153,25 @@ class PluginHost(object):
                     self.logger.log('Plugin host file does not exist in the location ' + pcpath, True, 'Error')
                     errorCode = CommonVariables.FailedPrepostPluginConfigNotFound
 
-                if(errorCode == CommonVariables.PrePost_PluginStatus_Success):
-                    sys.path.append(ppath)
-                    plugin = __import__(pname)
+                # Fix #3: A later plugin must not overwrite an earlier validation error.
+                if errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                    return errorCode, dobackup, fsFreeze_on
 
-                    self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath,maxTimeOut=self.timeoutInSeconds))
-                    errorCode,dobackup,fsFreeze_on, self.pollTime = self.plugins[self.noOfPlugins].validate_scripts()
-                    self.logger.log('Validate Scripts output: errorCode - {0} dobackup - {1} fsFreeze_on - {2} pollTime - {3}'.format(errorCode, dobackup, fsFreeze_on, self.pollTime), True)
-                    self.noOfPlugins = self.noOfPlugins + 1
-                    self.pluginName.append(pname)
-                    self.preScriptCompleted.append(False)
-                    self.preScriptResult.append(None)
-                    self.postScriptCompleted.append(False)
-                    self.postScriptResult.append(None)
+                sys.path.append(ppath)
+                plugin = __import__(pname)
+                script_runner = plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath,maxTimeOut=self.timeoutInSeconds)
+                errorCode,dobackup,fsFreeze_on, self.pollTime = script_runner.validate_scripts()
+                self.logger.log('Validate Scripts output: errorCode - {0} dobackup - {1} fsFreeze_on - {2} pollTime - {3}'.format(errorCode, dobackup, fsFreeze_on, self.pollTime), True)
+                if errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                    return errorCode, dobackup, fsFreeze_on
+
+                self.plugins.append(script_runner)
+                self.noOfPlugins = self.noOfPlugins + 1
+                self.pluginName.append(pname)
+                self.preScriptCompleted.append(False)
+                self.preScriptResult.append(None)
+                self.postScriptCompleted.append(False)
+                self.postScriptResult.append(None)
 
                 len = len - 1
             if self.noOfPlugins != 0:

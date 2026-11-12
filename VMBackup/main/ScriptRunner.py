@@ -7,6 +7,7 @@ from stat import *
 from common import CommonVariables
 import traceback
 from Utils import HandlerUtil
+from Utils.TrustedPath import is_trusted_root_owned_file
 
     # config.json --------structure---------
     # {
@@ -78,6 +79,9 @@ class ScriptRunner(object):
             Get configuration information from config.json
 
         """
+        self.configLoaded = False
+        if not is_trusted_root_owned_file(self.configLocation, self.logger):
+            return
         try:
             with open(self.configLocation, 'r') as configFile:
                 configData = json.load(configFile)
@@ -106,7 +110,7 @@ class ScriptRunner(object):
                 self.pollSleepTime = int(configData['ScriptsExecutionPollTimeSeconds'])
             self.pollTotalCount = (self.timeoutInSeconds / self.pollSleepTime)
             self.configLoaded = True
-        except IOError:
+        except IOError as err:
             errMsg = 'Error in opening ' + self.pluginName + ' config file.' + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
         except ValueError as err:
@@ -127,20 +131,8 @@ class ScriptRunner(object):
         return file_owner
 
     def validate_permissions(self, filename):
-        valid_permissions = True
-        try:
-            permissions = oct(os.stat(filename)[ST_MODE])[-3:]
-            self.logger.log('Permissions of the file ' + filename + ' are ' + permissions,True)
-            if int(permissions[1]) > 0 : #validating permissions for group
-                valid_permissions = False
-            if int(permissions[2]) > 0 : #validating permissions for others
-                valid_permissions = False
-        except Exception as err:
-            errMsg = 'Error in fetching permissions of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
-            self.logger.log(errMsg, True, 'Error')
-            valid_permissions = False
-
-        return valid_permissions
+        # Fix #1: Root-only file modes do not prevent replacement by a parent owner.
+        return is_trusted_root_owned_file(filename, self.logger)
 
     def validate_scripts(self):
 
