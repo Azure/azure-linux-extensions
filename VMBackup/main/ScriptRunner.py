@@ -116,7 +116,7 @@ class ScriptRunner(object):
                 self.pollSleepTime = int(configData['ScriptsExecutionPollTimeSeconds'])
             self.pollTotalCount = (self.timeoutInSeconds / self.pollSleepTime)
             self.configLoaded = True
-        except IOError as err:
+        except IOError:
             errMsg = 'Error in opening ' + self.pluginName + ' config file.' + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
         except ValueError as err:
@@ -132,8 +132,6 @@ class ScriptRunner(object):
         dobackup = True
 
         self.close()
-        self.configLoaded = False
-        self.PreScriptCompletedSuccessfully = False
         self.get_config()
         self.logger.log(
             'Plugin {0}: timeout={1}, continueBackupOnFailure={2}, fsFreeze={3}'.format(
@@ -160,7 +158,8 @@ class ScriptRunner(object):
                 self._pinned_scripts[stage] = PinnedScript(path, self.logger)
                 self._pinned_scripts[stage].execution_path()
             except (OSError, AttributeError) as err:
-                missing_script = (getattr(err, 'errno', None) == errno.ENOENT and
+                missing_script = (getattr(err, 'errno', None) in
+                                  (errno.ENOENT, errno.ENOTDIR, errno.ELOOP) and
                                   stage not in self._pinned_scripts)
                 errorCode = not_found if missing_script else permission_error
                 self.logger.log(
@@ -194,9 +193,11 @@ class ScriptRunner(object):
             postScriptCompleted, postScriptResult, pluginIndex)
 
     def _run_pinned_script(self, stage, params, result, completed, results, index):
-        """Execute only a validated handle and always publish worker completion."""
+        """Execute a validated handle while preserving worker result semantics."""
         script = None
         process = None
+        launch_attempted = False
+        publish_result = False
         failure = (CommonVariables.FailedPrepostPreScriptFailed if stage == 'pre'
                    else CommonVariables.FailedPrepostPostScriptFailed)
         timeout = (CommonVariables.FailedPrepostPreScriptTimeout if stage == 'pre'
@@ -209,12 +210,13 @@ class ScriptRunner(object):
                 # The worker owns a duplicate so host cleanup cannot reuse its fd
                 # while a timed-out or delayed worker is still starting its shell.
                 script = pinned.duplicate()
-            paramsStr = ['/bin/sh', script.execution_path()]
+            paramsStr = ['sh', script.execution_path()]
             paramsStr.extend(str(param) for param in params)
             self.logger.log(
                 'Running plugin {0} {1}-script from pinned device={2}, inode={3}'.format(
                     self.pluginName, stage, script.device, script.inode),
                 True, 'Info')
+            launch_attempted = True
             process = subprocess.Popen(paramsStr, stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE, close_fds=True)
             flag_timeout = False
@@ -251,40 +253,27 @@ class ScriptRunner(object):
                     self.PreScriptCompletedSuccessfully = True
                 self.logger.log('Plugin {0} {1}-script completed successfully'.format(
                     self.pluginName, stage), True, 'Info')
+            publish_result = True
         except (OSError, ValueError) as err:
-            result.errorCode = failure
-            result.continueBackup = self.continueBackupOnFailure
             self.logger.log(
                 'Plugin {0} {1}-script execution failed; code={2}: {3}'.format(
                     self.pluginName, stage, failure, err), True, 'Error')
+            if launch_attempted:
+                # Preserve the existing worker-exception/completion contract.
+                raise
+            result.errorCode = failure
+            result.continueBackup = self.continueBackupOnFailure
+            publish_result = True
         finally:
             try:
-                if process is not None:
-                    try:
-                        # Do not release a procfs handle while its shell may still
-                        # need to open it. Bound that lifetime on timeout as well.
-                        if process.poll() is None:
-                            try:
-                                process.kill()
-                            except OSError as err:
-                                if process.poll() is None:
-                                    result.errorCode = failure
-                                    result.continueBackup = self.continueBackupOnFailure
-                                    self.logger.log(
-                                        'Cannot stop plugin {0} {1}-script shell; '
-                                        'retaining its descriptor until exit: {2}'.format(
-                                            self.pluginName, stage, err),
-                                        True, 'Error')
-                        process.wait()
-                    finally:
-                        process.stdout.close()
-                        process.stderr.close()
-            except OSError as err:
-                result.errorCode = failure
-                result.continueBackup = self.continueBackupOnFailure
-                self.logger.log(
-                    'Plugin {0} {1}-script process cleanup failed: {2}'.format(
-                        self.pluginName, stage, err), True, 'Error')
+                if process is not None and process.poll() is None:
+                    # Preserve timeout behavior: report it without killing or
+                    # waiting for the shell. Its worker handle must stay open.
+                    self._defer_script_cleanup(process, script, stage)
+                    script = None
+                elif process is not None:
+                    self._release_script_after_exit(process, script, stage)
+                    script = None
             finally:
                 try:
                     if script is not None:
@@ -296,5 +285,44 @@ class ScriptRunner(object):
                         'Plugin {0} {1}-script descriptor cleanup failed: {2}'.format(
                             self.pluginName, stage, err), True, 'Error')
                 finally:
-                    results[index] = result
-                    completed[index] = True
+                    if publish_result:
+                        results[index] = result
+                        completed[index] = True
+
+    def _defer_script_cleanup(self, process, script, stage):
+        cleanup = threading.Thread(
+            target=self._release_script_after_exit, args=(process, script, stage))
+        cleanup.daemon = True
+        try:
+            cleanup.start()
+        except RuntimeError as err:
+            self.logger.log(
+                'Cannot start cleanup for plugin {0} {1}-script; '
+                'waiting for shell exit before releasing its descriptor: {2}'.format(
+                    self.pluginName, stage, err), True, 'Error')
+            self._release_script_after_exit(process, script, stage)
+        return cleanup
+
+    def _release_script_after_exit(self, process, script, stage):
+        try:
+            process.wait()
+        except OSError as err:
+            self.logger.log(
+                'Plugin {0} {1}-script wait failed: {2}'.format(
+                    self.pluginName, stage, err), True, 'Error')
+            if process.poll() is None:
+                self.logger.log(
+                    'Plugin {0} {1}-script exit is unconfirmed; retaining its '
+                    'descriptor until extension exit'.format(self.pluginName, stage),
+                    True, 'Error')
+                return
+        try:
+            process.stdout.close()
+            process.stderr.close()
+        finally:
+            try:
+                script.close()
+            except OSError as err:
+                self.logger.log(
+                    'Plugin {0} {1}-script descriptor cleanup failed: {2}'.format(
+                        self.pluginName, stage, err), True, 'Error')

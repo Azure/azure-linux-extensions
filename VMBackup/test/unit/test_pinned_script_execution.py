@@ -8,6 +8,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import threading
 import types
 import unittest
 
@@ -63,7 +64,6 @@ class _Logger(object):
 
 class _FileSystem(object):
     O_RDONLY = os.O_RDONLY
-    O_NOFOLLOW = getattr(os, 'O_NOFOLLOW', 0x20000)
     O_NONBLOCK = getattr(os, 'O_NONBLOCK', 0x40000)
     getpid = staticmethod(os.getpid)
 
@@ -133,6 +133,8 @@ class _Process(object):
         self.stderr = io.BytesIO()
         self.killed = False
         self.waited = False
+        self.wait_started = threading.Event()
+        self.exited = threading.Event()
 
     def poll(self):
         return self.returncode
@@ -142,6 +144,9 @@ class _Process(object):
         self.returncode = -9
 
     def wait(self):
+        self.wait_started.set()
+        if self.returncode is None:
+            self.exited.wait()
         self.waited = True
         return self.returncode
 
@@ -170,9 +175,22 @@ class PinnedScriptTests(unittest.TestCase):
         self.process = _Process()
         self.launch_error = None
         self.close_host_during_launch = False
+        self.cleanup_threads = []
+        defer = self.runner._defer_script_cleanup
+        def capture_cleanup(process, script, stage):
+            cleanup = defer(process, script, stage)
+            self.cleanup_threads.append(cleanup)
+            return cleanup
+        self.runner._defer_script_cleanup = capture_cleanup
         ScriptRunner.subprocess.Popen = self._popen
 
     def tearDown(self):
+        if self.process.returncode is None:
+            self.process.returncode = 0
+        self.process.exited.set()
+        for cleanup in self.cleanup_threads:
+            cleanup.join(5)
+            self.assertFalse(cleanup.is_alive(), 'Cleanup worker did not exit')
         self.runner.close()
         ScriptRunner.subprocess.Popen = self.saved_popen
         pinned_module.os = self.saved_os
@@ -225,7 +243,7 @@ class PinnedScriptTests(unittest.TestCase):
         self.runner.preScriptParams = ['one argument', 'secret-test-argument']
         self._run('pre')
         arguments, kwargs = self.calls[0]
-        self.assertEqual('/bin/sh', arguments[0])
+        self.assertEqual('sh', arguments[0])
         self.assertTrue(arguments[1].startswith('/proc/'))
         self.assertNotEqual(self.pre, arguments[1])
         self.assertEqual(self.runner.preScriptParams, arguments[2:])
@@ -247,15 +265,14 @@ class PinnedScriptTests(unittest.TestCase):
 
     def test_non_regular_file_is_rejected_with_nonblocking_open(self):
         self.fs.mode = stat.S_IFIFO | 0o700
-        self.assertEqual(CommonVariables.FailedPrepostPreScriptPermissionError,
+        self.assertEqual(CommonVariables.FailedPrepostPreScriptNotFound,
                          self.runner.validate_scripts()[0])
         self.assertTrue(self.fs.flags[0] & self.fs.O_NONBLOCK)
-        self.assertTrue(self.fs.flags[0] & self.fs.O_NOFOLLOW)
         self.assertFalse(self.fs.fds)
 
-    def test_symlink_open_failure_is_not_retried_by_path(self):
+    def test_symlink_loop_preserves_not_found_error_without_path_fallback(self):
         self.fs.open_error = OSError(errno.ELOOP, 'symlink')
-        self.assertEqual(CommonVariables.FailedPrepostPreScriptPermissionError,
+        self.assertEqual(CommonVariables.FailedPrepostPreScriptNotFound,
                          self.runner.validate_scripts()[0])
         self.assertFalse(self.calls)
         self.assertEqual(1, len(self.fs.flags))
@@ -304,45 +321,62 @@ class PinnedScriptTests(unittest.TestCase):
         self.assertFalse(result.continueBackup)
         self.assertFalse(self.calls)
 
-    def test_launch_failure_publishes_completion_and_closes_worker_handle(self):
+    def test_launch_failure_preserves_exception_and_completion_contract(self):
         self._validate()
         self.launch_error = OSError(errno.EACCES, 'shell denied')
-        result = self._run('post')
-        self.assertEqual(CommonVariables.FailedPrepostPostScriptFailed,
-                         result.errorCode)
-        self.assertFalse(result.continueBackup)
-        self.assertEqual(2, len(self.fs.fds))
+        for stage in ['pre', 'post']:
+            completed, results = [False], [None]
+            with self.assertRaises(OSError):
+                getattr(self.runner, stage + '_script')(0, completed, results)
+            self.assertFalse(completed[0])
+            self.assertIsNone(results[0])
+            self.assertEqual(2, len(self.fs.fds))
 
-    def test_timeout_kills_and_reaps_shell_before_closing_worker_handle(self):
-        self._validate()
-        self.process.returncode = None
-        self.runner.pollTotalCount = 0
-        result = self._run('post')
-        self.assertEqual(CommonVariables.FailedPrepostPostScriptTimeout,
-                         result.errorCode)
-        self.assertFalse(result.continueBackup)
-        self.assertTrue(self.process.killed)
-        self.assertTrue(self.process.waited)
-        self.assertTrue(self.process.stdout.closed)
-        self.assertEqual(2, len(self.fs.fds))
+    def test_timeout_preserves_result_policy_and_does_not_kill_or_wait_for_shell(self):
+        for stage, error in [
+                ('pre', CommonVariables.FailedPrepostPreScriptTimeout),
+                ('post', CommonVariables.FailedPrepostPostScriptTimeout)]:
+            for continue_backup in [False, True]:
+                self._validate()
+                self.runner.continueBackupOnFailure = continue_backup
+                self.process = _Process(None)
+                self.runner.pollTotalCount = 0
+                result = self._run(stage)
+                self.assertEqual(error, result.errorCode)
+                self.assertEqual(continue_backup, result.continueBackup)
+                self.assertFalse(self.process.killed)
+                self.assertIsNone(self.process.returncode)
+                self.assertTrue(self.process.wait_started.wait(5))
+                self.assertFalse(self.process.waited)
+                self.assertFalse(self.process.stdout.closed)
+                self.runner.close()
+                self.assertEqual(1, len(self.fs.fds))
+                self.process.returncode = 0
+                self.process.exited.set()
+                cleanup = self.cleanup_threads[-1]
+                cleanup.join(5)
+                self.assertFalse(cleanup.is_alive())
+                self.assertFalse(self.fs.fds)
+                self.assertTrue(self.process.stdout.closed)
+                self.assertEqual(error, result.errorCode)
 
-    def test_failed_kill_retains_worker_handle_until_shell_exit(self):
+    def test_wait_failure_does_not_release_a_live_shell_descriptor(self):
         self._validate()
-        self.process.returncode = None
-        self.runner.pollTotalCount = 0
-        waited_with_handle = []
-        def kill():
-            raise OSError(errno.EPERM, 'fixture kill denied')
-        def wait():
-            waited_with_handle.append(len(self.fs.fds) == 3)
-            self.process.returncode = 1
-        self.process.kill = kill
-        self.process.wait = wait
-        result = self._run('pre')
-        self.assertEqual(CommonVariables.FailedPrepostPreScriptFailed,
-                         result.errorCode)
-        self.assertEqual([True], waited_with_handle)
-        self.assertIn('retaining its descriptor until exit', str(self.logger.messages))
+        script = self.runner._pinned_scripts['post'].duplicate()
+        process = _Process(None)
+        wait = process.wait
+        def wait_failure():
+            raise OSError(errno.ECHILD, 'fixture wait failed')
+        process.wait = wait_failure
+        try:
+            self.runner._release_script_after_exit(process, script, 'post')
+            self.assertEqual(3, len(self.fs.fds))
+            self.assertFalse(process.stdout.closed)
+            self.assertIn('retaining its descriptor', str(self.logger.messages))
+        finally:
+            process.returncode = 0
+            process.wait = wait
+            self.runner._release_script_after_exit(process, script, 'post')
         self.assertEqual(2, len(self.fs.fds))
 
     def test_nonzero_exit_preserves_failure_policy(self):
@@ -353,6 +387,26 @@ class PinnedScriptTests(unittest.TestCase):
                          result.errorCode)
         self.assertFalse(result.continueBackup)
         self.assertTrue(self.process.waited)
+
+    def test_exit_results_preserve_pre_post_policy_and_retry_accounting(self):
+        for stage, failure in [
+                ('pre', CommonVariables.FailedPrepostPreScriptFailed),
+                ('post', CommonVariables.FailedPrepostPostScriptFailed)]:
+            for continue_backup in [False, True]:
+                for exit_code in [0, 17]:
+                    self._validate()
+                    self.runner.continueBackupOnFailure = continue_backup
+                    self.runner.preScriptNoOfRetries = 2
+                    self.runner.postScriptNoOfRetries = 2
+                    self.process = _Process(exit_code)
+                    result = self._run(stage)
+                    self.assertEqual(0 if exit_code == 0 else failure,
+                                     result.errorCode)
+                    self.assertEqual(True if exit_code == 0 else continue_backup,
+                                     result.continueBackup)
+                    self.assertEqual(0 if exit_code == 0 else 2,
+                                     result.noOfRetries)
+                    self.assertEqual(2, result.requiredNoOfRetries)
 
     def test_host_cleanup_does_not_close_inflight_worker_duplicate(self):
         self._validate()
@@ -379,7 +433,7 @@ class PinnedScriptTests(unittest.TestCase):
             pass
         self.assertFalse(self.fs.fds)
 
-    def test_valid_plugin_cannot_mask_an_earlier_rejected_script(self):
+    def test_rejected_scripts_do_not_add_fail_fast_plugin_loading(self):
         host = PluginHost.PluginHost(self.logger)
         config = os.path.join(self.directory, 'host.conf')
         with open(config, 'w') as stream:
@@ -397,13 +451,92 @@ class PinnedScriptTests(unittest.TestCase):
         try:
             with host:
                 self.assertEqual(
-                    CommonVariables.FailedPrepostPreScriptPermissionError,
+                    CommonVariables.FailedPrepostPreScriptNotFound,
                     host.load_modules()[0])
-                self.assertFalse(host.modulesLoaded)
-                self.assertEqual(1, len(self.fs.flags))
+                self.assertTrue(host.modulesLoaded)
+                self.assertEqual(2, host.noOfPlugins)
+                self.assertEqual(2, len(self.fs.flags))
         finally:
             sys.path[:] = saved_path
         self.assertFalse(self.fs.fds)
+
+    def _plugin_load_snapshot(self, outcomes, permissions='600',
+                              owner='root', config_exists=True):
+        created = []
+        validations = []
+        permission_checks = []
+        module_name = '_vmbackup_failure_compat_fixture'
+        module = types.ModuleType(module_name)
+        class FixtureRunner(object):
+            def __init__(self, **kwargs):
+                self.index = len(created)
+                self.closed = False
+                created.append(self)
+
+            def validate_scripts(self):
+                validations.append(self.index)
+                return outcomes[self.index]
+
+            def close(self):
+                self.closed = True
+        module.ScriptRunner = FixtureRunner
+        host = PluginHost.PluginHost(self.logger)
+        config = os.path.join(self.directory, 'host-compat.conf')
+        plugin_config = self.config if config_exists else self.config + '.missing'
+        with open(config, 'w') as stream:
+            stream.write('[pre_post]\nnumberOfPlugins=2\n')
+            for index in range(2):
+                stream.write(
+                    'pluginName{0}={1}\npluginPath{0}={2}\n'
+                    'pluginConfigPath{0}={3}\n'.format(
+                        index, module_name, _MAIN_DIR, plugin_config))
+        def get_permissions(path):
+            permission_checks.append(path)
+            return permissions
+        host.configLocation = config
+        host.get_permissions = get_permissions
+        host.find_owner = lambda path: owner
+        saved_path = list(sys.path)
+        saved_module = sys.modules.get(module_name)
+        sys.modules[module_name] = module
+        try:
+            result = host.load_modules()
+            return (result, list(validations), host.noOfPlugins,
+                    host.modulesLoaded, host.pollTime,
+                    len(permission_checks), [runner.closed for runner in created])
+        finally:
+            close = getattr(host, 'close', None)
+            if close is not None:
+                close()
+            sys.path[:] = saved_path
+            if saved_module is None:
+                sys.modules.pop(module_name, None)
+            else:
+                sys.modules[module_name] = saved_module
+
+    def test_plugin_validation_failure_then_success_retains_original_result(self):
+        result = self._plugin_load_snapshot(
+            [(306, False, False, 2), (0, True, True, 3)])
+        self.assertEqual(((0, True, True), [0, 1], 2, True, 3, 2,
+                          [False, False]), result)
+
+    def test_plugin_validation_success_then_failure_retains_original_result(self):
+        result = self._plugin_load_snapshot(
+            [(0, True, True, 3), (307, False, False, 2)])
+        self.assertEqual(((307, False, False), [0, 1], 2, True, 2, 2,
+                          [False, False]), result)
+
+    def test_invalid_plugin_config_preserves_skip_and_return_policy(self):
+        for permissions, owner in [('777', 'root'), ('600', 'user')]:
+            result = self._plugin_load_snapshot(
+                [], permissions=permissions, owner=owner)
+            self.assertEqual(
+                ((CommonVariables.FailedPrepostPluginConfigPermissionError,
+                  True, True), [], 0, False, 3, 2, []), result)
+        result = self._plugin_load_snapshot([], config_exists=False)
+        self.assertEqual(
+            ((CommonVariables.FailedPrepostPluginConfigNotFound, True, True),
+             [], 0, False, 3, 0, []), result)
 
     def test_revalidation_and_repeated_cleanup_do_not_leak_descriptors(self):
         self._validate()
@@ -454,15 +587,22 @@ class NativeLinuxExecutionTests(unittest.TestCase):
         finally:
             script.close()
 
-    def test_symlink_is_rejected_by_real_nofollow_open(self):
+    def test_valid_symlink_target_remains_supported_and_pinned(self):
         target = os.path.join(self.directory, 'target.sh')
         link = os.path.join(self.directory, 'link.sh')
         with open(target, 'w') as script:
             script.write('exit 0\n')
         os.chmod(target, 0o700)
         os.symlink(target, link)
-        with self.assertRaises(OSError):
-            pinned_module.PinnedScript(link, self.logger)
+        script = pinned_module.PinnedScript(link, self.logger)
+        try:
+            os.unlink(link)
+            with open(link, 'w') as replacement:
+                replacement.write('replacement\n')
+            with open(script.execution_path()) as original:
+                self.assertEqual('exit 0\n', original.read())
+        finally:
+            script.close()
 
     def test_full_runner_pins_pre_and_post_across_replacement(self):
         pre = os.path.join(self.directory, 'pre.sh')

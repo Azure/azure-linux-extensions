@@ -158,26 +158,19 @@ class PluginHost(object):
                     self.logger.log('Plugin host file does not exist in the location ' + pcpath, True, 'Error')
                     errorCode = CommonVariables.FailedPrepostPluginConfigNotFound
 
-                # Do not let a later valid plugin mask a rejected script/config.
-                if errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                    self.close()
-                    return errorCode, dobackup, fsFreeze_on
+                if(errorCode == CommonVariables.PrePost_PluginStatus_Success):
+                    sys.path.append(ppath)
+                    plugin = __import__(pname)
 
-                sys.path.append(ppath)
-                plugin = __import__(pname)
-
-                self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath,maxTimeOut=self.timeoutInSeconds))
-                errorCode,dobackup,fsFreeze_on, self.pollTime = self.plugins[self.noOfPlugins].validate_scripts()
-                self.logger.log('Validate Scripts output: errorCode - {0} dobackup - {1} fsFreeze_on - {2} pollTime - {3}'.format(errorCode, dobackup,fsFreeze_on, self.pollTime), True)
-                if errorCode != CommonVariables.PrePost_PluginStatus_Success:
-                    self.close()
-                    return errorCode, dobackup, fsFreeze_on
-                self.noOfPlugins = self.noOfPlugins + 1
-                self.pluginName.append(pname)
-                self.preScriptCompleted.append(False)
-                self.preScriptResult.append(None)
-                self.postScriptCompleted.append(False)
-                self.postScriptResult.append(None)
+                    self.plugins.append(plugin.ScriptRunner(logger=self.logger,name=pname,configPath=pcpath,maxTimeOut=self.timeoutInSeconds))
+                    errorCode,dobackup,fsFreeze_on, self.pollTime = self.plugins[self.noOfPlugins].validate_scripts()
+                    self.logger.log('Validate Scripts output: errorCode - {0} dobackup - {1} fsFreeze_on - {2} pollTime - {3}'.format(errorCode, dobackup, fsFreeze_on, self.pollTime), True)
+                    self.noOfPlugins = self.noOfPlugins + 1
+                    self.pluginName.append(pname)
+                    self.preScriptCompleted.append(False)
+                    self.preScriptResult.append(None)
+                    self.postScriptCompleted.append(False)
+                    self.postScriptResult.append(None)
 
                 len = len - 1
             if self.noOfPlugins != 0:
@@ -187,7 +180,6 @@ class PluginHost(object):
             errMsg = 'Error in reading PluginHost config file : %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
             errorCode = CommonVariables.FailedPrepostPluginhostConfigParsing
-            self.close()
 
         return errorCode,dobackup,fsFreeze_on
 

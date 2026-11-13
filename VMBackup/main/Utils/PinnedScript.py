@@ -13,10 +13,12 @@ class PinnedScript(object):
         fd = None
         try:
             # Nonblocking open prevents a substituted FIFO from hanging validation.
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            # Preserve supported symlinks: pin and validate the opened target,
+            # never re-resolve the configured path when executing it.
+            fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
             metadata = os.fstat(fd)
             if not stat.S_ISREG(metadata.st_mode):
-                raise OSError(errno.EACCES, 'Script is not a regular file')
+                raise OSError(errno.ENOENT, 'Script is not a regular file')
             if metadata.st_uid != 0 or metadata.st_mode & 0o077:
                 raise OSError(errno.EACCES,
                               'Script must be root-owned with no group/other access')
