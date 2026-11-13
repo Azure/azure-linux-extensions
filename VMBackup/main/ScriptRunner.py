@@ -3,11 +3,13 @@ import subprocess
 import time
 import os
 import errno
+import fcntl
 import threading
+from pwd import getpwuid
+from stat import *
 from common import CommonVariables
 import traceback
 from Utils import HandlerUtil
-from Utils.PinnedScript import PinnedScript
 
     # config.json --------structure---------
     # {
@@ -73,15 +75,15 @@ class ScriptRunner(object):
         self.configLoaded = False
         self.PreScriptCompletedSuccessfully = False
         self.maxTimeOut = maxTimeOut
-        self._pinned_scripts = {}
+        self._script_fds = {}
         self._script_lock = threading.Lock()
 
     def close(self):
-        """Release validation handles, including when the post-script is skipped."""
+        """Close only handles not yet handed to an execution worker."""
         with self._script_lock:
-            for script in self._pinned_scripts.values():
-                script.close()
-            self._pinned_scripts.clear()
+            while self._script_fds:
+                _, fd = self._script_fds.popitem()
+                os.close(fd)
 
     def get_config(self):
         """
@@ -126,6 +128,89 @@ class ScriptRunner(object):
             errMsg = 'Error in fetching value for the key '+str(err) + ' in ' +self.pluginName+' config file.' + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
 
+    def find_owner(self, filename, fd=None):
+        file_owner = ''
+        try:
+            metadata = os.stat(filename) if fd is None else os.fstat(fd)
+            file_owner = getpwuid(metadata.st_uid).pw_name
+        except Exception as err:
+            errMsg = 'Error in fetching owner of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
+
+        return file_owner
+
+    def validate_permissions(self, filename, fd=None):
+        valid_permissions = True
+        try:
+            metadata = os.stat(filename) if fd is None else os.fstat(fd)
+            permissions = oct(metadata[ST_MODE])[-3:]
+            self.logger.log('Permissions of the file ' + filename + ' are ' + permissions,True)
+            if int(permissions[1]) > 0 : #validating permissions for group
+                valid_permissions = False
+            if int(permissions[2]) > 0 : #validating permissions for others
+                valid_permissions = False
+        except Exception as err:
+            errMsg = 'Error in fetching permissions of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
+            self.logger.log(errMsg, True, 'Error')
+            valid_permissions = False
+
+        return valid_permissions
+
+    def _open_validated_script(self, path, not_found, permission_error):
+        """On success the caller owns the fd; failures close it here."""
+        fd = None
+        retained = False
+        errorCode = permission_error
+        try:
+            # Validate the opened target, including supported symlinks. Nonblocking
+            # open avoids hanging if the configured name was replaced with a FIFO.
+            fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, 'O_CLOEXEC', 0))
+            fcntl.fcntl(fd, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+            metadata = os.fstat(fd)
+            if not S_ISREG(metadata.st_mode):
+                errorCode = not_found
+            elif self.validate_permissions(path, fd) and self.find_owner(path, fd) == 'root':
+                self._script_path(fd)
+                self.logger.log(
+                    'Validated script {0}: fd={1}, device={2}, inode={3}'.format(
+                        path, fd, metadata.st_dev, metadata.st_ino), True, 'Info')
+                retained = True
+                return fd, CommonVariables.PrePost_PluginStatus_Success
+            self.logger.log('Script validation rejected {0}: uid={1}, mode={2}; code={3}'.format(
+                path, metadata.st_uid, oct(metadata.st_mode & 0o777), errorCode), True, 'Error')
+        except (OSError, AttributeError) as err:
+            if fd is None and getattr(err, 'errno', None) in (
+                    errno.ENOENT, errno.ENOTDIR, errno.ELOOP):
+                errorCode = not_found
+            self.logger.log('Cannot validate script {0}; code={1}: {2}'.format(
+                path, errorCode, err), True, 'Error')
+        finally:
+            if fd is not None and not retained:
+                os.close(fd)
+        return None, errorCode
+
+    def _script_path(self, fd):
+        # Use the parent's descriptor so Python 2.7 needs neither descriptor
+        # inheritance nor preexec_fn in the threaded plugin host.
+        path = '/proc/{0}/fd/{1}'.format(os.getpid(), fd)
+        opened, referenced = os.fstat(fd), os.stat(path)
+        if (opened.st_dev, opened.st_ino) != (referenced.st_dev, referenced.st_ino):
+            raise OSError(errno.EACCES, 'Script procfs identity mismatch')
+        return path
+
+    def _take_script(self, stage):
+        # Handover and host cleanup share a lock. Once removed, only this worker
+        # (or its timeout cleanup waiter) is allowed to close the same handle.
+        with self._script_lock:
+            fd = self._script_fds.pop(stage, None)
+        if fd is None:
+            raise OSError(errno.EBADF, 'No validated ' + stage + '-script handle')
+        try:
+            return fd, self._script_path(fd)
+        except (OSError, AttributeError):
+            os.close(fd)
+            raise
+
     def validate_scripts(self):
 
         errorCode = CommonVariables.PrePost_PluginStatus_Success
@@ -145,28 +230,16 @@ class ScriptRunner(object):
 
         dobackup = self.continueBackupOnFailure
 
-        scripts = [
-            ('pre', self.preScriptLocation,
-             CommonVariables.FailedPrepostPreScriptNotFound,
-             CommonVariables.FailedPrepostPreScriptPermissionError),
-            ('post', self.postScriptLocation,
-             CommonVariables.FailedPrepostPostScriptNotFound,
-             CommonVariables.FailedPrepostPostScriptPermissionError)]
-        for stage, path, not_found, permission_error in scripts:
-            try:
-                # Validate the open object, then retain it across snapshot.
-                self._pinned_scripts[stage] = PinnedScript(path, self.logger)
-                self._pinned_scripts[stage].execution_path()
-            except (OSError, AttributeError) as err:
-                missing_script = (getattr(err, 'errno', None) in
-                                  (errno.ENOENT, errno.ENOTDIR, errno.ELOOP) and
-                                  stage not in self._pinned_scripts)
-                errorCode = not_found if missing_script else permission_error
-                self.logger.log(
-                    'Plugin {0}: {1}-script validation failed; code={2}: {3}'.format(
-                        self.pluginName, stage, errorCode, err), True, 'Error')
+        for stage, path, not_found, permission_error in [
+                ('pre', self.preScriptLocation, CommonVariables.FailedPrepostPreScriptNotFound,
+                 CommonVariables.FailedPrepostPreScriptPermissionError),
+                ('post', self.postScriptLocation, CommonVariables.FailedPrepostPostScriptNotFound,
+                 CommonVariables.FailedPrepostPostScriptPermissionError)]:
+            fd, errorCode = self._open_validated_script(path, not_found, permission_error)
+            if errorCode != CommonVariables.PrePost_PluginStatus_Success:
                 self.close()
                 return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
+            self._script_fds[stage] = fd
 
         return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
@@ -180,149 +253,157 @@ class ScriptRunner(object):
 
         result = ScriptRunnerResult()
         result.requiredNoOfRetries = self.preScriptNoOfRetries
-
-        self._run_pinned_script(
-            'pre', self.preScriptParams, result,
-            preScriptCompleted, preScriptResult, pluginIndex)
-
-    def post_script(self, pluginIndex, postScriptCompleted, postScriptResult):
-        result = ScriptRunnerResult()
-        result.requiredNoOfRetries = self.postScriptNoOfRetries
-        self._run_pinned_script(
-            'post', self.postScriptParams, result,
-            postScriptCompleted, postScriptResult, pluginIndex)
-
-    def _run_pinned_script(self, stage, params, result, completed, results, index):
-        """Execute a validated handle while preserving worker result semantics."""
-        script = None
-        process = None
-        launch_attempted = False
-        publish_result = False
-        failure = (CommonVariables.FailedPrepostPreScriptFailed if stage == 'pre'
-                   else CommonVariables.FailedPrepostPostScriptFailed)
-        timeout = (CommonVariables.FailedPrepostPreScriptTimeout if stage == 'pre'
-                   else CommonVariables.FailedPrepostPostScriptTimeout)
         try:
-            with self._script_lock:
-                pinned = self._pinned_scripts.get(stage)
-                if pinned is None:
-                    raise OSError(errno.EBADF, 'No validated script handle')
-                # The worker owns a duplicate so host cleanup cannot reuse its fd
-                # while a timed-out or delayed worker is still starting its shell.
-                script = pinned.duplicate()
-            paramsStr = ['sh', script.execution_path()]
-            paramsStr.extend(str(param) for param in params)
-            self.logger.log(
-                'Running plugin {0} {1}-script from pinned device={2}, inode={3}'.format(
-                    self.pluginName, stage, script.device, script.inode),
-                True, 'Info')
-            launch_attempted = True
-            process = subprocess.Popen(paramsStr, stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE, close_fds=True)
+            fd, scriptPath = self._take_script('pre')
+        except (OSError, AttributeError) as err:
+            self.logger.log('Cannot execute validated prescript for ' + self.pluginName + ': ' + str(err), True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPreScriptFailed
+            result.continueBackup = self.continueBackupOnFailure
+            preScriptResult[pluginIndex] = result
+            preScriptCompleted[pluginIndex] = True
+            return
+
+        process = None
+        try:
+            paramsStr = ['sh',scriptPath]
+            for param in self.preScriptParams:
+                paramsStr.append(str(param))
+
+            self.logger.log('Running prescript for '+self.pluginName+' module...',True,'Info')
+            process = subprocess.Popen(paramsStr, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+
             flag_timeout = False
             curr = 0
             cnt = 0
             while True:
                 while process.poll() is None:
                     if curr >= self.pollTotalCount:
+                        self.logger.log('Prescript for '+self.pluginName+' timed out.',True,'Error')
                         flag_timeout = True
                         break
                     curr = curr + 1
                     time.sleep(self.pollSleepTime)
-                if process.returncode == CommonVariables.PrePost_ScriptStatus_Success:
+                if process.returncode is CommonVariables.PrePost_ScriptStatus_Success:
                     break
-                if flag_timeout or cnt >= result.requiredNoOfRetries:
+                if flag_timeout:
                     break
+                if cnt >= self.preScriptNoOfRetries:
+                    break
+                self.logger.log('Prescript for '+self.pluginName+' failed. Retrying...',True,'Info')
                 cnt = cnt + 1
+
+
             result.noOfRetries = cnt
-            if flag_timeout:
-                result.errorCode = timeout
-                result.continueBackup = self.continueBackupOnFailure
-                self.logger.log('Plugin {0} {1}-script timed out; code={2}'.format(
-                    self.pluginName, stage, timeout), True, 'Error')
-            elif process.returncode != CommonVariables.PrePost_ScriptStatus_Success:
-                result.errorCode = failure
-                result.continueBackup = self.continueBackupOnFailure
-                self.logger.log(
-                    'Plugin {0} {1}-script exited with status={2}; code={3}'.format(
-                        self.pluginName, stage, process.returncode, failure),
-                    True, 'Error')
-            else:
-                result.errorCode = CommonVariables.PrePost_ScriptStatus_Success
-                if stage == 'pre':
-                    self.PreScriptCompletedSuccessfully = True
-                self.logger.log('Plugin {0} {1}-script completed successfully'.format(
-                    self.pluginName, stage), True, 'Info')
-            publish_result = True
-        except (OSError, ValueError) as err:
-            self.logger.log(
-                'Plugin {0} {1}-script execution failed; code={2}: {3}'.format(
-                    self.pluginName, stage, failure, err), True, 'Error')
-            if launch_attempted:
-                # Preserve the existing worker-exception/completion contract.
-                raise
-            result.errorCode = failure
-            result.continueBackup = self.continueBackupOnFailure
-            publish_result = True
-        finally:
-            try:
-                if process is not None and process.poll() is None:
-                    # Preserve timeout behavior: report it without killing or
-                    # waiting for the shell. Its worker handle must stay open.
-                    self._defer_script_cleanup(process, script, stage)
-                    script = None
-                elif process is not None:
-                    self._release_script_after_exit(process, script, stage)
-                    script = None
-            finally:
-                try:
-                    if script is not None:
-                        script.close()
-                except OSError as err:
-                    result.errorCode = failure
+            if not flag_timeout:
+                result.errorCode = process.returncode
+                if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
+                    self.logger.log('Prescript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
                     result.continueBackup = self.continueBackupOnFailure
-                    self.logger.log(
-                        'Plugin {0} {1}-script descriptor cleanup failed: {2}'.format(
-                            self.pluginName, stage, err), True, 'Error')
-                finally:
-                    if publish_result:
-                        results[index] = result
-                        completed[index] = True
-
-    def _defer_script_cleanup(self, process, script, stage):
-        cleanup = threading.Thread(
-            target=self._release_script_after_exit, args=(process, script, stage))
-        cleanup.daemon = True
-        try:
-            cleanup.start()
-        except RuntimeError as err:
-            self.logger.log(
-                'Cannot start cleanup for plugin {0} {1}-script; '
-                'waiting for shell exit before releasing its descriptor: {2}'.format(
-                    self.pluginName, stage, err), True, 'Error')
-            self._release_script_after_exit(process, script, stage)
-        return cleanup
-
-    def _release_script_after_exit(self, process, script, stage):
-        try:
-            process.wait()
-        except OSError as err:
-            self.logger.log(
-                'Plugin {0} {1}-script wait failed: {2}'.format(
-                    self.pluginName, stage, err), True, 'Error')
-            if process.poll() is None:
-                self.logger.log(
-                    'Plugin {0} {1}-script exit is unconfirmed; retaining its '
-                    'descriptor until extension exit'.format(self.pluginName, stage),
-                    True, 'Error')
-                return
-        try:
-            process.stdout.close()
-            process.stderr.close()
+                    result.errorCode = CommonVariables.FailedPrepostPreScriptFailed
+                else:
+                    self.PreScriptCompletedSuccessfully = True
+                    self.logger.log('Prescript for '+self.pluginName+' successfully executed.',True,'Info')
+            else:
+                result.errorCode =  CommonVariables.FailedPrepostPreScriptTimeout
+                result.continueBackup = self.continueBackupOnFailure
+            preScriptCompleted[pluginIndex] = True
+            preScriptResult[pluginIndex] = result
         finally:
+            self._release_script(fd, process)
+
+    def post_script(self, pluginIndex, postScriptCompleted, postScriptResult):
+
+            # Generates a system call to run the postscript
+            # -- pluginIndex is the index for the current plugin assigned by pluginHost
+            # -- postScriptCompleted is a bool array, upon completion of script, true will be assigned at pluginIndex
+            # -- postScriptResult is an array and it stores the result at pluginIndex
+
+        result = ScriptRunnerResult()
+
+        result.requiredNoOfRetries = self.postScriptNoOfRetries
+        try:
+            fd, scriptPath = self._take_script('post')
+        except (OSError, AttributeError) as err:
+            self.logger.log('Cannot execute validated postscript for ' + self.pluginName + ': ' + str(err), True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPostScriptFailed
+            result.continueBackup = self.continueBackupOnFailure
+            postScriptResult[pluginIndex] = result
+            postScriptCompleted[pluginIndex] = True
+            return
+
+        process = None
+        try:
+            paramsStr = ['sh',scriptPath]
+            for param in self.postScriptParams:
+                paramsStr.append(str(param))
+
+            self.logger.log('Running postscript for '+self.pluginName+' module...',True,'Info')
+            process = subprocess.Popen(paramsStr, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+
+            flag_timeout = False
+            curr = 0
+            cnt = 0
+            while True:
+                while process.poll() is None:
+                    if curr >= self.pollTotalCount:
+                        self.logger.log('Postscript for '+self.pluginName+' timed out.',True,'Error')
+                        flag_timeout = True
+                        break
+                    curr = curr + 1
+                    time.sleep(self.pollSleepTime)
+                if process.returncode is CommonVariables.PrePost_ScriptStatus_Success:
+                    break
+                if flag_timeout:
+                    break
+                if cnt >= self.postScriptNoOfRetries:
+                    break
+                self.logger.log('Postscript for '+self.pluginName+' failed. Retrying...',True,'Info')
+                cnt = cnt + 1
+
+            result.noOfRetries = cnt
+            if not flag_timeout:
+                result.errorCode = process.returncode
+                if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
+                    self.logger.log('Postscript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
+                    result.errorCode = CommonVariables.FailedPrepostPostScriptFailed
+                    result.continueBackup = self.continueBackupOnFailure
+                else:
+                    self.logger.log('Postscript for '+self.pluginName+' successfully executed.',True,'Info')
+            else:
+                result.errorCode =  CommonVariables.FailedPrepostPostScriptTimeout
+                result.continueBackup = self.continueBackupOnFailure
+            postScriptCompleted[pluginIndex] = True
+            postScriptResult[pluginIndex] = result
+        finally:
+            self._release_script(fd, process)
+
+    def _release_script(self, fd, process):
+        """Take ownership from the worker, deferring close if its shell is live."""
+        if process is not None and process.poll() is None:
+            # Preserve the timeout result without killing or waiting for the
+            # shell. Its existing handle is handed to this cleanup waiter.
+            cleanup = threading.Thread(target=self._wait_and_close_script, args=(fd, process))
+            cleanup.daemon = True
             try:
-                script.close()
+                cleanup.start()
+            except RuntimeError as err:
+                self.logger.log('Cannot start script cleanup for ' + self.pluginName + '; waiting for shell exit: ' + str(err), True, 'Error')
+                self._wait_and_close_script(fd, process)
+            return cleanup
+        self._wait_and_close_script(fd, process)
+
+    def _wait_and_close_script(self, fd, process):
+        if process is not None:
+            try:
+                process.wait()
             except OSError as err:
-                self.logger.log(
-                    'Plugin {0} {1}-script descriptor cleanup failed: {2}'.format(
-                        self.pluginName, stage, err), True, 'Error')
+                self.logger.log('Script cleanup wait failed for ' + self.pluginName + ': ' + str(err), True, 'Error')
+                if process.poll() is None:
+                    self.logger.log('Shell exit unconfirmed; retaining script handle until extension exit', True, 'Error')
+                    return
+        try:
+            if process is not None:
+                process.stdout.close()
+                process.stderr.close()
+        finally:
+            os.close(fd)

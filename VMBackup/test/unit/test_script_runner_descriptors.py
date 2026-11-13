@@ -18,7 +18,6 @@ _MAIN_DIR = os.path.abspath(os.path.join(
 if _MAIN_DIR not in sys.path:
     sys.path.insert(0, _MAIN_DIR)
 
-from Utils import PinnedScript as pinned_module
 from common import CommonVariables
 
 
@@ -28,9 +27,14 @@ def _import_modules():
         import Utils
         saved_handler = getattr(Utils, 'HandlerUtil', None)
         pwd = types.ModuleType('pwd')
-        pwd.getpwuid = lambda uid: type('Owner', (object,), {'pw_name': 'root'})()
+        pwd.getpwuid = lambda uid: type(
+            'Owner', (object,), {'pw_name': 'root' if uid == 0 else 'user'})()
         handler = types.ModuleType('Utils.HandlerUtil')
-        for name, module in [('pwd', pwd), ('Utils.HandlerUtil', handler)]:
+        fcntl = types.ModuleType('fcntl')
+        fcntl.F_SETFD, fcntl.FD_CLOEXEC = 2, 1
+        fcntl.fcntl = lambda *args: 0
+        for name, module in [('pwd', pwd), ('fcntl', fcntl),
+                             ('Utils.HandlerUtil', handler)]:
             saved[name] = sys.modules.get(name)
             sys.modules[name] = module
         Utils.HandlerUtil = handler
@@ -63,6 +67,7 @@ class _Logger(object):
 
 
 class _FileSystem(object):
+    path = os.path
     O_RDONLY = os.O_RDONLY
     O_NONBLOCK = getattr(os, 'O_NONBLOCK', 0x40000)
     getpid = staticmethod(os.getpid)
@@ -109,17 +114,17 @@ class _FileSystem(object):
         return os.stat_result(metadata)
 
     def stat(self, path):
+        if not path.startswith('/proc/'):
+            metadata = list(os.stat(path))
+            metadata[stat.ST_MODE] = self.mode
+            metadata[stat.ST_UID] = self.uid
+            return os.stat_result(metadata)
         if self.proc_error is not None:
             raise self.proc_error
         metadata = list(self.fstat(int(path.rsplit('/', 1)[1])))
         if self.identity_mismatch:
             metadata[stat.ST_INO] += 1
         return os.stat_result(metadata)
-
-    def dup(self, fd):
-        duplicate = os.dup(fd)
-        self.fds.add(duplicate)
-        return duplicate
 
     def close(self, fd):
         os.close(fd)
@@ -151,7 +156,7 @@ class _Process(object):
         return self.returncode
 
 
-class PinnedScriptTests(unittest.TestCase):
+class ScriptRunnerDescriptorTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.mkdtemp()
         self.pre = os.path.join(self.directory, 'pre.sh')
@@ -165,8 +170,14 @@ class PinnedScriptTests(unittest.TestCase):
                        'postScriptLocation': self.post,
                        'continueBackupOnFailure': False}, config)
         self.fs = _FileSystem()
-        self.saved_os = pinned_module.os
-        pinned_module.os = self.fs
+        self.saved_os = ScriptRunner.os
+        ScriptRunner.os = self.fs
+        self.saved_fcntl = ScriptRunner.fcntl
+        self.cloexec_calls = []
+        fcntl = types.ModuleType('fcntl_fixture')
+        fcntl.F_SETFD, fcntl.FD_CLOEXEC = 2, 1
+        fcntl.fcntl = lambda *args: self.cloexec_calls.append(args)
+        ScriptRunner.fcntl = fcntl
         self.logger = _Logger()
         self.runner = ScriptRunner.ScriptRunner(
             self.logger, 'test', self.config, 60)
@@ -176,12 +187,13 @@ class PinnedScriptTests(unittest.TestCase):
         self.launch_error = None
         self.close_host_during_launch = False
         self.cleanup_threads = []
-        defer = self.runner._defer_script_cleanup
-        def capture_cleanup(process, script, stage):
-            cleanup = defer(process, script, stage)
-            self.cleanup_threads.append(cleanup)
+        release = self.runner._release_script
+        def capture_cleanup(fd, process):
+            cleanup = release(fd, process)
+            if cleanup is not None:
+                self.cleanup_threads.append(cleanup)
             return cleanup
-        self.runner._defer_script_cleanup = capture_cleanup
+        self.runner._release_script = capture_cleanup
         ScriptRunner.subprocess.Popen = self._popen
 
     def tearDown(self):
@@ -193,7 +205,8 @@ class PinnedScriptTests(unittest.TestCase):
             self.assertFalse(cleanup.is_alive(), 'Cleanup worker did not exit')
         self.runner.close()
         ScriptRunner.subprocess.Popen = self.saved_popen
-        pinned_module.os = self.saved_os
+        ScriptRunner.os = self.saved_os
+        ScriptRunner.fcntl = self.saved_fcntl
         remaining = list(self.fs.fds)
         for fd in remaining:
             self.fs.close(fd)
@@ -249,6 +262,59 @@ class PinnedScriptTests(unittest.TestCase):
         self.assertEqual(self.runner.preScriptParams, arguments[2:])
         self.assertTrue(kwargs['close_fds'])
         self.assertNotIn('secret-test-argument', str(self.logger.messages))
+
+    def test_existing_helpers_support_paths_and_validate_opened_descriptors(self):
+        self.assertEqual('root', self.runner.find_owner(self.pre))
+        self.assertTrue(self.runner.validate_permissions(self.pre))
+        self._validate()
+        fd = self.runner._script_fds['pre']
+        self.assertEqual('root', self.runner.find_owner(self.pre, fd))
+        self.assertTrue(self.runner.validate_permissions(self.pre, fd))
+        self.assertEqual(sorted((fd, 2, 1) for fd in self.runner._script_fds.values()),
+                         sorted(self.cloexec_calls))
+
+    def test_worker_takes_the_original_handle_without_duplication(self):
+        self._validate()
+        original_fd = self.runner._script_fds['pre']
+        fd, path = self.runner._take_script('pre')
+        try:
+            self.assertEqual(original_fd, fd)
+            self.assertNotIn('pre', self.runner._script_fds)
+            self.assertEqual(2, len(self.fs.fds))
+            self.runner.close()
+            self.assertEqual(set([fd]), self.fs.fds)
+            self.assertEqual(b'original\n', os.read(fd, 4096))
+        finally:
+            self.runner._release_script(fd, None)
+        self.assertFalse(self.fs.fds)
+
+    def test_repeated_or_closed_stage_never_reopens_the_configured_path(self):
+        self._validate()
+        self.assertEqual(0, self._run('pre').errorCode)
+        self.assertEqual(CommonVariables.FailedPrepostPreScriptFailed,
+                         self._run('pre').errorCode)
+        self.runner.close()
+        self.assertEqual(CommonVariables.FailedPrepostPostScriptFailed,
+                         self._run('post').errorCode)
+        self.assertEqual(2, len(self.fs.flags))
+        self.assertEqual(1, len(self.calls))
+
+    def test_close_error_does_not_leave_a_stale_descriptor_to_close_again(self):
+        self._validate()
+        close = self.fs.close
+        def close_then_error(fd):
+            close(fd)
+            raise OSError(errno.EINTR, 'fixture close interrupted')
+        self.fs.close = close_then_error
+        try:
+            with self.assertRaises(OSError):
+                self.runner.close()
+            self.assertEqual(1, len(self.runner._script_fds))
+            self.assertEqual(1, len(self.fs.fds))
+        finally:
+            self.fs.close = close
+        self.runner.close()
+        self.assertFalse(self.fs.fds)
 
     def test_non_root_file_is_rejected_and_handle_closed(self):
         self.fs.uid = 1001
@@ -330,7 +396,7 @@ class PinnedScriptTests(unittest.TestCase):
                 getattr(self.runner, stage + '_script')(0, completed, results)
             self.assertFalse(completed[0])
             self.assertIsNone(results[0])
-            self.assertEqual(2, len(self.fs.fds))
+            self.assertEqual(1 if stage == 'pre' else 0, len(self.fs.fds))
 
     def test_timeout_preserves_result_policy_and_does_not_kill_or_wait_for_shell(self):
         for stage, error in [
@@ -362,22 +428,22 @@ class PinnedScriptTests(unittest.TestCase):
 
     def test_wait_failure_does_not_release_a_live_shell_descriptor(self):
         self._validate()
-        script = self.runner._pinned_scripts['post'].duplicate()
+        fd, path = self.runner._take_script('post')
         process = _Process(None)
         wait = process.wait
         def wait_failure():
             raise OSError(errno.ECHILD, 'fixture wait failed')
         process.wait = wait_failure
         try:
-            self.runner._release_script_after_exit(process, script, 'post')
-            self.assertEqual(3, len(self.fs.fds))
+            self.runner._wait_and_close_script(fd, process)
+            self.assertEqual(2, len(self.fs.fds))
             self.assertFalse(process.stdout.closed)
-            self.assertIn('retaining its descriptor', str(self.logger.messages))
+            self.assertIn('retaining script handle', str(self.logger.messages))
         finally:
             process.returncode = 0
             process.wait = wait
-            self.runner._release_script_after_exit(process, script, 'post')
-        self.assertEqual(2, len(self.fs.fds))
+            self.runner._wait_and_close_script(fd, process)
+        self.assertEqual(1, len(self.fs.fds))
 
     def test_nonzero_exit_preserves_failure_policy(self):
         self._validate()
@@ -408,7 +474,7 @@ class PinnedScriptTests(unittest.TestCase):
                                      result.noOfRetries)
                     self.assertEqual(2, result.requiredNoOfRetries)
 
-    def test_host_cleanup_does_not_close_inflight_worker_duplicate(self):
+    def test_host_cleanup_does_not_close_handle_transferred_to_worker(self):
         self._validate()
         self.close_host_during_launch = True
         self.assertEqual(0, self._run('pre').errorCode)
@@ -572,20 +638,24 @@ class NativeLinuxExecutionTests(unittest.TestCase):
         with open(path, 'w') as script:
             script.write('printf "%s" "$1" > "$2"\n')
         os.chmod(path, 0o700)
-        script = pinned_module.PinnedScript(path, self.logger)
+        runner = ScriptRunner.ScriptRunner(self.logger, 'native', None, 60)
+        fd, code = runner._open_validated_script(path, 302, 306)
+        self.assertEqual(0, code)
         try:
+            import fcntl
+            self.assertTrue(fcntl.fcntl(fd, fcntl.F_GETFD) & fcntl.FD_CLOEXEC)
             os.rename(path, path + '.old')
             with open(path, 'w') as replacement:
                 replacement.write('printf replacement > "$2"\n')
             process = subprocess.Popen(
-                ['/bin/sh', script.execution_path(), 'original argument', output],
+                ['/bin/sh', runner._script_path(fd), 'original argument', output],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
             stdout, stderr = process.communicate()
             self.assertEqual(0, process.returncode, stderr)
             with open(output) as result:
                 self.assertEqual('original argument', result.read())
         finally:
-            script.close()
+            os.close(fd)
 
     def test_valid_symlink_target_remains_supported_and_pinned(self):
         target = os.path.join(self.directory, 'target.sh')
@@ -594,15 +664,17 @@ class NativeLinuxExecutionTests(unittest.TestCase):
             script.write('exit 0\n')
         os.chmod(target, 0o700)
         os.symlink(target, link)
-        script = pinned_module.PinnedScript(link, self.logger)
+        runner = ScriptRunner.ScriptRunner(self.logger, 'native', None, 60)
+        fd, code = runner._open_validated_script(link, 302, 306)
+        self.assertEqual(0, code)
         try:
             os.unlink(link)
             with open(link, 'w') as replacement:
                 replacement.write('replacement\n')
-            with open(script.execution_path()) as original:
+            with open(runner._script_path(fd)) as original:
                 self.assertEqual('exit 0\n', original.read())
         finally:
-            script.close()
+            os.close(fd)
 
     def test_full_runner_pins_pre_and_post_across_replacement(self):
         pre = os.path.join(self.directory, 'pre.sh')
