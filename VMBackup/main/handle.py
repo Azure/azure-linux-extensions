@@ -500,44 +500,44 @@ def daemon():
                                 error_msg = 'Enable failed in fsfreeze snapshot flow'
                                 backup_logger.log(error_msg, True)
                     else:
-                        PluginHostObj = PluginHost(logger=backup_logger)
-                        PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
-                        doFsConsistentbackup = False
-                        appconsistentBackup = False
+                        with PluginHost(logger=backup_logger) as PluginHostObj:
+                            PluginHostErrorCode,dobackup,g_fsfreeze_on = PluginHostObj.pre_check()
+                            doFsConsistentbackup = False
+                            appconsistentBackup = False
 
-                        if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
-                                PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
-                                PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
-                                PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
-                                PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
-                            backup_logger.log('App Consistent Consistent Backup Enabled', True)
-                            HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
-                            appconsistentBackup = True
+                            if not (PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigParsing or
+                                    PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigParsing or
+                                    PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigNotFound or
+                                    PluginHostErrorCode == CommonVariables.FailedPrepostPluginhostConfigPermissionError or
+                                    PluginHostErrorCode == CommonVariables.FailedPrepostPluginConfigNotFound):
+                                backup_logger.log('App Consistent Consistent Backup Enabled', True)
+                                HandlerUtil.HandlerUtility.add_to_telemetery_data("isPrePostEnabled", "true")
+                                appconsistentBackup = True
 
-                        if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
-                            backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
-                            doFsConsistentbackup = True
+                            if(PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success):
+                                backup_logger.log('Triggering File System Consistent Backup because of error code' + ExtensionErrorCodeHelper.ExtensionErrorCodeHelper.StatusCodeStringBuilder(PluginHostErrorCode), True)
+                                doFsConsistentbackup = True
 
-                        preResult = PluginHostResult()
-                        postResult = PluginHostResult()
+                            preResult = PluginHostResult()
+                            postResult = PluginHostResult()
 
-                        if not doFsConsistentbackup:
-                            preResult = PluginHostObj.pre_script()
-                            dobackup = preResult.continueBackup
+                            if not doFsConsistentbackup:
+                                preResult = PluginHostObj.pre_script()
+                                dobackup = preResult.continueBackup
 
-                            if(g_fsfreeze_on == False and preResult.anyScriptFailed):
-                                dobackup = False
+                                if(g_fsfreeze_on == False and preResult.anyScriptFailed):
+                                    dobackup = False
 
-                        if dobackup:
-                            freeze_snapshot(thread_timeout)
+                            if dobackup:
+                                freeze_snapshot(thread_timeout)
 
-                        if not doFsConsistentbackup:
-                            postResult = PluginHostObj.post_script()
-                            if not postResult.continueBackup:
-                                dobackup = False
+                            if not doFsConsistentbackup:
+                                postResult = PluginHostObj.post_script()
+                                if not postResult.continueBackup:
+                                    dobackup = False
                 
-                            if(g_fsfreeze_on == False and postResult.anyScriptFailed):
-                                dobackup = False
+                                if(g_fsfreeze_on == False and postResult.anyScriptFailed):
+                                    dobackup = False
 
                         if not dobackup:
                             if run_result == CommonVariables.success and PluginHostErrorCode != CommonVariables.PrePost_PluginStatus_Success:
