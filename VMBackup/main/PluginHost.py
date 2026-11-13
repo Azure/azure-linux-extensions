@@ -74,6 +74,19 @@ class PluginHost(object):
         self.postScriptResult = []
         self.pollTime = 3
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception, traceback):
+        self.close()
+
+    def close(self):
+        """Release retained scripts even if validation fails or snapshot raises."""
+        for plugin in self.plugins:
+            close = getattr(plugin, 'close', None)
+            if close is not None:
+                close()
+
     def pre_check(self):
         self.logger.log('Loading script modules now...',True,'Info')
         errorCode = CommonVariables.PrePost_PluginStatus_Success

@@ -2,6 +2,9 @@ import json
 import subprocess
 import time
 import os
+import errno
+import fcntl
+import threading
 from pwd import getpwuid
 from stat import *
 from common import CommonVariables
@@ -72,6 +75,15 @@ class ScriptRunner(object):
         self.configLoaded = False
         self.PreScriptCompletedSuccessfully = False
         self.maxTimeOut = maxTimeOut
+        self._script_fds = {}
+        self._script_lock = threading.Lock()
+
+    def close(self):
+        """Close only handles not yet handed to an execution worker."""
+        with self._script_lock:
+            while self._script_fds:
+                _, fd = self._script_fds.popitem()
+                os.close(fd)
 
     def get_config(self):
         """
@@ -116,20 +128,22 @@ class ScriptRunner(object):
             errMsg = 'Error in fetching value for the key '+str(err) + ' in ' +self.pluginName+' config file.' + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
 
-    def find_owner(self, filename):
+    def find_owner(self, filename, fd=None):
         file_owner = ''
         try:
-            file_owner = getpwuid(os.stat(filename).st_uid).pw_name
+            metadata = os.stat(filename) if fd is None else os.fstat(fd)
+            file_owner = getpwuid(metadata.st_uid).pw_name
         except Exception as err:
             errMsg = 'Error in fetching owner of the file : ' + filename  + ': %s, stack trace: %s' % (str(err), traceback.format_exc())
             self.logger.log(errMsg, True, 'Error')
 
         return file_owner
 
-    def validate_permissions(self, filename):
+    def validate_permissions(self, filename, fd=None):
         valid_permissions = True
         try:
-            permissions = oct(os.stat(filename)[ST_MODE])[-3:]
+            metadata = os.stat(filename) if fd is None else os.fstat(fd)
+            permissions = oct(metadata[ST_MODE])[-3:]
             self.logger.log('Permissions of the file ' + filename + ' are ' + permissions,True)
             if int(permissions[1]) > 0 : #validating permissions for group
                 valid_permissions = False
@@ -142,13 +156,72 @@ class ScriptRunner(object):
 
         return valid_permissions
 
+    def _open_validated_script(self, path, not_found, permission_error):
+        """On success the caller owns the fd; failures close it here."""
+        fd = None
+        retained = False
+        errorCode = permission_error
+        try:
+            # Validate the opened target, including supported symlinks. Nonblocking
+            # open avoids hanging if the configured name was replaced with a FIFO.
+            fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, 'O_CLOEXEC', 0))
+            fcntl.fcntl(fd, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+            metadata = os.fstat(fd)
+            if not S_ISREG(metadata.st_mode):
+                errorCode = not_found
+            elif self.validate_permissions(path, fd) and self.find_owner(path, fd) == 'root':
+                self._script_path(fd)
+                self.logger.log(
+                    'Validated script {0}: fd={1}, device={2}, inode={3}'.format(
+                        path, fd, metadata.st_dev, metadata.st_ino), True, 'Info')
+                retained = True
+                return fd, CommonVariables.PrePost_PluginStatus_Success
+            self.logger.log('Script validation rejected {0}: uid={1}, mode={2}; code={3}'.format(
+                path, metadata.st_uid, oct(metadata.st_mode & 0o777), errorCode), True, 'Error')
+        except (OSError, AttributeError) as err:
+            if fd is None and getattr(err, 'errno', None) in (
+                    errno.ENOENT, errno.ENOTDIR, errno.ELOOP):
+                errorCode = not_found
+            self.logger.log('Cannot validate script {0}; code={1}: {2}'.format(
+                path, errorCode, err), True, 'Error')
+        finally:
+            if fd is not None and not retained:
+                os.close(fd)
+        return None, errorCode
+
+    def _script_path(self, fd):
+        # Use the parent's descriptor so Python 2.7 needs neither descriptor
+        # inheritance nor preexec_fn in the threaded plugin host.
+        path = '/proc/{0}/fd/{1}'.format(os.getpid(), fd)
+        opened, referenced = os.fstat(fd), os.stat(path)
+        if (opened.st_dev, opened.st_ino) != (referenced.st_dev, referenced.st_ino):
+            raise OSError(errno.EACCES, 'Script procfs identity mismatch')
+        return path
+
+    def _take_script(self, stage):
+        # Handover and host cleanup share a lock. Once removed, only this worker
+        # (or its timeout cleanup waiter) is allowed to close the same handle.
+        with self._script_lock:
+            fd = self._script_fds.pop(stage, None)
+        if fd is None:
+            raise OSError(errno.EBADF, 'No validated ' + stage + '-script handle')
+        try:
+            return fd, self._script_path(fd)
+        except (OSError, AttributeError):
+            os.close(fd)
+            raise
+
     def validate_scripts(self):
 
         errorCode = CommonVariables.PrePost_PluginStatus_Success
         dobackup = True
 
+        self.close()
         self.get_config()
-        self.logger.log('Plugin:'+str(self.pluginName)+' timeout:'+str(self.timeoutInSeconds)+' pollTotalCount:'+str(self.pollTotalCount) +' preScriptParams:'+str(self.preScriptParams)+' postScriptParams:' + str(self.postScriptParams)+ ' continueBackupOnFailure:' + str(self.continueBackupOnFailure) + ' preScriptNoOfRetries:' + str(self.preScriptNoOfRetries) + ' postScriptNoOfRetries:' + str(self.postScriptNoOfRetries) + ' Global FS Freeze on :' + str(self.fsFreeze_on), True, 'Info')
+        self.logger.log(
+            'Plugin {0}: timeout={1}, continueBackupOnFailure={2}, fsFreeze={3}'.format(
+                self.pluginName, self.timeoutInSeconds,
+                self.continueBackupOnFailure, self.fsFreeze_on), True, 'Info')
 
         if not self.configLoaded:
             errorCode = CommonVariables.FailedPrepostPluginConfigParsing
@@ -157,36 +230,16 @@ class ScriptRunner(object):
 
         dobackup = self.continueBackupOnFailure
 
-        if not os.path.isfile(self.preScriptLocation):
-            self.logger.log('Prescript file does not exist in the location '+self.preScriptLocation, True, 'Error')
-            errorCode = CommonVariables.FailedPrepostPreScriptNotFound
-            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
-
-        if not self.validate_permissions(self.preScriptLocation):
-            self.logger.log('Prescript file does not have desired permissions ', True, 'Error')
-            errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
-
-
-        if not self.find_owner(self.preScriptLocation) == 'root':
-            self.logger.log('The owner of the PreScript file ' + self.preScriptLocation + ' is ' + self.find_owner(self.preScriptLocation) + ' but not root', True, 'Error')
-            errorCode = CommonVariables.FailedPrepostPreScriptPermissionError
-            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
-
-        if not os.path.isfile(self.postScriptLocation):
-            self.logger.log('Postscript file does not exist in the location ' + self.postScriptLocation, True, 'Error')
-            errorCode = CommonVariables.FailedPrepostPostScriptNotFound
-            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
-
-        if not self.validate_permissions(self.postScriptLocation):
-            self.logger.log('Postscript file does not have desired permissions ', True, 'Error')
-            errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
-
-        if not self.find_owner(self.postScriptLocation) == 'root':
-            self.logger.log('The owner of the PostScript file ' + self.postScriptLocation + ' is '+ self.find_owner(self.postScriptLocation) + ' but  not root', True, 'Error')
-            errorCode = CommonVariables.FailedPrepostPostScriptPermissionError
-            return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
+        for stage, path, not_found, permission_error in [
+                ('pre', self.preScriptLocation, CommonVariables.FailedPrepostPreScriptNotFound,
+                 CommonVariables.FailedPrepostPreScriptPermissionError),
+                ('post', self.postScriptLocation, CommonVariables.FailedPrepostPostScriptNotFound,
+                 CommonVariables.FailedPrepostPostScriptPermissionError)]:
+            fd, errorCode = self._open_validated_script(path, not_found, permission_error)
+            if errorCode != CommonVariables.PrePost_PluginStatus_Success:
+                self.close()
+                return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
+            self._script_fds[stage] = fd
 
         return errorCode,dobackup,self.fsFreeze_on, self.pollSleepTime
 
@@ -200,50 +253,63 @@ class ScriptRunner(object):
 
         result = ScriptRunnerResult()
         result.requiredNoOfRetries = self.preScriptNoOfRetries
-
-        paramsStr = ['sh',str(self.preScriptLocation)]
-        for param in self.preScriptParams:
-            paramsStr.append(str(param))
-
-        self.logger.log('Running prescript for '+self.pluginName+' module...',True,'Info')
-        process = subprocess.Popen(paramsStr, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        flag_timeout = False
-        curr = 0
-        cnt = 0
-        while True:
-            while process.poll() is None:
-                if curr >= self.pollTotalCount:
-                    self.logger.log('Prescript for '+self.pluginName+' timed out.',True,'Error')
-                    flag_timeout = True
-                    break
-                curr = curr + 1
-                time.sleep(self.pollSleepTime)
-            if process.returncode is CommonVariables.PrePost_ScriptStatus_Success:
-                break
-            if flag_timeout:
-                break
-            if cnt >= self.preScriptNoOfRetries:
-                break
-            self.logger.log('Prescript for '+self.pluginName+' failed. Retrying...',True,'Info')
-            cnt = cnt + 1
-
-
-        result.noOfRetries = cnt
-        if not flag_timeout:
-            result.errorCode = process.returncode
-            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
-                self.logger.log('Prescript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
-                result.continueBackup = self.continueBackupOnFailure
-                result.errorCode = CommonVariables.FailedPrepostPreScriptFailed
-            else:
-                self.PreScriptCompletedSuccessfully = True
-                self.logger.log('Prescript for '+self.pluginName+' successfully executed.',True,'Info')
-        else:
-            result.errorCode =  CommonVariables.FailedPrepostPreScriptTimeout
+        try:
+            fd, scriptPath = self._take_script('pre')
+        except (OSError, AttributeError) as err:
+            self.logger.log('Cannot execute validated prescript for ' + self.pluginName + ': ' + str(err), True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPreScriptFailed
             result.continueBackup = self.continueBackupOnFailure
-        preScriptCompleted[pluginIndex] = True
-        preScriptResult[pluginIndex] = result
+            preScriptResult[pluginIndex] = result
+            preScriptCompleted[pluginIndex] = True
+            return
+
+        process = None
+        try:
+            paramsStr = ['sh',scriptPath]
+            for param in self.preScriptParams:
+                paramsStr.append(str(param))
+
+            self.logger.log('Running prescript for '+self.pluginName+' module...',True,'Info')
+            process = subprocess.Popen(paramsStr, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+
+            flag_timeout = False
+            curr = 0
+            cnt = 0
+            while True:
+                while process.poll() is None:
+                    if curr >= self.pollTotalCount:
+                        self.logger.log('Prescript for '+self.pluginName+' timed out.',True,'Error')
+                        flag_timeout = True
+                        break
+                    curr = curr + 1
+                    time.sleep(self.pollSleepTime)
+                if process.returncode is CommonVariables.PrePost_ScriptStatus_Success:
+                    break
+                if flag_timeout:
+                    break
+                if cnt >= self.preScriptNoOfRetries:
+                    break
+                self.logger.log('Prescript for '+self.pluginName+' failed. Retrying...',True,'Info')
+                cnt = cnt + 1
+
+
+            result.noOfRetries = cnt
+            if not flag_timeout:
+                result.errorCode = process.returncode
+                if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
+                    self.logger.log('Prescript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
+                    result.continueBackup = self.continueBackupOnFailure
+                    result.errorCode = CommonVariables.FailedPrepostPreScriptFailed
+                else:
+                    self.PreScriptCompletedSuccessfully = True
+                    self.logger.log('Prescript for '+self.pluginName+' successfully executed.',True,'Info')
+            else:
+                result.errorCode =  CommonVariables.FailedPrepostPreScriptTimeout
+                result.continueBackup = self.continueBackupOnFailure
+            preScriptCompleted[pluginIndex] = True
+            preScriptResult[pluginIndex] = result
+        finally:
+            self._release_script(fd, process)
 
     def post_script(self, pluginIndex, postScriptCompleted, postScriptResult):
 
@@ -255,45 +321,89 @@ class ScriptRunner(object):
         result = ScriptRunnerResult()
 
         result.requiredNoOfRetries = self.postScriptNoOfRetries
-
-        paramsStr = ['sh',str(self.postScriptLocation)]
-        for param in self.postScriptParams:
-            paramsStr.append(str(param))
-
-        self.logger.log('Running postscript for '+self.pluginName+' module...',True,'Info')
-        process = subprocess.Popen(paramsStr, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        flag_timeout = False
-        curr = 0
-        cnt = 0
-        while True:
-            while process.poll() is None:
-                if curr >= self.pollTotalCount:
-                    self.logger.log('Postscript for '+self.pluginName+' timed out.',True,'Error')
-                    flag_timeout = True
-                    break
-                curr = curr + 1
-                time.sleep(self.pollSleepTime)
-            if process.returncode is CommonVariables.PrePost_ScriptStatus_Success:
-                break
-            if flag_timeout:
-                break
-            if cnt >= self.postScriptNoOfRetries:
-                break
-            self.logger.log('Postscript for '+self.pluginName+' failed. Retrying...',True,'Info')
-            cnt = cnt + 1
-
-        result.noOfRetries = cnt
-        if not flag_timeout:
-            result.errorCode = process.returncode
-            if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
-                self.logger.log('Postscript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
-                result.errorCode = CommonVariables.FailedPrepostPostScriptFailed
-                result.continueBackup = self.continueBackupOnFailure
-            else:
-                self.logger.log('Postscript for '+self.pluginName+' successfully executed.',True,'Info')
-        else:
-            result.errorCode =  CommonVariables.FailedPrepostPostScriptTimeout
+        try:
+            fd, scriptPath = self._take_script('post')
+        except (OSError, AttributeError) as err:
+            self.logger.log('Cannot execute validated postscript for ' + self.pluginName + ': ' + str(err), True, 'Error')
+            result.errorCode = CommonVariables.FailedPrepostPostScriptFailed
             result.continueBackup = self.continueBackupOnFailure
-        postScriptCompleted[pluginIndex] = True
-        postScriptResult[pluginIndex] = result
+            postScriptResult[pluginIndex] = result
+            postScriptCompleted[pluginIndex] = True
+            return
+
+        process = None
+        try:
+            paramsStr = ['sh',scriptPath]
+            for param in self.postScriptParams:
+                paramsStr.append(str(param))
+
+            self.logger.log('Running postscript for '+self.pluginName+' module...',True,'Info')
+            process = subprocess.Popen(paramsStr, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+
+            flag_timeout = False
+            curr = 0
+            cnt = 0
+            while True:
+                while process.poll() is None:
+                    if curr >= self.pollTotalCount:
+                        self.logger.log('Postscript for '+self.pluginName+' timed out.',True,'Error')
+                        flag_timeout = True
+                        break
+                    curr = curr + 1
+                    time.sleep(self.pollSleepTime)
+                if process.returncode is CommonVariables.PrePost_ScriptStatus_Success:
+                    break
+                if flag_timeout:
+                    break
+                if cnt >= self.postScriptNoOfRetries:
+                    break
+                self.logger.log('Postscript for '+self.pluginName+' failed. Retrying...',True,'Info')
+                cnt = cnt + 1
+
+            result.noOfRetries = cnt
+            if not flag_timeout:
+                result.errorCode = process.returncode
+                if result.errorCode != CommonVariables.PrePost_ScriptStatus_Success:
+                    self.logger.log('Postscript for '+self.pluginName+' failed with error code: '+str(result.errorCode)+' .',True,'Error')
+                    result.errorCode = CommonVariables.FailedPrepostPostScriptFailed
+                    result.continueBackup = self.continueBackupOnFailure
+                else:
+                    self.logger.log('Postscript for '+self.pluginName+' successfully executed.',True,'Info')
+            else:
+                result.errorCode =  CommonVariables.FailedPrepostPostScriptTimeout
+                result.continueBackup = self.continueBackupOnFailure
+            postScriptCompleted[pluginIndex] = True
+            postScriptResult[pluginIndex] = result
+        finally:
+            self._release_script(fd, process)
+
+    def _release_script(self, fd, process):
+        """Take ownership from the worker, deferring close if its shell is live."""
+        if process is not None and process.poll() is None:
+            # Preserve the timeout result without killing or waiting for the
+            # shell. Its existing handle is handed to this cleanup waiter.
+            cleanup = threading.Thread(target=self._wait_and_close_script, args=(fd, process))
+            cleanup.daemon = True
+            try:
+                cleanup.start()
+            except RuntimeError as err:
+                self.logger.log('Cannot start script cleanup for ' + self.pluginName + '; waiting for shell exit: ' + str(err), True, 'Error')
+                self._wait_and_close_script(fd, process)
+            return cleanup
+        self._wait_and_close_script(fd, process)
+
+    def _wait_and_close_script(self, fd, process):
+        if process is not None:
+            try:
+                process.wait()
+            except OSError as err:
+                self.logger.log('Script cleanup wait failed for ' + self.pluginName + ': ' + str(err), True, 'Error')
+                if process.poll() is None:
+                    self.logger.log('Shell exit unconfirmed; retaining script handle until extension exit', True, 'Error')
+                    return
+        try:
+            if process is not None:
+                process.stdout.close()
+                process.stderr.close()
+        finally:
+            os.close(fd)
