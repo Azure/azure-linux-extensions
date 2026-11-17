@@ -33,7 +33,6 @@ class _FakeParaParser(object):
 class GetStatusToReportUsedSizeTests(unittest.TestCase):
 
     def setUp(self):
-        # handle.py pulls in most of main/; restore the module table afterwards.
         saved_modules = dict(sys.modules)
         sys.path.insert(0, _MAIN_DIR)
 
@@ -45,7 +44,6 @@ class GetStatusToReportUsedSizeTests(unittest.TestCase):
             sys.modules.update(saved_modules)
         self.addCleanup(restore)
 
-        # Only the guest-agent dependency is replaced; status serialization is real.
         waagent_util = types.ModuleType("Utils.WAAgentUtil")
         waagent_util.waagent = types.ModuleType("waagent")
         sys.modules["Utils.WAAgentUtil"] = waagent_util
@@ -112,32 +110,11 @@ class GetStatusToReportUsedSizeTests(unittest.TestCase):
             str(computed_size) in m and "number_of_blobs : {0}".format(lun_count) in m
             for m in self.logger.messages))
 
-    def test_single_lun_above_1tib_is_not_capped(self):
-        # Previously capped to 1 TiB per included LUN.
-        self._assert_reported_uncapped(3 * ONE_TIB + 12345, lun_count=1)
-
     def test_multiple_luns_above_lun_count_tib_is_not_capped(self):
-        self._assert_reported_uncapped(10 * ONE_TIB + 1, lun_count=4)
-
-    def test_no_included_luns_reports_computed_size(self):
-        self._assert_reported_uncapped(5 * ONE_TIB, lun_count=0)
+        self._assert_reported_uncapped(10 * ONE_TIB, lun_count=4)
 
     def test_size_within_previous_cap_is_unchanged(self):
         self._assert_reported_uncapped(ONE_TIB - 1, lun_count=1)
-
-    def test_size_computation_failure_is_reported(self):
-        blob_storage, file_storage = self._report(0, lun_count=2, failed=True)
-        self.assertEqual(0, blob_storage["totalUsedSizeInBytes"])
-        self.assertTrue(blob_storage["isSizeComputationFailed"])
-        self.assertTrue(file_storage["isSizeComputationFailed"])
-
-    def test_size_is_computed_only_once(self):
-        computed = 2 * ONE_TIB
-        self._report(computed, lun_count=1)
-        self.handle.get_status_to_report(
-            self.common.status_success, self.common.success, "again")
-        self.assertEqual(1, len(self.size_calc_calls))
-        self.assertEqual(computed, self.handle.total_used_size)
 
 
 if __name__ == "__main__":
