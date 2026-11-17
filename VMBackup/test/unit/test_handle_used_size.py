@@ -1,33 +1,16 @@
-"""Tests for used-size reporting in handle.get_status_to_report (billing)."""
+"""Tests that handle.get_status_to_report reports the computed used size uncapped."""
 
+import importlib
+import json
 import os
 import sys
 import types
 import unittest
 
-try:
-    from unittest import mock
-except ImportError:
-    import mock
-
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _MAIN_DIR = os.path.abspath(
     os.path.join(_HERE, os.pardir, os.pardir, "main"))
-if _MAIN_DIR not in sys.path:
-    sys.path.insert(0, _MAIN_DIR)
-
-# Allow importing handle.py on non-Linux dev boxes.
-for _name in ("pwd", "grp", "fcntl", "termios"):
-    try:
-        __import__(_name)
-    except ImportError:
-        sys.modules[_name] = types.ModuleType(_name)
-if not hasattr(sys.modules["pwd"], "getpwuid"):
-    sys.modules["pwd"].getpwuid = lambda uid: None
-
-import handle
-from Utils import HandlerUtil
 
 ONE_TIB = 1024 ** 4
 
@@ -43,59 +26,118 @@ class _FakeLogger(object):
 class _FakeParaParser(object):
     def __init__(self, include_lun_list):
         self.includeLunList = include_lun_list
-        self.taskId = "task"
+        self.taskId = "task-id"
         self.commandStartTimeUTCTicks = "0"
 
 
 class GetStatusToReportUsedSizeTests(unittest.TestCase):
 
     def setUp(self):
-        self._saved_telemetry = dict(HandlerUtil.HandlerUtility.telemetry_data)
-        self.hutil = mock.Mock()
-        self.hutil.do_status_report.return_value = ("blob", "file")
+        # handle.py pulls in most of main/; restore the module table afterwards.
+        saved_modules = dict(sys.modules)
+        sys.path.insert(0, _MAIN_DIR)
+
+        def restore():
+            sys.path.remove(_MAIN_DIR)
+            for name in list(sys.modules):
+                if name not in saved_modules:
+                    del sys.modules[name]
+            sys.modules.update(saved_modules)
+        self.addCleanup(restore)
+
+        # Only the guest-agent dependency is replaced; status serialization is real.
+        waagent_util = types.ModuleType("Utils.WAAgentUtil")
+        waagent_util.waagent = types.ModuleType("waagent")
+        sys.modules["Utils.WAAgentUtil"] = waagent_util
+        self.handle = importlib.import_module("handle")
+        handler_util = importlib.import_module("Utils.HandlerUtil")
+        common = importlib.import_module("common").CommonVariables
+        self.common = common
+
+        class TestHandlerUtility(handler_util.HandlerUtility):
+            def __init__(self):
+                self.partitioncount = 0
+                self.storageDetailsObj = None
+
+        hutil = TestHandlerUtility()
+        hutil._context = handler_util.HandlerContext("VMSnapshotLinux")
+        hutil.log = lambda *args, **kwargs: None
+        hutil.eventlogger = None
+        hutil.add_telemetry_data = lambda: None
+        hutil.get_machine_id = lambda: "test-machine"
+        hutil.get_public_settings = lambda: {common.vmType: common.VmTypeV2}
+        handler_util.HandlerUtility.telemetry_data = {}
+        handler_util.HandlerUtility.serializable_telemetry_data = []
+
         self.logger = _FakeLogger()
-        self._patches = [
-            mock.patch.object(handle, "hutil", self.hutil, create=True),
-            mock.patch.object(handle, "backup_logger", self.logger, create=True),
-            mock.patch.object(handle, "MyPatching", None, create=True),
-            mock.patch.object(handle, "total_used_size", -1, create=True),
-            mock.patch.object(handle, "size_calculation_failed", False, create=True),
-        ]
-        for p in self._patches:
-            p.start()
+        self.size_calc_calls = []
+        self.handle.hutil = hutil
+        self.handle.backup_logger = self.logger
+        self.handle.MyPatching = None
+        self.handle.total_used_size = -1
+        self.handle.size_calculation_failed = False
 
-    def tearDown(self):
-        for p in self._patches:
-            p.stop()
-        HandlerUtil.HandlerUtility.telemetry_data = self._saved_telemetry
+    def _install_size_calculation(self, computed_size, failed):
+        calls = self.size_calc_calls
 
-    def _report(self, computed_size, include_lun_list, failed=False):
-        with mock.patch.object(handle, "para_parser", _FakeParaParser(include_lun_list), create=True), \
-                mock.patch.object(handle.SizeCalculation, "SizeCalculation") as size_calc_cls:
-            size_calc_cls.return_value.get_total_used_size.return_value = (computed_size, failed)
-            handle.get_status_to_report("success", 1, "msg")
-        return self.hutil.do_status_report.call_args[1]
+        class FakeSizeCalculation(object):
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
 
-    def test_used_size_above_1tib_per_lun_is_not_capped(self):
-        computed = 3 * ONE_TIB + 12345
-        kwargs = self._report(computed, include_lun_list=[-1])
+            def get_total_used_size(self):
+                return computed_size, failed
 
-        self.assertEqual(computed, kwargs["total_size"])
-        self.assertFalse(kwargs["failure_flag"])
-        telemetry = HandlerUtil.HandlerUtility.telemetry_data
-        self.assertEqual(str(computed), telemetry["totalUsedSizeInBytes"])
-        self.assertEqual("False", telemetry["isSizeComputationFailed"])
-        self.assertEqual("1", telemetry["includedLunCount"])
-        self.assertTrue(any(str(computed) in m for m in self.logger.messages))
+        fake_module = types.ModuleType("Utils.SizeCalculation")
+        fake_module.SizeCalculation = FakeSizeCalculation
+        self.handle.SizeCalculation = fake_module
+
+    def _report(self, computed_size, lun_count, failed=False):
+        self._install_size_calculation(computed_size, failed)
+        self.handle.para_parser = _FakeParaParser(list(range(lun_count)))
+        blob_report, file_report = self.handle.get_status_to_report(
+            self.common.status_success, self.common.success, "done")
+        self.assertIsNotNone(blob_report)
+        self.assertIsNotNone(file_report)
+        self.assertEqual(1, len(self.size_calc_calls))
+        return (json.loads(blob_report)[0]["status"]["storageDetails"],
+                json.loads(file_report)[0]["status"]["storageDetails"])
+
+    def _assert_reported_uncapped(self, computed_size, lun_count):
+        blob_storage, file_storage = self._report(computed_size, lun_count)
+        self.assertEqual(computed_size, blob_storage["totalUsedSizeInBytes"])
+        self.assertEqual(computed_size, file_storage["totalUsedSizeInBytes"])
+        self.assertFalse(blob_storage["isSizeComputationFailed"])
+        self.assertEqual(computed_size, self.handle.total_used_size)
+        self.assertTrue(any(
+            str(computed_size) in m and "number_of_blobs : {0}".format(lun_count) in m
+            for m in self.logger.messages))
+
+    def test_single_lun_above_1tib_is_not_capped(self):
+        # Previously capped to 1 TiB per included LUN.
+        self._assert_reported_uncapped(3 * ONE_TIB + 12345, lun_count=1)
+
+    def test_multiple_luns_above_lun_count_tib_is_not_capped(self):
+        self._assert_reported_uncapped(10 * ONE_TIB + 1, lun_count=4)
+
+    def test_no_included_luns_reports_computed_size(self):
+        self._assert_reported_uncapped(5 * ONE_TIB, lun_count=0)
+
+    def test_size_within_previous_cap_is_unchanged(self):
+        self._assert_reported_uncapped(ONE_TIB - 1, lun_count=1)
 
     def test_size_computation_failure_is_reported(self):
-        kwargs = self._report(0, include_lun_list=[], failed=True)
+        blob_storage, file_storage = self._report(0, lun_count=2, failed=True)
+        self.assertEqual(0, blob_storage["totalUsedSizeInBytes"])
+        self.assertTrue(blob_storage["isSizeComputationFailed"])
+        self.assertTrue(file_storage["isSizeComputationFailed"])
 
-        self.assertEqual(0, kwargs["total_size"])
-        self.assertTrue(kwargs["failure_flag"])
-        telemetry = HandlerUtil.HandlerUtility.telemetry_data
-        self.assertEqual("True", telemetry["isSizeComputationFailed"])
-        self.assertEqual("0", telemetry["includedLunCount"])
+    def test_size_is_computed_only_once(self):
+        computed = 2 * ONE_TIB
+        self._report(computed, lun_count=1)
+        self.handle.get_status_to_report(
+            self.common.status_success, self.common.success, "again")
+        self.assertEqual(1, len(self.size_calc_calls))
+        self.assertEqual(computed, self.handle.total_used_size)
 
 
 if __name__ == "__main__":
