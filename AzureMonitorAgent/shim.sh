@@ -10,16 +10,16 @@ ARG="$@"
 
 function find_python() {
     local python_exec_command=$1
-
-    if command -v python3 >/dev/null 2>&1 ; then
+    if command -v /usr/libexec/platform-python >/dev/null 2>&1 ; then
+        # Prefer platform-python when available — this is the python waagent uses (RHEL 8+)
+        # and ensures AMA uses the same interpreter with the same installed modules.
+        eval ${python_exec_command}="/usr/libexec/platform-python"
+    elif command -v python3 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python3"
     elif command -v python2 >/dev/null 2>&1 ; then
         eval ${python_exec_command}="python2"
-    elif command -v /usr/libexec/platform-python >/dev/null 2>&1 ; then
-        # If a user-installed python isn't available, check for a platform-python. This is typically only used in RHEL 8.0.
-        echo "User-installed python not found. Using /usr/libexec/platform-python as the python interpreter."
-        eval ${python_exec_command}="/usr/libexec/platform-python"
     fi
+    
 }
 
 find_python PYTHON
