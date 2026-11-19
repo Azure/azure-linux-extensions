@@ -142,7 +142,7 @@ class CryptMountConfigUtil(object):
             return False
 
         if not os.path.exists(azure_crypt_mount_backup_location) and not os.path.exists(crypttab_backup_location):
-            self.logger.log(msg=("MountPoint info not found for" + device_item_real_path), level=CommonVariables.ErrorLevel)
+            self.logger.log(msg=("MountPoint info not found for" + crypt_item.dev_path), level=CommonVariables.ErrorLevel)
             # Not sure when this happens..
             # in this case also, just add an entry to the azure_crypt_mount without a mount point.
             self.add_crypt_item(crypt_item)
@@ -265,19 +265,21 @@ class CryptMountConfigUtil(object):
         threads = []
         lock = threading.Lock()
         for device_item in device_items:
-            if device_item.file_system == "crypto_LUKS": 
+            if device_item.file_system == "crypto_LUKS":
+                 #restore LUKS2 token using BackUp.
+                 self.disk_util.restore_luks2_token(device_name=device_item.name)
                  device_item_path = self.disk_util.get_device_path(device_item.name)
                  azure_item_path = azure_name_table[device_item_path] if device_item_path in azure_name_table else device_item_path
                  thread = threading.Thread(target=self._device_unlock_using_luks2_header,args=(device_item.name,device_item_path,azure_item_path,lock))
                  threads.append(thread)
                  thread.start()
         for thread in threads:
-            thread.join()       
+            thread.join()
         self.logger.log("device_unlock_using_luks2_header End")
 
     def consolidate_azure_crypt_mount(self, passphrase_file):
         """
-        Reads the backup files from block devices that have a LUKS header and adds it to the cenral azure_crypt_mount file
+        Reads the backup files from block devices that have a LUKS2 header and adds it to the central azure_crypt_mount file
         """
         self.logger.log("Consolidating azure_crypt_mount")
 
