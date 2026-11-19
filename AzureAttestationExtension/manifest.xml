@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<ExtensionImage xmlns="http://schemas.microsoft.com/windowsazure">
+  <ProviderNameSpace>Microsoft.Azure.TestAttestation</ProviderNameSpace>
+  <Type>AzureAttestationLinuxAgent</Type>
+  <Version>0.1</Version>
+  <Label>Microsoft Azure Attestation Agent for Linux</Label>
+  <HostingResources>VmRole</HostingResources>
+  <MediaLink></MediaLink>
+  <Description>Microsoft Azure Attestation Test Extension for Linux</Description>
+  <IsInternalExtension>true</IsInternalExtension>
+  <Eula></Eula>
+  <PrivacyUri>http://www.microsoft.com/privacystatement/en-us/OnlineServices/Default.aspx</PrivacyUri>
+  <HomepageUri></HomepageUri>
+  <IsJsonExtension>true</IsJsonExtension>
+  <SupportedOS>Linux</SupportedOS>
+  <CompanyName>Microsoft</CompanyName>
+  <!--%REGIONS%-->
+</ExtensionImage>
