@@ -146,10 +146,7 @@ def get_status_to_report(status, status_code, message, snapshot_info = None):
             sizeCalculation = SizeCalculation.SizeCalculation(patching = MyPatching , hutil = hutil, logger = backup_logger , para_parser = para_parser)
             total_used_size,size_calculation_failed = sizeCalculation.get_total_used_size()
             number_of_blobs = len(para_parser.includeLunList)
-            maximum_possible_size = number_of_blobs * 1099511627776
-            if(total_used_size>maximum_possible_size and number_of_blobs != 0):
-                total_used_size = maximum_possible_size
-            backup_logger.log("Assertion Check, total size : {0} ,maximum_possible_size : {1}".format(total_used_size,maximum_possible_size),True)
+            backup_logger.log("Assertion Check, total size : {0}, number_of_blobs : {1}".format(total_used_size, number_of_blobs),True)
         if(para_parser is not None):
             blob_report_msg, file_report_msg = hutil.do_status_report(operation='Enable',status=status,\
                     status_code=str(status_code),\
